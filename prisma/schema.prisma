@@ -1,0 +1,515 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ===================================
+// PERFIL E AUTH (Clerk gerencia auth)
+// ===================================
+
+model Profile {
+  id        String   @id // Clerk user ID
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  email     String   @unique
+  name      String
+  avatarUrl String?
+  phone     String?
+  role      Role     @default(VENDEDOR)
+  segment   String?
+  onboarded Boolean  @default(false)
+
+  // Assinatura Stripe
+  stripeCustomerId     String? @unique
+  stripeSubscriptionId String? @unique
+  plan                 Plan    @default(FREE)
+  planExpiresAt        DateTime?
+
+  // Gamificação
+  xp    Int @default(0)
+  level Int @default(1)
+
+  // Relações
+  diagnostics       Diagnostic[]
+  virtualCompany    VirtualCompany?
+  progress          UserProgress[]
+  lessonProgress    UserLessonProgress[]
+  objectionSessions ObjectionSession[]
+  generatedScripts  GeneratedScript[]
+  xpTransactions    XPTransaction[]
+  userBadges        UserBadge[]
+  userMissions      UserMission[]
+  ninetyDayPlans    NinetyDayPlan[]
+  managedTeam       Team?           @relation("TeamManager")
+  teamMembership    TeamMember?
+}
+
+enum Role {
+  VENDEDOR
+  FUNCIONARIO
+  GESTOR
+  ADMIN
+}
+
+enum Plan {
+  FREE
+  PRO
+  TEAM
+}
+
+// ===================================
+// MÓDULO 1 — SCANNER EMPRESARIAL
+// ===================================
+
+model Diagnostic {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id])
+
+  // Dados da empresa
+  companyName String
+  segment     String
+  teamSize    String
+
+  // Scores por categoria (0-100)
+  scoreLeads     Int @default(0)
+  scoreProcess   Int @default(0)
+  scoreTeam      Int @default(0)
+  scoreKpis      Int @default(0)
+  scoreTools     Int @default(0)
+  scoreValue     Int @default(0)
+  scoreRetention Int @default(0)
+  scoreMoney     Int @default(0)
+  scoreTotal     Int @default(0)
+
+  answers        String // JSON das respostas
+  diagnosticType String @default("EMPRESA") // EMPRESA | VENDEDOR
+  llm            String @default("claude")
+
+  result DiagnosticResult?
+}
+
+model DiagnosticResult {
+  id           String     @id @default(cuid())
+  diagnosticId String     @unique
+  diagnostic   Diagnostic @relation(fields: [diagnosticId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  summary        String
+  strengths      String // JSON array
+  weaknesses     String // JSON array
+  actions        String // JSON array
+  priority       String // CRITICO | ATENCAO | BOM | EXCELENTE
+  classification String @default("{}") // JSON: { leads: CRITICO|ATENCAO|FORTE, ... }
+  insights       String @default("{}") // JSON: { leads: "...", ... }
+}
+
+// ===================================
+// MÓDULO 2 — SIMULAÇÃO GAMIFICADA
+// ===================================
+
+model VirtualCompany {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  profileId    String  @unique
+  profile      Profile @relation(fields: [profileId], references: [id])
+  diagnosticId String?
+
+  name         String
+  segment      String
+  currentMRR   Float  @default(0)
+  currentMonth Int    @default(1)
+
+  rounds SimulationRound[]
+}
+
+model SimulationRound {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  companyId String
+  company   VirtualCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  month     Int
+  mrrBefore Float
+  mrrAfter  Float
+
+  decisions   RoundDecision[]
+  aiAnalysis  String? // JSON — benchmark + feedback da IA
+
+  unlockedTrailId String?
+}
+
+model RoundDecision {
+  id      String          @id @default(cuid())
+  roundId String
+  round   SimulationRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  category String
+  decision String
+  impact   Float // impacto percentual no MRR
+  xpGained Int   @default(0)
+}
+
+// ===================================
+// MÓDULO 3 — TRILHAS DE APRENDIZADO
+// ===================================
+
+model Trail {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  segments    String[] // segmentos de mercado aplicáveis
+  funnel      FunnelStage
+  coverImage  String?
+  order       Int      @default(0)
+  published   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  modules  TrailModule[]
+  progress UserProgress[]
+}
+
+enum FunnelStage {
+  PROSPECCAO
+  QUALIFICACAO
+  PROPOSTA
+  NEGOCIACAO
+  FECHAMENTO
+  POS_VENDA
+}
+
+model TrailModule {
+  id          String @id @default(cuid())
+  trailId     String
+  trail       Trail  @relation(fields: [trailId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String
+  order       Int    @default(0)
+
+  lessons Lesson[]
+}
+
+model Lesson {
+  id       String      @id @default(cuid())
+  moduleId String
+  module   TrailModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  title     String
+  type      LessonType @default(TEXT)
+  content   String // Markdown ou URL de vídeo
+  order     Int        @default(0)
+  xpReward  Int        @default(10)
+  duration  Int        @default(5) // minutos estimados
+
+  quiz     Quiz?
+  progress UserLessonProgress[]
+}
+
+enum LessonType {
+  TEXT
+  VIDEO
+  QUIZ
+}
+
+model Quiz {
+  id       String @id @default(cuid())
+  lessonId String @unique
+  lesson   Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  questions QuizQuestion[]
+}
+
+model QuizQuestion {
+  id     String @id @default(cuid())
+  quizId String
+  quiz   Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  question String
+  options  String[] // array de alternativas
+  correct  Int      // índice da opção correta
+  order    Int      @default(0)
+}
+
+model UserProgress {
+  id        String   @id @default(cuid())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id])
+  trailId   String
+  trail     Trail    @relation(fields: [trailId], references: [id])
+
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  completed   Boolean   @default(false)
+
+  @@unique([profileId, trailId])
+}
+
+model UserLessonProgress {
+  id        String   @id @default(cuid())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id])
+  lessonId  String
+  lesson    Lesson   @relation(fields: [lessonId], references: [id])
+
+  completed   Boolean   @default(false)
+  score       Int? // pontuação no quiz (0-100)
+  completedAt DateTime?
+
+  @@unique([profileId, lessonId])
+}
+
+// ===================================
+// MÓDULO 4 — SIMULADOR DE OBJEÇÕES
+// ===================================
+
+model ObjectionSession {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id])
+
+  objection String // tipo de objeção (preço, concorrente, timing...)
+  segment   String
+  product   String
+
+  messages   ObjectionMessage[]
+  completed  Boolean @default(false)
+  finalScore Int? // 0-100
+  feedback   String? // feedback da IA ao final
+  xpGained   Int     @default(0)
+}
+
+model ObjectionMessage {
+  id        String           @id @default(cuid())
+  sessionId String
+  session   ObjectionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  role      String // "user" | "assistant" (IA como cliente)
+  content   String
+  createdAt DateTime @default(now())
+}
+
+// ===================================
+// MÓDULO 5 — GERADOR DE SCRIPTS
+// ===================================
+
+model GeneratedScript {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id])
+
+  segment      String
+  leadRole     String // cargo do lead
+  product      String
+  painPoint    String
+
+  coldCall      String // roteiro de cold call
+  followUpEmail String // e-mail de follow-up
+  proposal      String // estrutura de proposta
+  linkedinMsg   String // mensagem LinkedIn
+
+  llm String @default("claude")
+}
+
+// ===================================
+// MÓDULO 6 — PLAYBOOK INTERATIVO
+// ===================================
+
+model PlaybookItem {
+  id        String      @id @default(cuid())
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  title     String
+  content   String   // Markdown
+  category  FunnelStage
+  segments  String[] // segmentos aplicáveis
+  tags      String[]
+  order     Int      @default(0)
+  published Boolean  @default(true)
+}
+
+// ===================================
+// MÓDULO 7 — GAMIFICAÇÃO
+// ===================================
+
+model XPTransaction {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id])
+
+  amount Int
+  reason String
+  source XPSource
+}
+
+enum XPSource {
+  LESSON_COMPLETE
+  QUIZ_PASS
+  OBJECTION_PRACTICE
+  SCRIPT_GENERATE
+  SIMULATION_ROUND
+  MISSION_COMPLETE
+  BADGE_UNLOCK
+  DAILY_LOGIN
+  SCANNER_COMPLETE
+}
+
+model Badge {
+  id          String @id @default(cuid())
+  name        String @unique
+  description String
+  icon        String // emoji ou URL
+  condition   String // JSON — condição para desbloquear
+  xpBonus     Int    @default(0)
+  rarity      String @default("COMMON") // COMMON | RARE | EPIC | LEGENDARY
+
+  userBadges UserBadge[]
+}
+
+model UserBadge {
+  id        String   @id @default(cuid())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id])
+  badgeId   String
+  badge     Badge    @relation(fields: [badgeId], references: [id])
+  earnedAt  DateTime @default(now())
+
+  @@unique([profileId, badgeId])
+}
+
+model Mission {
+  id          String      @id @default(cuid())
+  title       String
+  description String
+  xpReward    Int
+  type        MissionType @default(WEEKLY)
+  condition   String // JSON — { action, count }
+  active      Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+
+  userMissions UserMission[]
+}
+
+enum MissionType {
+  DAILY
+  WEEKLY
+  PERMANENT
+}
+
+model UserMission {
+  id        String   @id @default(cuid())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id])
+  missionId String
+  mission   Mission  @relation(fields: [missionId], references: [id])
+
+  progress     Int      @default(0)
+  completed    Boolean  @default(false)
+  completedAt  DateTime?
+  weekStart    DateTime? // para missões semanais
+  solutionText String?  // plano gerado pela IA ao concluir o desafio
+
+  @@unique([profileId, missionId, weekStart])
+}
+
+model NinetyDayPlan {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id])
+
+  diagnosticId String @unique
+  content      String // narrativa do plano de 90 dias gerado pela IA
+
+  actions PlanAction[]
+}
+
+model PlanAction {
+  id     String        @id @default(cuid())
+  planId String
+  plan   NinetyDayPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  area        String // leads | process | team | kpis | tools | value | retention | money
+  phase       Int       @default(1) // 1 = dias 1-30, 2 = dias 31-60, 3 = dias 61-90
+  text        String
+  impact      Int       @default(5) // quanto soma no score da área ao ser concluída
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  order       Int       @default(0)
+}
+
+// ===================================
+// MÓDULO 8 — PAINEL DO GESTOR
+// ===================================
+
+model Team {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  managerId String  @unique
+  manager   Profile @relation("TeamManager", fields: [managerId], references: [id])
+
+  name          String
+  businessModel String  @default("B2B")  // B2B | B2C
+  segment       String  @default("")
+  subsegment    String  @default("")
+  size          String  @default("1-10")
+  invite        String  @unique @default(cuid()) // código de convite
+
+  members       TeamMember[]
+  goals         Goal[]
+  announcements Announcement[]
+}
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  teamId    String
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  profileId String   @unique
+  profile   Profile  @relation(fields: [profileId], references: [id])
+  joinedAt  DateTime @default(now())
+
+  @@unique([teamId, profileId])
+}
+
+model Goal {
+  id     String @id @default(cuid())
+  teamId String
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  title     String
+  target    Float
+  current   Float    @default(0)
+  unit      String // "leads", "conversões", "%", etc.
+  startDate DateTime
+  endDate   DateTime
+  createdAt DateTime @default(now())
+}
+
+model Announcement {
+  id        String   @id @default(cuid())
+  teamId    String
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  title     String
+  content   String
+  pinned    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
