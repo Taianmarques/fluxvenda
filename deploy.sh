@@ -4,7 +4,7 @@
 set -e
 
 APP_NAME="fluxvenda"
-PORT=3000
+PORT=3002
 
 cd "$(dirname "$0")"
 
