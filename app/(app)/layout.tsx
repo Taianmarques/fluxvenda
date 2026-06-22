@@ -16,6 +16,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!profile?.onboarded) redirect("/onboarding");
 
   const isGestor = profile.role === "GESTOR" || profile.role === "ADMIN";
+  const isAdmin = profile.role === "ADMIN";
 
   const NAV = [
     { href: "/dashboard",  label: "Dashboard",  icon: "🏠", show: true },
@@ -27,7 +28,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/scripts",    label: "Scripts",    icon: "✍️", show: true },
     { href: "/playbook",   label: "Playbook",   icon: "📖", show: true },
     { href: "/ranking",    label: "Ranking",    icon: "🏆", show: true },
-    { href: "/gestor",     label: "Equipe",     icon: "👥", show: isGestor },
+    { href: "/gestor",      label: "Equipe",      icon: "👥", show: isGestor },
+    { href: "/whatsapp",    label: "WhatsApp",    icon: "🟢", show: isGestor },
+    { href: "/ferramentas", label: "Ferramentas", icon: "🧰", show: isGestor },
+    { href: "/admin",       label: "Super Admin", icon: "🛠️", show: isAdmin },
   ];
 
   return (

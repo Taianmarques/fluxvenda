@@ -12,7 +12,7 @@ const isPublicRoute = createRouteMatcher([
   "/api/equipe/convite(.*)", // info pública do time para a página de convite
 ]);
 
-const isGestorRoute = createRouteMatcher(["/gestor(.*)"]);
+const isGestorRoute = createRouteMatcher(["/gestor(.*)", "/ferramentas(.*)", "/whatsapp(.*)"]);
 const isVendedorRoute = createRouteMatcher(["/dashboard(.*)", "/scanner(.*)", "/simulacao(.*)", "/trilhas(.*)", "/objecoes(.*)", "/scripts(.*)"]);
 
 export default clerkMiddleware(async (auth, req) => {

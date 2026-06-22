@@ -476,6 +476,7 @@ model Team {
   members       TeamMember[]
   goals         Goal[]
   announcements Announcement[]
+  agentConfig   AgentConfig?
 }
 
 model TeamMember {
@@ -512,4 +513,67 @@ model Announcement {
   content   String
   pinned    Boolean  @default(false)
   createdAt DateTime @default(now())
+}
+
+// ===================================
+// MÓDULO 9 — FERRAMENTAS PLUG-AND-PLAY
+// AGENTE DE ATENDIMENTO IA NO WHATSAPP
+// ===================================
+
+model AgentConfig {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  teamId String @unique
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  nome     String   @default("Assistente")
+  tom      String   @default("CONSULTIVO") // FORMAL | PROXIMO | CONSULTIVO
+  servicos String[] @default([])
+  objecoes String[] @default([])
+  horario  String   @default("")
+
+  systemPrompt String?
+  active       Boolean @default(false)
+
+  uazapiInstance String?
+  uazapiToken    String?
+
+  conversations Conversation[]
+}
+
+model Conversation {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agentConfigId String
+  agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id], onDelete: Cascade)
+
+  contactNumber  String
+  contactName    String?
+  status         ConversationStatus @default(ATIVO)
+  humanTakeover  Boolean            @default(false) // true = atendente humano assumiu, agente para de responder
+
+  messages Message[]
+
+  @@unique([agentConfigId, contactNumber])
+}
+
+enum ConversationStatus {
+  ATIVO
+  AGUARDANDO
+  FINALIZADO
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  role    String // user | assistant | human
+  content String
 }
