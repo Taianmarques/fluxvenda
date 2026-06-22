@@ -26,9 +26,10 @@ export async function POST(req: NextRequest) {
   const contactNumber: string = String(message.sender_pn || message.chatid).split("@")[0];
   const contactName: string | undefined = message.senderName || body.chat?.wa_contactName || body.chat?.name;
 
+  // Cliente respondeu — zera o contador de follow-up
   const conversation = await prisma.conversation.upsert({
     where: { agentConfigId_contactNumber: { agentConfigId: config.id, contactNumber } },
-    update: { status: "ATIVO", ...(contactName && { contactName }) },
+    update: { status: "ATIVO", followupCount: 0, ...(contactName && { contactName }) },
     create: { agentConfigId: config.id, contactNumber, contactName, status: "ATIVO" },
   });
 

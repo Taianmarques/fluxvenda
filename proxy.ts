@@ -10,6 +10,7 @@ const isPublicRoute = createRouteMatcher([
   "/api/webhooks(.*)",
   "/api/onboarding(.*)",
   "/api/equipe/convite(.*)", // info pública do time para a página de convite
+  "/api/cron(.*)",          // protegido por CRON_SECRET, não por sessão de usuário
 ]);
 
 const isGestorRoute = createRouteMatcher(["/gestor(.*)", "/ferramentas(.*)", "/whatsapp(.*)"]);

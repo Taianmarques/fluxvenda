@@ -11,6 +11,9 @@ type InitialConfig = {
   horario: string;
   uazapiInstance: string | null;
   hasToken: boolean;
+  followupEnabled: boolean;
+  followupDelayHours: number;
+  followupMaxAttempts: number;
 } | null;
 
 const TOM_OPTIONS = [
@@ -35,6 +38,9 @@ export function WhatsappAgentClient({ initialConfig }: { initialConfig: InitialC
   const [servicos, setServicos] = useState((initialConfig?.servicos ?? []).join("\n"));
   const [objecoes, setObjecoes] = useState((initialConfig?.objecoes ?? []).join("\n"));
   const [horario, setHorario] = useState(initialConfig?.horario ?? "Segunda a sexta, 9h às 18h");
+  const [followupEnabled, setFollowupEnabled] = useState(initialConfig?.followupEnabled ?? true);
+  const [followupDelayHours, setFollowupDelayHours] = useState(initialConfig?.followupDelayHours ?? 24);
+  const [followupMaxAttempts, setFollowupMaxAttempts] = useState(initialConfig?.followupMaxAttempts ?? 2);
 
   const [showTest, setShowTest] = useState(false);
   const [chat, setChat] = useState<ChatMsg[]>([]);
@@ -57,6 +63,9 @@ export function WhatsappAgentClient({ initialConfig }: { initialConfig: InitialC
           servicos: splitLines(servicos),
           objecoes: splitLines(objecoes),
           horario,
+          followupEnabled,
+          followupDelayHours,
+          followupMaxAttempts,
         }),
       });
       if (!res.ok) throw new Error();
@@ -102,6 +111,11 @@ export function WhatsappAgentClient({ initialConfig }: { initialConfig: InitialC
           </div>
           <p className="text-sm text-gray-400">Instância conectada: <span className="text-gray-300">{initialConfig?.uazapiInstance || "—"}</span></p>
           {servicos && <p className="text-sm text-gray-400">Serviços: <span className="text-gray-300">{splitLines(servicos).join(", ")}</span></p>}
+          <p className="text-sm text-gray-400">
+            Follow-up: <span className="text-gray-300">
+              {followupEnabled ? `a cada ${followupDelayHours}h, até ${followupMaxAttempts} tentativa${followupMaxAttempts === 1 ? "" : "s"}` : "desativado"}
+            </span>
+          </p>
         </div>
 
         <button
@@ -145,7 +159,7 @@ export function WhatsappAgentClient({ initialConfig }: { initialConfig: InitialC
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-6">
       <div className="flex gap-2 text-xs">
-        {[1, 2].map(n => (
+        {[1, 2, 3].map(n => (
           <div key={n} className={`flex-1 h-1.5 rounded-full ${n <= step ? "bg-blue-500" : "bg-gray-800"}`} />
         ))}
       </div>
@@ -190,6 +204,40 @@ export function WhatsappAgentClient({ initialConfig }: { initialConfig: InitialC
             <label className="text-sm text-gray-400 block mb-1">Horário de atendimento</label>
             <input value={horario} onChange={e => setHorario(e.target.value)} className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-600" />
           </div>
+        </div>
+      )}
+
+      {step === 3 && (
+        <div className="space-y-4">
+          <p className="font-semibold">3. Follow-up automático</p>
+          <p className="text-sm text-gray-400">Se o contato não responder, o agente manda uma mensagem de retomada sozinho, usando o contexto da conversa.</p>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={followupEnabled} onChange={e => setFollowupEnabled(e.target.checked)} className="w-4 h-4" />
+            <span className="text-sm">Ativar follow-up automático</span>
+          </label>
+
+          {followupEnabled && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm text-gray-400 block mb-1">Esperar (horas) sem resposta</label>
+                <input
+                  type="number" min={1} max={720} value={followupDelayHours}
+                  onChange={e => setFollowupDelayHours(Math.max(1, Number(e.target.value)))}
+                  className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-600"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-400 block mb-1">Máximo de tentativas</label>
+                <input
+                  type="number" min={0} max={10} value={followupMaxAttempts}
+                  onChange={e => setFollowupMaxAttempts(Math.max(0, Number(e.target.value)))}
+                  className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-600"
+                />
+              </div>
+            </div>
+          )}
+
           <p className="text-xs text-gray-500">Ao salvar, criamos automaticamente a conexão do WhatsApp e mostramos um QR code para você escanear — sem precisar de nenhum painel externo.</p>
         </div>
       )}
@@ -203,7 +251,7 @@ export function WhatsappAgentClient({ initialConfig }: { initialConfig: InitialC
         >
           {step === 1 ? (isConfigured ? "Cancelar" : "") : "← Voltar"}
         </button>
-        {step < 2 ? (
+        {step < 3 ? (
           <button onClick={() => setStep(step + 1)} className="bg-blue-600 hover:bg-blue-500 rounded-xl px-5 py-2 text-sm font-medium">
             Continuar
           </button>

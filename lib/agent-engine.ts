@@ -63,3 +63,25 @@ export async function runAgent(
 
   return completion.choices[0]?.message?.content?.trim() ?? "Desculpe, não consegui processar sua mensagem.";
 }
+
+export async function generateFollowupMessage(
+  systemPrompt: string,
+  history: { role: "user" | "assistant"; content: string }[],
+  attemptNumber: number
+): Promise<string> {
+  const instruction = attemptNumber >= 2
+    ? "O cliente já não respondeu a um follow-up anterior. Mande uma última mensagem curta e educada, sem ser insistente, dando a entender que essa é a última tentativa de contato."
+    : "O cliente não responde há um tempo. Mande uma mensagem curta e natural retomando a conversa, sem ser insistente, baseada no que foi discutido.";
+
+  const completion = await openai.chat.completions.create({
+    model: MODEL,
+    max_tokens: 200,
+    messages: [
+      { role: "system", content: systemPrompt },
+      ...history.map(m => ({ role: m.role, content: m.content })),
+      { role: "user", content: `[Instrução interna — não é uma mensagem do cliente] ${instruction}` },
+    ],
+  });
+
+  return completion.choices[0]?.message?.content?.trim() ?? "";
+}

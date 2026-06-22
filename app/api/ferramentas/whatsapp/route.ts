@@ -11,6 +11,9 @@ const schema = z.object({
   servicos: z.array(z.string()).default([]),
   objecoes: z.array(z.string()).default([]),
   horario: z.string().default(""),
+  followupEnabled: z.boolean().default(true),
+  followupDelayHours: z.number().int().min(1).max(720).default(24),
+  followupMaxAttempts: z.number().int().min(0).max(10).default(2),
 });
 
 async function getOwnTeam(userId: string) {
@@ -40,19 +43,19 @@ export async function POST(req: NextRequest) {
   const body = schema.safeParse(await req.json());
   if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
 
-  const { nome, tom, servicos, objecoes, horario } = body.data;
-
-  const systemPrompt = await generateSystemPrompt({
-    nome,
-    tom,
-    servicos,
-    objecoes,
-    horario,
-    segmento: team.segment,
-    empresa: team.name,
-  });
+  const { nome, tom, servicos, objecoes, horario, followupEnabled, followupDelayHours, followupMaxAttempts } = body.data;
 
   const existing = await prisma.agentConfig.findUnique({ where: { teamId: team.id } });
+
+  // Só regenera o system prompt se a personalidade/configuração comercial realmente mudou
+  const personaChanged = !existing
+    || existing.nome !== nome || existing.tom !== tom || existing.horario !== horario
+    || JSON.stringify(existing.servicos) !== JSON.stringify(servicos)
+    || JSON.stringify(existing.objecoes) !== JSON.stringify(objecoes);
+
+  const systemPrompt = personaChanged
+    ? await generateSystemPrompt({ nome, tom, servicos, objecoes, horario, segmento: team.segment, empresa: team.name })
+    : existing!.systemPrompt;
 
   // Cria a instância na UazAPI automaticamente na primeira configuração — o cliente nunca
   // precisa acessar o painel da UazAPI, só escaneia o QR code que mostramos depois.
@@ -67,8 +70,8 @@ export async function POST(req: NextRequest) {
 
   const config = await prisma.agentConfig.upsert({
     where: { teamId: team.id },
-    update: { nome, tom, servicos, objecoes, horario, systemPrompt, uazapiInstance, uazapiToken },
-    create: { teamId: team.id, nome, tom, servicos, objecoes, horario, systemPrompt, uazapiInstance, uazapiToken, active: false },
+    update: { nome, tom, servicos, objecoes, horario, systemPrompt, uazapiInstance, uazapiToken, followupEnabled, followupDelayHours, followupMaxAttempts },
+    create: { teamId: team.id, nome, tom, servicos, objecoes, horario, systemPrompt, uazapiInstance, uazapiToken, active: false, followupEnabled, followupDelayHours, followupMaxAttempts },
   });
 
   return NextResponse.json({ config });

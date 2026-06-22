@@ -540,6 +540,10 @@ model AgentConfig {
   uazapiInstance String?
   uazapiToken    String?
 
+  followupEnabled     Boolean @default(true)
+  followupDelayHours  Int     @default(24)
+  followupMaxAttempts Int     @default(2)
+
   conversations Conversation[]
 }
 
@@ -555,6 +559,9 @@ model Conversation {
   contactName    String?
   status         ConversationStatus @default(ATIVO)
   humanTakeover  Boolean            @default(false) // true = atendente humano assumiu, agente para de responder
+
+  followupCount  Int       @default(0)
+  lastFollowupAt DateTime?
 
   messages Message[]
 
