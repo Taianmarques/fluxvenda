@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { runAgent } from "@/lib/agent-engine";
-import { sendWhatsAppTextAsTeam } from "@/lib/whatsapp";
+import { runAgent, transcribeAudio } from "@/lib/agent-engine";
+import { sendWhatsAppTextAsTeam, downloadMessageMedia } from "@/lib/whatsapp";
+
+function isAudioMessage(message: any): boolean {
+  return typeof message?.content === "object" && typeof message.content?.mimetype === "string" && message.content.mimetype.startsWith("audio/");
+}
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
@@ -11,10 +15,9 @@ export async function POST(req: NextRequest) {
 
   const message = body.message;
   const token: string | undefined = body.token;
-  const text: string = message?.text || message?.content || "";
 
-  // Ignora eco de mensagens enviadas pela própria API, mensagens de grupo ou payloads sem texto
-  if (!message || !token || message.fromMe || message.wasSentByApi || message.isGroup || !text) {
+  // Ignora eco de mensagens enviadas pela própria API, mensagens de grupo ou payloads incompletos
+  if (!message || !token || message.fromMe || message.wasSentByApi || message.isGroup) {
     return NextResponse.json({ ok: true });
   }
 
@@ -22,6 +25,22 @@ export async function POST(req: NextRequest) {
   if (!config || !config.systemPrompt || !config.uazapiToken) {
     return NextResponse.json({ ok: true });
   }
+
+  let text: string = typeof message.text === "string" && message.text
+    ? message.text
+    : (typeof message.content === "string" ? message.content : "");
+
+  if (!text && isAudioMessage(message)) {
+    try {
+      const messageId = message.id || message.messageid;
+      const media = await downloadMessageMedia(config.uazapiToken, messageId);
+      text = await transcribeAudio(media.fileURL, media.mimetype);
+    } catch (err) {
+      console.error("[whatsapp-webhook] erro ao transcrever áudio:", err);
+    }
+  }
+
+  if (!text) return NextResponse.json({ ok: true });
 
   const contactNumber: string = String(message.sender_pn || message.chatid).split("@")[0];
   const contactName: string | undefined = message.senderName || body.chat?.wa_contactName || body.chat?.name;

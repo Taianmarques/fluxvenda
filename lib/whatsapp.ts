@@ -83,6 +83,18 @@ export async function getInstanceStatus(token: string): Promise<UazapiInstanceSt
   return parseInstanceStatus(await res.json());
 }
 
+// Baixa uma mídia (áudio, imagem, etc.) de uma mensagem recebida — a UazAPI já entrega
+// descriptografada e pronta para download, sem precisarmos lidar com a criptografia do WhatsApp.
+export async function downloadMessageMedia(token: string, messageId: string): Promise<{ fileURL: string; mimetype: string }> {
+  const res = await fetch(`${UAZAPI_URL}/message/download`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", token },
+    body: JSON.stringify({ id: messageId }),
+  });
+  if (!res.ok) throw new Error(`Erro ao baixar mídia: ${res.status}`);
+  return res.json();
+}
+
 // Desconecta (logout) o WhatsApp da instância, sem excluir a instância — pode reconectar depois via QR code
 export async function disconnectInstance(token: string): Promise<void> {
   const res = await fetch(`${UAZAPI_URL}/instance/disconnect`, {

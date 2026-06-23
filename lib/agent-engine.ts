@@ -1,5 +1,20 @@
 import { openai, MODEL } from "@/lib/openai";
 
+export async function transcribeAudio(fileURL: string, mimetype: string): Promise<string> {
+  const res = await fetch(fileURL);
+  if (!res.ok) throw new Error(`Erro ao baixar áudio para transcrição: ${res.status}`);
+  const buffer = Buffer.from(await res.arrayBuffer());
+  const ext = mimetype.includes("mpeg") ? "mp3" : mimetype.includes("ogg") ? "ogg" : "wav";
+  const file = new File([buffer], `audio.${ext}`, { type: mimetype });
+
+  const result = await openai.audio.transcriptions.create({
+    file,
+    model: "whisper-1",
+    language: "pt",
+  });
+  return result.text.trim();
+}
+
 export type AgentConfigInput = {
   nome: string;
   tom: string;
