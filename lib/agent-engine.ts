@@ -96,6 +96,33 @@ export async function runAgent(
   return completion.choices[0]?.message?.content?.trim() ?? "Desculpe, não consegui processar sua mensagem.";
 }
 
+// Responde com base numa imagem enviada pelo cliente (foto de produto, comprovante, etc.),
+// usando a visão do modelo em vez de transcrever/descrever a imagem em texto antes.
+export async function runAgentWithImage(
+  systemPrompt: string,
+  history: { role: "user" | "assistant"; content: string }[],
+  imageUrl: string,
+  caption: string
+): Promise<string> {
+  const completion = await openai.chat.completions.create({
+    model: MODEL,
+    max_tokens: 400,
+    messages: [
+      { role: "system", content: systemPrompt },
+      ...history.map(m => ({ role: m.role, content: m.content })),
+      {
+        role: "user",
+        content: [
+          { type: "text", text: caption || "(o cliente mandou essa imagem sem legenda)" },
+          { type: "image_url", image_url: { url: imageUrl } },
+        ],
+      },
+    ],
+  });
+
+  return completion.choices[0]?.message?.content?.trim() ?? "Desculpe, não consegui processar a imagem.";
+}
+
 export async function generateFollowupMessage(
   systemPrompt: string,
   history: { role: "user" | "assistant"; content: string }[],

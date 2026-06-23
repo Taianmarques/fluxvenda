@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { runAgent, transcribeAudio } from "@/lib/agent-engine";
+import { runAgent, runAgentWithImage, transcribeAudio } from "@/lib/agent-engine";
 import { sendWhatsAppTextAsTeam, downloadMessageMedia } from "@/lib/whatsapp";
 
-function isAudioMessage(message: any): boolean {
-  return typeof message?.content === "object" && typeof message.content?.mimetype === "string" && message.content.mimetype.startsWith("audio/");
+function mediaMimetype(message: any): string | null {
+  return typeof message?.content === "object" && typeof message.content?.mimetype === "string"
+    ? message.content.mimetype
+    : null;
 }
 
 export async function POST(req: NextRequest) {
@@ -26,17 +28,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  let text: string = typeof message.text === "string" && message.text
+  const caption: string = typeof message.text === "string" && message.text
     ? message.text
     : (typeof message.content === "string" ? message.content : "");
 
-  if (!text && isAudioMessage(message)) {
+  const mimetype = mediaMimetype(message);
+  let imageUrl: string | null = null;
+  let text = caption;
+
+  if (!caption && mimetype?.startsWith("audio/")) {
     try {
-      const messageId = message.id || message.messageid;
-      const media = await downloadMessageMedia(config.uazapiToken, messageId);
+      const media = await downloadMessageMedia(config.uazapiToken, message.id || message.messageid);
       text = await transcribeAudio(media.fileURL, media.mimetype);
     } catch (err) {
       console.error("[whatsapp-webhook] erro ao transcrever áudio:", err);
+    }
+  } else if (mimetype?.startsWith("image/")) {
+    try {
+      const media = await downloadMessageMedia(config.uazapiToken, message.id || message.messageid);
+      imageUrl = media.fileURL;
+      text = caption ? `[Imagem] ${caption}` : "[Imagem enviada pelo cliente]";
+    } catch (err) {
+      console.error("[whatsapp-webhook] erro ao baixar imagem:", err);
     }
   }
 
@@ -66,13 +79,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  const reply = await runAgent(
-    config.systemPrompt,
-    // Mensagens do atendente humano entram como "assistant" para o agente manter o contexto
-    // de tudo que já foi dito pela empresa, mesmo no período em que esteve em atendimento manual.
-    history.map(m => ({ role: m.role === "user" ? "user" : "assistant", content: m.content })),
-    text
-  );
+  // Mensagens do atendente humano entram como "assistant" para o agente manter o contexto
+  // de tudo que já foi dito pela empresa, mesmo no período em que esteve em atendimento manual.
+  const historyForAgent = history.map(m => ({ role: m.role === "user" ? "user" as const : "assistant" as const, content: m.content }));
+
+  const reply = imageUrl
+    ? await runAgentWithImage(config.systemPrompt, historyForAgent, imageUrl, caption)
+    : await runAgent(config.systemPrompt, historyForAgent, text);
 
   await prisma.message.create({ data: { conversationId: conversation.id, role: "assistant", content: reply } });
 
