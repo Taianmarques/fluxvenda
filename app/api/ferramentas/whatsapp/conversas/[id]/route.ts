@@ -28,9 +28,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   return NextResponse.json({ conversation });
 }
 
-const patchSchema = z.object({ stageId: z.string().nullable() });
+const patchSchema = z.object({
+  stageId: z.string().nullable().optional(),
+  dealValue: z.number().nullable().optional(),
+});
 
-// Move a conversa para outra etapa do pipeline (drag and drop no kanban)
+// Move a conversa para outra etapa do pipeline e/ou atualiza o valor negociado
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -50,7 +53,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const conversation = await prisma.conversation.findFirst({ where: { id, agentConfigId: config.id } });
   if (!conversation) return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
 
-  const updated = await prisma.conversation.update({ where: { id }, data: { stageId: body.data.stageId } });
+  const updated = await prisma.conversation.update({
+    where: { id },
+    data: {
+      ...(body.data.stageId !== undefined && { stageId: body.data.stageId }),
+      ...(body.data.dealValue !== undefined && { dealValue: body.data.dealValue }),
+    },
+  });
 
   return NextResponse.json({ conversation: updated });
 }

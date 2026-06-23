@@ -582,6 +582,8 @@ model Conversation {
   stageId String?
   stage   PipelineStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
 
+  dealValue Float? // valor negociado nesse atendimento (R$)
+
   followupCount  Int       @default(0)
   lastFollowupAt DateTime?
 

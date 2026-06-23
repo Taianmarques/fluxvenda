@@ -13,12 +13,26 @@ export type PipelineConversation = {
   contactName: string | null;
   contactNumber: string;
   stageId: string | null;
+  dealValue: number | null;
   lastMessage: string | null;
   updatedAt: string;
 };
 
-function Card({ conv, onClick }: { conv: PipelineConversation; onClick: () => void }) {
+function formatBRL(value: number): string {
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function Card({ conv, onClick, onValueChange }: { conv: PipelineConversation; onClick: () => void; onValueChange: (id: string, value: number | null) => void }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: conv.id });
+  const [editingValue, setEditingValue] = useState(false);
+  const [valueInput, setValueInput] = useState(conv.dealValue != null ? String(conv.dealValue) : "");
+
+  function commitValue() {
+    setEditingValue(false);
+    const raw = valueInput.trim() === "" ? null : Number(valueInput.replace(",", "."));
+    const parsed = raw !== null && Number.isFinite(raw) ? raw : null;
+    if (parsed !== conv.dealValue) onValueChange(conv.id, parsed);
+  }
 
   return (
     <div
@@ -30,44 +44,71 @@ function Card({ conv, onClick }: { conv: PipelineConversation; onClick: () => vo
     >
       <p className="font-medium text-sm truncate">{conv.contactName || conv.contactNumber}</p>
       <p className="text-xs text-gray-500 truncate mt-1">{conv.lastMessage || "—"}</p>
+      {editingValue ? (
+        <input
+          autoFocus
+          value={valueInput}
+          onClick={e => e.stopPropagation()}
+          onChange={e => setValueInput(e.target.value)}
+          onBlur={commitValue}
+          onKeyDown={e => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
+          onPointerDown={e => e.stopPropagation()}
+          placeholder="0,00"
+          className="w-full mt-2 bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs text-green-300"
+        />
+      ) : (
+        <p
+          className="text-xs font-semibold text-green-400 mt-2 cursor-text"
+          onClick={e => { e.stopPropagation(); setEditingValue(true); }}
+          onPointerDown={e => e.stopPropagation()}
+        >
+          {conv.dealValue != null ? formatBRL(conv.dealValue) : "+ valor negociado"}
+        </p>
+      )}
     </div>
   );
 }
 
 function Column({
-  stage, conversations, onClickCard, onRename, onDelete,
+  stage, conversations, onClickCard, onRename, onDelete, onValueChange,
 }: {
   stage: Stage;
   conversations: PipelineConversation[];
   onClickCard: (id: string) => void;
   onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
+  onValueChange: (id: string, value: number | null) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id });
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(stage.name);
 
+  const total = conversations.reduce((sum, c) => sum + (c.dealValue ?? 0), 0);
+
   return (
     <div ref={setNodeRef} className={`w-72 flex-shrink-0 flex flex-col bg-gray-950/50 rounded-2xl border ${isOver ? "border-blue-600" : "border-gray-800"}`}>
-      <div className="p-3 border-b border-gray-800 flex items-center gap-2">
-        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: stage.color }} />
-        {editing ? (
-          <input
-            autoFocus
-            value={name}
-            onChange={e => setName(e.target.value)}
-            onBlur={() => { setEditing(false); if (name.trim() && name !== stage.name) onRename(stage.id, name.trim()); }}
-            onKeyDown={e => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
-            className="flex-1 bg-gray-900 border border-gray-700 rounded px-2 py-0.5 text-sm"
-          />
-        ) : (
-          <p className="flex-1 font-medium text-sm truncate cursor-text" onClick={() => setEditing(true)}>{stage.name}</p>
-        )}
-        <span className="text-xs text-gray-500">{conversations.length}</span>
-        <button onClick={() => onDelete(stage.id)} className="text-gray-600 hover:text-red-400 text-xs">✕</button>
+      <div className="p-3 border-b border-gray-800">
+        <div className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: stage.color }} />
+          {editing ? (
+            <input
+              autoFocus
+              value={name}
+              onChange={e => setName(e.target.value)}
+              onBlur={() => { setEditing(false); if (name.trim() && name !== stage.name) onRename(stage.id, name.trim()); }}
+              onKeyDown={e => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
+              className="flex-1 bg-gray-900 border border-gray-700 rounded px-2 py-0.5 text-sm"
+            />
+          ) : (
+            <p className="flex-1 font-medium text-sm truncate cursor-text" onClick={() => setEditing(true)}>{stage.name}</p>
+          )}
+          <span className="text-xs text-gray-500">{conversations.length}</span>
+          <button onClick={() => onDelete(stage.id)} className="text-gray-600 hover:text-red-400 text-xs">✕</button>
+        </div>
+        {total > 0 && <p className="text-xs font-semibold text-green-400 mt-1.5">{formatBRL(total)}</p>}
       </div>
       <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[120px]">
-        {conversations.map(c => <Card key={c.id} conv={c} onClick={() => onClickCard(c.id)} />)}
+        {conversations.map(c => <Card key={c.id} conv={c} onClick={() => onClickCard(c.id)} onValueChange={onValueChange} />)}
       </div>
     </div>
   );
@@ -106,6 +147,15 @@ export function WhatsappPipeline({
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ stageId }),
+    });
+  }
+
+  async function handleValueChange(conversationId: string, value: number | null) {
+    setLocalConversations(prev => prev.map(c => c.id === conversationId ? { ...c, dealValue: value } : c));
+    await fetch(`/api/ferramentas/whatsapp/conversas/${conversationId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dealValue: value }),
     });
   }
 
@@ -148,6 +198,7 @@ export function WhatsappPipeline({
               onClickCard={onSelectConversation}
               onRename={() => {}}
               onDelete={() => {}}
+              onValueChange={handleValueChange}
             />
           )}
           {stages.map(stage => (
@@ -158,6 +209,7 @@ export function WhatsappPipeline({
               onClickCard={onSelectConversation}
               onRename={handleRename}
               onDelete={handleDelete}
+              onValueChange={handleValueChange}
             />
           ))}
           <div className="w-64 flex-shrink-0">

@@ -49,6 +49,7 @@ export default async function WhatsappInboxPage() {
         status: c.status,
         humanTakeover: c.humanTakeover,
         stageId: c.stageId,
+        dealValue: c.dealValue,
         updatedAt: c.updatedAt.toISOString(),
         lastMessage: c.messages[0]?.content ?? null,
       }))}

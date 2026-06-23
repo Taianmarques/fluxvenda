@@ -10,6 +10,7 @@ type ConversationSummary = {
   status: string;
   humanTakeover: boolean;
   stageId: string | null;
+  dealValue: number | null;
   updatedAt: string;
   lastMessage: string | null;
 };
@@ -56,7 +57,7 @@ export function WhatsappInbox({
       if (data.conversations) {
         setConversations(data.conversations.map((c: any) => ({
           id: c.id, contactName: c.contactName, contactNumber: c.contactNumber,
-          status: c.status, humanTakeover: c.humanTakeover, stageId: c.stageId, updatedAt: c.updatedAt,
+          status: c.status, humanTakeover: c.humanTakeover, stageId: c.stageId, dealValue: c.dealValue, updatedAt: c.updatedAt,
           lastMessage: c.messages[0]?.content ?? null,
         })));
       }
