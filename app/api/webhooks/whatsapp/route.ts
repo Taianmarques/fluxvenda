@@ -62,7 +62,10 @@ export async function POST(req: NextRequest) {
   const conversation = await prisma.conversation.upsert({
     where: { agentConfigId_contactNumber: { agentConfigId: config.id, contactNumber } },
     update: { status: "ATIVO", followupCount: 0, ...(contactName && { contactName }) },
-    create: { agentConfigId: config.id, contactNumber, contactName, status: "ATIVO" },
+    create: {
+      agentConfigId: config.id, contactNumber, contactName, status: "ATIVO",
+      stageId: (await prisma.pipelineStage.findFirst({ where: { agentConfigId: config.id }, orderBy: { order: "asc" } }))?.id,
+    },
   });
 
   const recentMessages = await prisma.message.findMany({

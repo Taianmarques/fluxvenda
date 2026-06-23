@@ -29,21 +29,26 @@ export default async function WhatsappInboxPage() {
     );
   }
 
-  const conversations = await prisma.conversation.findMany({
-    where: { agentConfigId: config.id },
-    orderBy: { updatedAt: "desc" },
-    include: { messages: { orderBy: { createdAt: "desc" }, take: 1 } },
-  });
+  const [conversations, stages] = await Promise.all([
+    prisma.conversation.findMany({
+      where: { agentConfigId: config.id },
+      orderBy: { updatedAt: "desc" },
+      include: { messages: { orderBy: { createdAt: "desc" }, take: 1 } },
+    }),
+    prisma.pipelineStage.findMany({ where: { agentConfigId: config.id }, orderBy: { order: "asc" } }),
+  ]);
 
   return (
     <WhatsappInbox
       agentName={config.nome}
+      initialStages={stages.map(s => ({ id: s.id, name: s.name, color: s.color, order: s.order }))}
       initialConversations={conversations.map(c => ({
         id: c.id,
         contactName: c.contactName,
         contactNumber: c.contactNumber,
         status: c.status,
         humanTakeover: c.humanTakeover,
+        stageId: c.stageId,
         updatedAt: c.updatedAt.toISOString(),
         lastMessage: c.messages[0]?.content ?? null,
       }))}

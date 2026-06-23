@@ -549,6 +549,21 @@ model AgentConfig {
   followupMaxAttempts Int     @default(2)
 
   conversations Conversation[]
+  pipelineStages PipelineStage[]
+}
+
+model PipelineStage {
+  id            String      @id @default(cuid())
+  createdAt     DateTime    @default(now())
+
+  agentConfigId String
+  agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id], onDelete: Cascade)
+
+  name  String
+  color String @default("#3b82f6")
+  order Int    @default(0)
+
+  conversations Conversation[]
 }
 
 model Conversation {
@@ -563,6 +578,9 @@ model Conversation {
   contactName    String?
   status         ConversationStatus @default(ATIVO)
   humanTakeover  Boolean            @default(false) // true = atendente humano assumiu, agente para de responder
+
+  stageId String?
+  stage   PipelineStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
 
   followupCount  Int       @default(0)
   lastFollowupAt DateTime?
