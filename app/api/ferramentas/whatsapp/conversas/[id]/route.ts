@@ -30,10 +30,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
 const patchSchema = z.object({
   stageId: z.string().nullable().optional(),
+  leadStatusId: z.string().nullable().optional(),
   dealValue: z.number().nullable().optional(),
 });
 
-// Move a conversa para outra etapa do pipeline e/ou atualiza o valor negociado
+// Move a conversa para outra etapa do pipeline, muda o status do lead e/ou o valor negociado
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -50,6 +51,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!stage) return NextResponse.json({ error: "Etapa não encontrada" }, { status: 404 });
   }
 
+  if (body.data.leadStatusId) {
+    const status = await prisma.leadStatus.findFirst({ where: { id: body.data.leadStatusId, agentConfigId: config.id } });
+    if (!status) return NextResponse.json({ error: "Status não encontrado" }, { status: 404 });
+  }
+
   const conversation = await prisma.conversation.findFirst({ where: { id, agentConfigId: config.id } });
   if (!conversation) return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
 
@@ -57,6 +63,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     where: { id },
     data: {
       ...(body.data.stageId !== undefined && { stageId: body.data.stageId }),
+      ...(body.data.leadStatusId !== undefined && { leadStatusId: body.data.leadStatusId }),
       ...(body.data.dealValue !== undefined && { dealValue: body.data.dealValue }),
     },
   });

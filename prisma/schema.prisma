@@ -550,6 +550,7 @@ model AgentConfig {
 
   conversations Conversation[]
   pipelineStages PipelineStage[]
+  leadStatuses   LeadStatus[]
 }
 
 model PipelineStage {
@@ -561,6 +562,20 @@ model PipelineStage {
 
   name  String
   color String @default("#3b82f6")
+  order Int    @default(0)
+
+  conversations Conversation[]
+}
+
+model LeadStatus {
+  id            String      @id @default(cuid())
+  createdAt     DateTime    @default(now())
+
+  agentConfigId String
+  agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id], onDelete: Cascade)
+
+  name  String
+  color String @default("#6b7280")
   order Int    @default(0)
 
   conversations Conversation[]
@@ -581,6 +596,9 @@ model Conversation {
 
   stageId String?
   stage   PipelineStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
+
+  leadStatusId String?
+  leadStatus   LeadStatus? @relation(fields: [leadStatusId], references: [id], onDelete: SetNull)
 
   dealValue Float? // valor negociado nesse atendimento (R$)
 

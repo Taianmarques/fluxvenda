@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { WhatsappPipeline, type Stage } from "./WhatsappPipeline";
+import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 
 type ConversationSummary = {
   id: string;
@@ -10,6 +11,7 @@ type ConversationSummary = {
   status: string;
   humanTakeover: boolean;
   stageId: string | null;
+  leadStatusId: string | null;
   dealValue: number | null;
   updatedAt: string;
   lastMessage: string | null;
@@ -82,16 +84,18 @@ function timeAgo(iso: string) {
 }
 
 export function WhatsappInbox({
-  agentName, initialConversations, initialStages,
+  agentName, initialConversations, initialStages, initialLeadStatuses,
 }: {
   agentName: string;
   initialConversations: ConversationSummary[];
   initialStages: Stage[];
+  initialLeadStatuses: LeadStatus[];
 }) {
   const [view, setView] = useState<"lista" | "pipeline">("lista");
   const [theme, setTheme] = useState<ChatTheme>("dark");
   const [conversations, setConversations] = useState(initialConversations);
   const [stages, setStages] = useState(initialStages);
+  const [leadStatuses, setLeadStatuses] = useState(initialLeadStatuses);
   const [selectedId, setSelectedId] = useState<string | null>(initialConversations[0]?.id ?? null);
   const [detail, setDetail] = useState<ConversationDetail | null>(null);
   const [input, setInput] = useState("");
@@ -117,7 +121,7 @@ export function WhatsappInbox({
       if (data.conversations) {
         setConversations(data.conversations.map((c: any) => ({
           id: c.id, contactName: c.contactName, contactNumber: c.contactNumber,
-          status: c.status, humanTakeover: c.humanTakeover, stageId: c.stageId, dealValue: c.dealValue, updatedAt: c.updatedAt,
+          status: c.status, humanTakeover: c.humanTakeover, stageId: c.stageId, leadStatusId: c.leadStatusId, dealValue: c.dealValue, updatedAt: c.updatedAt,
           lastMessage: c.messages[0]?.content ?? null,
         })));
       }
@@ -130,6 +134,23 @@ export function WhatsappInbox({
       const data = await res.json();
       if (data.stages) setStages(data.stages);
     } catch {}
+  }
+
+  async function refreshLeadStatuses() {
+    try {
+      const res = await fetch("/api/ferramentas/whatsapp/status");
+      const data = await res.json();
+      if (data.statuses) setLeadStatuses(data.statuses);
+    } catch {}
+  }
+
+  async function handleLeadStatusChange(conversationId: string, leadStatusId: string | null) {
+    setConversations(prev => prev.map(c => c.id === conversationId ? { ...c, leadStatusId } : c));
+    await fetch(`/api/ferramentas/whatsapp/conversas/${conversationId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ leadStatusId }),
+    });
   }
 
   async function refreshDetail(id: string) {
@@ -216,10 +237,12 @@ export function WhatsappInbox({
       {view === "pipeline" ? (
         <WhatsappPipeline
           stages={stages}
+          leadStatuses={leadStatuses}
           conversations={conversations}
           theme={theme}
           onSelectConversation={id => { setSelectedId(id); setView("lista"); }}
           onStagesChange={refreshStages}
+          onLeadStatusesChange={refreshLeadStatuses}
         />
       ) : (
         <div className="flex-1 flex overflow-hidden">
@@ -230,18 +253,30 @@ export function WhatsappInbox({
                 <p className={`text-sm p-4 ${t.listSecondary}`}>Nenhuma conversa ainda.</p>
               ) : (
                 conversations.map(c => (
-                  <button
+                  <div
                     key={c.id}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => setSelectedId(c.id)}
-                    className={`w-full text-left px-4 py-3 border-b transition-colors ${t.listItemBorder} ${selectedId === c.id ? t.listItemSelected : ""}`}
+                    onKeyDown={e => (e.key === "Enter" || e.key === " ") && setSelectedId(c.id)}
+                    className={`w-full text-left px-4 py-3 border-b transition-colors cursor-pointer ${t.listItemBorder} ${selectedId === c.id ? t.listItemSelected : ""}`}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <p className="font-medium truncate">{c.contactName || c.contactNumber}</p>
                       {c.humanTakeover && <span className="text-[10px] flex-shrink-0 px-1.5 py-0.5 rounded-full bg-orange-900/50 text-orange-300 border border-orange-700">manual</span>}
                     </div>
                     <p className={`text-xs truncate mt-0.5 ${t.listSecondary}`}>{c.lastMessage || "—"}</p>
-                    <p className={`text-[10px] mt-0.5 ${t.listTertiary}`}>{timeAgo(c.updatedAt)}</p>
-                  </button>
+                    <div className="flex items-center justify-between mt-1.5">
+                      <p className={`text-[10px] ${t.listTertiary}`}>{timeAgo(c.updatedAt)}</p>
+                      <LeadStatusBadge
+                        leadStatusId={c.leadStatusId}
+                        statuses={leadStatuses}
+                        onChange={id => handleLeadStatusChange(c.id, id)}
+                        onStatusesChange={refreshLeadStatuses}
+                        dark={theme === "dark"}
+                      />
+                    </div>
+                  </div>
                 ))
               )}
             </div>

@@ -3,7 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { generateSystemPrompt } from "@/lib/agent-engine";
 import { createInstance } from "@/lib/whatsapp";
-import { seedDefaultStages } from "@/lib/pipeline";
+import { seedDefaultStages, seedDefaultLeadStatuses } from "@/lib/pipeline";
 import { z } from "zod";
 
 const schema = z.object({
@@ -93,6 +93,7 @@ export async function POST(req: NextRequest) {
 
   if (!existing) {
     await seedDefaultStages(config.id);
+    await seedDefaultLeadStatuses(config.id);
   }
 
   return NextResponse.json({ config });
