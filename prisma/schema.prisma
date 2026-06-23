@@ -534,6 +534,10 @@ model AgentConfig {
   objecoes String[] @default([])
   horario  String   @default("")
 
+  descricaoEmpresa String @default("") // história, diferenciais, público-alvo
+  precos           String @default("") // valores, formas de pagamento, parcelamento, garantias
+  enderecoContato  String @default("") // endereço, site, redes sociais, outros canais
+
   systemPrompt String?
   active       Boolean @default(false)
 

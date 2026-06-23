@@ -36,6 +36,7 @@ export default async function WhatsappAgentPage() {
             initialConfig={config ? {
               nome: config.nome, tom: config.tom, servicos: config.servicos, objecoes: config.objecoes,
               horario: config.horario, uazapiInstance: config.uazapiInstance, hasToken: Boolean(config.uazapiToken),
+              descricaoEmpresa: config.descricaoEmpresa, precos: config.precos, enderecoContato: config.enderecoContato,
               followupEnabled: config.followupEnabled, followupDelayHours: config.followupDelayHours, followupMaxAttempts: config.followupMaxAttempts,
             } : null}
           />
@@ -107,6 +108,7 @@ export default async function WhatsappAgentPage() {
             initialConfig={{
               nome: config.nome, tom: config.tom, servicos: config.servicos, objecoes: config.objecoes,
               horario: config.horario, uazapiInstance: config.uazapiInstance, hasToken: Boolean(config.uazapiToken),
+              descricaoEmpresa: config.descricaoEmpresa, precos: config.precos, enderecoContato: config.enderecoContato,
               followupEnabled: config.followupEnabled, followupDelayHours: config.followupDelayHours, followupMaxAttempts: config.followupMaxAttempts,
             }}
           />

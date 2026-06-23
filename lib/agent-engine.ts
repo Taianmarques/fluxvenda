@@ -6,6 +6,9 @@ export type AgentConfigInput = {
   servicos: string[];
   objecoes: string[];
   horario: string;
+  descricaoEmpresa?: string;
+  precos?: string;
+  enderecoContato?: string;
   segmento?: string;
   empresa?: string;
 };
@@ -16,30 +19,44 @@ const TOM_LABEL: Record<string, string> = {
   CONSULTIVO: "consultivo, atencioso e orientado a entender a necessidade do cliente antes de oferecer algo",
 };
 
+// Monta os fatos da empresa de forma determinística (sem reescrita por IA), para garantir que
+// nenhum detalhe (preço, endereço, etc.) seja perdido ou parafraseado incorretamente.
+function buildFatosEmpresa(config: AgentConfigInput): string {
+  const blocos: string[] = [];
+  if (config.descricaoEmpresa) blocos.push(`SOBRE A EMPRESA:\n${config.descricaoEmpresa}`);
+  if (config.servicos.length) blocos.push(`SERVIÇOS/PRODUTOS OFERECIDOS:\n${config.servicos.map(s => `- ${s}`).join("\n")}`);
+  if (config.precos) blocos.push(`PREÇOS E CONDIÇÕES:\n${config.precos}`);
+  if (config.horario) blocos.push(`HORÁRIO DE ATENDIMENTO:\n${config.horario}`);
+  if (config.enderecoContato) blocos.push(`ENDEREÇO, CONTATO E LINKS:\n${config.enderecoContato}`);
+  if (config.objecoes.length) blocos.push(`OBJEÇÕES COMUNS DOS CLIENTES (responda com argumentos realistas):\n${config.objecoes.map(s => `- ${s}`).join("\n")}`);
+  return blocos.join("\n\n");
+}
+
 export async function generateSystemPrompt(config: AgentConfigInput): Promise<string> {
-  const prompt = `Crie um system prompt em português para um agente de IA que atende clientes via WhatsApp em nome da empresa "${config.empresa ?? "a empresa"}" (segmento: ${config.segmento ?? "não informado"}).
+  const fatosEmpresa = buildFatosEmpresa(config);
 
-Dados do agente:
-- Nome: ${config.nome}
-- Tom de voz: ${TOM_LABEL[config.tom] ?? config.tom}
-- Serviços/produtos oferecidos: ${config.servicos.join(", ") || "não informado"}
-- Objeções comuns dos clientes: ${config.objecoes.join(", ") || "não informado"}
-- Horário de atendimento: ${config.horario || "não informado"}
+  const prompt = `Crie um system prompt em português para um agente de IA chamado "${config.nome}" que atende clientes via WhatsApp em nome da empresa "${config.empresa ?? "a empresa"}" (segmento: ${config.segmento ?? "não informado"}).
 
-O system prompt deve instruir o agente a:
-- se apresentar pelo nome quando relevante
-- manter o tom de voz indicado
-- entender a necessidade do cliente antes de empurrar venda
-- responder objeções comuns listadas com argumentos realistas
-- ser direto e usar mensagens curtas, adequadas ao WhatsApp (poucas frases por resposta)
-- avisar quando estiver fora do horário de atendimento, se perguntado
-- nunca inventar informações que não foram fornecidas
+Tom de voz do agente: ${TOM_LABEL[config.tom] ?? config.tom}
+
+Fatos sobre a empresa (use exatamente estas informações, sem resumir, sem trocar números/valores/endereços por aproximações):
+${fatosEmpresa || "Nenhuma informação adicional fornecida."}
+
+O system prompt final deve:
+- abrir com a identidade do agente (nome, empresa, tom de voz)
+- incluir, em uma seção separada e claramente identificada, TODOS os fatos acima na íntegra (preços, horário, endereço, serviços, objeções) — não pode perder nenhum dado fornecido
+- instruir o agente a se apresentar pelo nome quando relevante
+- instruir a entender a necessidade do cliente antes de empurrar venda
+- instruir a responder objeções comuns com argumentos realistas baseados nos fatos
+- instruir a ser direto e usar mensagens curtas, adequadas ao WhatsApp (poucas frases por resposta)
+- instruir a avisar quando estiver fora do horário de atendimento, se perguntado
+- instruir a NUNCA inventar preços, endereços, prazos ou qualquer informação que não esteja nos fatos acima — se perguntado algo fora disso, admitir que não tem essa informação e oferecer encaminhar para um humano
 
 Responda APENAS com o texto final do system prompt, sem comentários adicionais.`;
 
   const completion = await openai.chat.completions.create({
     model: MODEL,
-    max_tokens: 600,
+    max_tokens: 1200,
     messages: [{ role: "user", content: prompt }],
   });
 

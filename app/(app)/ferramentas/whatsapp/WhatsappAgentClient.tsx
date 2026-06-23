@@ -11,6 +11,9 @@ type InitialConfig = {
   horario: string;
   uazapiInstance: string | null;
   hasToken: boolean;
+  descricaoEmpresa: string;
+  precos: string;
+  enderecoContato: string;
   followupEnabled: boolean;
   followupDelayHours: number;
   followupMaxAttempts: number;
@@ -24,6 +27,8 @@ const TOM_OPTIONS = [
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
 
+const TOTAL_STEPS = 4;
+
 export function WhatsappAgentClient({ initialConfig }: { initialConfig: InitialConfig }) {
   const router = useRouter();
   const isConfigured = Boolean(initialConfig?.hasToken);
@@ -35,7 +40,10 @@ export function WhatsappAgentClient({ initialConfig }: { initialConfig: InitialC
 
   const [nome, setNome] = useState(initialConfig?.nome ?? "Sofia");
   const [tom, setTom] = useState(initialConfig?.tom ?? "CONSULTIVO");
+  const [descricaoEmpresa, setDescricaoEmpresa] = useState(initialConfig?.descricaoEmpresa ?? "");
+  const [enderecoContato, setEnderecoContato] = useState(initialConfig?.enderecoContato ?? "");
   const [servicos, setServicos] = useState((initialConfig?.servicos ?? []).join("\n"));
+  const [precos, setPrecos] = useState(initialConfig?.precos ?? "");
   const [objecoes, setObjecoes] = useState((initialConfig?.objecoes ?? []).join("\n"));
   const [horario, setHorario] = useState(initialConfig?.horario ?? "Segunda a sexta, 9h às 18h");
   const [followupEnabled, setFollowupEnabled] = useState(initialConfig?.followupEnabled ?? true);
@@ -60,6 +68,7 @@ export function WhatsappAgentClient({ initialConfig }: { initialConfig: InitialC
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nome, tom,
+          descricaoEmpresa, enderecoContato, precos,
           servicos: splitLines(servicos),
           objecoes: splitLines(objecoes),
           horario,
@@ -110,7 +119,10 @@ export function WhatsappAgentClient({ initialConfig }: { initialConfig: InitialC
             <button onClick={() => setEditing(true)} className="text-sm text-blue-400 hover:text-blue-300">Editar configurações</button>
           </div>
           <p className="text-sm text-gray-400">Instância conectada: <span className="text-gray-300">{initialConfig?.uazapiInstance || "—"}</span></p>
+          {descricaoEmpresa && <p className="text-sm text-gray-400">Sobre a empresa: <span className="text-gray-300">{descricaoEmpresa}</span></p>}
           {servicos && <p className="text-sm text-gray-400">Serviços: <span className="text-gray-300">{splitLines(servicos).join(", ")}</span></p>}
+          {precos && <p className="text-sm text-gray-400">Preços: <span className="text-gray-300">{precos}</span></p>}
+          {enderecoContato && <p className="text-sm text-gray-400">Endereço/contato: <span className="text-gray-300">{enderecoContato}</span></p>}
           <p className="text-sm text-gray-400">
             Follow-up: <span className="text-gray-300">
               {followupEnabled ? `a cada ${followupDelayHours}h, até ${followupMaxAttempts} tentativa${followupMaxAttempts === 1 ? "" : "s"}` : "desativado"}
@@ -159,7 +171,7 @@ export function WhatsappAgentClient({ initialConfig }: { initialConfig: InitialC
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-6">
       <div className="flex gap-2 text-xs">
-        {[1, 2, 3].map(n => (
+        {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map(n => (
           <div key={n} className={`flex-1 h-1.5 rounded-full ${n <= step ? "bg-blue-500" : "bg-gray-800"}`} />
         ))}
       </div>
@@ -191,10 +203,41 @@ export function WhatsappAgentClient({ initialConfig }: { initialConfig: InitialC
 
       {step === 2 && (
         <div className="space-y-4">
-          <p className="font-semibold">2. Configuração comercial</p>
+          <p className="font-semibold">2. Sobre a empresa</p>
+          <p className="text-sm text-gray-400">Quanto mais detalhes você der aqui, mais o agente vai saber responder sem inventar nada.</p>
+          <div>
+            <label className="text-sm text-gray-400 block mb-1">Conte sobre sua empresa</label>
+            <textarea
+              value={descricaoEmpresa} onChange={e => setDescricaoEmpresa(e.target.value)} rows={4}
+              placeholder="História, diferenciais, público-alvo, o que vocês fazem de melhor..."
+              className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-600"
+            />
+          </div>
+          <div>
+            <label className="text-sm text-gray-400 block mb-1">Endereço, site e redes sociais</label>
+            <textarea
+              value={enderecoContato} onChange={e => setEnderecoContato(e.target.value)} rows={3}
+              placeholder="Endereço físico, site, Instagram, outros canais de atendimento..."
+              className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-600"
+            />
+          </div>
+        </div>
+      )}
+
+      {step === 3 && (
+        <div className="space-y-4">
+          <p className="font-semibold">3. Configuração comercial</p>
           <div>
             <label className="text-sm text-gray-400 block mb-1">Serviços/produtos (um por linha)</label>
             <textarea value={servicos} onChange={e => setServicos(e.target.value)} rows={3} className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-600" />
+          </div>
+          <div>
+            <label className="text-sm text-gray-400 block mb-1">Preços e condições</label>
+            <textarea
+              value={precos} onChange={e => setPrecos(e.target.value)} rows={3}
+              placeholder="Valores, formas de pagamento, parcelamento, garantias..."
+              className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-600"
+            />
           </div>
           <div>
             <label className="text-sm text-gray-400 block mb-1">Objeções comuns (uma por linha)</label>
@@ -207,9 +250,9 @@ export function WhatsappAgentClient({ initialConfig }: { initialConfig: InitialC
         </div>
       )}
 
-      {step === 3 && (
+      {step === 4 && (
         <div className="space-y-4">
-          <p className="font-semibold">3. Follow-up automático</p>
+          <p className="font-semibold">4. Follow-up automático</p>
           <p className="text-sm text-gray-400">Se o contato não responder, o agente manda uma mensagem de retomada sozinho, usando o contexto da conversa.</p>
 
           <label className="flex items-center gap-2 cursor-pointer">
@@ -251,7 +294,7 @@ export function WhatsappAgentClient({ initialConfig }: { initialConfig: InitialC
         >
           {step === 1 ? (isConfigured ? "Cancelar" : "") : "← Voltar"}
         </button>
-        {step < 3 ? (
+        {step < TOTAL_STEPS ? (
           <button onClick={() => setStep(step + 1)} className="bg-blue-600 hover:bg-blue-500 rounded-xl px-5 py-2 text-sm font-medium">
             Continuar
           </button>
