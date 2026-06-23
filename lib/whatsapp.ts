@@ -83,6 +83,16 @@ export async function getInstanceStatus(token: string): Promise<UazapiInstanceSt
   return parseInstanceStatus(await res.json());
 }
 
+// Desconecta (logout) o WhatsApp da instância, sem excluir a instância — pode reconectar depois via QR code
+export async function disconnectInstance(token: string): Promise<void> {
+  const res = await fetch(`${UAZAPI_URL}/instance/disconnect`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", token },
+    body: JSON.stringify({}),
+  });
+  if (!res.ok) throw new Error(`Erro ao desconectar instância: ${res.status}`);
+}
+
 // Cria uma instância nova na UazAPI para uma empresa (multi-tenant) e retorna seu token dedicado
 export async function createInstance(name: string): Promise<{ token: string; name: string }> {
   if (!UAZAPI_ADMIN_TOKEN) throw new Error("UAZAPI_ADMIN_TOKEN não configurado");

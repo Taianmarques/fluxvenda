@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { WhatsappAgentClient } from "./WhatsappAgentClient";
 import { QrConnect } from "./QrConnect";
+import { AgentActions } from "./AgentActions";
+import { getInstanceStatus } from "@/lib/whatsapp";
 
 function daysAgo(n: number) {
   const d = new Date();
@@ -45,7 +47,9 @@ export default async function WhatsappAgentPage() {
     );
   }
 
-  if (!config.active) {
+  const instanceStatus = await getInstanceStatus(config.uazapiToken).catch(() => ({ connected: false }));
+
+  if (!instanceStatus.connected) {
     return (
       <div className="min-h-screen bg-gray-950 text-white p-6">
         <div className="max-w-md mx-auto space-y-6">
@@ -75,7 +79,14 @@ export default async function WhatsappAgentPage() {
             <h1 className="text-3xl font-bold mt-2">🤖 {config.nome}</h1>
             <p className="text-gray-400 mt-1">Agente de atendimento conectado ao WhatsApp da sua empresa.</p>
           </div>
-          <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-green-900/40 text-green-300 border border-green-800/50">● Ativo</span>
+          <div className="flex items-center gap-3">
+            <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${
+              config.active ? "bg-green-900/40 text-green-300 border-green-800/50" : "bg-yellow-900/40 text-yellow-300 border-yellow-800/50"
+            }`}>
+              {config.active ? "● Ativo" : "⏸ Pausado"}
+            </span>
+            <AgentActions active={config.active} />
+          </div>
         </div>
 
         <div className="grid grid-cols-3 gap-4">
