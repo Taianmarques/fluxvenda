@@ -625,4 +625,7 @@ model Message {
 
   role    String // user | assistant | human
   content String
+
+  mediaUrl  String? // url pública (já descriptografada via UazAPI) da mídia, se houver
+  mediaType String? // image | video | audio | document
 }

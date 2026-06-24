@@ -43,6 +43,39 @@ export async function sendWhatsAppTextAsTeam(token: string, phone: string, text:
   await sendText(UAZAPI_URL, token, phone, text);
 }
 
+export type MediaType = "image" | "video" | "audio" | "document";
+
+// Envia uma mídia (foto, vídeo, áudio ou documento) pela instância própria de uma empresa.
+// `fileBase64` é o conteúdo puro em base64 (sem prefixo "data:...;base64,").
+export async function sendMediaAsTeam(
+  token: string,
+  phone: string,
+  type: MediaType,
+  fileBase64: string,
+  options?: { caption?: string; fileName?: string }
+): Promise<{ messageid: string }> {
+  const number = formatPhone(phone);
+
+  const res = await fetch(`${UAZAPI_URL}/send/media`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", token },
+    body: JSON.stringify({
+      number,
+      type,
+      file: fileBase64,
+      ...(options?.caption && { caption: options.caption }),
+      ...(options?.fileName && { docName: options.fileName }),
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Erro ao enviar mídia: ${res.status} ${body}`);
+  }
+
+  return res.json();
+}
+
 export type UazapiInstanceStatus = {
   connected: boolean;
   qrcode: string | null;

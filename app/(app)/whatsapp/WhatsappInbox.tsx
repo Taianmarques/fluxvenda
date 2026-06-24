@@ -21,8 +21,28 @@ type Message = {
   id: string;
   role: string;
   content: string;
+  mediaUrl?: string | null;
+  mediaType?: string | null;
   createdAt: string;
 };
+
+type MediaKind = "image" | "video" | "audio" | "document";
+
+type Attachment = {
+  base64: string;
+  type: MediaKind;
+  fileName: string;
+  previewUrl: string;
+};
+
+const MAX_ATTACHMENT_MB = 15;
+
+function detectMediaKind(mime: string): MediaKind {
+  if (mime.startsWith("image/")) return "image";
+  if (mime.startsWith("video/")) return "video";
+  if (mime.startsWith("audio/")) return "audio";
+  return "document";
+}
 
 type ConversationDetail = {
   id: string;
@@ -83,6 +103,23 @@ function timeAgo(iso: string) {
   return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
+function MediaContent({ mediaUrl, mediaType, content }: { mediaUrl: string; mediaType: string; content: string }) {
+  const isPlaceholder = !content || content.startsWith("[");
+  return (
+    <div>
+      {mediaType === "image" && <img src={mediaUrl} alt="" className="rounded-lg max-w-[240px] max-h-[240px] object-cover mb-1" />}
+      {mediaType === "video" && <video controls src={mediaUrl} className="rounded-lg max-w-[240px] mb-1" />}
+      {mediaType === "audio" && <audio controls src={mediaUrl} className="mb-1" />}
+      {mediaType === "document" && (
+        <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 underline mb-1">
+          📄 {isPlaceholder ? "Documento" : content}
+        </a>
+      )}
+      {!isPlaceholder && mediaType !== "document" && <p className="whitespace-pre-wrap">{content}</p>}
+    </div>
+  );
+}
+
 export function WhatsappInbox({
   agentName, initialConversations, initialStages, initialLeadStatuses,
 }: {
@@ -100,7 +137,10 @@ export function WhatsappInbox({
   const [detail, setDetail] = useState<ConversationDetail | null>(null);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [attachment, setAttachment] = useState<Attachment | null>(null);
+  const [attachError, setAttachError] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const t = THEMES[theme];
 
   useEffect(() => {
@@ -178,16 +218,47 @@ export function WhatsappInbox({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [detail?.messages.length]);
 
+  function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    setAttachError("");
+    if (file.size > MAX_ATTACHMENT_MB * 1024 * 1024) {
+      setAttachError(`Arquivo muito grande (máx. ${MAX_ATTACHMENT_MB}MB).`);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const base64 = dataUrl.split(",")[1] ?? "";
+      setAttachment({
+        base64,
+        type: detectMediaKind(file.type),
+        fileName: file.name,
+        previewUrl: dataUrl,
+      });
+    };
+    reader.onerror = () => setAttachError("Não foi possível ler o arquivo.");
+    reader.readAsDataURL(file);
+  }
+
   async function handleSend() {
-    if (!input.trim() || !selectedId || sending) return;
+    if ((!input.trim() && !attachment) || !selectedId || sending) return;
     const content = input.trim();
+    const media = attachment;
     setInput("");
+    setAttachment(null);
     setSending(true);
     try {
       await fetch(`/api/ferramentas/whatsapp/conversas/${selectedId}/mensagem`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({
+          ...(content && { content }),
+          ...(media && { media: { base64: media.base64, type: media.type, fileName: media.fileName } }),
+        }),
       });
       await refreshDetail(selectedId);
       await refreshList();
@@ -316,7 +387,11 @@ export function WhatsappInbox({
                         }`}>
                           {m.role === "human" && <p className="text-[10px] opacity-70 mb-0.5">Você (atendente)</p>}
                           {m.role === "assistant" && <p className="text-[10px] opacity-70 mb-0.5">🤖 {agentName}</p>}
-                          <p className="whitespace-pre-wrap">{m.content}</p>
+                          {m.mediaUrl && m.mediaType ? (
+                            <MediaContent mediaUrl={m.mediaUrl} mediaType={m.mediaType} content={m.content} />
+                          ) : (
+                            <p className="whitespace-pre-wrap">{m.content}</p>
+                          )}
                           <p className="text-[10px] opacity-60 mt-1 text-right">{new Date(m.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</p>
                         </div>
                       </div>
@@ -325,17 +400,41 @@ export function WhatsappInbox({
                   <div ref={bottomRef} />
                 </div>
 
-                <div className={`p-4 border-t flex gap-2 ${t.inputBar}`}>
-                  <input
-                    value={input}
-                    onChange={e => setInput(e.target.value)}
-                    onKeyDown={e => e.key === "Enter" && handleSend()}
-                    placeholder="Digite uma mensagem para assumir a conversa..."
-                    className={`flex-1 border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-green-600 ${t.inputField}`}
-                  />
-                  <button onClick={handleSend} disabled={sending} className="bg-green-700 hover:bg-green-600 disabled:opacity-50 rounded-xl px-5 py-2.5 text-sm font-medium text-white">
-                    Enviar
-                  </button>
+                <div className={`p-4 border-t ${t.inputBar}`}>
+                  {attachError && <p className="text-xs text-red-400 mb-2">{attachError}</p>}
+                  {attachment && (
+                    <div className={`flex items-center gap-2 mb-2 p-2 rounded-lg border ${t.inputField}`}>
+                      {attachment.type === "image" ? (
+                        <img src={attachment.previewUrl} alt="" className="w-10 h-10 object-cover rounded" />
+                      ) : (
+                        <span className="text-lg">
+                          {attachment.type === "video" ? "🎬" : attachment.type === "audio" ? "🎤" : "📄"}
+                        </span>
+                      )}
+                      <span className="text-xs truncate flex-1">{attachment.fileName}</span>
+                      <button onClick={() => setAttachment(null)} className="text-gray-500 hover:text-red-400 text-xs px-1">✕</button>
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} />
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      title="Anexar foto, vídeo, áudio ou documento"
+                      className={`px-3 rounded-xl border text-lg ${t.inputField}`}
+                    >
+                      📎
+                    </button>
+                    <input
+                      value={input}
+                      onChange={e => setInput(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && handleSend()}
+                      placeholder={attachment ? "Adicionar legenda (opcional)..." : "Digite uma mensagem para assumir a conversa..."}
+                      className={`flex-1 border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-green-600 ${t.inputField}`}
+                    />
+                    <button onClick={handleSend} disabled={sending} className="bg-green-700 hover:bg-green-600 disabled:opacity-50 rounded-xl px-5 py-2.5 text-sm font-medium text-white">
+                      Enviar
+                    </button>
+                  </div>
                 </div>
               </>
             )}
