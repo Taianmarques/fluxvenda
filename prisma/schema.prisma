@@ -548,9 +548,10 @@ model AgentConfig {
   followupDelayHours  Int     @default(24)
   followupMaxAttempts Int     @default(2)
 
-  schedulingEnabled   Boolean @default(false)
-  slotDurationMinutes Int     @default(30)
-  availability        Json    @default("[]") // [{ dayOfWeek: 0-6, start: "09:00", end: "18:00" }]
+  schedulingEnabled        Boolean @default(false)
+  slotDurationMinutes      Int     @default(30)
+  availability             Json    @default("[]") // [{ dayOfWeek: 0-6, start: "09:00", end: "18:00" }]
+  appointmentReminderHours Int     @default(24) // quantas horas antes do compromisso enviar a confirmação
 
   conversations Conversation[]
   pipelineStages PipelineStage[]
@@ -576,6 +577,8 @@ model Appointment {
   durationMinutes Int      @default(30)
   notes           String   @default("")
   status          AppointmentStatus @default(CONFIRMADO)
+
+  reminderSentAt DateTime? // quando o lembrete de confirmação foi enviado (evita reenvio)
 }
 
 enum AppointmentStatus {

@@ -148,6 +148,14 @@ export const SCHEDULING_TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "cancelar_agendamento",
+      description: "Cancela o próximo agendamento confirmado dessa conversa. Use quando o cliente disser que não pode ir ao compromisso ou pedir para cancelar.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
 ];
 
 // Roda o agente com acesso a ferramentas (ex: agendamento) — chama o modelo em loop até ele

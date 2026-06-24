@@ -35,15 +35,17 @@ function fmtDate(d: Date): string {
 }
 
 export function AgendaClient({
-  initialSchedulingEnabled, initialSlotDurationMinutes, initialAvailability,
+  initialSchedulingEnabled, initialSlotDurationMinutes, initialAvailability, initialAppointmentReminderHours,
 }: {
   initialSchedulingEnabled: boolean;
   initialSlotDurationMinutes: number;
   initialAvailability: AvailabilityRule[];
+  initialAppointmentReminderHours: number;
 }) {
   const [showSettings, setShowSettings] = useState(false);
   const [schedulingEnabled, setSchedulingEnabled] = useState(initialSchedulingEnabled);
   const [slotDurationMinutes, setSlotDurationMinutes] = useState(initialSlotDurationMinutes);
+  const [appointmentReminderHours, setAppointmentReminderHours] = useState(initialAppointmentReminderHours);
   const [rules, setRules] = useState<Record<number, { enabled: boolean; start: string; end: string }>>(() => {
     const base: Record<number, { enabled: boolean; start: string; end: string }> = {};
     for (let i = 0; i < 7; i++) {
@@ -91,7 +93,7 @@ export function AgendaClient({
       await fetch("/api/ferramentas/whatsapp/agenda", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ schedulingEnabled, slotDurationMinutes, availability }),
+        body: JSON.stringify({ schedulingEnabled, slotDurationMinutes, availability, appointmentReminderHours }),
       });
     } finally {
       setSavingSettings(false);
@@ -187,6 +189,16 @@ export function AgendaClient({
                 onChange={e => setSlotDurationMinutes(Math.max(5, Number(e.target.value)))}
                 className="w-32 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
               />
+            </div>
+
+            <div>
+              <label className="text-sm text-gray-400 block mb-1">Enviar lembrete de confirmação quantas horas antes do compromisso</label>
+              <input
+                type="number" min={1} max={168} value={appointmentReminderHours}
+                onChange={e => setAppointmentReminderHours(Math.max(1, Number(e.target.value)))}
+                className="w-32 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+              />
+              <p className="text-xs text-gray-500 mt-1">O agente pergunta se o cliente confirma presença. Se ele disser que não pode ir, a IA cancela e já oferece reagendar.</p>
             </div>
 
             <div>

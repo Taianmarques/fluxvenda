@@ -34,6 +34,7 @@ export default async function AgendaPage() {
       initialSchedulingEnabled={config.schedulingEnabled}
       initialSlotDurationMinutes={config.slotDurationMinutes}
       initialAvailability={config.availability as any}
+      initialAppointmentReminderHours={config.appointmentReminderHours}
     />
   );
 }

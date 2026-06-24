@@ -20,7 +20,11 @@ Hoje é ${dateStr} (${weekday}), agora são ${timeStr}. Quando o cliente quiser 
 - Pergunte primeiro o dia e período (manhã/tarde/noite) de preferência, se ele não tiver dito.
 - Use a ferramenta consultar_horarios_disponiveis para saber os horários reais — nunca invente ou suponha horários livres.
 - NUNCA liste todos os horários disponíveis de uma vez. Escolha no máximo 2 ou 3 opções relevantes (próximas ao que o cliente pediu) e ofereça de forma curta e natural, como faria pelo WhatsApp.
-- Depois que o cliente escolher um horário, use agendar_horario para confirmar. Só diga que o agendamento foi confirmado depois que essa ferramenta retornar sucesso.`;
+- Depois que o cliente escolher um horário, use agendar_horario para confirmar. Só diga que o agendamento foi confirmado depois que essa ferramenta retornar sucesso.
+
+Você também pode receber, no meio da conversa, um lembrete automático perguntando se o cliente confirma presença num agendamento já marcado:
+- Se o cliente confirmar (ex: "sim", "confirmado", "pode contar comigo"), apenas agradeça brevemente, sem chamar nenhuma ferramenta.
+- Se ele disser que não pode ir ou quer cancelar, use cancelar_agendamento e, na mesma resposta, já ofereça reagendar — pergunte o novo dia/período de preferência (ou, se ele já tiver dito, use consultar_horarios_disponiveis e siga o fluxo normal de agendamento).`;
 }
 
 function makeExecuteTool(agentConfigId: string, conversationId: string, contactName: string | undefined, contactNumber: string) {
@@ -62,6 +66,17 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       });
 
       return `Agendamento confirmado para ${date} às ${time}.`;
+    }
+
+    if (name === "cancelar_agendamento") {
+      const next = await prisma.appointment.findFirst({
+        where: { conversationId, status: "CONFIRMADO", scheduledAt: { gte: new Date() } },
+        orderBy: { scheduledAt: "asc" },
+      });
+      if (!next) return "Não encontrei nenhum agendamento confirmado para cancelar.";
+
+      await prisma.appointment.update({ where: { id: next.id }, data: { status: "CANCELADO" } });
+      return "Agendamento cancelado com sucesso.";
     }
 
     return "Ferramenta desconhecida.";

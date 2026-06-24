@@ -22,6 +22,7 @@ export async function GET() {
     schedulingEnabled: config.schedulingEnabled,
     slotDurationMinutes: config.slotDurationMinutes,
     availability: config.availability,
+    appointmentReminderHours: config.appointmentReminderHours,
   });
 }
 
@@ -35,6 +36,7 @@ const schema = z.object({
   schedulingEnabled: z.boolean().optional(),
   slotDurationMinutes: z.number().int().min(5).max(480).optional(),
   availability: z.array(ruleSchema).optional(),
+  appointmentReminderHours: z.number().int().min(1).max(168).optional(),
 });
 
 export async function PATCH(req: NextRequest) {
@@ -56,5 +58,6 @@ export async function PATCH(req: NextRequest) {
     schedulingEnabled: updated.schedulingEnabled,
     slotDurationMinutes: updated.slotDurationMinutes,
     availability: updated.availability,
+    appointmentReminderHours: updated.appointmentReminderHours,
   });
 }

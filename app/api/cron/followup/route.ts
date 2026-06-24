@@ -9,6 +9,12 @@ function hoursAgo(n: number) {
   return d;
 }
 
+function hoursFromNow(n: number) {
+  const d = new Date();
+  d.setHours(d.getHours() + n);
+  return d;
+}
+
 // Disparado por um scheduler externo (crontab/cron-job.org) com:
 // Authorization: Bearer <CRON_SECRET>
 export async function POST(req: NextRequest) {
@@ -62,5 +68,40 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, checked, sent });
+  // Lembretes de confirmação de agendamento
+  let remindersChecked = 0;
+  let remindersSent = 0;
+
+  const schedulingConfigs = await prisma.agentConfig.findMany({
+    where: { active: true, schedulingEnabled: true, uazapiToken: { not: null } },
+  });
+
+  for (const config of schedulingConfigs) {
+    if (!config.uazapiToken) continue;
+
+    const dueAppointments = await prisma.appointment.findMany({
+      where: {
+        agentConfigId: config.id,
+        status: "CONFIRMADO",
+        reminderSentAt: null,
+        scheduledAt: { gt: new Date(), lte: hoursFromNow(config.appointmentReminderHours) },
+      },
+    });
+
+    for (const appointment of dueAppointments) {
+      remindersChecked++;
+      const dateStr = appointment.scheduledAt.toLocaleDateString("pt-BR");
+      const timeStr = appointment.scheduledAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      const message = `Olá! Passando para confirmar seu agendamento de ${dateStr} às ${timeStr}. Você confirma presença?`;
+
+      if (appointment.conversationId) {
+        await prisma.message.create({ data: { conversationId: appointment.conversationId, role: "assistant", content: message } });
+      }
+      await prisma.appointment.update({ where: { id: appointment.id }, data: { reminderSentAt: new Date() } });
+      await sendWhatsAppTextAsTeam(config.uazapiToken, appointment.contactNumber, message);
+      remindersSent++;
+    }
+  }
+
+  return NextResponse.json({ ok: true, checked, sent, remindersChecked, remindersSent });
 }
