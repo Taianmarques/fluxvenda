@@ -139,8 +139,13 @@ export function WhatsappInbox({
   const [sending, setSending] = useState(false);
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const [attachError, setAttachError] = useState("");
+  const [recording, setRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const t = THEMES[theme];
 
   useEffect(() => {
@@ -218,6 +223,19 @@ export function WhatsappInbox({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [detail?.messages.length]);
 
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      mediaRecorderRef.current?.stream.getTracks().forEach(track => track.stop());
+    };
+  }, []);
+
+  function formatRecordingTime(seconds: number) {
+    const m = Math.floor(seconds / 60).toString().padStart(2, "0");
+    const s = (seconds % 60).toString().padStart(2, "0");
+    return `${m}:${s}`;
+  }
+
   function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -242,6 +260,55 @@ export function WhatsappInbox({
     };
     reader.onerror = () => setAttachError("Não foi possível ler o arquivo.");
     reader.readAsDataURL(file);
+  }
+
+  async function startRecording() {
+    setAttachError("");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      recordedChunksRef.current = [];
+
+      recorder.ondataavailable = e => { if (e.data.size > 0) recordedChunksRef.current.push(e.data); };
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setRecording(true);
+      setRecordingSeconds(0);
+      recordingTimerRef.current = setInterval(() => setRecordingSeconds(s => s + 1), 1000);
+    } catch {
+      setAttachError("Não foi possível acessar o microfone. Verifique a permissão do navegador.");
+    }
+  }
+
+  function stopRecording(save: boolean) {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder) return;
+
+    if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+
+    recorder.onstop = () => {
+      recorder.stream.getTracks().forEach(track => track.stop());
+      setRecording(false);
+
+      if (!save) return;
+
+      const blob = new Blob(recordedChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        const base64 = dataUrl.split(",")[1] ?? "";
+        setAttachment({
+          base64,
+          type: "audio",
+          fileName: `gravacao-${Date.now()}.webm`,
+          previewUrl: dataUrl,
+        });
+      };
+      reader.readAsDataURL(blob);
+    };
+
+    recorder.stop();
   }
 
   async function handleSend() {
@@ -406,35 +473,57 @@ export function WhatsappInbox({
                     <div className={`flex items-center gap-2 mb-2 p-2 rounded-lg border ${t.inputField}`}>
                       {attachment.type === "image" ? (
                         <img src={attachment.previewUrl} alt="" className="w-10 h-10 object-cover rounded" />
+                      ) : attachment.type === "audio" ? (
+                        <audio controls src={attachment.previewUrl} className="h-8 flex-1" />
                       ) : (
-                        <span className="text-lg">
-                          {attachment.type === "video" ? "🎬" : attachment.type === "audio" ? "🎤" : "📄"}
-                        </span>
+                        <span className="text-lg">{attachment.type === "video" ? "🎬" : "📄"}</span>
                       )}
-                      <span className="text-xs truncate flex-1">{attachment.fileName}</span>
-                      <button onClick={() => setAttachment(null)} className="text-gray-500 hover:text-red-400 text-xs px-1">✕</button>
+                      {attachment.type !== "audio" && <span className="text-xs truncate flex-1">{attachment.fileName}</span>}
+                      <button onClick={() => setAttachment(null)} className="text-gray-500 hover:text-red-400 text-xs px-1 flex-shrink-0">✕</button>
                     </div>
                   )}
-                  <div className="flex gap-2">
-                    <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} />
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      title="Anexar foto, vídeo, áudio ou documento"
-                      className={`px-3 rounded-xl border text-lg ${t.inputField}`}
-                    >
-                      📎
-                    </button>
-                    <input
-                      value={input}
-                      onChange={e => setInput(e.target.value)}
-                      onKeyDown={e => e.key === "Enter" && handleSend()}
-                      placeholder={attachment ? "Adicionar legenda (opcional)..." : "Digite uma mensagem para assumir a conversa..."}
-                      className={`flex-1 border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-green-600 ${t.inputField}`}
-                    />
-                    <button onClick={handleSend} disabled={sending} className="bg-green-700 hover:bg-green-600 disabled:opacity-50 rounded-xl px-5 py-2.5 text-sm font-medium text-white">
-                      Enviar
-                    </button>
-                  </div>
+
+                  {recording ? (
+                    <div className={`flex items-center gap-3 rounded-xl border px-4 py-2.5 ${t.inputField}`}>
+                      <span className="relative flex h-2.5 w-2.5">
+                        <span className="absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75 animate-ping" />
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
+                      </span>
+                      <span className="text-sm flex-1">Gravando... {formatRecordingTime(recordingSeconds)}</span>
+                      <button onClick={() => stopRecording(false)} title="Cancelar" className="text-gray-500 hover:text-red-400 text-lg">🗑️</button>
+                      <button onClick={() => stopRecording(true)} title="Usar áudio" className="bg-green-700 hover:bg-green-600 text-white rounded-lg px-3 py-1 text-sm font-medium">
+                        ✓ Usar
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} />
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        title="Anexar foto, vídeo, áudio ou documento"
+                        className={`px-3 rounded-xl border text-lg ${t.inputField}`}
+                      >
+                        📎
+                      </button>
+                      <button
+                        onClick={startRecording}
+                        title="Gravar áudio"
+                        className={`px-3 rounded-xl border text-lg ${t.inputField}`}
+                      >
+                        🎤
+                      </button>
+                      <input
+                        value={input}
+                        onChange={e => setInput(e.target.value)}
+                        onKeyDown={e => e.key === "Enter" && handleSend()}
+                        placeholder={attachment ? "Adicionar legenda (opcional)..." : "Digite uma mensagem para assumir a conversa..."}
+                        className={`flex-1 border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-green-600 ${t.inputField}`}
+                      />
+                      <button onClick={handleSend} disabled={sending} className="bg-green-700 hover:bg-green-600 disabled:opacity-50 rounded-xl px-5 py-2.5 text-sm font-medium text-white">
+                        Enviar
+                      </button>
+                    </div>
+                  )}
                 </div>
               </>
             )}
