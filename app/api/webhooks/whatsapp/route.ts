@@ -1,12 +1,71 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { runAgent, runAgentWithImage, transcribeAudio } from "@/lib/agent-engine";
+import { runAgent, runAgentWithImage, runAgentWithTools, transcribeAudio, SCHEDULING_TOOLS } from "@/lib/agent-engine";
 import { sendWhatsAppTextAsTeam, downloadMessageMedia } from "@/lib/whatsapp";
+import { getAvailableSlots, isSlotAvailable, formatSlotsForAgent, type AvailabilityRule } from "@/lib/scheduling";
 
 function mediaMimetype(message: any): string | null {
   return typeof message?.content === "object" && typeof message.content?.mimetype === "string"
     ? message.content.mimetype
     : null;
+}
+
+function buildSchedulingContext(): string {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("pt-BR");
+  const weekday = now.toLocaleDateString("pt-BR", { weekday: "long" });
+  const timeStr = now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  return `\n\nFERRAMENTAS DE AGENDAMENTO:
+Hoje é ${dateStr} (${weekday}), agora são ${timeStr}. Quando o cliente quiser agendar algo:
+- Pergunte primeiro o dia e período (manhã/tarde/noite) de preferência, se ele não tiver dito.
+- Use a ferramenta consultar_horarios_disponiveis para saber os horários reais — nunca invente ou suponha horários livres.
+- NUNCA liste todos os horários disponíveis de uma vez. Escolha no máximo 2 ou 3 opções relevantes (próximas ao que o cliente pediu) e ofereça de forma curta e natural, como faria pelo WhatsApp.
+- Depois que o cliente escolher um horário, use agendar_horario para confirmar. Só diga que o agendamento foi confirmado depois que essa ferramenta retornar sucesso.`;
+}
+
+function makeExecuteTool(agentConfigId: string, conversationId: string, contactName: string | undefined, contactNumber: string) {
+  return async function executeTool(name: string, args: any): Promise<string> {
+    const config = await prisma.agentConfig.findUnique({ where: { id: agentConfigId } });
+    if (!config) return "Erro interno: configuração do agente não encontrada.";
+
+    const availability = config.availability as unknown as AvailabilityRule[];
+
+    if (name === "consultar_horarios_disponiveis") {
+      const busy = await prisma.appointment.findMany({
+        where: { agentConfigId, status: "CONFIRMADO" },
+        select: { scheduledAt: true, durationMinutes: true },
+      });
+      const slots = getAvailableSlots(availability, config.slotDurationMinutes, busy);
+      return formatSlotsForAgent(slots);
+    }
+
+    if (name === "agendar_horario") {
+      const { date, time, notes } = args;
+      if (!date || !time) return "Erro: data e horário são obrigatórios.";
+
+      const scheduledAt = new Date(`${date}T${time}:00`);
+      if (isNaN(scheduledAt.getTime())) return "Erro: data ou horário em formato inválido.";
+
+      const busy = await prisma.appointment.findMany({
+        where: { agentConfigId, status: "CONFIRMADO" },
+        select: { scheduledAt: true, durationMinutes: true },
+      });
+
+      const available = isSlotAvailable(availability, config.slotDurationMinutes, busy, scheduledAt);
+      if (!available) return "Esse horário não está mais disponível. Consulte os horários disponíveis novamente e ofereça outra opção ao cliente.";
+
+      await prisma.appointment.create({
+        data: {
+          agentConfigId, conversationId, contactName, contactNumber,
+          scheduledAt, durationMinutes: config.slotDurationMinutes, notes: notes ?? "",
+        },
+      });
+
+      return `Agendamento confirmado para ${date} às ${time}.`;
+    }
+
+    return "Ferramenta desconhecida.";
+  };
 }
 
 export async function POST(req: NextRequest) {
@@ -92,9 +151,20 @@ export async function POST(req: NextRequest) {
   // de tudo que já foi dito pela empresa, mesmo no período em que esteve em atendimento manual.
   const historyForAgent = history.map(m => ({ role: m.role === "user" ? "user" as const : "assistant" as const, content: m.content }));
 
-  const reply = imageUrl
-    ? await runAgentWithImage(config.systemPrompt, historyForAgent, imageUrl, caption)
-    : await runAgent(config.systemPrompt, historyForAgent, text);
+  let reply: string;
+  if (imageUrl) {
+    reply = await runAgentWithImage(config.systemPrompt, historyForAgent, imageUrl, caption);
+  } else if (config.schedulingEnabled) {
+    reply = await runAgentWithTools(
+      config.systemPrompt + buildSchedulingContext(),
+      historyForAgent,
+      text,
+      SCHEDULING_TOOLS,
+      makeExecuteTool(config.id, conversation.id, contactName, contactNumber)
+    );
+  } else {
+    reply = await runAgent(config.systemPrompt, historyForAgent, text);
+  }
 
   await prisma.message.create({ data: { conversationId: conversation.id, role: "assistant", content: reply } });
 

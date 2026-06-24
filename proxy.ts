@@ -13,7 +13,7 @@ const isPublicRoute = createRouteMatcher([
   "/api/cron(.*)",          // protegido por CRON_SECRET, não por sessão de usuário
 ]);
 
-const isGestorRoute = createRouteMatcher(["/gestor(.*)", "/ferramentas(.*)", "/whatsapp(.*)"]);
+const isGestorRoute = createRouteMatcher(["/gestor(.*)", "/ferramentas(.*)", "/whatsapp(.*)", "/agenda(.*)"]);
 const isVendedorRoute = createRouteMatcher(["/dashboard(.*)", "/scanner(.*)", "/simulacao(.*)", "/trilhas(.*)", "/objecoes(.*)", "/scripts(.*)"]);
 
 export default clerkMiddleware(async (auth, req) => {

@@ -8,6 +8,8 @@
 #   bash setup.sh
 set -e
 
+export TZ=America/Sao_Paulo
+
 REPO_URL="https://github.com/Taianmarques/fluxvenda.git"
 APP_DIR="$HOME/fluxvenda"
 APP_NAME="fluxvenda"
@@ -79,7 +81,7 @@ fi
 
 echo "==> Iniciando/reiniciando com PM2..."
 if pm2 describe "$APP_NAME" > /dev/null 2>&1; then
-  pm2 restart "$APP_NAME"
+  pm2 restart "$APP_NAME" --update-env
 else
   pm2 start npm --name "$APP_NAME" -- start -- -p $PORT
   pm2 startup > /dev/null 2>&1 || true

@@ -33,6 +33,7 @@ RUN npm run build
 
 ENV NODE_ENV=production
 ENV PORT=3002
+ENV TZ=America/Sao_Paulo
 EXPOSE 3002
 
 CMD ["sh", "-c", "npx prisma migrate deploy && npm run start -- -p 3002"]

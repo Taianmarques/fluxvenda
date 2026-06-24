@@ -123,6 +123,75 @@ export async function runAgentWithImage(
   return completion.choices[0]?.message?.content?.trim() ?? "Desculpe, não consegui processar a imagem.";
 }
 
+export const SCHEDULING_TOOLS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "consultar_horarios_disponiveis",
+      description: "Consulta os horários reais disponíveis para agendamento nos próximos dias. Use SEMPRE antes de propor qualquer data/horário ao cliente — nunca invente horários.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "agendar_horario",
+      description: "Confirma um agendamento numa data e hora específicas, depois que o cliente escolheu um horário dentre os disponíveis retornados por consultar_horarios_disponiveis.",
+      parameters: {
+        type: "object",
+        properties: {
+          date: { type: "string", description: "Data no formato YYYY-MM-DD" },
+          time: { type: "string", description: "Horário no formato HH:mm" },
+          notes: { type: "string", description: "Observações sobre o agendamento, se houver" },
+        },
+        required: ["date", "time"],
+      },
+    },
+  },
+];
+
+// Roda o agente com acesso a ferramentas (ex: agendamento) — chama o modelo em loop até ele
+// parar de pedir ferramentas e devolver uma resposta final em texto.
+export async function runAgentWithTools(
+  systemPrompt: string,
+  history: { role: "user" | "assistant"; content: string }[],
+  newMessage: string,
+  tools: typeof SCHEDULING_TOOLS,
+  executeTool: (name: string, args: any) => Promise<string>
+): Promise<string> {
+  const messages: any[] = [
+    { role: "system", content: systemPrompt },
+    ...history.map(m => ({ role: m.role, content: m.content })),
+    { role: "user", content: newMessage },
+  ];
+
+  for (let round = 0; round < 3; round++) {
+    const completion = await openai.chat.completions.create({
+      model: MODEL,
+      max_tokens: 400,
+      messages,
+      tools,
+    });
+    const msg = completion.choices[0]?.message;
+    if (!msg) break;
+
+    if (!msg.tool_calls || msg.tool_calls.length === 0) {
+      return msg.content?.trim() ?? "Desculpe, não consegui processar sua mensagem.";
+    }
+
+    messages.push(msg);
+    for (const call of msg.tool_calls) {
+      if (call.type !== "function") continue;
+      let args: any = {};
+      try { args = JSON.parse(call.function.arguments || "{}"); } catch {}
+      const result = await executeTool(call.function.name, args);
+      messages.push({ role: "tool", tool_call_id: call.id, content: result });
+    }
+  }
+
+  return "Desculpe, não consegui processar sua mensagem.";
+}
+
 export async function generateFollowupMessage(
   systemPrompt: string,
   history: { role: "user" | "assistant"; content: string }[],
