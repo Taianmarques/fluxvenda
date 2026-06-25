@@ -16,6 +16,7 @@ export default async function FerramentasPage() {
   });
 
   const whatsappConfigured = Boolean(team?.agentConfig?.active);
+  const schedulingEnabled = Boolean(team?.agentConfig?.schedulingEnabled);
 
   const TOOLS = [
     {
@@ -25,6 +26,14 @@ export default async function FerramentasPage() {
       description: "Conecte o WhatsApp da sua empresa a um agente de IA treinado para qualificar leads e responder objeções automaticamente.",
       status: whatsappConfigured ? "Ativo" : "Não configurado",
       statusColor: whatsappConfigured ? "bg-green-900/40 text-green-300 border-green-800/50" : "bg-gray-800 text-gray-400 border-gray-700",
+    },
+    {
+      href: "/agenda",
+      icon: "📅",
+      title: "Agendamento via WhatsApp",
+      description: "O agente de IA consulta sua disponibilidade real e marca compromissos direto na conversa, sem precisar de confirmação manual.",
+      status: !whatsappConfigured ? "Requer WhatsApp ativo" : schedulingEnabled ? "Ativo" : "Não configurado",
+      statusColor: whatsappConfigured && schedulingEnabled ? "bg-green-900/40 text-green-300 border-green-800/50" : "bg-gray-800 text-gray-400 border-gray-700",
     },
   ];
 
