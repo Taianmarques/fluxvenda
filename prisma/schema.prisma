@@ -544,9 +544,8 @@ model AgentConfig {
   uazapiInstance String?
   uazapiToken    String?
 
-  followupEnabled     Boolean @default(true)
-  followupDelayHours  Int     @default(24)
-  followupMaxAttempts Int     @default(2)
+  followupEnabled       Boolean @default(true)
+  followupDelaysMinutes Json    @default("[1440]") // minutos de espera por tentativa, ex: [1440, 720] = 24h, depois +12h. O número de tentativas é o tamanho do array.
 
   schedulingEnabled        Boolean @default(false)
   slotDurationMinutes      Int     @default(30)

@@ -15,9 +15,24 @@ type InitialConfig = {
   precos: string;
   enderecoContato: string;
   followupEnabled: boolean;
-  followupDelayHours: number;
-  followupMaxAttempts: number;
+  followupDelaysMinutes: number[];
 } | null;
+
+type DelayUnit = "horas" | "minutos";
+type DelayRow = { value: number; unit: DelayUnit };
+
+function minutesToRow(minutes: number): DelayRow {
+  return minutes % 60 === 0 ? { value: minutes / 60, unit: "horas" } : { value: minutes, unit: "minutos" };
+}
+
+function rowToMinutes(row: DelayRow): number {
+  return row.unit === "horas" ? row.value * 60 : row.value;
+}
+
+function formatDelay(minutes: number): string {
+  if (minutes % 60 === 0) return `${minutes / 60}h`;
+  return `${minutes}min`;
+}
 
 const TOM_OPTIONS = [
   { value: "FORMAL", label: "Formal", description: "Protocolar, direto ao ponto" },
@@ -47,8 +62,20 @@ export function WhatsappAgentClient({ initialConfig }: { initialConfig: InitialC
   const [objecoes, setObjecoes] = useState((initialConfig?.objecoes ?? []).join("\n"));
   const [horario, setHorario] = useState(initialConfig?.horario ?? "Segunda a sexta, 9h às 18h");
   const [followupEnabled, setFollowupEnabled] = useState(initialConfig?.followupEnabled ?? true);
-  const [followupDelayHours, setFollowupDelayHours] = useState(initialConfig?.followupDelayHours ?? 24);
-  const [followupMaxAttempts, setFollowupMaxAttempts] = useState(initialConfig?.followupMaxAttempts ?? 2);
+  const [followupDelays, setFollowupDelays] = useState<DelayRow[]>(
+    (initialConfig?.followupDelaysMinutes ?? [1440, 1440]).map(minutesToRow)
+  );
+
+  function addFollowupAttempt() {
+    const last = followupDelays[followupDelays.length - 1] ?? { value: 24, unit: "horas" as DelayUnit };
+    setFollowupDelays([...followupDelays, { ...last }]);
+  }
+  function removeFollowupAttempt(i: number) {
+    setFollowupDelays(followupDelays.filter((_, idx) => idx !== i));
+  }
+  function updateFollowupAttempt(i: number, row: Partial<DelayRow>) {
+    setFollowupDelays(followupDelays.map((r, idx) => (idx === i ? { ...r, ...row } : r)));
+  }
 
   const [showTest, setShowTest] = useState(false);
   const [chat, setChat] = useState<ChatMsg[]>([]);
@@ -73,8 +100,7 @@ export function WhatsappAgentClient({ initialConfig }: { initialConfig: InitialC
           objecoes: splitLines(objecoes),
           horario,
           followupEnabled,
-          followupDelayHours,
-          followupMaxAttempts,
+          followupDelaysMinutes: followupDelays.map(rowToMinutes),
         }),
       });
       if (!res.ok) throw new Error();
@@ -125,7 +151,9 @@ export function WhatsappAgentClient({ initialConfig }: { initialConfig: InitialC
           {enderecoContato && <p className="text-sm text-gray-400">Endereço/contato: <span className="text-gray-300">{enderecoContato}</span></p>}
           <p className="text-sm text-gray-400">
             Follow-up: <span className="text-gray-300">
-              {followupEnabled ? `a cada ${followupDelayHours}h, até ${followupMaxAttempts} tentativa${followupMaxAttempts === 1 ? "" : "s"}` : "desativado"}
+              {followupEnabled
+                ? `${followupDelays.length} tentativa${followupDelays.length === 1 ? "" : "s"} (${followupDelays.map(rowToMinutes).map(formatDelay).join(" → ")})`
+                : "desativado"}
             </span>
           </p>
         </div>
@@ -261,23 +289,34 @@ export function WhatsappAgentClient({ initialConfig }: { initialConfig: InitialC
           </label>
 
           {followupEnabled && (
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm text-gray-400 block mb-1">Esperar (horas) sem resposta</label>
-                <input
-                  type="number" min={1} max={720} value={followupDelayHours}
-                  onChange={e => setFollowupDelayHours(Math.max(1, Number(e.target.value)))}
-                  className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-600"
-                />
-              </div>
-              <div>
-                <label className="text-sm text-gray-400 block mb-1">Máximo de tentativas</label>
-                <input
-                  type="number" min={0} max={10} value={followupMaxAttempts}
-                  onChange={e => setFollowupMaxAttempts(Math.max(0, Number(e.target.value)))}
-                  className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-600"
-                />
-              </div>
+            <div className="space-y-2">
+              <label className="text-sm text-gray-400 block">Tentativas (cada uma pode esperar um tempo diferente)</label>
+              {followupDelays.map((row, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500 w-20 flex-shrink-0">
+                    {i === 0 ? "1ª tentativa" : `${i + 1}ª, +`}
+                  </span>
+                  <input
+                    type="number" min={1} max={row.unit === "horas" ? 720 : 1440} value={row.value}
+                    onChange={e => updateFollowupAttempt(i, { value: Math.max(1, Number(e.target.value)) })}
+                    className="w-24 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+                  />
+                  <select
+                    value={row.unit} onChange={e => updateFollowupAttempt(i, { unit: e.target.value as DelayUnit })}
+                    className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+                  >
+                    <option value="horas">horas</option>
+                    <option value="minutos">minutos</option>
+                  </select>
+                  <span className="text-xs text-gray-500">sem resposta</span>
+                  {followupDelays.length > 1 && (
+                    <button onClick={() => removeFollowupAttempt(i)} className="text-xs text-red-400 hover:text-red-300 ml-auto">Remover</button>
+                  )}
+                </div>
+              ))}
+              {followupDelays.length < 10 && (
+                <button onClick={addFollowupAttempt} className="text-sm text-blue-400 hover:text-blue-300">+ Adicionar tentativa</button>
+              )}
             </div>
           )}
 

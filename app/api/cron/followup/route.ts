@@ -3,12 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { generateFollowupMessage } from "@/lib/agent-engine";
 import { sendWhatsAppTextAsTeam } from "@/lib/whatsapp";
 
-function hoursAgo(n: number) {
-  const d = new Date();
-  d.setHours(d.getHours() - n);
-  return d;
-}
-
 function hoursFromNow(n: number) {
   const d = new Date();
   d.setHours(d.getHours() + n);
@@ -32,18 +26,27 @@ export async function POST(req: NextRequest) {
   let checked = 0;
 
   for (const config of configs) {
+    const delays = config.followupDelaysMinutes as unknown as number[];
+    if (!Array.isArray(delays) || delays.length === 0) continue;
+
     const candidates = await prisma.conversation.findMany({
       where: {
         agentConfigId: config.id,
         humanTakeover: false,
         status: { not: "FINALIZADO" },
-        followupCount: { lt: config.followupMaxAttempts },
-        updatedAt: { lte: hoursAgo(config.followupDelayHours) },
+        followupCount: { lt: delays.length },
       },
       include: { messages: { orderBy: { createdAt: "desc" }, take: 20 } },
     });
 
     for (const conversation of candidates) {
+      // A 1ª tentativa conta a partir da última atividade da conversa; as seguintes contam
+      // a partir do envio da tentativa anterior, permitindo intervalos diferentes entre elas.
+      const referenceTime = conversation.followupCount === 0 ? conversation.updatedAt : (conversation.lastFollowupAt ?? conversation.updatedAt);
+      const delayMinutes = delays[conversation.followupCount];
+      const dueAt = new Date(referenceTime.getTime() + delayMinutes * 60000);
+      if (dueAt > new Date()) continue;
+
       checked++;
       const lastMessage = conversation.messages[0];
       // Só faz follow-up se a última mensagem foi nossa (estamos esperando o cliente responder)

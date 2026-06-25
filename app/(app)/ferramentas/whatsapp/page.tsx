@@ -39,7 +39,7 @@ export default async function WhatsappAgentPage() {
               nome: config.nome, tom: config.tom, servicos: config.servicos, objecoes: config.objecoes,
               horario: config.horario, uazapiInstance: config.uazapiInstance, hasToken: Boolean(config.uazapiToken),
               descricaoEmpresa: config.descricaoEmpresa, precos: config.precos, enderecoContato: config.enderecoContato,
-              followupEnabled: config.followupEnabled, followupDelayHours: config.followupDelayHours, followupMaxAttempts: config.followupMaxAttempts,
+              followupEnabled: config.followupEnabled, followupDelaysMinutes: config.followupDelaysMinutes as unknown as number[],
             } : null}
           />
         </div>
@@ -120,7 +120,7 @@ export default async function WhatsappAgentPage() {
               nome: config.nome, tom: config.tom, servicos: config.servicos, objecoes: config.objecoes,
               horario: config.horario, uazapiInstance: config.uazapiInstance, hasToken: Boolean(config.uazapiToken),
               descricaoEmpresa: config.descricaoEmpresa, precos: config.precos, enderecoContato: config.enderecoContato,
-              followupEnabled: config.followupEnabled, followupDelayHours: config.followupDelayHours, followupMaxAttempts: config.followupMaxAttempts,
+              followupEnabled: config.followupEnabled, followupDelaysMinutes: config.followupDelaysMinutes as unknown as number[],
             }}
           />
         </div>

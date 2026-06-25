@@ -16,8 +16,7 @@ const schema = z.object({
   precos: z.string().default(""),
   enderecoContato: z.string().default(""),
   followupEnabled: z.boolean().default(true),
-  followupDelayHours: z.number().int().min(1).max(720).default(24),
-  followupMaxAttempts: z.number().int().min(0).max(10).default(2),
+  followupDelaysMinutes: z.array(z.number().int().min(1).max(43200)).max(10).default([1440]),
 });
 
 async function getOwnTeam(userId: string) {
@@ -49,7 +48,7 @@ export async function POST(req: NextRequest) {
 
   const {
     nome, tom, servicos, objecoes, horario, descricaoEmpresa, precos, enderecoContato,
-    followupEnabled, followupDelayHours, followupMaxAttempts,
+    followupEnabled, followupDelaysMinutes,
   } = body.data;
 
   const existing = await prisma.agentConfig.findUnique({ where: { teamId: team.id } });
@@ -83,11 +82,11 @@ export async function POST(req: NextRequest) {
     where: { teamId: team.id },
     update: {
       nome, tom, servicos, objecoes, horario, descricaoEmpresa, precos, enderecoContato,
-      systemPrompt, uazapiInstance, uazapiToken, followupEnabled, followupDelayHours, followupMaxAttempts,
+      systemPrompt, uazapiInstance, uazapiToken, followupEnabled, followupDelaysMinutes,
     },
     create: {
       teamId: team.id, nome, tom, servicos, objecoes, horario, descricaoEmpresa, precos, enderecoContato,
-      systemPrompt, uazapiInstance, uazapiToken, active: false, followupEnabled, followupDelayHours, followupMaxAttempts,
+      systemPrompt, uazapiInstance, uazapiToken, active: false, followupEnabled, followupDelaysMinutes,
     },
   });
 
