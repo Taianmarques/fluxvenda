@@ -12,7 +12,111 @@ type Appointment = {
   durationMinutes: number;
   status: "CONFIRMADO" | "CANCELADO" | "CONCLUIDO";
   notes: string;
+  professional?: { id: string; name: string } | null;
+  service?: { id: string; name: string } | null;
 };
+type Professional = { id: string; name: string; availability: AvailabilityRule[]; active: boolean };
+type Service = { id: string; name: string; durationMinutes: number; active: boolean };
+
+function rulesFromAvailability(availability: AvailabilityRule[]): Record<number, { enabled: boolean; start: string; end: string }> {
+  const base: Record<number, { enabled: boolean; start: string; end: string }> = {};
+  for (let i = 0; i < 7; i++) {
+    const found = availability.find(r => r.dayOfWeek === i);
+    base[i] = found ? { enabled: true, start: found.start, end: found.end } : { enabled: false, start: "09:00", end: "18:00" };
+  }
+  return base;
+}
+
+function AvailabilityEditor({ rules, onChange }: { rules: Record<number, { enabled: boolean; start: string; end: string }>; onChange: (r: Record<number, { enabled: boolean; start: string; end: string }>) => void }) {
+  return (
+    <div className="space-y-2">
+      {DIAS.map((dia, i) => (
+        <div key={i} className="flex items-center gap-3">
+          <label className="flex items-center gap-2 w-32 flex-shrink-0 cursor-pointer">
+            <input
+              type="checkbox" checked={rules[i].enabled}
+              onChange={e => onChange({ ...rules, [i]: { ...rules[i], enabled: e.target.checked } })}
+              className="w-4 h-4"
+            />
+            <span className="text-sm">{dia}</span>
+          </label>
+          <input
+            type="time" disabled={!rules[i].enabled} value={rules[i].start}
+            onChange={e => onChange({ ...rules, [i]: { ...rules[i], start: e.target.value } })}
+            className="bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 text-sm disabled:opacity-40"
+          />
+          <span className="text-gray-500 text-sm">até</span>
+          <input
+            type="time" disabled={!rules[i].enabled} value={rules[i].end}
+            onChange={e => onChange({ ...rules, [i]: { ...rules[i], end: e.target.value } })}
+            className="bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 text-sm disabled:opacity-40"
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function rulesToAvailability(rules: Record<number, { enabled: boolean; start: string; end: string }>): AvailabilityRule[] {
+  return Object.entries(rules).filter(([, r]) => r.enabled).map(([day, r]) => ({ dayOfWeek: Number(day), start: r.start, end: r.end }));
+}
+
+function ProfessionalRow({ professional, onUpdated, onDeleted }: { professional: Professional; onUpdated: () => void; onDeleted: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [rules, setRules] = useState(() => rulesFromAvailability(professional.availability));
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    setSaving(true);
+    try {
+      await fetch(`/api/ferramentas/whatsapp/profissionais/${professional.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ availability: rulesToAvailability(rules) }),
+      });
+      setEditing(false);
+      onUpdated();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function toggleActive() {
+    await fetch(`/api/ferramentas/whatsapp/profissionais/${professional.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ active: !professional.active }),
+    });
+    onUpdated();
+  }
+
+  async function remove() {
+    if (!confirm(`Remover ${professional.name}?`)) return;
+    await fetch(`/api/ferramentas/whatsapp/profissionais/${professional.id}`, { method: "DELETE" });
+    onDeleted();
+  }
+
+  return (
+    <div className="bg-gray-950 border border-gray-800 rounded-xl p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className={`text-sm font-medium ${!professional.active ? "text-gray-500 line-through" : ""}`}>{professional.name}</p>
+        <div className="flex gap-2 text-xs">
+          <button onClick={() => setEditing(s => !s)} className="text-blue-400 hover:text-blue-300">Horários</button>
+          <button onClick={toggleActive} className="text-gray-400 hover:text-white">{professional.active ? "Desativar" : "Ativar"}</button>
+          <button onClick={remove} className="text-red-400 hover:text-red-300">Remover</button>
+        </div>
+      </div>
+      {editing && (
+        <div className="mt-3 space-y-3">
+          <AvailabilityEditor rules={rules} onChange={setRules} />
+          <button onClick={save} disabled={saving} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium">
+            {saving ? "Salvando..." : "Salvar horários"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const DIAS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 const DIAS_ABREV = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -43,18 +147,18 @@ export function AgendaClient({
   initialAppointmentReminderHours: number;
 }) {
   const [showSettings, setShowSettings] = useState(false);
+  const [showTeam, setShowTeam] = useState(false);
   const [schedulingEnabled, setSchedulingEnabled] = useState(initialSchedulingEnabled);
   const [slotDurationMinutes, setSlotDurationMinutes] = useState(initialSlotDurationMinutes);
   const [appointmentReminderHours, setAppointmentReminderHours] = useState(initialAppointmentReminderHours);
-  const [rules, setRules] = useState<Record<number, { enabled: boolean; start: string; end: string }>>(() => {
-    const base: Record<number, { enabled: boolean; start: string; end: string }> = {};
-    for (let i = 0; i < 7; i++) {
-      const found = initialAvailability.find(r => r.dayOfWeek === i);
-      base[i] = found ? { enabled: true, start: found.start, end: found.end } : { enabled: false, start: "09:00", end: "18:00" };
-    }
-    return base;
-  });
+  const [rules, setRules] = useState(() => rulesFromAvailability(initialAvailability));
   const [savingSettings, setSavingSettings] = useState(false);
+
+  const [professionals, setProfessionals] = useState<Professional[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [newProfessionalName, setNewProfessionalName] = useState("");
+  const [newServiceName, setNewServiceName] = useState("");
+  const [newServiceDuration, setNewServiceDuration] = useState(30);
 
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -66,6 +170,8 @@ export function AgendaClient({
   const [newContactName, setNewContactName] = useState("");
   const [newContactNumber, setNewContactNumber] = useState("");
   const [newNotes, setNewNotes] = useState("");
+  const [newProfessionalId, setNewProfessionalId] = useState("");
+  const [newServiceId, setNewServiceId] = useState("");
   const [newError, setNewError] = useState("");
 
   async function loadAppointments() {
@@ -81,14 +187,62 @@ export function AgendaClient({
     }
   }
 
+  async function loadProfessionals() {
+    const res = await fetch("/api/ferramentas/whatsapp/profissionais");
+    const data = await res.json();
+    setProfessionals(data.professionals ?? []);
+  }
+
+  async function loadServices() {
+    const res = await fetch("/api/ferramentas/whatsapp/servicos");
+    const data = await res.json();
+    setServices(data.services ?? []);
+  }
+
   useEffect(() => { loadAppointments(); }, [weekStart]);
+  useEffect(() => { loadProfessionals(); loadServices(); }, []);
+
+  async function handleAddProfessional() {
+    if (!newProfessionalName.trim()) return;
+    await fetch("/api/ferramentas/whatsapp/profissionais", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newProfessionalName.trim() }),
+    });
+    setNewProfessionalName("");
+    loadProfessionals();
+  }
+
+  async function handleAddService() {
+    if (!newServiceName.trim()) return;
+    await fetch("/api/ferramentas/whatsapp/servicos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newServiceName.trim(), durationMinutes: newServiceDuration }),
+    });
+    setNewServiceName("");
+    loadServices();
+  }
+
+  async function handleToggleService(service: Service) {
+    await fetch(`/api/ferramentas/whatsapp/servicos/${service.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ active: !service.active }),
+    });
+    loadServices();
+  }
+
+  async function handleDeleteService(service: Service) {
+    if (!confirm(`Remover ${service.name}?`)) return;
+    await fetch(`/api/ferramentas/whatsapp/servicos/${service.id}`, { method: "DELETE" });
+    loadServices();
+  }
 
   async function handleSaveSettings() {
     setSavingSettings(true);
     try {
-      const availability: AvailabilityRule[] = Object.entries(rules)
-        .filter(([, r]) => r.enabled)
-        .map(([day, r]) => ({ dayOfWeek: Number(day), start: r.start, end: r.end }));
+      const availability = rulesToAvailability(rules);
 
       await fetch("/api/ferramentas/whatsapp/agenda", {
         method: "PATCH",
@@ -124,6 +278,8 @@ export function AgendaClient({
         contactName: newContactName || undefined,
         contactNumber: newContactNumber.trim(),
         notes: newNotes || undefined,
+        professionalId: newProfessionalId || undefined,
+        serviceId: newServiceId || undefined,
       }),
     });
     if (!res.ok) {
@@ -132,7 +288,7 @@ export function AgendaClient({
       return;
     }
     setShowNewForm(false);
-    setNewDate(""); setNewTime(""); setNewContactName(""); setNewContactNumber(""); setNewNotes("");
+    setNewDate(""); setNewTime(""); setNewContactName(""); setNewContactNumber(""); setNewNotes(""); setNewProfessionalId(""); setNewServiceId("");
     loadAppointments();
   }
 
@@ -154,6 +310,9 @@ export function AgendaClient({
             <button onClick={() => setShowNewForm(s => !s)} className="bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-2.5 text-sm font-medium">
               + Novo agendamento
             </button>
+            <button onClick={() => setShowTeam(s => !s)} className="bg-gray-800 hover:bg-gray-700 rounded-xl px-4 py-2.5 text-sm font-medium">
+              👤 Serviços e profissionais
+            </button>
             <button onClick={() => setShowSettings(s => !s)} className="bg-gray-800 hover:bg-gray-700 rounded-xl px-4 py-2.5 text-sm font-medium">
               ⚙️ Configurar disponibilidade
             </button>
@@ -169,9 +328,64 @@ export function AgendaClient({
               <input placeholder="Nome do contato" value={newContactName} onChange={e => setNewContactName(e.target.value)} className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
               <input placeholder="Número (com DDD)" value={newContactNumber} onChange={e => setNewContactNumber(e.target.value)} className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
             </div>
+            {(professionals.length > 0 || services.length > 0) && (
+              <div className="grid grid-cols-2 gap-3">
+                {professionals.length > 0 && (
+                  <select value={newProfessionalId} onChange={e => setNewProfessionalId(e.target.value)} className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm">
+                    <option value="">Sem profissional específico</option>
+                    {professionals.filter(p => p.active).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                )}
+                {services.length > 0 && (
+                  <select value={newServiceId} onChange={e => setNewServiceId(e.target.value)} className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm">
+                    <option value="">Sem serviço específico</option>
+                    {services.filter(s => s.active).map(s => <option key={s.id} value={s.id}>{s.name} ({s.durationMinutes}min)</option>)}
+                  </select>
+                )}
+              </div>
+            )}
             <input placeholder="Observações (opcional)" value={newNotes} onChange={e => setNewNotes(e.target.value)} className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
             {newError && <p className="text-sm text-red-400">{newError}</p>}
             <button onClick={handleCreateAppointment} className="bg-green-700 hover:bg-green-600 rounded-xl px-4 py-2 text-sm font-medium">Salvar</button>
+          </div>
+        )}
+
+        {showTeam && (
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
+              <p className="font-semibold">Profissionais</p>
+              <p className="text-xs text-gray-500">Cada profissional tem sua própria agenda. Se não cadastrar nenhum, o agendamento usa a disponibilidade geral configurada acima.</p>
+              <div className="space-y-2">
+                {professionals.map(p => (
+                  <ProfessionalRow key={p.id} professional={p} onUpdated={loadProfessionals} onDeleted={loadProfessionals} />
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input placeholder="Nome do profissional" value={newProfessionalName} onChange={e => setNewProfessionalName(e.target.value)} className="flex-1 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
+                <button onClick={handleAddProfessional} className="bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-2 text-sm font-medium">Adicionar</button>
+              </div>
+            </div>
+
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
+              <p className="font-semibold">Serviços</p>
+              <p className="text-xs text-gray-500">Cada serviço tem sua própria duração. Se não cadastrar nenhum, o agendamento usa a duração padrão configurada acima.</p>
+              <div className="space-y-2">
+                {services.map(s => (
+                  <div key={s.id} className="bg-gray-950 border border-gray-800 rounded-xl p-3 flex items-center justify-between gap-2">
+                    <p className={`text-sm font-medium ${!s.active ? "text-gray-500 line-through" : ""}`}>{s.name} <span className="text-gray-500 font-normal">({s.durationMinutes}min)</span></p>
+                    <div className="flex gap-2 text-xs">
+                      <button onClick={() => handleToggleService(s)} className="text-gray-400 hover:text-white">{s.active ? "Desativar" : "Ativar"}</button>
+                      <button onClick={() => handleDeleteService(s)} className="text-red-400 hover:text-red-300">Remover</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input placeholder="Nome do serviço" value={newServiceName} onChange={e => setNewServiceName(e.target.value)} className="flex-1 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
+                <input type="number" min={5} max={480} value={newServiceDuration} onChange={e => setNewServiceDuration(Math.max(5, Number(e.target.value)))} className="w-20 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
+                <button onClick={handleAddService} className="bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-2 text-sm font-medium">Adicionar</button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -202,32 +416,10 @@ export function AgendaClient({
             </div>
 
             <div>
-              <p className="text-sm text-gray-400 mb-2">Dias e horários de disponibilidade</p>
-              <div className="space-y-2">
-                {DIAS.map((dia, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <label className="flex items-center gap-2 w-32 flex-shrink-0 cursor-pointer">
-                      <input
-                        type="checkbox" checked={rules[i].enabled}
-                        onChange={e => setRules(prev => ({ ...prev, [i]: { ...prev[i], enabled: e.target.checked } }))}
-                        className="w-4 h-4"
-                      />
-                      <span className="text-sm">{dia}</span>
-                    </label>
-                    <input
-                      type="time" disabled={!rules[i].enabled} value={rules[i].start}
-                      onChange={e => setRules(prev => ({ ...prev, [i]: { ...prev[i], start: e.target.value } }))}
-                      className="bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 text-sm disabled:opacity-40"
-                    />
-                    <span className="text-gray-500 text-sm">até</span>
-                    <input
-                      type="time" disabled={!rules[i].enabled} value={rules[i].end}
-                      onChange={e => setRules(prev => ({ ...prev, [i]: { ...prev[i], end: e.target.value } }))}
-                      className="bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 text-sm disabled:opacity-40"
-                    />
-                  </div>
-                ))}
-              </div>
+              <p className="text-sm text-gray-400 mb-2">
+                Dias e horários de disponibilidade {professionals.length > 0 && <span className="text-xs">(usado só para quem não tem profissional atribuído)</span>}
+              </p>
+              <AvailabilityEditor rules={rules} onChange={setRules} />
             </div>
 
             <button onClick={handleSaveSettings} disabled={savingSettings} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl px-5 py-2 text-sm font-medium">
@@ -266,6 +458,9 @@ export function AgendaClient({
                             <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${st.color}`}>{st.label}</span>
                           </div>
                           <p className="text-xs text-gray-300 truncate mt-0.5">{a.contactName || a.contactNumber}</p>
+                          {(a.professional || a.service) && (
+                            <p className="text-[10px] text-gray-500 truncate">{[a.service?.name, a.professional?.name].filter(Boolean).join(" · ")}</p>
+                          )}
                           {a.status === "CONFIRMADO" && (
                             <button onClick={() => handleCancel(a.id)} className="text-[10px] text-red-400 hover:text-red-300 mt-1">Cancelar</button>
                           )}

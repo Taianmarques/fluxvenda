@@ -557,6 +557,41 @@ model AgentConfig {
   pipelineStages PipelineStage[]
   leadStatuses   LeadStatus[]
   appointments   Appointment[]
+  professionals  Professional[]
+  services       Service[]
+}
+
+// Se a empresa não cadastrar nenhum profissional, o agendamento usa a disponibilidade
+// e duração padrão do AgentConfig (modo "agenda única"). Ao cadastrar profissionais,
+// cada um passa a ter sua própria disponibilidade e os agendamentos exigem escolha de profissional.
+model Professional {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+  agentConfigId String
+  agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id], onDelete: Cascade)
+
+  name         String
+  availability Json    @default("[]") // [{ dayOfWeek: 0-6, start: "09:00", end: "18:00" }]
+  active       Boolean @default(true)
+
+  appointments         Appointment[]
+  pendingInConversations Conversation[]
+}
+
+// Se a empresa não cadastrar nenhum serviço, o agendamento usa slotDurationMinutes do
+// AgentConfig. Ao cadastrar serviços, cada um define sua própria duração.
+model Service {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+  agentConfigId String
+  agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id], onDelete: Cascade)
+
+  name            String
+  durationMinutes Int
+  active          Boolean @default(true)
+
+  appointments           Appointment[]
+  pendingInConversations Conversation[]
 }
 
 model Appointment {
@@ -569,6 +604,12 @@ model Appointment {
 
   conversationId String?
   conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  professionalId String?
+  professional   Professional? @relation(fields: [professionalId], references: [id], onDelete: SetNull)
+
+  serviceId String?
+  service   Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
 
   contactName   String?
   contactNumber String
@@ -638,6 +679,13 @@ model Conversation {
 
   followupCount  Int       @default(0)
   lastFollowupAt DateTime?
+
+  // Memoriza o último serviço/profissional que a IA resolveu nessa conversa, pra usar como
+  // fallback em agendar_horario caso o modelo não repita o parâmetro na chamada de confirmação.
+  pendingProfessionalId String?
+  pendingProfessional   Professional? @relation(fields: [pendingProfessionalId], references: [id], onDelete: SetNull)
+  pendingServiceId      String?
+  pendingService        Service?      @relation(fields: [pendingServiceId], references: [id], onDelete: SetNull)
 
   messages     Message[]
   appointments Appointment[]

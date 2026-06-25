@@ -127,9 +127,24 @@ export const SCHEDULING_TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "listar_servicos_profissionais",
+      description: "Lista os serviços e/ou profissionais disponíveis para agendamento nessa empresa. Use antes de consultar horários, se a empresa trabalhar com serviços ou profissionais diferentes.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "consultar_horarios_disponiveis",
       description: "Consulta os horários reais disponíveis para agendamento nos próximos dias. Use SEMPRE antes de propor qualquer data/horário ao cliente — nunca invente horários.",
-      parameters: { type: "object", properties: {}, required: [] },
+      parameters: {
+        type: "object",
+        properties: {
+          service: { type: "string", description: "Nome do serviço escolhido pelo cliente, se a empresa trabalhar com serviços" },
+          professional: { type: "string", description: "Nome do profissional escolhido pelo cliente, se a empresa trabalhar com profissionais" },
+        },
+        required: [],
+      },
     },
   },
   {
@@ -142,6 +157,8 @@ export const SCHEDULING_TOOLS = [
         properties: {
           date: { type: "string", description: "Data no formato YYYY-MM-DD" },
           time: { type: "string", description: "Horário no formato HH:mm" },
+          service: { type: "string", description: "Nome do serviço escolhido, se aplicável" },
+          professional: { type: "string", description: "Nome do profissional escolhido, se aplicável" },
           notes: { type: "string", description: "Observações sobre o agendamento, se houver" },
         },
         required: ["date", "time"],

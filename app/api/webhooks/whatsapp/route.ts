@@ -10,13 +10,25 @@ function mediaMimetype(message: any): string | null {
     : null;
 }
 
-function buildSchedulingContext(): string {
+async function buildSchedulingContext(agentConfigId: string): Promise<string> {
   const now = new Date();
   const dateStr = now.toLocaleDateString("pt-BR");
   const weekday = now.toLocaleDateString("pt-BR", { weekday: "long" });
   const timeStr = now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+  const [services, professionals] = await Promise.all([
+    prisma.service.findMany({ where: { agentConfigId, active: true }, select: { name: true } }),
+    prisma.professional.findMany({ where: { agentConfigId, active: true }, select: { name: true } }),
+  ]);
+
+  const selectionNote = services.length > 0 || professionals.length > 0
+    ? `Essa empresa trabalha com ${services.length > 0 ? "serviços específicos" : ""}${services.length > 0 && professionals.length > 0 ? " e " : ""}${professionals.length > 0 ? "profissionais específicos" : ""}. Use listar_servicos_profissionais para saber as opções e pergunte ao cliente qual ele quer ANTES de consultar horários. Depois, passe o nome escolhido nos parâmetros "service"/"professional" das ferramentas de agendamento.`
+    : `Essa empresa não trabalha com serviços ou profissionais específicos — não chame listar_servicos_profissionais.`;
+
   return `\n\nFERRAMENTAS DE AGENDAMENTO:
-Hoje é ${dateStr} (${weekday}), agora são ${timeStr}. Quando o cliente quiser agendar algo:
+Hoje é ${dateStr} (${weekday}), agora são ${timeStr}. ${selectionNote}
+
+Quando o cliente quiser agendar algo:
 - Pergunte primeiro o dia e período (manhã/tarde/noite) de preferência, se ele não tiver dito.
 - Use a ferramenta consultar_horarios_disponiveis para saber os horários reais — nunca invente ou suponha horários livres.
 - NUNCA liste todos os horários disponíveis de uma vez. Escolha no máximo 2 ou 3 opções relevantes (próximas ao que o cliente pediu) e ofereça de forma curta e natural, como faria pelo WhatsApp.
@@ -28,18 +40,51 @@ Você também pode receber, no meio da conversa, um lembrete automático pergunt
 }
 
 function makeExecuteTool(agentConfigId: string, conversationId: string, contactName: string | undefined, contactNumber: string) {
+  async function resolveProfessional(name?: string) {
+    if (!name) return null;
+    return prisma.professional.findFirst({ where: { agentConfigId, active: true, name: { equals: name, mode: "insensitive" } } });
+  }
+  async function resolveService(name?: string) {
+    if (!name) return null;
+    return prisma.service.findFirst({ where: { agentConfigId, active: true, name: { equals: name, mode: "insensitive" } } });
+  }
+
   return async function executeTool(name: string, args: any): Promise<string> {
     const config = await prisma.agentConfig.findUnique({ where: { id: agentConfigId } });
     if (!config) return "Erro interno: configuração do agente não encontrada.";
 
-    const availability = config.availability as unknown as AvailabilityRule[];
+    if (name === "listar_servicos_profissionais") {
+      const [services, professionals] = await Promise.all([
+        prisma.service.findMany({ where: { agentConfigId, active: true }, select: { name: true } }),
+        prisma.professional.findMany({ where: { agentConfigId, active: true }, select: { name: true } }),
+      ]);
+      const parts: string[] = [];
+      if (services.length > 0) parts.push(`Serviços: ${services.map(s => s.name).join(", ")}`);
+      if (professionals.length > 0) parts.push(`Profissionais: ${professionals.map(p => p.name).join(", ")}`);
+      return parts.length > 0 ? parts.join("\n") : "Essa empresa não tem serviços ou profissionais cadastrados.";
+    }
 
     if (name === "consultar_horarios_disponiveis") {
+      const professional = await resolveProfessional(args?.professional);
+      const service = await resolveService(args?.service);
+
+      // Memoriza a escolha do cliente nessa conversa, pra usar como fallback se o modelo
+      // não repetir o parâmetro service/professional na chamada de agendar_horario.
+      if (professional || service) {
+        await prisma.conversation.update({
+          where: { id: conversationId },
+          data: { ...(professional && { pendingProfessionalId: professional.id }), ...(service && { pendingServiceId: service.id }) },
+        });
+      }
+
+      const availability = (professional?.availability ?? config.availability) as unknown as AvailabilityRule[];
+      const slotDuration = service?.durationMinutes ?? config.slotDurationMinutes;
+
       const busy = await prisma.appointment.findMany({
-        where: { agentConfigId, status: "CONFIRMADO" },
+        where: { agentConfigId, status: "CONFIRMADO", ...(professional ? { professionalId: professional.id } : {}) },
         select: { scheduledAt: true, durationMinutes: true },
       });
-      const slots = getAvailableSlots(availability, config.slotDurationMinutes, busy);
+      const slots = getAvailableSlots(availability, slotDuration, busy);
       return formatSlotsForAgent(slots);
     }
 
@@ -50,20 +95,31 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       const scheduledAt = new Date(`${date}T${time}:00`);
       if (isNaN(scheduledAt.getTime())) return "Erro: data ou horário em formato inválido.";
 
+      const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
+      const professional = (await resolveProfessional(args?.professional))
+        ?? (conversation?.pendingProfessionalId ? await prisma.professional.findUnique({ where: { id: conversation.pendingProfessionalId } }) : null);
+      const service = (await resolveService(args?.service))
+        ?? (conversation?.pendingServiceId ? await prisma.service.findUnique({ where: { id: conversation.pendingServiceId } }) : null);
+
+      const availability = (professional?.availability ?? config.availability) as unknown as AvailabilityRule[];
+      const slotDuration = service?.durationMinutes ?? config.slotDurationMinutes;
+
       const busy = await prisma.appointment.findMany({
-        where: { agentConfigId, status: "CONFIRMADO" },
+        where: { agentConfigId, status: "CONFIRMADO", ...(professional ? { professionalId: professional.id } : {}) },
         select: { scheduledAt: true, durationMinutes: true },
       });
 
-      const available = isSlotAvailable(availability, config.slotDurationMinutes, busy, scheduledAt);
+      const available = isSlotAvailable(availability, slotDuration, busy, scheduledAt);
       if (!available) return "Esse horário não está mais disponível. Consulte os horários disponíveis novamente e ofereça outra opção ao cliente.";
 
       await prisma.appointment.create({
         data: {
           agentConfigId, conversationId, contactName, contactNumber,
-          scheduledAt, durationMinutes: config.slotDurationMinutes, notes: notes ?? "",
+          scheduledAt, durationMinutes: slotDuration, notes: notes ?? "",
+          professionalId: professional?.id, serviceId: service?.id,
         },
       });
+      await prisma.conversation.update({ where: { id: conversationId }, data: { pendingProfessionalId: null, pendingServiceId: null } });
 
       return `Agendamento confirmado para ${date} às ${time}.`;
     }
@@ -171,7 +227,7 @@ export async function POST(req: NextRequest) {
     reply = await runAgentWithImage(config.systemPrompt, historyForAgent, imageUrl, caption);
   } else if (config.schedulingEnabled) {
     reply = await runAgentWithTools(
-      config.systemPrompt + buildSchedulingContext(),
+      config.systemPrompt + await buildSchedulingContext(config.id),
       historyForAgent,
       text,
       SCHEDULING_TOOLS,
