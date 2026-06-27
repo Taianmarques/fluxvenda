@@ -368,6 +368,7 @@ enum XPSource {
   BADGE_UNLOCK
   DAILY_LOGIN
   SCANNER_COMPLETE
+  DEAL_WON
 }
 
 model Badge {
@@ -690,7 +691,8 @@ model Conversation {
   leadStatusId String?
   leadStatus   LeadStatus? @relation(fields: [leadStatusId], references: [id], onDelete: SetNull)
 
-  dealValue Float? // valor negociado nesse atendimento (R$)
+  dealValue Float?    // valor negociado nesse atendimento (R$)
+  wonAt     DateTime? // quando a negociação foi marcada como ganha (null = não ganha)
 
   followupCount  Int       @default(0)
   lastFollowupAt DateTime?

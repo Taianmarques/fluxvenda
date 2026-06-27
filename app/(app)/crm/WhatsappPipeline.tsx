@@ -16,6 +16,7 @@ export type PipelineConversation = {
   stageId: string | null;
   leadStatusId: string | null;
   dealValue: number | null;
+  wonAt: string | null;
   lastMessage: string | null;
   updatedAt: string;
 };
@@ -51,12 +52,13 @@ function formatBRL(value: number): string {
 }
 
 function Card({
-  conv, onClick, onValueChange, onLeadStatusChange, leadStatuses, onLeadStatusesChange, dark, t,
+  conv, onClick, onValueChange, onLeadStatusChange, onMarcarGanho, leadStatuses, onLeadStatusesChange, dark, t,
 }: {
   conv: PipelineConversation;
   onClick: () => void;
   onValueChange: (id: string, value: number | null) => void;
   onLeadStatusChange: (id: string, leadStatusId: string | null) => void;
+  onMarcarGanho: (id: string) => void;
   leadStatuses: LeadStatus[];
   onLeadStatusesChange: () => void;
   dark: boolean;
@@ -105,20 +107,32 @@ function Card({
           className={`w-full mt-2 border rounded px-2 py-1 text-xs ${t.input}`}
         />
       ) : (
-        <p
-          className="text-xs font-semibold text-green-500 mt-2 cursor-text"
-          onClick={e => { e.stopPropagation(); setEditingValue(true); }}
-          onPointerDown={e => e.stopPropagation()}
-        >
-          {conv.dealValue != null ? formatBRL(conv.dealValue) : "+ valor negociado"}
-        </p>
+        <div className="flex items-center justify-between gap-2 mt-2">
+          <p
+            className="text-xs font-semibold cursor-text text-green-500"
+            onClick={e => { e.stopPropagation(); setEditingValue(true); }}
+            onPointerDown={e => e.stopPropagation()}
+          >
+            {conv.dealValue != null ? (conv.wonAt ? `🏆 ${formatBRL(conv.dealValue)}` : formatBRL(conv.dealValue)) : "+ valor negociado"}
+          </p>
+          {conv.dealValue != null && !conv.wonAt && (
+            <button
+              onClick={e => { e.stopPropagation(); onMarcarGanho(conv.id); }}
+              onPointerDown={e => e.stopPropagation()}
+              title="Marcar como ganho"
+              className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-green-900/40 text-green-300 border border-green-800/50 hover:bg-green-900/70 flex-shrink-0"
+            >
+              Dar ganho
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
 }
 
 function Column({
-  stage, conversations, onClickCard, onRename, onDelete, onValueChange, onLeadStatusChange, leadStatuses, onLeadStatusesChange, dark, t,
+  stage, conversations, onClickCard, onRename, onDelete, onValueChange, onLeadStatusChange, onMarcarGanho, leadStatuses, onLeadStatusesChange, dark, t,
 }: {
   stage: Stage;
   conversations: PipelineConversation[];
@@ -127,6 +141,7 @@ function Column({
   onDelete: (id: string) => void;
   onValueChange: (id: string, value: number | null) => void;
   onLeadStatusChange: (id: string, leadStatusId: string | null) => void;
+  onMarcarGanho: (id: string) => void;
   leadStatuses: LeadStatus[];
   onLeadStatusesChange: () => void;
   dark: boolean;
@@ -164,7 +179,7 @@ function Column({
         {conversations.map(c => (
           <Card
             key={c.id} conv={c} onClick={() => onClickCard(c.id)} onValueChange={onValueChange}
-            onLeadStatusChange={onLeadStatusChange} leadStatuses={leadStatuses} onLeadStatusesChange={onLeadStatusesChange}
+            onLeadStatusChange={onLeadStatusChange} onMarcarGanho={onMarcarGanho} leadStatuses={leadStatuses} onLeadStatusesChange={onLeadStatusesChange}
             dark={dark} t={t}
           />
         ))}
@@ -232,6 +247,13 @@ export function WhatsappPipeline({
     });
   }
 
+  async function handleMarcarGanho(conversationId: string) {
+    const res = await fetch(`/api/ferramentas/whatsapp/conversas/${conversationId}/ganho`, { method: "POST" });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error ?? "Não foi possível marcar como ganho."); return; }
+    setLocalConversations(prev => prev.map(c => c.id === conversationId ? { ...c, wonAt: data.conversation.wonAt, stageId: data.conversation.stageId } : c));
+  }
+
   async function handleAddStage() {
     if (!newStageName.trim()) return;
     await fetch("/api/ferramentas/whatsapp/etapas", {
@@ -273,6 +295,7 @@ export function WhatsappPipeline({
               onDelete={() => {}}
               onValueChange={handleValueChange}
               onLeadStatusChange={handleLeadStatusChange}
+              onMarcarGanho={handleMarcarGanho}
               leadStatuses={leadStatuses}
               onLeadStatusesChange={onLeadStatusesChange}
               dark={theme === "dark"}
@@ -289,6 +312,7 @@ export function WhatsappPipeline({
               onDelete={handleDelete}
               onValueChange={handleValueChange}
               onLeadStatusChange={handleLeadStatusChange}
+              onMarcarGanho={handleMarcarGanho}
               leadStatuses={leadStatuses}
               onLeadStatusesChange={onLeadStatusesChange}
               dark={theme === "dark"}

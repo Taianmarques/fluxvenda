@@ -12,9 +12,14 @@ type ConversationSummary = {
   stageId: string | null;
   leadStatusId: string | null;
   dealValue: number | null;
+  wonAt: string | null;
   updatedAt: string;
   lastMessage: string | null;
 };
+
+function formatBRL(value: number): string {
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
 
 type Message = {
   id: string;
@@ -48,6 +53,8 @@ type ConversationDetail = {
   contactName: string | null;
   contactNumber: string;
   humanTakeover: boolean;
+  dealValue: number | null;
+  wonAt: string | null;
   messages: Message[];
 };
 
@@ -164,7 +171,8 @@ export function WhatsappInbox({
       if (data.conversations) {
         setConversations(data.conversations.map((c: any) => ({
           id: c.id, contactName: c.contactName, contactNumber: c.contactNumber,
-          status: c.status, humanTakeover: c.humanTakeover, stageId: c.stageId, leadStatusId: c.leadStatusId, dealValue: c.dealValue, updatedAt: c.updatedAt,
+          status: c.status, humanTakeover: c.humanTakeover, stageId: c.stageId, leadStatusId: c.leadStatusId,
+          dealValue: c.dealValue, wonAt: c.wonAt, updatedAt: c.updatedAt,
           lastMessage: c.messages[0]?.content ?? null,
         })));
       }
@@ -330,6 +338,15 @@ export function WhatsappInbox({
     await refreshDetail(selectedId);
   }
 
+  async function handleMarcarGanho() {
+    if (!selectedId) return;
+    const res = await fetch(`/api/ferramentas/whatsapp/conversas/${selectedId}/ganho`, { method: "POST" });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error ?? "Não foi possível marcar como ganho."); return; }
+    await refreshDetail(selectedId);
+    await refreshList();
+  }
+
   const filteredConversations = search.trim()
     ? conversations.filter(c => {
         const q = search.trim().toLowerCase();
@@ -390,6 +407,11 @@ export function WhatsappInbox({
                       {c.humanTakeover && <span className="text-[10px] flex-shrink-0 px-1.5 py-0.5 rounded-full bg-orange-900/50 text-orange-300 border border-orange-700">manual</span>}
                     </div>
                     <p className={`text-xs truncate mt-0.5 ${t.listSecondary}`}>{c.lastMessage || "—"}</p>
+                    {c.dealValue != null && (
+                      <p className={`text-xs font-semibold mt-1 ${c.wonAt ? "text-green-500" : "text-gray-400"}`}>
+                        {c.wonAt && "🏆 "}{formatBRL(c.dealValue)}
+                      </p>
+                    )}
                     <div className="flex items-center justify-between mt-1.5">
                       <p className={`text-[10px] ${t.listTertiary}`}>{timeAgo(c.updatedAt)}</p>
                       <LeadStatusBadge
@@ -418,14 +440,26 @@ export function WhatsappInbox({
                   <div>
                     <p className="font-semibold">{detail.contactName || detail.contactNumber}</p>
                     <p className={`text-xs ${t.subtitle}`}>{detail.contactNumber}</p>
+                    {detail.dealValue != null && (
+                      <p className={`text-xs font-semibold mt-1 ${detail.wonAt ? "text-green-500" : "text-gray-400"}`}>
+                        {detail.wonAt ? `🏆 Ganho — ${formatBRL(detail.dealValue)}` : formatBRL(detail.dealValue)}
+                      </p>
+                    )}
                   </div>
-                  {detail.humanTakeover ? (
-                    <button onClick={handleRetomar} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200">
-                      ↩ Devolver para o agente
-                    </button>
-                  ) : (
-                    <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-green-900/40 text-green-300 border border-green-800/50">🤖 Agente respondendo</span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {detail.dealValue != null && !detail.wonAt && (
+                      <button onClick={handleMarcarGanho} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-green-700 hover:bg-green-600 text-white">
+                        🏆 Dar ganho
+                      </button>
+                    )}
+                    {detail.humanTakeover ? (
+                      <button onClick={handleRetomar} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200">
+                        ↩ Devolver para o agente
+                      </button>
+                    ) : (
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-green-900/40 text-green-300 border border-green-800/50">🤖 Agente respondendo</span>
+                    )}
+                  </div>
                 </div>
 
                 <div className={`flex-1 overflow-y-auto p-5 space-y-2 ${t.chatBg}`}>

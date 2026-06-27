@@ -51,7 +51,7 @@ export function PipelineBoard({
     if (data.conversations) {
       setConversations(data.conversations.map((c: any) => ({
         id: c.id, contactName: c.contactName, contactNumber: c.contactNumber,
-        stageId: c.stageId, leadStatusId: c.leadStatusId, dealValue: c.dealValue, updatedAt: c.updatedAt,
+        stageId: c.stageId, leadStatusId: c.leadStatusId, dealValue: c.dealValue, wonAt: c.wonAt, updatedAt: c.updatedAt,
         lastMessage: c.messages[0]?.content ?? null,
       })));
     }

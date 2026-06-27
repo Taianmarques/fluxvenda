@@ -58,6 +58,7 @@ export default async function WhatsappInboxPage({
         stageId: c.stageId,
         leadStatusId: c.leadStatusId,
         dealValue: c.dealValue,
+        wonAt: c.wonAt?.toISOString() ?? null,
         updatedAt: c.updatedAt.toISOString(),
         lastMessage: c.messages[0]?.content ?? null,
       }))}
