@@ -3,34 +3,40 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const TABS = [
-  { href: "/crm", label: "💬 Mensagens" },
-  { href: "/crm/agenda", label: "📅 Agenda" },
+const CRM_NAV = [
+  { href: "/crm", label: "Mensagens", icon: "💬" },
+  { href: "/crm/agenda", label: "Agenda", icon: "📅" },
 ];
 
 export default function CrmLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   return (
-    <div className="h-full flex flex-col bg-gray-950">
-      <div className="border-b border-gray-800 px-6 pt-4 flex-shrink-0">
-        <nav className="flex gap-1">
-          {TABS.map(tab => {
-            const active = tab.href === "/crm" ? pathname === "/crm" : pathname.startsWith(tab.href);
+    <div className="h-full flex bg-gray-950">
+      <aside className="w-56 flex-shrink-0 border-r border-gray-800 bg-gray-900 flex flex-col">
+        <div className="px-5 py-5 border-b border-gray-800">
+          <p className="font-bold text-blue-400 text-lg">CRM</p>
+        </div>
+
+        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">
+          {CRM_NAV.map(item => {
+            const active = item.href === "/crm" ? pathname === "/crm" : pathname.startsWith(item.href);
             return (
               <Link
-                key={tab.href}
-                href={tab.href}
-                className={`text-sm font-medium px-4 py-2.5 rounded-t-lg border-b-2 transition-colors ${
-                  active ? "text-white border-blue-500 bg-gray-900" : "text-gray-500 border-transparent hover:text-gray-300"
+                key={item.href}
+                href={item.href}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
+                  active ? "text-white bg-gray-800" : "text-gray-400 hover:text-white hover:bg-gray-800"
                 }`}
               >
-                {tab.label}
+                <span className="text-base">{item.icon}</span>
+                {item.label}
               </Link>
             );
           })}
         </nav>
-      </div>
+      </aside>
+
       <div className="flex-1 overflow-hidden">{children}</div>
     </div>
   );
