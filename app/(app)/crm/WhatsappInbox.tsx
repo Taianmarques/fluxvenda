@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  MessageCircle, Search, X, Trophy, Lock, Undo2, Bot, CheckCircle2, User,
-  FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap, StickyNote,
+  MessageCircle, Search, X, Trophy, Lock, Unlock, Bot, User,
+  FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap, StickyNote, ArrowRightLeft,
 } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { EmojiPicker } from "./EmojiPicker";
@@ -168,6 +168,7 @@ export function WhatsappInbox({
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showQuickReplies, setShowQuickReplies] = useState(false);
   const [noteMode, setNoteMode] = useState(false);
+  const [showTransferMenu, setShowTransferMenu] = useState(false);
   const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -614,52 +615,62 @@ export function WhatsappInbox({
                       </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 flex-wrap justify-end">
-                    <select
-                      value={detail.assignedToId ?? ""}
-                      onChange={e => handleAssign(e.target.value || null)}
-                      title="Transferir conversa"
-                      className={`text-xs px-2 py-1.5 rounded-lg border ${t.inputField}`}
-                    >
-                      <option value="">Sem atendente</option>
-                      {attendants.map(a => <option key={a.id} value={a.id}>{a.name}{a.id === currentUserId ? " (você)" : ""}</option>)}
-                    </select>
-
-                    {detail.status === "FINALIZADO" ? (
-                      <>
-                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-800 text-gray-300 border border-gray-700 flex items-center gap-1">
-                          <Lock size={12} /> Encerrado
-                        </span>
-                        <button onClick={handleReabrir} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200">
-                          Reabrir
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        {detail.dealValue != null && !detail.wonAt && (
-                          <button onClick={handleMarcarGanho} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-green-700 hover:bg-green-600 text-white flex items-center gap-1">
-                            <Trophy size={13} /> Dar ganho
-                          </button>
-                        )}
-                        {detail.humanTakeover ? (
-                          <button onClick={handleRetomar} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 flex items-center gap-1">
-                            <Undo2 size={13} /> Devolver para o agente
-                          </button>
-                        ) : (
-                          <>
-                            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-green-900/40 text-green-300 border border-green-800/50 flex items-center gap-1">
-                              <Bot size={13} /> Agente respondendo
-                            </span>
-                            <button onClick={handleAceitar} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-600 text-white flex items-center gap-1">
-                              <CheckCircle2 size={13} /> Aceitar
-                            </button>
-                          </>
-                        )}
-                        <button onClick={handleEncerrar} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-900/40 hover:bg-red-900/70 text-red-300 border border-red-800/50 flex items-center gap-1">
-                          <Lock size={13} /> Encerrar
-                        </button>
-                      </>
+                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                    {detail.dealValue != null && !detail.wonAt && detail.status !== "FINALIZADO" && (
+                      <button onClick={handleMarcarGanho} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-green-700 hover:bg-green-600 text-white flex items-center gap-1">
+                        <Trophy size={13} /> Dar ganho
+                      </button>
                     )}
+
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowTransferMenu(s => !s)}
+                        title="Transferir conversa"
+                        className={`p-2 rounded-lg ${t.toggleInactive} hover:bg-black/10`}
+                      >
+                        <ArrowRightLeft size={16} />
+                      </button>
+                      {showTransferMenu && (
+                        <>
+                          <div className="fixed inset-0 z-10" onClick={() => setShowTransferMenu(false)} />
+                          <div className={`absolute z-20 top-full right-0 mt-1 w-48 rounded-xl border shadow-xl p-1.5 space-y-0.5 ${theme === "dark" ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}`}>
+                            <button
+                              onClick={() => { handleAssign(null); setShowTransferMenu(false); }}
+                              className={`w-full text-left text-xs px-2 py-1.5 rounded-lg ${!detail.assignedToId ? "font-semibold" : ""} ${theme === "dark" ? "text-gray-300 hover:bg-gray-800" : "text-gray-600 hover:bg-gray-100"}`}
+                            >
+                              Sem atendente
+                            </button>
+                            {attendants.map(a => (
+                              <button
+                                key={a.id}
+                                onClick={() => { handleAssign(a.id); setShowTransferMenu(false); }}
+                                className={`w-full text-left text-xs px-2 py-1.5 rounded-lg truncate ${a.id === detail.assignedToId ? "font-semibold" : ""} ${theme === "dark" ? "text-gray-300 hover:bg-gray-800" : "text-gray-600 hover:bg-gray-100"}`}
+                              >
+                                {a.name}{a.id === currentUserId ? " (você)" : ""}
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {detail.status !== "FINALIZADO" && (
+                      <button
+                        onClick={detail.humanTakeover ? handleRetomar : handleAceitar}
+                        title={detail.humanTakeover ? "Atendimento manual — clique para devolver ao agente de IA" : "Agente de IA respondendo — clique para assumir"}
+                        className={`p-2 rounded-lg ${detail.humanTakeover ? `${t.toggleInactive} hover:bg-black/10` : "bg-green-600 text-white"}`}
+                      >
+                        <Bot size={16} />
+                      </button>
+                    )}
+
+                    <button
+                      onClick={detail.status === "FINALIZADO" ? handleReabrir : handleEncerrar}
+                      title={detail.status === "FINALIZADO" ? "Encerrado — clique para reabrir" : "Encerrar atendimento"}
+                      className={`p-2 rounded-lg ${detail.status === "FINALIZADO" ? "bg-gray-700 text-gray-200" : `${t.toggleInactive} hover:bg-black/10`}`}
+                    >
+                      {detail.status === "FINALIZADO" ? <Unlock size={16} /> : <Lock size={16} />}
+                    </button>
                   </div>
                 </div>
 
