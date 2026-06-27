@@ -662,44 +662,46 @@ export function WhatsappInbox({
                       </button>
                     </div>
                   ) : (
-                    <div className="flex gap-2">
-                      <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} />
-                      <button
-                        onClick={() => fileInputRef.current?.click()}
-                        title="Anexar foto, vídeo, áudio ou documento"
-                        className={`px-3 rounded-xl border text-lg ${t.inputField}`}
-                      >
-                        📎
-                      </button>
-                      <button
-                        onClick={startRecording}
-                        title="Gravar áudio"
-                        className={`px-3 rounded-xl border text-lg ${t.inputField}`}
-                      >
-                        🎤
-                      </button>
-                      <button
-                        onClick={handleToggleSignature}
-                        disabled={!isManager || signatureSaving}
-                        title={
-                          isManager
-                            ? signatureEnabled ? "Assinatura ativada — clique pra desativar" : "Assinatura desativada — clique pra ativar"
-                            : signatureEnabled ? "Assinatura ativada pelo gestor" : "Assinatura desativada pelo gestor"
-                        }
-                        className={`px-3 rounded-xl border text-lg ${signatureEnabled ? "bg-blue-700 border-blue-600 text-white" : t.inputField} ${!isManager ? "cursor-default opacity-70" : ""}`}
-                      >
-                        ✍️
-                      </button>
+                    <div className={`rounded-2xl border px-3 py-2 ${t.inputField}`}>
                       <input
                         value={input}
                         onChange={e => setInput(e.target.value)}
                         onKeyDown={e => e.key === "Enter" && handleSend()}
                         placeholder={attachment ? "Adicionar legenda (opcional)..." : "Digite uma mensagem para assumir a conversa..."}
-                        className={`flex-1 border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-green-600 ${t.inputField}`}
+                        className="w-full bg-transparent text-sm focus:outline-none"
                       />
-                      <button onClick={handleSend} disabled={sending} className="bg-green-700 hover:bg-green-600 disabled:opacity-50 rounded-xl px-5 py-2.5 text-sm font-medium text-white">
-                        Enviar
-                      </button>
+                      <div className="flex items-center justify-between mt-1.5">
+                        <div className="flex items-center gap-0.5">
+                          <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} />
+                          <button
+                            onClick={() => fileInputRef.current?.click()}
+                            title="Anexar foto, vídeo, áudio ou documento"
+                            className="p-1.5 rounded-lg text-base opacity-70 hover:opacity-100 hover:bg-black/10"
+                          >
+                            📎
+                          </button>
+                          <button
+                            onClick={handleToggleSignature}
+                            disabled={!isManager || signatureSaving}
+                            title={
+                              isManager
+                                ? signatureEnabled ? "Assinatura ativada — clique pra desativar" : "Assinatura desativada — clique pra ativar"
+                                : signatureEnabled ? "Assinatura ativada pelo gestor" : "Assinatura desativada pelo gestor"
+                            }
+                            className={`p-1.5 rounded-lg text-base hover:bg-black/10 ${signatureEnabled ? "text-blue-500" : "opacity-70 hover:opacity-100"} ${!isManager ? "cursor-default" : ""}`}
+                          >
+                            ✍️
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button onClick={startRecording} title="Gravar áudio" className="p-1.5 rounded-lg text-base opacity-70 hover:opacity-100 hover:bg-black/10">
+                            🎤
+                          </button>
+                          <button onClick={handleSend} disabled={sending} className="bg-green-700 hover:bg-green-600 disabled:opacity-50 rounded-full px-4 py-1.5 text-sm font-medium text-white">
+                            Enviar
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
