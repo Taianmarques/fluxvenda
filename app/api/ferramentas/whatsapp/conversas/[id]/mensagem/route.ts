@@ -33,12 +33,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   let mediaType: string | null = null;
   let content = body.data.content ?? "";
 
+  // Assinatura sai só no texto enviado pro cliente pelo WhatsApp — o chat interno já mostra
+  // o nome de quem mandou via senderId, então o content salvo no banco fica sem assinatura.
+  let signaturePrefix = "";
+  if (config.signatureEnabled) {
+    const sender = await prisma.profile.findUnique({ where: { id: userId }, select: { name: true } });
+    if (sender?.name) signaturePrefix = `*${sender.name}:*\n`;
+  }
+
   if (body.data.media) {
     const { base64, type, fileName } = body.data.media;
     let sent;
     try {
       sent = await sendMediaAsTeam(config.uazapiToken, conversation.contactNumber, type, base64, {
-        caption: body.data.content,
+        caption: body.data.content ? `${signaturePrefix}${body.data.content}` : (signaturePrefix || undefined),
         fileName,
       });
     } catch (err) {
@@ -56,7 +64,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     if (!content) content = fileName ? `[${type}] ${fileName}` : `[${type}]`;
   } else {
-    await sendWhatsAppTextAsTeam(config.uazapiToken, conversation.contactNumber, content);
+    await sendWhatsAppTextAsTeam(config.uazapiToken, conversation.contactNumber, `${signaturePrefix}${content}`);
   }
 
   const message = await prisma.message.create({

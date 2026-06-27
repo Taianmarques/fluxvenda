@@ -559,6 +559,9 @@ model AgentConfig {
   leadDistributionMode LeadDistributionMode @default(MANUAL)
   lastAssignedToId     String? // último atendente que recebeu um lead no rodízio/IA — marca a posição da fila
 
+  // Quando ativo, mensagens manuais de atendentes saem no WhatsApp assinadas com o nome de quem mandou
+  signatureEnabled Boolean @default(false)
+
   conversations Conversation[]
   pipelines      Pipeline[]
   leadStatuses   LeadStatus[]
