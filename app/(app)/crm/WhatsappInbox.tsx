@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+  MessageCircle, Search, X, Trophy, Lock, Undo2, Bot, CheckCircle2, User,
+  FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon,
+} from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 
 type ConversationSummary = {
@@ -124,7 +128,7 @@ function MediaContent({ mediaUrl, mediaType, content }: { mediaUrl: string; medi
       {mediaType === "audio" && <audio controls src={mediaUrl} className="mb-1" />}
       {mediaType === "document" && (
         <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 underline mb-1">
-          📄 {isPlaceholder ? "Documento" : content}
+          <FileText size={14} /> {isPlaceholder ? "Documento" : content}
         </a>
       )}
       {!isPlaceholder && mediaType !== "document" && <p className="whitespace-pre-wrap">{content}</p>}
@@ -453,15 +457,15 @@ export function WhatsappInbox({
     <div className={`h-full flex flex-col ${t.root}`}>
       <div className={`px-4 py-3 border-b ${t.header} flex items-center justify-between flex-shrink-0`}>
         <div>
-          <p className="font-bold text-lg">💬 WhatsApp</p>
+          <p className="font-bold text-lg flex items-center gap-2"><MessageCircle size={18} /> WhatsApp</p>
           <p className={`text-xs ${t.subtitle}`}>Agente: {agentName}</p>
         </div>
         <button
           onClick={toggleTheme}
           title={theme === "dark" ? "Mudar para fundo claro" : "Mudar para fundo escuro"}
-          className={`text-sm px-2.5 py-1.5 rounded-lg ${t.toggleBar} ${t.toggleInactive}`}
+          className={`p-2 rounded-lg ${t.toggleBar} ${t.toggleInactive}`}
         >
-          {theme === "dark" ? "☀️" : "🌙"}
+          {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
         </button>
       </div>
 
@@ -490,7 +494,7 @@ export function WhatsappInbox({
                 ))}
               </div>
               <div className={`flex items-center gap-2 rounded-lg px-3 py-1.5 ${t.toggleBar}`}>
-                <span className="text-sm opacity-60">🔍</span>
+                <Search size={14} className="opacity-60 flex-shrink-0" />
                 <input
                   value={search}
                   onChange={e => setSearch(e.target.value)}
@@ -498,7 +502,7 @@ export function WhatsappInbox({
                   className={`flex-1 bg-transparent text-sm focus:outline-none placeholder:opacity-60`}
                 />
                 {search && (
-                  <button onClick={() => setSearch("")} className="text-sm opacity-60 hover:opacity-100">✕</button>
+                  <button onClick={() => setSearch("")} className="opacity-60 hover:opacity-100"><X size={14} /></button>
                 )}
               </div>
             </div>
@@ -525,8 +529,8 @@ export function WhatsappInbox({
                     </div>
                     <p className={`text-xs truncate mt-0.5 ${t.listSecondary}`}>{c.lastMessage || "—"}</p>
                     {c.dealValue != null && (
-                      <p className={`text-xs font-semibold mt-1 ${c.wonAt ? "text-green-500" : "text-gray-400"}`}>
-                        {c.wonAt && "🏆 "}{formatBRL(c.dealValue)}
+                      <p className={`text-xs font-semibold mt-1 flex items-center gap-1 ${c.wonAt ? "text-green-500" : "text-gray-400"}`}>
+                        {c.wonAt && <Trophy size={11} />}{formatBRL(c.dealValue)}
                       </p>
                     )}
                     <div className="flex items-center justify-between mt-1.5">
@@ -558,8 +562,8 @@ export function WhatsappInbox({
                     <p className="font-semibold">{detail.contactName || detail.contactNumber}</p>
                     <p className={`text-xs ${t.subtitle}`}>{detail.contactNumber}</p>
                     {detail.dealValue != null && (
-                      <p className={`text-xs font-semibold mt-1 ${detail.wonAt ? "text-green-500" : "text-gray-400"}`}>
-                        {detail.wonAt ? `🏆 Ganho — ${formatBRL(detail.dealValue)}` : formatBRL(detail.dealValue)}
+                      <p className={`text-xs font-semibold mt-1 flex items-center gap-1 ${detail.wonAt ? "text-green-500" : "text-gray-400"}`}>
+                        {detail.wonAt ? <><Trophy size={12} /> Ganho — {formatBRL(detail.dealValue)}</> : formatBRL(detail.dealValue)}
                       </p>
                     )}
                   </div>
@@ -576,7 +580,9 @@ export function WhatsappInbox({
 
                     {detail.status === "FINALIZADO" ? (
                       <>
-                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-800 text-gray-300 border border-gray-700">🔒 Encerrado</span>
+                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-800 text-gray-300 border border-gray-700 flex items-center gap-1">
+                          <Lock size={12} /> Encerrado
+                        </span>
                         <button onClick={handleReabrir} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200">
                           Reabrir
                         </button>
@@ -584,24 +590,26 @@ export function WhatsappInbox({
                     ) : (
                       <>
                         {detail.dealValue != null && !detail.wonAt && (
-                          <button onClick={handleMarcarGanho} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-green-700 hover:bg-green-600 text-white">
-                            🏆 Dar ganho
+                          <button onClick={handleMarcarGanho} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-green-700 hover:bg-green-600 text-white flex items-center gap-1">
+                            <Trophy size={13} /> Dar ganho
                           </button>
                         )}
                         {detail.humanTakeover ? (
-                          <button onClick={handleRetomar} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200">
-                            ↩ Devolver para o agente
+                          <button onClick={handleRetomar} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 flex items-center gap-1">
+                            <Undo2 size={13} /> Devolver para o agente
                           </button>
                         ) : (
                           <>
-                            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-green-900/40 text-green-300 border border-green-800/50">🤖 Agente respondendo</span>
-                            <button onClick={handleAceitar} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-600 text-white">
-                              ✅ Aceitar
+                            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-green-900/40 text-green-300 border border-green-800/50 flex items-center gap-1">
+                              <Bot size={13} /> Agente respondendo
+                            </span>
+                            <button onClick={handleAceitar} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-600 text-white flex items-center gap-1">
+                              <CheckCircle2 size={13} /> Aceitar
                             </button>
                           </>
                         )}
-                        <button onClick={handleEncerrar} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-900/40 hover:bg-red-900/70 text-red-300 border border-red-800/50">
-                          🔒 Encerrar
+                        <button onClick={handleEncerrar} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-900/40 hover:bg-red-900/70 text-red-300 border border-red-800/50 flex items-center gap-1">
+                          <Lock size={13} /> Encerrar
                         </button>
                       </>
                     )}
@@ -618,8 +626,8 @@ export function WhatsappInbox({
                           m.role === "assistant" ? t.bubbleAssistant :
                           t.bubbleIncoming
                         }`}>
-                          {m.role === "human" && <p className="text-[10px] opacity-70 mb-0.5">👤 {m.sender?.name ?? "Atendente"}</p>}
-                          {m.role === "assistant" && <p className="text-[10px] opacity-70 mb-0.5">🤖 {agentName}</p>}
+                          {m.role === "human" && <p className="text-[10px] opacity-70 mb-0.5 flex items-center gap-1"><User size={10} /> {m.sender?.name ?? "Atendente"}</p>}
+                          {m.role === "assistant" && <p className="text-[10px] opacity-70 mb-0.5 flex items-center gap-1"><Bot size={10} /> {agentName}</p>}
                           {m.mediaUrl && m.mediaType ? (
                             <MediaContent mediaUrl={m.mediaUrl} mediaType={m.mediaType} content={m.content} />
                           ) : (
@@ -642,10 +650,10 @@ export function WhatsappInbox({
                       ) : attachment.type === "audio" ? (
                         <audio controls src={attachment.previewUrl} className="h-8 flex-1" />
                       ) : (
-                        <span className="text-lg">{attachment.type === "video" ? "🎬" : "📄"}</span>
+                        <span className="text-gray-400">{attachment.type === "video" ? <Video size={20} /> : <FileText size={20} />}</span>
                       )}
                       {attachment.type !== "audio" && <span className="text-xs truncate flex-1">{attachment.fileName}</span>}
-                      <button onClick={() => setAttachment(null)} className="text-gray-500 hover:text-red-400 text-xs px-1 flex-shrink-0">✕</button>
+                      <button onClick={() => setAttachment(null)} className="text-gray-500 hover:text-red-400 px-1 flex-shrink-0"><X size={14} /></button>
                     </div>
                   )}
 
@@ -656,9 +664,9 @@ export function WhatsappInbox({
                         <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
                       </span>
                       <span className="text-sm flex-1">Gravando... {formatRecordingTime(recordingSeconds)}</span>
-                      <button onClick={() => stopRecording(false)} title="Cancelar" className="text-gray-500 hover:text-red-400 text-lg">🗑️</button>
-                      <button onClick={() => stopRecording(true)} title="Usar áudio" className="bg-green-700 hover:bg-green-600 text-white rounded-lg px-3 py-1 text-sm font-medium">
-                        ✓ Usar
+                      <button onClick={() => stopRecording(false)} title="Cancelar" className="text-gray-500 hover:text-red-400"><Trash2 size={18} /></button>
+                      <button onClick={() => stopRecording(true)} title="Usar áudio" className="bg-green-700 hover:bg-green-600 text-white rounded-lg px-3 py-1 text-sm font-medium flex items-center gap-1">
+                        <Check size={14} /> Usar
                       </button>
                     </div>
                   ) : (
@@ -676,9 +684,9 @@ export function WhatsappInbox({
                           <button
                             onClick={() => fileInputRef.current?.click()}
                             title="Anexar foto, vídeo, áudio ou documento"
-                            className="p-1.5 rounded-lg text-base opacity-70 hover:opacity-100 hover:bg-black/10"
+                            className="p-1.5 rounded-lg opacity-70 hover:opacity-100 hover:bg-black/10"
                           >
-                            📎
+                            <Paperclip size={18} />
                           </button>
                           <button
                             onClick={handleToggleSignature}
@@ -688,14 +696,14 @@ export function WhatsappInbox({
                                 ? signatureEnabled ? "Assinatura ativada — clique pra desativar" : "Assinatura desativada — clique pra ativar"
                                 : signatureEnabled ? "Assinatura ativada pelo gestor" : "Assinatura desativada pelo gestor"
                             }
-                            className={`p-1.5 rounded-lg text-base hover:bg-black/10 ${signatureEnabled ? "text-blue-500" : "opacity-70 hover:opacity-100"} ${!isManager ? "cursor-default" : ""}`}
+                            className={`p-1.5 rounded-lg hover:bg-black/10 ${signatureEnabled ? "text-blue-500" : "opacity-70 hover:opacity-100"} ${!isManager ? "cursor-default" : ""}`}
                           >
-                            ✍️
+                            <PenLine size={18} />
                           </button>
                         </div>
                         <div className="flex items-center gap-1">
-                          <button onClick={startRecording} title="Gravar áudio" className="p-1.5 rounded-lg text-base opacity-70 hover:opacity-100 hover:bg-black/10">
-                            🎤
+                          <button onClick={startRecording} title="Gravar áudio" className="p-1.5 rounded-lg opacity-70 hover:opacity-100 hover:bg-black/10">
+                            <Mic size={18} />
                           </button>
                           <button onClick={handleSend} disabled={sending} className="bg-green-700 hover:bg-green-600 disabled:opacity-50 rounded-full px-4 py-1.5 text-sm font-medium text-white">
                             Enviar
