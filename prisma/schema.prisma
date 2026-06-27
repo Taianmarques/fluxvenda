@@ -568,6 +568,7 @@ model AgentConfig {
   appointments   Appointment[]
   professionals  Professional[]
   services       Service[]
+  quickReplies   QuickReply[]
 }
 
 enum LeadDistributionMode {
@@ -608,6 +609,19 @@ model Service {
 
   appointments           Appointment[]
   pendingInConversations Conversation[]
+}
+
+// Textos prontos que qualquer atendente pode inserir rápido no chat (ex: saudações,
+// respostas padrão). Compartilhadas por toda a equipe do número.
+model QuickReply {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  agentConfigId String
+  agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id], onDelete: Cascade)
+
+  title   String // nome curto pra identificar na lista, ex: "Saudação"
+  content String
 }
 
 model Appointment {

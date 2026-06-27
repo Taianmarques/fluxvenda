@@ -3,9 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import {
   MessageCircle, Search, X, Trophy, Lock, Undo2, Bot, CheckCircle2, User,
-  FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon,
+  FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap,
 } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
+import { EmojiPicker } from "./EmojiPicker";
+import { QuickReplies, type QuickReply } from "./QuickReplies";
 
 type ConversationSummary = {
   id: string;
@@ -163,6 +165,9 @@ export function WhatsappInbox({
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [signatureEnabled, setSignatureEnabled] = useState(initialSignatureEnabled);
   const [signatureSaving, setSignatureSaving] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showQuickReplies, setShowQuickReplies] = useState(false);
+  const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -180,6 +185,7 @@ export function WhatsappInbox({
       .then(res => res.json())
       .then(data => { if (data.attendants) setAttendants(data.attendants); })
       .catch(() => {});
+    refreshQuickReplies();
   }, []);
 
   function toggleTheme() {
@@ -208,6 +214,14 @@ export function WhatsappInbox({
       const res = await fetch("/api/ferramentas/whatsapp/status");
       const data = await res.json();
       if (data.statuses) setLeadStatuses(data.statuses);
+    } catch {}
+  }
+
+  async function refreshQuickReplies() {
+    try {
+      const res = await fetch("/api/ferramentas/whatsapp/respostas-rapidas");
+      const data = await res.json();
+      if (data.quickReplies) setQuickReplies(data.quickReplies);
     } catch {}
   }
 
@@ -256,6 +270,16 @@ export function WhatsappInbox({
     const m = Math.floor(seconds / 60).toString().padStart(2, "0");
     const s = (seconds % 60).toString().padStart(2, "0");
     return `${m}:${s}`;
+  }
+
+  function handleSelectEmoji(emoji: string) {
+    setInput(prev => prev + emoji);
+    setShowEmojiPicker(false);
+  }
+
+  function handleSelectQuickReply(content: string) {
+    setInput(content);
+    setShowQuickReplies(false);
   }
 
   function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
@@ -670,7 +694,19 @@ export function WhatsappInbox({
                       </button>
                     </div>
                   ) : (
-                    <div className={`rounded-2xl border px-3 py-2 ${t.inputField}`}>
+                    <div className={`relative rounded-2xl border px-3 py-2 ${t.inputField}`}>
+                      {showEmojiPicker && (
+                        <EmojiPicker onSelect={handleSelectEmoji} onClose={() => setShowEmojiPicker(false)} dark={theme === "dark"} />
+                      )}
+                      {showQuickReplies && (
+                        <QuickReplies
+                          quickReplies={quickReplies}
+                          onSelect={handleSelectQuickReply}
+                          onChange={refreshQuickReplies}
+                          onClose={() => setShowQuickReplies(false)}
+                          dark={theme === "dark"}
+                        />
+                      )}
                       <input
                         value={input}
                         onChange={e => setInput(e.target.value)}
@@ -681,6 +717,20 @@ export function WhatsappInbox({
                       <div className="flex items-center justify-between mt-1.5">
                         <div className="flex items-center gap-0.5">
                           <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} />
+                          <button
+                            onClick={() => setShowEmojiPicker(s => !s)}
+                            title="Emojis"
+                            className="p-1.5 rounded-lg opacity-70 hover:opacity-100 hover:bg-black/10"
+                          >
+                            <Smile size={18} />
+                          </button>
+                          <button
+                            onClick={() => setShowQuickReplies(s => !s)}
+                            title="Respostas rápidas"
+                            className="p-1.5 rounded-lg opacity-70 hover:opacity-100 hover:bg-black/10"
+                          >
+                            <Zap size={18} />
+                          </button>
                           <button
                             onClick={() => fileInputRef.current?.click()}
                             title="Anexar foto, vídeo, áudio ou documento"
