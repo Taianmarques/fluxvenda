@@ -130,6 +130,7 @@ export function WhatsappInbox({
 }) {
   const [view, setView] = useState<"lista" | "pipeline">("lista");
   const [theme, setTheme] = useState<ChatTheme>("dark");
+  const [search, setSearch] = useState("");
   const [conversations, setConversations] = useState(initialConversations);
   const [stages, setStages] = useState(initialStages);
   const [leadStatuses, setLeadStatuses] = useState(initialLeadStatuses);
@@ -340,6 +341,15 @@ export function WhatsappInbox({
     await refreshDetail(selectedId);
   }
 
+  const filteredConversations = search.trim()
+    ? conversations.filter(c => {
+        const q = search.trim().toLowerCase();
+        return (c.contactName ?? "").toLowerCase().includes(q)
+          || c.contactNumber.includes(q)
+          || (c.lastMessage ?? "").toLowerCase().includes(q);
+      })
+    : conversations;
+
   return (
     <div className={`h-full flex flex-col ${t.root}`}>
       <div className={`px-4 py-3 border-b ${t.header} flex items-center justify-between flex-shrink-0`}>
@@ -386,11 +396,25 @@ export function WhatsappInbox({
         <div className="flex-1 flex overflow-hidden">
           {/* Lista de conversas */}
           <aside className={`w-80 flex-shrink-0 border-r ${t.sidebar} flex flex-col`}>
+            <div className={`px-3 py-2.5 border-b ${t.sidebar} flex-shrink-0`}>
+              <div className={`flex items-center gap-2 rounded-lg px-3 py-1.5 ${t.toggleBar}`}>
+                <span className="text-sm opacity-60">🔍</span>
+                <input
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Buscar conversa..."
+                  className={`flex-1 bg-transparent text-sm focus:outline-none placeholder:opacity-60`}
+                />
+                {search && (
+                  <button onClick={() => setSearch("")} className="text-sm opacity-60 hover:opacity-100">✕</button>
+                )}
+              </div>
+            </div>
             <div className="flex-1 overflow-y-auto">
-              {conversations.length === 0 ? (
-                <p className={`text-sm p-4 ${t.listSecondary}`}>Nenhuma conversa ainda.</p>
+              {filteredConversations.length === 0 ? (
+                <p className={`text-sm p-4 ${t.listSecondary}`}>{search ? "Nenhuma conversa encontrada." : "Nenhuma conversa ainda."}</p>
               ) : (
-                conversations.map(c => (
+                filteredConversations.map(c => (
                   <div
                     key={c.id}
                     role="button"
