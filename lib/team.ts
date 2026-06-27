@@ -2,17 +2,24 @@ import { prisma } from "@/lib/prisma";
 
 // CRM (mensagens, pipeline, agenda, vendas): aberto ao gestor (dono da equipe) e a qualquer
 // atendente que tenha entrado na equipe via código de convite (TeamMember), não importa o
-// role — várias pessoas atendem pelo mesmo número de WhatsApp.
-export async function getOwnAgentConfig(userId: string) {
-  const profile = await prisma.profile.findUnique({ where: { id: userId } });
-  if (!profile) return null;
-
+// role — várias pessoas atendem pelo mesmo número de WhatsApp. Também informa se o usuário
+// é o gestor (vê tudo) ou um atendente (vê só o que está atribuído a ele + não atribuído).
+export async function getOwnAgentConfigWithRole(userId: string) {
   const ownTeam = await prisma.team.findUnique({ where: { managerId: userId } });
-  if (ownTeam) return prisma.agentConfig.findUnique({ where: { teamId: ownTeam.id } });
+  if (ownTeam) {
+    const config = await prisma.agentConfig.findUnique({ where: { teamId: ownTeam.id } });
+    return config ? { config, isManager: true as const } : null;
+  }
 
   const membership = await prisma.teamMember.findUnique({ where: { profileId: userId } });
   if (!membership) return null;
-  return prisma.agentConfig.findUnique({ where: { teamId: membership.teamId } });
+  const config = await prisma.agentConfig.findUnique({ where: { teamId: membership.teamId } });
+  return config ? { config, isManager: false as const } : null;
+}
+
+export async function getOwnAgentConfig(userId: string) {
+  const result = await getOwnAgentConfigWithRole(userId);
+  return result?.config ?? null;
 }
 
 // Configuração do agente (Ferramentas > WhatsApp): só o gestor pode editar nome, tom,

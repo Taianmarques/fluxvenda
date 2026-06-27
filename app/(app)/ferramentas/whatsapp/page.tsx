@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { WhatsappAgentClient } from "./WhatsappAgentClient";
+import { DistribuicaoClient } from "./DistribuicaoClient";
 import { QrConnect } from "./QrConnect";
 import { AgentActions } from "./AgentActions";
 import { getInstanceStatus } from "@/lib/whatsapp";
@@ -112,6 +113,8 @@ export default async function WhatsappAgentPage() {
           </div>
           <span className="text-green-400 text-xl">→</span>
         </Link>
+
+        <DistribuicaoClient initialMode={config.leadDistributionMode} />
 
         <div>
           <h2 className="text-xl font-bold mb-4">Configurações do agente</h2>

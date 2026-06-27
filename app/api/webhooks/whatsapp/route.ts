@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { runAgent, runAgentWithImage, runAgentWithTools, transcribeAudio, SCHEDULING_TOOLS } from "@/lib/agent-engine";
+import { runAgent, runAgentWithImage, runAgentWithTools, transcribeAudio, classifyLeadQualified, SCHEDULING_TOOLS } from "@/lib/agent-engine";
 import { sendWhatsAppTextAsTeam, downloadMessageMedia } from "@/lib/whatsapp";
 import { getAvailableSlots, isSlotAvailable, formatSlotsForAgent, type AvailabilityRule } from "@/lib/scheduling";
+import { assignNextAttendant } from "@/lib/assignment";
 
 function mediaMimetype(message: any): string | null {
   return typeof message?.content === "object" && typeof message.content?.mimetype === "string"
@@ -216,6 +217,12 @@ export async function POST(req: NextRequest) {
 
   await prisma.message.create({ data: { conversationId: conversation.id, role: "user", content: text, mediaUrl, mediaType } });
 
+  // Conversa nova + rodízio ativo: já nasce atribuída a um atendente, em ordem
+  const isNewConversation = conversation.createdAt.getTime() === conversation.updatedAt.getTime();
+  if (isNewConversation && config.leadDistributionMode === "RODIZIO") {
+    await assignNextAttendant(config.id, config.teamId, conversation.id);
+  }
+
   // Atendente humano assumiu essa conversa — apenas registra a mensagem, sem o agente responder
   if (conversation.humanTakeover) {
     return NextResponse.json({ ok: true });
@@ -241,6 +248,16 @@ export async function POST(req: NextRequest) {
   }
 
   await prisma.message.create({ data: { conversationId: conversation.id, role: "assistant", content: reply } });
+
+  // IA decide quando o lead está qualificado e atribui a um atendente (rodízio), se ainda não tiver dono
+  if (config.leadDistributionMode === "IA_QUALIFICACAO" && !conversation.assignedToId) {
+    try {
+      const qualified = await classifyLeadQualified([...historyForAgent, { role: "user", content: text }, { role: "assistant", content: reply }]);
+      if (qualified) await assignNextAttendant(config.id, config.teamId, conversation.id);
+    } catch (err) {
+      console.error("[whatsapp-webhook] erro ao classificar qualificação do lead:", err);
+    }
+  }
 
   await sendWhatsAppTextAsTeam(config.uazapiToken, contactNumber, reply);
 

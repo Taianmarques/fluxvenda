@@ -63,7 +63,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     data: { conversationId: id, role: "human", content, mediaUrl, mediaType, senderId: userId },
   });
 
-  await prisma.conversation.update({ where: { id }, data: { humanTakeover: true, status: "ATIVO" } });
+  await prisma.conversation.update({
+    where: { id },
+    data: {
+      humanTakeover: true,
+      status: "ATIVO",
+      // "Primeiro a assumir": quem manda a primeira mensagem manual fica responsável pela conversa
+      ...(config.leadDistributionMode === "PRIMEIRO_A_ASSUMIR" && !conversation.assignedToId && { assignedToId: userId }),
+    },
+  });
 
   return NextResponse.json({ message });
 }

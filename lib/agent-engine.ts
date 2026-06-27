@@ -238,3 +238,33 @@ export async function generateFollowupMessage(
 
   return completion.choices[0]?.message?.content?.trim() ?? "";
 }
+
+// Avalia se o cliente já demonstrou interesse real de compra (lead qualificado) — usado
+// pelo modo de distribuição "IA_QUALIFICACAO" pra decidir quando atribuir a um atendente.
+export async function classifyLeadQualified(
+  history: { role: "user" | "assistant"; content: string }[]
+): Promise<boolean> {
+  const transcript = history
+    .slice(-12)
+    .map(m => `${m.role === "user" ? "Cliente" : "Atendimento"}: ${m.content}`)
+    .join("\n");
+
+  if (!transcript.trim()) return false;
+
+  const completion = await openai.chat.completions.create({
+    model: MODEL,
+    max_tokens: 5,
+    messages: [
+      {
+        role: "system",
+        content: "Você analisa conversas de vendas pelo WhatsApp. Responda APENAS \"sim\" ou \"nao\" (sem pontuação). " +
+          "O cliente demonstrou interesse real de compra ou fechamento (perguntou preço/condições com intenção de seguir, disse que quer comprar, pediu pra agendar/fechar, confirmou que vai prosseguir)? " +
+          "Pergunta genérica, curiosidade ou só pedir informação não conta como qualificado.",
+      },
+      { role: "user", content: transcript },
+    ],
+  });
+
+  const answer = completion.choices[0]?.message?.content?.trim().toLowerCase() ?? "";
+  return answer.startsWith("sim");
+}

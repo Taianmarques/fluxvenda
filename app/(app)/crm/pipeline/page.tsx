@@ -2,14 +2,16 @@ import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { getOwnAgentConfig } from "@/lib/team";
+import { getOwnAgentConfigWithRole } from "@/lib/team";
 import { PipelineBoardLoader as PipelineBoard } from "./PipelineBoardLoader";
 
 export default async function PipelinePage() {
   const user = await currentUser();
   if (!user) redirect("/sign-in");
 
-  const config = await getOwnAgentConfig(user.id);
+  const result = await getOwnAgentConfigWithRole(user.id);
+  const config = result?.config;
+  const isManager = result?.isManager ?? false;
 
   if (!config?.active) {
     return (
@@ -33,7 +35,10 @@ export default async function PipelinePage() {
       include: { stages: { orderBy: { order: "asc" } } },
     }),
     prisma.conversation.findMany({
-      where: { agentConfigId: config.id },
+      where: {
+        agentConfigId: config.id,
+        ...(isManager ? {} : { OR: [{ assignedToId: user.id }, { assignedToId: null }] }),
+      },
       orderBy: { updatedAt: "desc" },
       include: { messages: { orderBy: { createdAt: "desc" }, take: 1 } },
     }),

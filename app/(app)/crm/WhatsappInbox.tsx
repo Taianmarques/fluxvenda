@@ -13,9 +13,12 @@ type ConversationSummary = {
   leadStatusId: string | null;
   dealValue: number | null;
   wonAt: string | null;
+  assignedToId: string | null;
   updatedAt: string;
   lastMessage: string | null;
 };
+
+type Attendant = { id: string; name: string; isManager: boolean };
 
 function formatBRL(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -56,6 +59,7 @@ type ConversationDetail = {
   humanTakeover: boolean;
   dealValue: number | null;
   wonAt: string | null;
+  assignedToId: string | null;
   messages: Message[];
 };
 
@@ -128,17 +132,20 @@ function MediaContent({ mediaUrl, mediaType, content }: { mediaUrl: string; medi
 }
 
 export function WhatsappInbox({
-  agentName, initialConversations, initialLeadStatuses, initialSelectedId,
+  agentName, initialConversations, initialLeadStatuses, initialSelectedId, currentUserId, isManager,
 }: {
   agentName: string;
   initialConversations: ConversationSummary[];
   initialLeadStatuses: LeadStatus[];
   initialSelectedId?: string | null;
+  currentUserId: string;
+  isManager: boolean;
 }) {
   const [theme, setTheme] = useState<ChatTheme>("dark");
   const [search, setSearch] = useState("");
   const [conversations, setConversations] = useState(initialConversations);
   const [leadStatuses, setLeadStatuses] = useState(initialLeadStatuses);
+  const [attendants, setAttendants] = useState<Attendant[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId ?? initialConversations[0]?.id ?? null);
   const [detail, setDetail] = useState<ConversationDetail | null>(null);
   const [input, setInput] = useState("");
@@ -159,6 +166,14 @@ export function WhatsappInbox({
     if (saved === "light" || saved === "dark") setTheme(saved);
   }, []);
 
+  useEffect(() => {
+    if (!isManager) return;
+    fetch("/api/ferramentas/whatsapp/atendentes")
+      .then(res => res.json())
+      .then(data => { if (data.attendants) setAttendants(data.attendants); })
+      .catch(() => {});
+  }, [isManager]);
+
   function toggleTheme() {
     const next: ChatTheme = theme === "dark" ? "light" : "dark";
     setTheme(next);
@@ -173,7 +188,7 @@ export function WhatsappInbox({
         setConversations(data.conversations.map((c: any) => ({
           id: c.id, contactName: c.contactName, contactNumber: c.contactNumber,
           status: c.status, humanTakeover: c.humanTakeover, stageId: c.stageId, leadStatusId: c.leadStatusId,
-          dealValue: c.dealValue, wonAt: c.wonAt, updatedAt: c.updatedAt,
+          dealValue: c.dealValue, wonAt: c.wonAt, assignedToId: c.assignedToId, updatedAt: c.updatedAt,
           lastMessage: c.messages[0]?.content ?? null,
         })));
       }
@@ -348,6 +363,18 @@ export function WhatsappInbox({
     await refreshList();
   }
 
+  async function handleAssign(assignedToId: string | null) {
+    if (!selectedId) return;
+    const res = await fetch(`/api/ferramentas/whatsapp/conversas/${selectedId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ assignedToId }),
+    });
+    if (!res.ok) { const data = await res.json().catch(() => ({})); alert(data.error ?? "Não foi possível atualizar a atribuição."); return; }
+    await refreshDetail(selectedId);
+    await refreshList();
+  }
+
   const filteredConversations = search.trim()
     ? conversations.filter(c => {
         const q = search.trim().toLowerCase();
@@ -448,6 +475,24 @@ export function WhatsappInbox({
                     )}
                   </div>
                   <div className="flex items-center gap-2">
+                    {isManager ? (
+                      <select
+                        value={detail.assignedToId ?? ""}
+                        onChange={e => handleAssign(e.target.value || null)}
+                        className={`text-xs px-2 py-1.5 rounded-lg border ${t.inputField}`}
+                      >
+                        <option value="">Sem atendente</option>
+                        {attendants.map(a => <option key={a.id} value={a.id}>{a.name}{a.isManager ? " (você)" : ""}</option>)}
+                      </select>
+                    ) : detail.assignedToId === currentUserId ? (
+                      <button onClick={() => handleAssign(null)} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200">
+                        Liberar conversa
+                      </button>
+                    ) : !detail.assignedToId ? (
+                      <button onClick={() => handleAssign(currentUserId)} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-600 text-white">
+                        Assumir pra mim
+                      </button>
+                    ) : null}
                     {detail.dealValue != null && !detail.wonAt && (
                       <button onClick={handleMarcarGanho} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-green-700 hover:bg-green-600 text-white">
                         🏆 Dar ganho

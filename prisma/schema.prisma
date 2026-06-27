@@ -48,6 +48,7 @@ model Profile {
   managedTeam       Team?           @relation("TeamManager")
   teamMembership    TeamMember?
   sentMessages      Message[]
+  assignedConversations Conversation[] @relation("AssignedConversations")
 }
 
 enum Role {
@@ -554,12 +555,23 @@ model AgentConfig {
   availability             Json    @default("[]") // [{ dayOfWeek: 0-6, start: "09:00", end: "18:00" }]
   appointmentReminderHours Int     @default(24) // quantas horas antes do compromisso enviar a confirmação
 
+  // Como conversas novas são distribuídas entre os atendentes da equipe
+  leadDistributionMode LeadDistributionMode @default(MANUAL)
+  lastAssignedToId     String? // último atendente que recebeu um lead no rodízio/IA — marca a posição da fila
+
   conversations Conversation[]
   pipelines      Pipeline[]
   leadStatuses   LeadStatus[]
   appointments   Appointment[]
   professionals  Professional[]
   services       Service[]
+}
+
+enum LeadDistributionMode {
+  MANUAL              // ninguém é atribuído automaticamente
+  PRIMEIRO_A_ASSUMIR  // quem mandar a 1ª mensagem manual na conversa fica responsável
+  RODIZIO             // toda conversa nova já nasce atribuída, alternando entre atendentes
+  IA_QUALIFICACAO     // a IA avalia a conversa e atribui (rodízio) quando o lead parece qualificado
 }
 
 // Se a empresa não cadastrar nenhum profissional, o agendamento usa a disponibilidade
@@ -694,6 +706,11 @@ model Conversation {
 
   dealValue Float?    // valor negociado nesse atendimento (R$)
   wonAt     DateTime? // quando a negociação foi marcada como ganha (null = não ganha)
+
+  // Atendente responsável por essa conversa — null = ainda não atribuída (qualquer atendente
+  // pode ver e assumir). Quem atribui/quando depende do leadDistributionMode do AgentConfig.
+  assignedToId String?
+  assignedTo   Profile? @relation("AssignedConversations", fields: [assignedToId], references: [id], onDelete: SetNull)
 
   followupCount  Int       @default(0)
   lastFollowupAt DateTime?
