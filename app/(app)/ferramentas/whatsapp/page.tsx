@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { WhatsappAgentClient } from "./WhatsappAgentClient";
 import { DistribuicaoClient } from "./DistribuicaoClient";
-import { AssinaturaClient } from "./AssinaturaClient";
 import { QrConnect } from "./QrConnect";
 import { AgentActions } from "./AgentActions";
 import { getInstanceStatus } from "@/lib/whatsapp";
@@ -116,8 +115,6 @@ export default async function WhatsappAgentPage() {
         </Link>
 
         <DistribuicaoClient initialMode={config.leadDistributionMode} />
-
-        <AssinaturaClient initialEnabled={config.signatureEnabled} />
 
         <div>
           <h2 className="text-xl font-bold mb-4">Configurações do agente</h2>

@@ -51,6 +51,7 @@ export default async function WhatsappInboxPage({
       agentName={config.nome}
       currentUserId={user.id}
       isManager={isManager}
+      initialSignatureEnabled={config.signatureEnabled}
       initialLeadStatuses={leadStatuses.map(s => ({ id: s.id, name: s.name, color: s.color, order: s.order }))}
       initialSelectedId={c ?? null}
       initialConversations={conversations.map(c => ({

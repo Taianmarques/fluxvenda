@@ -133,7 +133,7 @@ function MediaContent({ mediaUrl, mediaType, content }: { mediaUrl: string; medi
 }
 
 export function WhatsappInbox({
-  agentName, initialConversations, initialLeadStatuses, initialSelectedId, currentUserId, isManager,
+  agentName, initialConversations, initialLeadStatuses, initialSelectedId, currentUserId, isManager, initialSignatureEnabled,
 }: {
   agentName: string;
   initialConversations: ConversationSummary[];
@@ -141,6 +141,7 @@ export function WhatsappInbox({
   initialSelectedId?: string | null;
   currentUserId: string;
   isManager: boolean;
+  initialSignatureEnabled: boolean;
 }) {
   const [theme, setTheme] = useState<ChatTheme>("dark");
   const [search, setSearch] = useState("");
@@ -156,6 +157,8 @@ export function WhatsappInbox({
   const [attachError, setAttachError] = useState("");
   const [recording, setRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [signatureEnabled, setSignatureEnabled] = useState(initialSignatureEnabled);
+  const [signatureSaving, setSignatureSaving] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -405,6 +408,22 @@ export function WhatsappInbox({
     });
     await refreshDetail(selectedId);
     await refreshList();
+  }
+
+  async function handleToggleSignature() {
+    if (!isManager || signatureSaving) return;
+    const next = !signatureEnabled;
+    setSignatureSaving(true);
+    try {
+      await fetch("/api/ferramentas/whatsapp/assinatura", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ signatureEnabled: next }),
+      });
+      setSignatureEnabled(next);
+    } finally {
+      setSignatureSaving(false);
+    }
   }
 
   const statusCounts = {
@@ -658,6 +677,18 @@ export function WhatsappInbox({
                         className={`px-3 rounded-xl border text-lg ${t.inputField}`}
                       >
                         🎤
+                      </button>
+                      <button
+                        onClick={handleToggleSignature}
+                        disabled={!isManager || signatureSaving}
+                        title={
+                          isManager
+                            ? signatureEnabled ? "Assinatura ativada — clique pra desativar" : "Assinatura desativada — clique pra ativar"
+                            : signatureEnabled ? "Assinatura ativada pelo gestor" : "Assinatura desativada pelo gestor"
+                        }
+                        className={`px-3 rounded-xl border text-lg ${signatureEnabled ? "bg-blue-700 border-blue-600 text-white" : t.inputField} ${!isManager ? "cursor-default opacity-70" : ""}`}
+                      >
+                        ✍️
                       </button>
                       <input
                         value={input}
