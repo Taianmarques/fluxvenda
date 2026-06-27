@@ -35,6 +35,16 @@ export default function CrmLayout({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
+
+        <div className="px-3 py-4 border-t border-gray-800">
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+          >
+            <span className="text-base">←</span>
+            Plataforma B2B
+          </Link>
+        </div>
       </aside>
 
       <div className="flex-1 overflow-hidden">{children}</div>
