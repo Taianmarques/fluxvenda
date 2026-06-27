@@ -34,6 +34,47 @@ function formatDelay(minutes: number): string {
   return `${minutes}min`;
 }
 
+function FollowupDelaysEditor({
+  followupDelays, onAdd, onRemove, onUpdate,
+}: {
+  followupDelays: DelayRow[];
+  onAdd: () => void;
+  onRemove: (i: number) => void;
+  onUpdate: (i: number, row: Partial<DelayRow>) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <label className="text-sm text-gray-400 block">Tentativas (cada uma pode esperar um tempo diferente)</label>
+      {followupDelays.map((row, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <span className="text-xs text-gray-500 w-20 flex-shrink-0">
+            {i === 0 ? "1ª tentativa" : `${i + 1}ª, +`}
+          </span>
+          <input
+            type="number" min={1} max={row.unit === "horas" ? 720 : 1440} value={row.value}
+            onChange={e => onUpdate(i, { value: Math.max(1, Number(e.target.value)) })}
+            className="w-24 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+          />
+          <select
+            value={row.unit} onChange={e => onUpdate(i, { unit: e.target.value as DelayUnit })}
+            className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+          >
+            <option value="horas">horas</option>
+            <option value="minutos">minutos</option>
+          </select>
+          <span className="text-xs text-gray-500">sem resposta</span>
+          {followupDelays.length > 1 && (
+            <button onClick={() => onRemove(i)} className="text-xs text-red-400 hover:text-red-300 ml-auto">Remover</button>
+          )}
+        </div>
+      ))}
+      {followupDelays.length < 10 && (
+        <button onClick={onAdd} className="text-sm text-blue-400 hover:text-blue-300">+ Adicionar tentativa</button>
+      )}
+    </div>
+  );
+}
+
 const TOM_OPTIONS = [
   { value: "FORMAL", label: "Formal", description: "Protocolar, direto ao ponto" },
   { value: "PROXIMO", label: "Próximo", description: "Descontraído e caloroso" },
@@ -75,6 +116,42 @@ export function WhatsappAgentClient({ initialConfig }: { initialConfig: InitialC
   }
   function updateFollowupAttempt(i: number, row: Partial<DelayRow>) {
     setFollowupDelays(followupDelays.map((r, idx) => (idx === i ? { ...r, ...row } : r)));
+  }
+
+  const [showQuickFollowup, setShowQuickFollowup] = useState(false);
+  const [savingQuickFollowup, setSavingQuickFollowup] = useState(false);
+
+  function cancelQuickFollowup() {
+    setFollowupEnabled(initialConfig?.followupEnabled ?? true);
+    setFollowupDelays((initialConfig?.followupDelaysMinutes ?? [1440, 1440]).map(minutesToRow));
+    setShowQuickFollowup(false);
+  }
+
+  async function handleSaveQuickFollowup() {
+    setSavingQuickFollowup(true);
+    setError("");
+    try {
+      const res = await fetch("/api/ferramentas/whatsapp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nome, tom,
+          descricaoEmpresa, enderecoContato, precos,
+          servicos: splitLines(servicos),
+          objecoes: splitLines(objecoes),
+          horario,
+          followupEnabled,
+          followupDelaysMinutes: followupDelays.map(rowToMinutes),
+        }),
+      });
+      if (!res.ok) throw new Error();
+      setShowQuickFollowup(false);
+      router.refresh();
+    } catch {
+      setError("Não foi possível salvar. Tente novamente.");
+    } finally {
+      setSavingQuickFollowup(false);
+    }
   }
 
   const [showTest, setShowTest] = useState(false);
@@ -149,13 +226,37 @@ export function WhatsappAgentClient({ initialConfig }: { initialConfig: InitialC
           {servicos && <p className="text-sm text-gray-400">Serviços: <span className="text-gray-300">{splitLines(servicos).join(", ")}</span></p>}
           {precos && <p className="text-sm text-gray-400">Preços: <span className="text-gray-300">{precos}</span></p>}
           {enderecoContato && <p className="text-sm text-gray-400">Endereço/contato: <span className="text-gray-300">{enderecoContato}</span></p>}
-          <p className="text-sm text-gray-400">
-            Follow-up: <span className="text-gray-300">
-              {followupEnabled
-                ? `${followupDelays.length} tentativa${followupDelays.length === 1 ? "" : "s"} (${followupDelays.map(rowToMinutes).map(formatDelay).join(" → ")})`
-                : "desativado"}
-            </span>
-          </p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm text-gray-400">
+              Follow-up: <span className="text-gray-300">
+                {followupEnabled
+                  ? `${followupDelays.length} tentativa${followupDelays.length === 1 ? "" : "s"} (${followupDelays.map(rowToMinutes).map(formatDelay).join(" → ")})`
+                  : "desativado"}
+              </span>
+            </p>
+            {!showQuickFollowup && (
+              <button onClick={() => setShowQuickFollowup(true)} className="text-xs text-blue-400 hover:text-blue-300 flex-shrink-0">Editar tempos</button>
+            )}
+          </div>
+
+          {showQuickFollowup && (
+            <div className="border-t border-gray-800 pt-3 space-y-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={followupEnabled} onChange={e => setFollowupEnabled(e.target.checked)} className="w-4 h-4" />
+                <span className="text-sm">Ativar follow-up automático</span>
+              </label>
+              {followupEnabled && (
+                <FollowupDelaysEditor followupDelays={followupDelays} onAdd={addFollowupAttempt} onRemove={removeFollowupAttempt} onUpdate={updateFollowupAttempt} />
+              )}
+              {error && <p className="text-sm text-red-400">{error}</p>}
+              <div className="flex gap-3">
+                <button onClick={handleSaveQuickFollowup} disabled={savingQuickFollowup} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl px-4 py-2 text-sm font-medium">
+                  {savingQuickFollowup ? "Salvando..." : "Salvar"}
+                </button>
+                <button onClick={cancelQuickFollowup} className="text-sm text-gray-400 hover:text-gray-200">Cancelar</button>
+              </div>
+            </div>
+          )}
         </div>
 
         <button
@@ -289,35 +390,7 @@ export function WhatsappAgentClient({ initialConfig }: { initialConfig: InitialC
           </label>
 
           {followupEnabled && (
-            <div className="space-y-2">
-              <label className="text-sm text-gray-400 block">Tentativas (cada uma pode esperar um tempo diferente)</label>
-              {followupDelays.map((row, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500 w-20 flex-shrink-0">
-                    {i === 0 ? "1ª tentativa" : `${i + 1}ª, +`}
-                  </span>
-                  <input
-                    type="number" min={1} max={row.unit === "horas" ? 720 : 1440} value={row.value}
-                    onChange={e => updateFollowupAttempt(i, { value: Math.max(1, Number(e.target.value)) })}
-                    className="w-24 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
-                  />
-                  <select
-                    value={row.unit} onChange={e => updateFollowupAttempt(i, { unit: e.target.value as DelayUnit })}
-                    className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
-                  >
-                    <option value="horas">horas</option>
-                    <option value="minutos">minutos</option>
-                  </select>
-                  <span className="text-xs text-gray-500">sem resposta</span>
-                  {followupDelays.length > 1 && (
-                    <button onClick={() => removeFollowupAttempt(i)} className="text-xs text-red-400 hover:text-red-300 ml-auto">Remover</button>
-                  )}
-                </div>
-              ))}
-              {followupDelays.length < 10 && (
-                <button onClick={addFollowupAttempt} className="text-sm text-blue-400 hover:text-blue-300">+ Adicionar tentativa</button>
-              )}
-            </div>
+            <FollowupDelaysEditor followupDelays={followupDelays} onAdd={addFollowupAttempt} onRemove={removeFollowupAttempt} onUpdate={updateFollowupAttempt} />
           )}
 
           <p className="text-xs text-gray-500">Ao salvar, criamos automaticamente a conexão do WhatsApp e mostramos um QR code para você escanear — sem precisar de nenhum painel externo.</p>
