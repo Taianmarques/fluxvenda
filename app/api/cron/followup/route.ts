@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
         status: { not: "FINALIZADO" },
         followupCount: { lt: delays.length },
       },
-      include: { messages: { orderBy: { createdAt: "desc" }, take: 20 } },
+      include: { messages: { where: { role: { not: "note" } }, orderBy: { createdAt: "desc" }, take: 20 } },
     });
 
     for (const conversation of candidates) {

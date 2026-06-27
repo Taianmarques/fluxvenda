@@ -40,7 +40,7 @@ export default async function PipelinePage() {
         ...(isManager ? {} : { OR: [{ assignedToId: user.id }, { assignedToId: null }] }),
       },
       orderBy: { updatedAt: "desc" },
-      include: { messages: { orderBy: { createdAt: "desc" }, take: 1 } },
+      include: { messages: { where: { role: { not: "note" } }, orderBy: { createdAt: "desc" }, take: 1 } },
     }),
     prisma.leadStatus.findMany({ where: { agentConfigId: config.id }, orderBy: { order: "asc" } }),
   ]);

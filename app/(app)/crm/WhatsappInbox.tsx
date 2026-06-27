@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   MessageCircle, Search, X, Trophy, Lock, Undo2, Bot, CheckCircle2, User,
-  FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap,
+  FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap, StickyNote,
 } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { EmojiPicker } from "./EmojiPicker";
@@ -273,8 +273,8 @@ export function WhatsappInbox({
   }
 
   function handleSelectEmoji(emoji: string) {
+    // Mantém aberto pra permitir escolher vários emojis em sequência, igual ao WhatsApp
     setInput(prev => prev + emoji);
-    setShowEmojiPicker(false);
   }
 
   function handleSelectQuickReply(content: string) {
@@ -375,6 +375,23 @@ export function WhatsappInbox({
       });
       await refreshDetail(selectedId);
       await refreshList();
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function handleSendNote() {
+    if (!input.trim() || !selectedId || sending) return;
+    const content = input.trim();
+    setInput("");
+    setSending(true);
+    try {
+      await fetch(`/api/ferramentas/whatsapp/conversas/${selectedId}/nota`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      await refreshDetail(selectedId);
     } finally {
       setSending(false);
     }
@@ -642,6 +659,19 @@ export function WhatsappInbox({
 
                 <div className={`flex-1 overflow-y-auto p-5 space-y-2 ${t.chatBg}`}>
                   {detail.messages.map(m => {
+                    if (m.role === "note") {
+                      return (
+                        <div key={m.id} className="flex justify-center">
+                          <div className="max-w-[85%] rounded-lg px-3 py-2 text-sm bg-amber-900/30 border border-amber-800/40 text-amber-100">
+                            <p className="text-[10px] opacity-80 mb-0.5 flex items-center gap-1 text-amber-300">
+                              <StickyNote size={10} /> Nota interna — {m.sender?.name ?? "Atendente"}
+                            </p>
+                            <p className="whitespace-pre-wrap">{m.content}</p>
+                            <p className="text-[10px] opacity-60 mt-1 text-right">{new Date(m.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</p>
+                          </div>
+                        </div>
+                      );
+                    }
                     const isOutgoing = m.role === "assistant" || m.role === "human";
                     return (
                       <div key={m.id} className={`flex ${isOutgoing ? "justify-end" : "justify-start"}`}>
@@ -755,6 +785,16 @@ export function WhatsappInbox({
                           <button onClick={startRecording} title="Gravar áudio" className="p-1.5 rounded-lg opacity-70 hover:opacity-100 hover:bg-black/10">
                             <Mic size={18} />
                           </button>
+                          {!attachment && (
+                            <button
+                              onClick={handleSendNote}
+                              disabled={sending || !input.trim()}
+                              title="Salvar como nota interna (não envia ao cliente)"
+                              className="flex items-center gap-1 bg-amber-900/40 hover:bg-amber-900/70 disabled:opacity-40 text-amber-300 border border-amber-800/50 rounded-full px-3 py-1.5 text-sm font-medium"
+                            >
+                              <StickyNote size={14} /> Nota
+                            </button>
+                          )}
                           <button onClick={handleSend} disabled={sending} className="bg-green-700 hover:bg-green-600 disabled:opacity-50 rounded-full px-4 py-1.5 text-sm font-medium text-white">
                             Enviar
                           </button>

@@ -208,8 +208,9 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  // Notas internas nunca entram no contexto da IA nem são contadas aqui — são só pra equipe ver
   const recentMessages = await prisma.message.findMany({
-    where: { conversationId: conversation.id },
+    where: { conversationId: conversation.id, role: { not: "note" } },
     orderBy: { createdAt: "desc" },
     take: 20,
   });
