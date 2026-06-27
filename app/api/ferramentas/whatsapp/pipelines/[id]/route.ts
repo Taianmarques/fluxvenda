@@ -13,7 +13,6 @@ async function getOwnAgentConfig(userId: string) {
 
 const patchSchema = z.object({
   name: z.string().min(1).max(40).optional(),
-  color: z.string().optional(),
   order: z.number().int().optional(),
 });
 
@@ -25,15 +24,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!config) return NextResponse.json({ error: "Agente não encontrado" }, { status: 404 });
 
   const { id } = await params;
-  const stage = await prisma.pipelineStage.findFirst({ where: { id, pipeline: { agentConfigId: config.id } } });
-  if (!stage) return NextResponse.json({ error: "Etapa não encontrada" }, { status: 404 });
+  const pipeline = await prisma.pipeline.findFirst({ where: { id, agentConfigId: config.id } });
+  if (!pipeline) return NextResponse.json({ error: "Pipeline não encontrado" }, { status: 404 });
 
   const body = patchSchema.safeParse(await req.json());
   if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
 
-  const updated = await prisma.pipelineStage.update({ where: { id }, data: body.data });
+  const updated = await prisma.pipeline.update({ where: { id }, data: body.data });
 
-  return NextResponse.json({ stage: updated });
+  return NextResponse.json({ pipeline: updated });
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -44,11 +43,14 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if (!config) return NextResponse.json({ error: "Agente não encontrado" }, { status: 404 });
 
   const { id } = await params;
-  const stage = await prisma.pipelineStage.findFirst({ where: { id, pipeline: { agentConfigId: config.id } } });
-  if (!stage) return NextResponse.json({ error: "Etapa não encontrada" }, { status: 404 });
+  const pipeline = await prisma.pipeline.findFirst({ where: { id, agentConfigId: config.id } });
+  if (!pipeline) return NextResponse.json({ error: "Pipeline não encontrado" }, { status: 404 });
 
-  // Conversas dessa etapa ficam sem etapa (stageId null) — onDelete: SetNull no schema
-  await prisma.pipelineStage.delete({ where: { id } });
+  const count = await prisma.pipeline.count({ where: { agentConfigId: config.id } });
+  if (count <= 1) return NextResponse.json({ error: "Não é possível excluir o único pipeline" }, { status: 400 });
+
+  // Etapas desse pipeline são removidas em cascata; conversas dessas etapas ficam sem etapa (stageId null)
+  await prisma.pipeline.delete({ where: { id } });
 
   return NextResponse.json({ ok: true });
 }

@@ -200,7 +200,10 @@ export async function POST(req: NextRequest) {
     update: { status: "ATIVO", followupCount: 0, ...(contactName && { contactName }) },
     create: {
       agentConfigId: config.id, contactNumber, contactName, status: "ATIVO",
-      stageId: (await prisma.pipelineStage.findFirst({ where: { agentConfigId: config.id }, orderBy: { order: "asc" } }))?.id,
+      stageId: (await prisma.pipelineStage.findFirst({
+        where: { pipeline: { agentConfigId: config.id } },
+        orderBy: [{ pipeline: { order: "asc" } }, { order: "asc" }],
+      }))?.id,
     },
   });
 

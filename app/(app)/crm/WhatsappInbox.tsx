@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { WhatsappPipeline, type Stage } from "./WhatsappPipeline";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 
 type ConversationSummary = {
@@ -121,20 +120,18 @@ function MediaContent({ mediaUrl, mediaType, content }: { mediaUrl: string; medi
 }
 
 export function WhatsappInbox({
-  agentName, initialConversations, initialStages, initialLeadStatuses,
+  agentName, initialConversations, initialLeadStatuses, initialSelectedId,
 }: {
   agentName: string;
   initialConversations: ConversationSummary[];
-  initialStages: Stage[];
   initialLeadStatuses: LeadStatus[];
+  initialSelectedId?: string | null;
 }) {
-  const [view, setView] = useState<"lista" | "pipeline">("lista");
   const [theme, setTheme] = useState<ChatTheme>("dark");
   const [search, setSearch] = useState("");
   const [conversations, setConversations] = useState(initialConversations);
-  const [stages, setStages] = useState(initialStages);
   const [leadStatuses, setLeadStatuses] = useState(initialLeadStatuses);
-  const [selectedId, setSelectedId] = useState<string | null>(initialConversations[0]?.id ?? null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId ?? initialConversations[0]?.id ?? null);
   const [detail, setDetail] = useState<ConversationDetail | null>(null);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -171,14 +168,6 @@ export function WhatsappInbox({
           lastMessage: c.messages[0]?.content ?? null,
         })));
       }
-    } catch {}
-  }
-
-  async function refreshStages() {
-    try {
-      const res = await fetch("/api/ferramentas/whatsapp/etapas");
-      const data = await res.json();
-      if (data.stages) setStages(data.stages);
     } catch {}
   }
 
@@ -357,43 +346,16 @@ export function WhatsappInbox({
           <p className="font-bold text-lg">💬 WhatsApp</p>
           <p className={`text-xs ${t.subtitle}`}>Agente: {agentName}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={toggleTheme}
-            title={theme === "dark" ? "Mudar para fundo claro" : "Mudar para fundo escuro"}
-            className={`text-sm px-2.5 py-1.5 rounded-lg ${t.toggleBar} ${t.toggleInactive}`}
-          >
-            {theme === "dark" ? "☀️" : "🌙"}
-          </button>
-          <div className={`flex gap-1 rounded-lg p-1 ${t.toggleBar}`}>
-            <button
-              onClick={() => setView("lista")}
-              className={`text-xs font-medium px-3 py-1.5 rounded-md transition-colors ${view === "lista" ? t.toggleActive : t.toggleInactive}`}
-            >
-              💬 Lista
-            </button>
-            <button
-              onClick={() => setView("pipeline")}
-              className={`text-xs font-medium px-3 py-1.5 rounded-md transition-colors ${view === "pipeline" ? t.toggleActive : t.toggleInactive}`}
-            >
-              📋 Pipeline
-            </button>
-          </div>
-        </div>
+        <button
+          onClick={toggleTheme}
+          title={theme === "dark" ? "Mudar para fundo claro" : "Mudar para fundo escuro"}
+          className={`text-sm px-2.5 py-1.5 rounded-lg ${t.toggleBar} ${t.toggleInactive}`}
+        >
+          {theme === "dark" ? "☀️" : "🌙"}
+        </button>
       </div>
 
-      {view === "pipeline" ? (
-        <WhatsappPipeline
-          stages={stages}
-          leadStatuses={leadStatuses}
-          conversations={conversations}
-          theme={theme}
-          onSelectConversation={id => { setSelectedId(id); setView("lista"); }}
-          onStagesChange={refreshStages}
-          onLeadStatusesChange={refreshLeadStatuses}
-        />
-      ) : (
-        <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden">
           {/* Lista de conversas */}
           <aside className={`w-80 flex-shrink-0 border-r ${t.sidebar} flex flex-col`}>
             <div className={`px-3 py-2.5 border-b ${t.sidebar} flex-shrink-0`}>
@@ -553,7 +515,7 @@ export function WhatsappInbox({
             )}
           </main>
         </div>
-      )}
     </div>
   );
 }
+

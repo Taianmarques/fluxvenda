@@ -553,7 +553,7 @@ model AgentConfig {
   appointmentReminderHours Int     @default(24) // quantas horas antes do compromisso enviar a confirmação
 
   conversations Conversation[]
-  pipelineStages PipelineStage[]
+  pipelines      Pipeline[]
   leadStatuses   LeadStatus[]
   appointments   Appointment[]
   professionals  Professional[]
@@ -627,12 +627,28 @@ enum AppointmentStatus {
   CONCLUIDO
 }
 
+// Uma empresa pode ter vários pipelines (ex: Vendas, Suporte). Cada conversa fica em uma
+// etapa por vez, e a etapa pertence a um único pipeline — então o pipeline "atual" da
+// conversa é sempre o do stage em que ela está.
+model Pipeline {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+
+  agentConfigId String
+  agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id], onDelete: Cascade)
+
+  name  String
+  order Int    @default(0)
+
+  stages PipelineStage[]
+}
+
 model PipelineStage {
   id            String      @id @default(cuid())
   createdAt     DateTime    @default(now())
 
-  agentConfigId String
-  agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id], onDelete: Cascade)
+  pipelineId String
+  pipeline   Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
 
   name  String
   color String @default("#3b82f6")

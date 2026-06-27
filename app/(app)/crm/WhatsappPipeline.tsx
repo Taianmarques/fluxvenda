@@ -174,8 +174,9 @@ function Column({
 }
 
 export function WhatsappPipeline({
-  stages, leadStatuses, conversations, theme, onSelectConversation, onStagesChange, onLeadStatusesChange,
+  pipelineId, stages, leadStatuses, conversations, theme, onSelectConversation, onStagesChange, onLeadStatusesChange,
 }: {
+  pipelineId: string;
   stages: Stage[];
   leadStatuses: LeadStatus[];
   conversations: PipelineConversation[];
@@ -236,7 +237,7 @@ export function WhatsappPipeline({
     await fetch("/api/ferramentas/whatsapp/etapas", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newStageName.trim() }),
+      body: JSON.stringify({ pipelineId, name: newStageName.trim() }),
     });
     setNewStageName("");
     onStagesChange();

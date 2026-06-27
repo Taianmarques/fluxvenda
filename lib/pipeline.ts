@@ -8,10 +8,12 @@ export const DEFAULT_STAGES = [
   { name: "Perdido", color: "#ef4444" },
 ];
 
-export async function seedDefaultStages(agentConfigId: string) {
+export async function seedDefaultPipeline(agentConfigId: string, name = "Pipeline Principal") {
+  const pipeline = await prisma.pipeline.create({ data: { agentConfigId, name, order: 0 } });
   await prisma.pipelineStage.createMany({
-    data: DEFAULT_STAGES.map((s, i) => ({ agentConfigId, name: s.name, color: s.color, order: i })),
+    data: DEFAULT_STAGES.map((s, i) => ({ pipelineId: pipeline.id, name: s.name, color: s.color, order: i })),
   });
+  return pipeline;
 }
 
 export const DEFAULT_LEAD_STATUSES = [

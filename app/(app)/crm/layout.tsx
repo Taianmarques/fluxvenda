@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const CRM_NAV = [
   { href: "/crm", label: "Mensagens", icon: "💬" },
+  { href: "/crm/pipeline", label: "Pipeline", icon: "📋" },
   { href: "/crm/agenda", label: "Agenda", icon: "📅" },
 ];
 

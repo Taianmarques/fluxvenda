@@ -47,7 +47,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
 
   if (body.data.stageId) {
-    const stage = await prisma.pipelineStage.findFirst({ where: { id: body.data.stageId, agentConfigId: config.id } });
+    const stage = await prisma.pipelineStage.findFirst({ where: { id: body.data.stageId, pipeline: { agentConfigId: config.id } } });
     if (!stage) return NextResponse.json({ error: "Etapa não encontrada" }, { status: 404 });
   }
 
