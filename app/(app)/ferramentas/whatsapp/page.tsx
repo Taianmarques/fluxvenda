@@ -103,12 +103,12 @@ export default async function WhatsappAgentPage() {
         </div>
 
         <Link
-          href="/whatsapp"
+          href="/crm"
           className="flex items-center justify-between gap-4 bg-gradient-to-r from-green-950/40 to-emerald-950/40 border border-green-800/50 rounded-2xl p-5 hover:border-green-600 transition-colors"
         >
           <div>
-            <p className="font-semibold text-green-300">💬 Abrir caixa de entrada</p>
-            <p className="text-sm text-gray-400 mt-1">Veja as conversas em tempo real e assuma o atendimento manualmente quando precisar.</p>
+            <p className="font-semibold text-green-300">💬 Abrir CRM</p>
+            <p className="text-sm text-gray-400 mt-1">Veja as conversas em tempo real, a agenda e assuma o atendimento manualmente quando precisar.</p>
           </div>
           <span className="text-green-400 text-xl">→</span>
         </Link>

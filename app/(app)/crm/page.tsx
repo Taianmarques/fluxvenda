@@ -16,7 +16,7 @@ export default async function WhatsappInboxPage() {
 
   if (!config?.active) {
     return (
-      <div className="min-h-screen bg-gray-950 text-white p-6 flex items-center justify-center">
+      <div className="h-full bg-gray-950 text-white p-6 flex items-center justify-center">
         <div className="max-w-md text-center space-y-4">
           <p className="text-5xl">💬</p>
           <h1 className="text-2xl font-bold">Nenhum agente de WhatsApp ativo</h1>

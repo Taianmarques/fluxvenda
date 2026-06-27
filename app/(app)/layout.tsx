@@ -29,8 +29,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/playbook",   label: "Playbook",   icon: "📖", show: true },
     { href: "/ranking",    label: "Ranking",    icon: "🏆", show: true },
     { href: "/gestor",      label: "Equipe",      icon: "👥", show: isGestor },
-    { href: "/whatsapp",    label: "WhatsApp",    icon: "🟢", show: isGestor },
-    { href: "/agenda",      label: "Agenda",      icon: "📅", show: isGestor },
+    { href: "/crm",         label: "CRM",         icon: "🟢", show: isGestor },
     { href: "/ferramentas", label: "Ferramentas", icon: "🧰", show: isGestor },
     { href: "/admin",       label: "Super Admin", icon: "🛠️", show: isAdmin },
   ];

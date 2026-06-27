@@ -28,7 +28,7 @@ export default async function FerramentasPage() {
       statusColor: whatsappConfigured ? "bg-green-900/40 text-green-300 border-green-800/50" : "bg-gray-800 text-gray-400 border-gray-700",
     },
     {
-      href: "/agenda",
+      href: "/crm/agenda",
       icon: "📅",
       title: "Agendamento via WhatsApp",
       description: "O agente de IA consulta sua disponibilidade real e marca compromissos direto na conversa, sem precisar de confirmação manual.",
