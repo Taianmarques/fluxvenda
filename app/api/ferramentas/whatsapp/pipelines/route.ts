@@ -1,16 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
+import { getOwnAgentConfig } from "@/lib/team";
 import { DEFAULT_STAGES } from "@/lib/pipeline";
 import { z } from "zod";
-
-async function getOwnAgentConfig(userId: string) {
-  const profile = await prisma.profile.findUnique({ where: { id: userId } });
-  if (!profile || (profile.role !== "GESTOR" && profile.role !== "ADMIN")) return null;
-  const team = await prisma.team.findUnique({ where: { managerId: userId } });
-  if (!team) return null;
-  return prisma.agentConfig.findUnique({ where: { teamId: team.id } });
-}
 
 export async function GET() {
   const { userId } = await auth();

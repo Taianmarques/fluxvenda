@@ -2,17 +2,14 @@ import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { getOwnAgentConfig } from "@/lib/team";
 import { PipelineBoardLoader as PipelineBoard } from "./PipelineBoardLoader";
 
 export default async function PipelinePage() {
   const user = await currentUser();
   if (!user) redirect("/sign-in");
 
-  const profile = await prisma.profile.findUnique({ where: { id: user.id } });
-  if (!profile || (profile.role !== "GESTOR" && profile.role !== "ADMIN")) redirect("/dashboard");
-
-  const team = await prisma.team.findUnique({ where: { managerId: user.id }, include: { agentConfig: true } });
-  const config = team?.agentConfig;
+  const config = await getOwnAgentConfig(user.id);
 
   if (!config?.active) {
     return (

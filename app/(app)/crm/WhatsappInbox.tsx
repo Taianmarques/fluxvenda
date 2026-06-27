@@ -28,6 +28,7 @@ type Message = {
   mediaUrl?: string | null;
   mediaType?: string | null;
   createdAt: string;
+  sender?: { name: string } | null;
 };
 
 type MediaKind = "image" | "video" | "audio" | "document";
@@ -472,7 +473,7 @@ export function WhatsappInbox({
                           m.role === "assistant" ? t.bubbleAssistant :
                           t.bubbleIncoming
                         }`}>
-                          {m.role === "human" && <p className="text-[10px] opacity-70 mb-0.5">Você (atendente)</p>}
+                          {m.role === "human" && <p className="text-[10px] opacity-70 mb-0.5">👤 {m.sender?.name ?? "Atendente"}</p>}
                           {m.role === "assistant" && <p className="text-[10px] opacity-70 mb-0.5">🤖 {agentName}</p>}
                           {m.mediaUrl && m.mediaType ? (
                             <MediaContent mediaUrl={m.mediaUrl} mediaType={m.mediaType} content={m.content} />

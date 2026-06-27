@@ -17,6 +17,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const isGestor = profile.role === "GESTOR" || profile.role === "ADMIN";
   const isAdmin = profile.role === "ADMIN";
 
+  // Atendentes (membros de equipe, qualquer role) também acessam o CRM do número da equipe
+  const isTeamMember = isGestor || Boolean(await prisma.teamMember.findUnique({ where: { profileId: user.id } }));
+
   const NAV = [
     { href: "/dashboard",  label: "Dashboard",  icon: "🏠", show: true },
     { href: "/scanner",    label: "Scanner",    icon: "📊", show: true },
@@ -28,7 +31,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/playbook",   label: "Playbook",   icon: "📖", show: true },
     { href: "/ranking",    label: "Ranking",    icon: "🏆", show: true },
     { href: "/gestor",      label: "Equipe",      icon: "👥", show: isGestor },
-    { href: "/crm",         label: "CRM",         icon: "🟢", show: isGestor },
+    { href: "/crm",         label: "CRM",         icon: "🟢", show: isTeamMember },
     { href: "/ferramentas", label: "Ferramentas", icon: "🧰", show: isGestor },
     { href: "/admin",       label: "Super Admin", icon: "🛠️", show: isAdmin },
   ];

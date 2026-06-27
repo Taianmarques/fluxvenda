@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
+import { getOwnAgentConfig } from "@/lib/team";
 import { sendWhatsAppTextAsTeam, sendMediaAsTeam, downloadMessageMedia } from "@/lib/whatsapp";
 import { z } from "zod";
 
@@ -12,14 +13,6 @@ const schema = z.object({
     fileName: z.string().optional(),
   }).optional(),
 }).refine(d => d.content || d.media, { message: "content ou media é obrigatório" });
-
-async function getOwnAgentConfig(userId: string) {
-  const profile = await prisma.profile.findUnique({ where: { id: userId } });
-  if (!profile || (profile.role !== "GESTOR" && profile.role !== "ADMIN")) return null;
-  const team = await prisma.team.findUnique({ where: { managerId: userId } });
-  if (!team) return null;
-  return prisma.agentConfig.findUnique({ where: { teamId: team.id } });
-}
 
 // Envia uma mensagem (texto e/ou mídia) como atendente humano — assume a conversa e pausa o agente de IA
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -67,7 +60,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const message = await prisma.message.create({
-    data: { conversationId: id, role: "human", content, mediaUrl, mediaType },
+    data: { conversationId: id, role: "human", content, mediaUrl, mediaType, senderId: userId },
   });
 
   await prisma.conversation.update({ where: { id }, data: { humanTakeover: true, status: "ATIVO" } });
