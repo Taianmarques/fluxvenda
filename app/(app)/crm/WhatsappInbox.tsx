@@ -56,6 +56,7 @@ type ConversationDetail = {
   id: string;
   contactName: string | null;
   contactNumber: string;
+  status: string;
   humanTakeover: boolean;
   dealValue: number | null;
   wonAt: string | null;
@@ -143,6 +144,7 @@ export function WhatsappInbox({
 }) {
   const [theme, setTheme] = useState<ChatTheme>("dark");
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"todos" | "ativos" | "pendentes" | "finalizados">("todos");
   const [conversations, setConversations] = useState(initialConversations);
   const [leadStatuses, setLeadStatuses] = useState(initialLeadStatuses);
   const [attendants, setAttendants] = useState<Attendant[]>([]);
@@ -167,12 +169,11 @@ export function WhatsappInbox({
   }, []);
 
   useEffect(() => {
-    if (!isManager) return;
     fetch("/api/ferramentas/whatsapp/atendentes")
       .then(res => res.json())
       .then(data => { if (data.attendants) setAttendants(data.attendants); })
       .catch(() => {});
-  }, [isManager]);
+  }, []);
 
   function toggleTheme() {
     const next: ChatTheme = theme === "dark" ? "light" : "dark";
@@ -375,14 +376,59 @@ export function WhatsappInbox({
     await refreshList();
   }
 
+  async function handleAceitar() {
+    if (!selectedId) return;
+    const res = await fetch(`/api/ferramentas/whatsapp/conversas/${selectedId}/aceitar`, { method: "POST" });
+    if (!res.ok) { const data = await res.json().catch(() => ({})); alert(data.error ?? "Não foi possível aceitar a conversa."); return; }
+    await refreshDetail(selectedId);
+    await refreshList();
+  }
+
+  async function handleEncerrar() {
+    if (!selectedId) return;
+    if (!confirm("Encerrar esse atendimento? Se o cliente mandar outra mensagem, a conversa reabre automaticamente.")) return;
+    await fetch(`/api/ferramentas/whatsapp/conversas/${selectedId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "FINALIZADO" }),
+    });
+    await refreshDetail(selectedId);
+    await refreshList();
+  }
+
+  async function handleReabrir() {
+    if (!selectedId) return;
+    await fetch(`/api/ferramentas/whatsapp/conversas/${selectedId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "ATIVO" }),
+    });
+    await refreshDetail(selectedId);
+    await refreshList();
+  }
+
+  const statusCounts = {
+    todos: conversations.length,
+    ativos: conversations.filter(c => c.humanTakeover && c.status !== "FINALIZADO").length,
+    pendentes: conversations.filter(c => !c.humanTakeover && c.status !== "FINALIZADO").length,
+    finalizados: conversations.filter(c => c.status === "FINALIZADO").length,
+  };
+
+  const statusFiltered = conversations.filter(c => {
+    if (statusFilter === "ativos") return c.humanTakeover && c.status !== "FINALIZADO";
+    if (statusFilter === "pendentes") return !c.humanTakeover && c.status !== "FINALIZADO";
+    if (statusFilter === "finalizados") return c.status === "FINALIZADO";
+    return true;
+  });
+
   const filteredConversations = search.trim()
-    ? conversations.filter(c => {
+    ? statusFiltered.filter(c => {
         const q = search.trim().toLowerCase();
         return (c.contactName ?? "").toLowerCase().includes(q)
           || c.contactNumber.includes(q)
           || (c.lastMessage ?? "").toLowerCase().includes(q);
       })
-    : conversations;
+    : statusFiltered;
 
   return (
     <div className={`h-full flex flex-col ${t.root}`}>
@@ -403,7 +449,27 @@ export function WhatsappInbox({
       <div className="flex-1 flex overflow-hidden">
           {/* Lista de conversas */}
           <aside className={`w-80 flex-shrink-0 border-r ${t.sidebar} flex flex-col`}>
-            <div className={`px-3 py-2.5 border-b ${t.sidebar} flex-shrink-0`}>
+            <div className={`px-3 py-2.5 border-b ${t.sidebar} flex-shrink-0 space-y-2`}>
+              <div className="flex items-center gap-1.5 overflow-x-auto">
+                {([
+                  ["todos", "Todos"],
+                  ["ativos", "Ativos"],
+                  ["pendentes", "Pendentes"],
+                  ["finalizados", "Finalizados"],
+                ] as const).map(([key, label]) => (
+                  <button
+                    key={key}
+                    onClick={() => setStatusFilter(key)}
+                    className={`flex-shrink-0 text-xs font-medium px-2.5 py-1.5 rounded-full border transition-colors ${
+                      statusFilter === key
+                        ? "border-blue-600 bg-blue-950/30 text-blue-300"
+                        : `border-transparent ${t.toggleBar} ${t.toggleInactive}`
+                    }`}
+                  >
+                    {label} <span className="opacity-70">{statusCounts[key]}</span>
+                  </button>
+                ))}
+              </div>
               <div className={`flex items-center gap-2 rounded-lg px-3 py-1.5 ${t.toggleBar}`}>
                 <span className="text-sm opacity-60">🔍</span>
                 <input
@@ -419,7 +485,7 @@ export function WhatsappInbox({
             </div>
             <div className="flex-1 overflow-y-auto">
               {filteredConversations.length === 0 ? (
-                <p className={`text-sm p-4 ${t.listSecondary}`}>{search ? "Nenhuma conversa encontrada." : "Nenhuma conversa ainda."}</p>
+                <p className={`text-sm p-4 ${t.listSecondary}`}>{search ? "Nenhuma conversa encontrada." : "Nenhuma conversa nessa aba."}</p>
               ) : (
                 filteredConversations.map(c => (
                   <div
@@ -432,7 +498,11 @@ export function WhatsappInbox({
                   >
                     <div className="flex items-center justify-between gap-2">
                       <p className="font-medium truncate">{c.contactName || c.contactNumber}</p>
-                      {c.humanTakeover && <span className="text-[10px] flex-shrink-0 px-1.5 py-0.5 rounded-full bg-orange-900/50 text-orange-300 border border-orange-700">manual</span>}
+                      {c.status === "FINALIZADO" ? (
+                        <span className="text-[10px] flex-shrink-0 px-1.5 py-0.5 rounded-full bg-gray-700/50 text-gray-300 border border-gray-600">encerrado</span>
+                      ) : c.humanTakeover ? (
+                        <span className="text-[10px] flex-shrink-0 px-1.5 py-0.5 rounded-full bg-orange-900/50 text-orange-300 border border-orange-700">manual</span>
+                      ) : null}
                     </div>
                     <p className={`text-xs truncate mt-0.5 ${t.listSecondary}`}>{c.lastMessage || "—"}</p>
                     {c.dealValue != null && (
@@ -474,36 +544,47 @@ export function WhatsappInbox({
                       </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    {isManager ? (
-                      <select
-                        value={detail.assignedToId ?? ""}
-                        onChange={e => handleAssign(e.target.value || null)}
-                        className={`text-xs px-2 py-1.5 rounded-lg border ${t.inputField}`}
-                      >
-                        <option value="">Sem atendente</option>
-                        {attendants.map(a => <option key={a.id} value={a.id}>{a.name}{a.isManager ? " (você)" : ""}</option>)}
-                      </select>
-                    ) : detail.assignedToId === currentUserId ? (
-                      <button onClick={() => handleAssign(null)} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200">
-                        Liberar conversa
-                      </button>
-                    ) : !detail.assignedToId ? (
-                      <button onClick={() => handleAssign(currentUserId)} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-600 text-white">
-                        Assumir pra mim
-                      </button>
-                    ) : null}
-                    {detail.dealValue != null && !detail.wonAt && (
-                      <button onClick={handleMarcarGanho} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-green-700 hover:bg-green-600 text-white">
-                        🏆 Dar ganho
-                      </button>
-                    )}
-                    {detail.humanTakeover ? (
-                      <button onClick={handleRetomar} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200">
-                        ↩ Devolver para o agente
-                      </button>
+                  <div className="flex items-center gap-2 flex-wrap justify-end">
+                    <select
+                      value={detail.assignedToId ?? ""}
+                      onChange={e => handleAssign(e.target.value || null)}
+                      title="Transferir conversa"
+                      className={`text-xs px-2 py-1.5 rounded-lg border ${t.inputField}`}
+                    >
+                      <option value="">Sem atendente</option>
+                      {attendants.map(a => <option key={a.id} value={a.id}>{a.name}{a.id === currentUserId ? " (você)" : ""}</option>)}
+                    </select>
+
+                    {detail.status === "FINALIZADO" ? (
+                      <>
+                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-800 text-gray-300 border border-gray-700">🔒 Encerrado</span>
+                        <button onClick={handleReabrir} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200">
+                          Reabrir
+                        </button>
+                      </>
                     ) : (
-                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-green-900/40 text-green-300 border border-green-800/50">🤖 Agente respondendo</span>
+                      <>
+                        {detail.dealValue != null && !detail.wonAt && (
+                          <button onClick={handleMarcarGanho} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-green-700 hover:bg-green-600 text-white">
+                            🏆 Dar ganho
+                          </button>
+                        )}
+                        {detail.humanTakeover ? (
+                          <button onClick={handleRetomar} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200">
+                            ↩ Devolver para o agente
+                          </button>
+                        ) : (
+                          <>
+                            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-green-900/40 text-green-300 border border-green-800/50">🤖 Agente respondendo</span>
+                            <button onClick={handleAceitar} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-600 text-white">
+                              ✅ Aceitar
+                            </button>
+                          </>
+                        )}
+                        <button onClick={handleEncerrar} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-900/40 hover:bg-red-900/70 text-red-300 border border-red-800/50">
+                          🔒 Encerrar
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
