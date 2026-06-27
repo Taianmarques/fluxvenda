@@ -167,6 +167,7 @@ export function WhatsappInbox({
   const [signatureSaving, setSignatureSaving] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showQuickReplies, setShowQuickReplies] = useState(false);
+  const [noteMode, setNoteMode] = useState(false);
   const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -395,6 +396,11 @@ export function WhatsappInbox({
     } finally {
       setSending(false);
     }
+  }
+
+  function handlePrimaryAction() {
+    if (noteMode) handleSendNote();
+    else handleSend();
   }
 
   async function handleRetomar() {
@@ -740,8 +746,8 @@ export function WhatsappInbox({
                       <input
                         value={input}
                         onChange={e => setInput(e.target.value)}
-                        onKeyDown={e => e.key === "Enter" && handleSend()}
-                        placeholder={attachment ? "Adicionar legenda (opcional)..." : "Digite uma mensagem para assumir a conversa..."}
+                        onKeyDown={e => e.key === "Enter" && handlePrimaryAction()}
+                        placeholder={noteMode ? "Escreva uma nota interna (só a equipe vê)..." : attachment ? "Adicionar legenda (opcional)..." : "Digite uma mensagem para assumir a conversa..."}
                         className="w-full bg-transparent text-sm focus:outline-none"
                       />
                       <div className="flex items-center justify-between mt-1.5">
@@ -780,23 +786,24 @@ export function WhatsappInbox({
                           >
                             <PenLine size={18} />
                           </button>
+                          <button
+                            onClick={() => setNoteMode(s => !s)}
+                            title={noteMode ? "Nota interna ativada — clique pra voltar a enviar mensagem" : "Escrever nota interna (não envia ao cliente)"}
+                            className={`p-1.5 rounded-lg ${noteMode ? "bg-amber-500 text-white" : "opacity-70 hover:opacity-100 hover:bg-black/10"}`}
+                          >
+                            <StickyNote size={18} />
+                          </button>
                         </div>
                         <div className="flex items-center gap-1">
                           <button onClick={startRecording} title="Gravar áudio" className="p-1.5 rounded-lg opacity-70 hover:opacity-100 hover:bg-black/10">
                             <Mic size={18} />
                           </button>
-                          {!attachment && (
-                            <button
-                              onClick={handleSendNote}
-                              disabled={sending || !input.trim()}
-                              title="Salvar como nota interna (não envia ao cliente)"
-                              className="flex items-center gap-1 bg-amber-900/40 hover:bg-amber-900/70 disabled:opacity-40 text-amber-300 border border-amber-800/50 rounded-full px-3 py-1.5 text-sm font-medium"
-                            >
-                              <StickyNote size={14} /> Nota
-                            </button>
-                          )}
-                          <button onClick={handleSend} disabled={sending} className="bg-green-700 hover:bg-green-600 disabled:opacity-50 rounded-full px-4 py-1.5 text-sm font-medium text-white">
-                            Enviar
+                          <button
+                            onClick={handlePrimaryAction}
+                            disabled={sending || (noteMode && !input.trim())}
+                            className={`rounded-full px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50 ${noteMode ? "bg-amber-600 hover:bg-amber-500" : "bg-green-700 hover:bg-green-600"}`}
+                          >
+                            {noteMode ? "Salvar nota" : "Enviar"}
                           </button>
                         </div>
                       </div>
