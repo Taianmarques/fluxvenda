@@ -3,13 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import {
   MessageCircle, Search, X, Trophy, Lock, Unlock, Bot, User,
-  FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap, StickyNote, ArrowRightLeft, HandCoins, CalendarClock,
+  FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap, StickyNote, ArrowRightLeft, HandCoins, CalendarClock, ListFilter,
 } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { EmojiPicker } from "./EmojiPicker";
 import { QuickReplies, type QuickReply } from "./QuickReplies";
 import { OpportunitiesPanel, type Opportunity } from "./OpportunitiesPanel";
 import { ScheduledMessagesPanel, type ScheduledMessage } from "./ScheduledMessagesPanel";
+import { ConversationFiltersPanel, EMPTY_FILTERS, hasActiveFilters, type ConversationFilters } from "./ConversationFiltersPanel";
 
 type ConversationSummary = {
   id: string;
@@ -21,7 +22,10 @@ type ConversationSummary = {
   opportunities: Opportunity[];
   assignedToId: string | null;
   updatedAt: string;
+  lastReadAt: string | null;
   lastMessage: string | null;
+  lastMessageRole: string | null;
+  lastMessageAt: string | null;
 };
 
 type Attendant = { id: string; name: string; isManager: boolean };
@@ -172,6 +176,8 @@ export function WhatsappInbox({
   const [showTransferMenu, setShowTransferMenu] = useState(false);
   const [showOpportunities, setShowOpportunities] = useState(false);
   const [showScheduled, setShowScheduled] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<ConversationFilters>(EMPTY_FILTERS);
   const [scheduledMessages, setScheduledMessages] = useState<ScheduledMessage[]>([]);
   const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -209,7 +215,10 @@ export function WhatsappInbox({
           id: c.id, contactName: c.contactName, contactNumber: c.contactNumber,
           status: c.status, humanTakeover: c.humanTakeover, leadStatusId: c.leadStatusId,
           opportunities: c.opportunities, assignedToId: c.assignedToId, updatedAt: c.updatedAt,
+          lastReadAt: c.lastReadAt,
           lastMessage: c.messages[0]?.content ?? null,
+          lastMessageRole: c.messages[0]?.role ?? null,
+          lastMessageAt: c.messages[0]?.createdAt ?? null,
         })));
       }
     } catch {}
@@ -495,14 +504,28 @@ export function WhatsappInbox({
     return c.status === "FINALIZADO";
   });
 
+  const extraFiltered = statusFiltered.filter(c => {
+    if (filters.attendantId === "__none__" && c.assignedToId) return false;
+    if (filters.attendantId && filters.attendantId !== "__none__" && c.assignedToId !== filters.attendantId) return false;
+    if (filters.leadStatusId && c.leadStatusId !== filters.leadStatusId) return false;
+    if (filters.onlyOpenOpportunity && !c.opportunities.some(o => !o.wonAt)) return false;
+    if (filters.onlyUnanswered && c.lastMessageRole !== "user") return false;
+    if (filters.onlyUnread) {
+      const lastAt = c.lastMessageAt ? new Date(c.lastMessageAt).getTime() : 0;
+      const readAt = c.lastReadAt ? new Date(c.lastReadAt).getTime() : 0;
+      if (!(lastAt > readAt)) return false;
+    }
+    return true;
+  });
+
   const filteredConversations = search.trim()
-    ? statusFiltered.filter(c => {
+    ? extraFiltered.filter(c => {
         const q = search.trim().toLowerCase();
         return (c.contactName ?? "").toLowerCase().includes(q)
           || c.contactNumber.includes(q)
           || (c.lastMessage ?? "").toLowerCase().includes(q);
       })
-    : statusFiltered;
+    : extraFiltered;
 
   return (
     <div className={`h-full flex flex-col ${t.root}`}>
@@ -543,17 +566,38 @@ export function WhatsappInbox({
                   </button>
                 ))}
               </div>
-              <div className={`flex items-center gap-2 rounded-lg px-3 py-1.5 ${t.toggleBar}`}>
-                <Search size={14} className="opacity-60 flex-shrink-0" />
-                <input
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  placeholder="Buscar conversa..."
-                  className={`flex-1 bg-transparent text-sm focus:outline-none placeholder:opacity-60`}
-                />
-                {search && (
-                  <button onClick={() => setSearch("")} className="opacity-60 hover:opacity-100"><X size={14} /></button>
-                )}
+              <div className="flex items-center gap-1.5">
+                <div className={`flex-1 flex items-center gap-2 rounded-lg px-3 py-1.5 ${t.toggleBar}`}>
+                  <Search size={14} className="opacity-60 flex-shrink-0" />
+                  <input
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    placeholder="Buscar conversa..."
+                    className={`flex-1 bg-transparent text-sm focus:outline-none placeholder:opacity-60`}
+                  />
+                  {search && (
+                    <button onClick={() => setSearch("")} className="opacity-60 hover:opacity-100"><X size={14} /></button>
+                  )}
+                </div>
+                <div className="relative">
+                  <button
+                    onClick={() => setShowFilters(s => !s)}
+                    title="Filtros"
+                    className={`p-2 rounded-lg ${hasActiveFilters(filters) ? "bg-blue-600 text-white" : `${t.toggleBar} ${t.toggleInactive}`}`}
+                  >
+                    <ListFilter size={14} />
+                  </button>
+                  {showFilters && (
+                    <ConversationFiltersPanel
+                      filters={filters}
+                      onChange={setFilters}
+                      attendants={attendants}
+                      leadStatuses={leadStatuses}
+                      onClose={() => setShowFilters(false)}
+                      dark={theme === "dark"}
+                    />
+                  )}
+                </div>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto">

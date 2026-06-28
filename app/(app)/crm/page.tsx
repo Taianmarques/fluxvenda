@@ -67,7 +67,10 @@ export default async function WhatsappInboxPage({
         opportunities: c.opportunities.map(o => ({ id: o.id, title: o.title, dealValue: o.dealValue, wonAt: o.wonAt?.toISOString() ?? null })),
         assignedToId: c.assignedToId,
         updatedAt: c.updatedAt.toISOString(),
+        lastReadAt: c.lastReadAt?.toISOString() ?? null,
         lastMessage: c.messages[0]?.content ?? null,
+        lastMessageRole: c.messages[0]?.role ?? null,
+        lastMessageAt: c.messages[0]?.createdAt.toISOString() ?? null,
       }))}
     />
   );

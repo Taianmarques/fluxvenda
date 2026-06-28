@@ -25,6 +25,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
   }
 
+  // Abrir a conversa marca como lida pra todo mundo (não é por usuário) — usado no filtro "não lidas"
+  await prisma.conversation.update({ where: { id }, data: { lastReadAt: new Date() } });
+
   return NextResponse.json({ conversation });
 }
 

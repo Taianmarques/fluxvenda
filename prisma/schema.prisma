@@ -727,6 +727,10 @@ model Conversation {
   followupCount  Int       @default(0)
   lastFollowupAt DateTime?
 
+  // Marcado quando alguém da equipe abre a conversa — usado pro filtro "não lidas".
+  // É global (não por usuário): se alguém já leu, conta como lida pra todo mundo.
+  lastReadAt DateTime?
+
   // Memoriza o último serviço/profissional que a IA resolveu nessa conversa, pra usar como
   // fallback em agendar_horario caso o modelo não repita o parâmetro na chamada de confirmação.
   pendingProfessionalId String?
