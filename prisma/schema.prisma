@@ -49,6 +49,7 @@ model Profile {
   teamMembership    TeamMember?
   sentMessages      Message[]
   assignedConversations Conversation[] @relation("AssignedConversations")
+  scheduledMessages ScheduledMessage[]
 }
 
 enum Role {
@@ -733,9 +734,10 @@ model Conversation {
   pendingServiceId      String?
   pendingService        Service?      @relation(fields: [pendingServiceId], references: [id], onDelete: SetNull)
 
-  messages      Message[]
-  appointments  Appointment[]
-  opportunities Opportunity[]
+  messages          Message[]
+  appointments      Appointment[]
+  opportunities     Opportunity[]
+  scheduledMessages ScheduledMessage[]
 
   @@unique([agentConfigId, contactNumber])
 }
@@ -757,6 +759,23 @@ model Opportunity {
   title     String? // nome opcional pra diferenciar quando há mais de uma, ex: "Plano anual"
   dealValue Float
   wonAt     DateTime? // quando foi marcada como ganha (null = ainda em negociação)
+}
+
+// Mensagem de texto programada pra ser enviada automaticamente numa data/hora futura —
+// o cron de followup verifica e dispara quando chega a hora.
+model ScheduledMessage {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   Profile @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  content      String
+  scheduledFor DateTime
+  sentAt       DateTime? // null = ainda não enviada
 }
 
 enum ConversationStatus {

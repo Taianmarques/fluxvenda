@@ -106,5 +106,42 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, checked, sent, remindersChecked, remindersSent });
+  // Envios agendados: mensagens de texto que um atendente programou pra sair numa hora futura
+  let scheduledChecked = 0;
+  let scheduledSent = 0;
+
+  const dueScheduled = await prisma.scheduledMessage.findMany({
+    where: { sentAt: null, scheduledFor: { lte: new Date() } },
+    include: { conversation: { include: { agentConfig: true } } },
+  });
+
+  for (const scheduled of dueScheduled) {
+    scheduledChecked++;
+    const conversation = scheduled.conversation;
+    const config = conversation.agentConfig;
+    if (!config.uazapiToken) continue;
+
+    let signaturePrefix = "";
+    if (config.signatureEnabled) {
+      const sender = await prisma.profile.findUnique({ where: { id: scheduled.createdById }, select: { name: true } });
+      if (sender?.name) signaturePrefix = `*${sender.name}:*\n`;
+    }
+
+    await sendWhatsAppTextAsTeam(config.uazapiToken, conversation.contactNumber, `${signaturePrefix}${scheduled.content}`);
+    await prisma.message.create({
+      data: { conversationId: conversation.id, role: "human", content: scheduled.content, senderId: scheduled.createdById },
+    });
+    await prisma.conversation.update({
+      where: { id: conversation.id },
+      data: {
+        humanTakeover: true,
+        status: "ATIVO",
+        ...(config.leadDistributionMode === "PRIMEIRO_A_ASSUMIR" && !conversation.assignedToId && { assignedToId: scheduled.createdById }),
+      },
+    });
+    await prisma.scheduledMessage.update({ where: { id: scheduled.id }, data: { sentAt: new Date() } });
+    scheduledSent++;
+  }
+
+  return NextResponse.json({ ok: true, checked, sent, remindersChecked, remindersSent, scheduledChecked, scheduledSent });
 }

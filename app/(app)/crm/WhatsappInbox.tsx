@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import {
   MessageCircle, Search, X, Trophy, Lock, Unlock, Bot, User,
-  FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap, StickyNote, ArrowRightLeft, HandCoins,
+  FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap, StickyNote, ArrowRightLeft, HandCoins, CalendarClock,
 } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { EmojiPicker } from "./EmojiPicker";
 import { QuickReplies, type QuickReply } from "./QuickReplies";
 import { OpportunitiesPanel, type Opportunity } from "./OpportunitiesPanel";
+import { ScheduledMessagesPanel, type ScheduledMessage } from "./ScheduledMessagesPanel";
 
 type ConversationSummary = {
   id: string;
@@ -168,6 +169,8 @@ export function WhatsappInbox({
   const [noteMode, setNoteMode] = useState(false);
   const [showTransferMenu, setShowTransferMenu] = useState(false);
   const [showOpportunities, setShowOpportunities] = useState(false);
+  const [showScheduled, setShowScheduled] = useState(false);
+  const [scheduledMessages, setScheduledMessages] = useState<ScheduledMessage[]>([]);
   const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -244,15 +247,25 @@ export function WhatsappInbox({
     } catch {}
   }
 
+  async function refreshScheduled(id: string) {
+    try {
+      const res = await fetch(`/api/ferramentas/whatsapp/conversas/${id}/envios-agendados`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.scheduledMessages) setScheduledMessages(data.scheduledMessages);
+    } catch {}
+  }
+
   useEffect(() => {
     const interval = setInterval(refreshList, 5000);
     return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
-    if (!selectedId) { setDetail(null); return; }
+    if (!selectedId) { setDetail(null); setScheduledMessages([]); return; }
     refreshDetail(selectedId);
-    const interval = setInterval(() => refreshDetail(selectedId), 3000);
+    refreshScheduled(selectedId);
+    const interval = setInterval(() => { refreshDetail(selectedId); refreshScheduled(selectedId); }, 3000);
     return () => clearInterval(interval);
   }, [selectedId]);
 
@@ -624,6 +637,25 @@ export function WhatsappInbox({
                           opportunities={detail.opportunities}
                           onChange={() => refreshDetail(detail.id)}
                           onClose={() => setShowOpportunities(false)}
+                          dark={theme === "dark"}
+                        />
+                      )}
+                    </div>
+
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowScheduled(s => !s)}
+                        title="Agendar envio"
+                        className={`p-2 rounded-lg ${scheduledMessages.length > 0 ? "bg-blue-600 text-white" : `${t.toggleInactive} hover:bg-black/10`}`}
+                      >
+                        <CalendarClock size={16} />
+                      </button>
+                      {showScheduled && (
+                        <ScheduledMessagesPanel
+                          conversationId={detail.id}
+                          scheduledMessages={scheduledMessages}
+                          onChange={() => refreshScheduled(detail.id)}
+                          onClose={() => setShowScheduled(false)}
                           dark={theme === "dark"}
                         />
                       )}
