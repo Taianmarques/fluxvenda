@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   MessageCircle, Search, X, Trophy, Lock, Unlock, Bot, User,
-  FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap, StickyNote, ArrowRightLeft, CircleDollarSign,
+  FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap, StickyNote, ArrowRightLeft, ThumbsUp,
 } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { EmojiPicker } from "./EmojiPicker";
@@ -618,7 +618,7 @@ export function WhatsappInbox({
                   <div className="flex items-center gap-1.5 flex-wrap justify-end">
                     {detail.dealValue != null && !detail.wonAt && detail.status !== "FINALIZADO" && (
                       <button onClick={handleMarcarGanho} title="Dar ganho" className="p-2 rounded-lg bg-green-600 text-white">
-                        <CircleDollarSign size={16} />
+                        <ThumbsUp size={16} />
                       </button>
                     )}
 
