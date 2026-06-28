@@ -39,7 +39,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
   const updated = await prisma.opportunity.update({
     where: { id: oppId },
-    data: { wonAt: new Date(), ...(closedStage && { stageId: closedStage.id }) },
+    data: { wonAt: new Date(), ...(closedStage && { stageId: closedStage.id, stageEnteredAt: new Date() }) },
   });
 
   const [, profile] = await prisma.$transaction([

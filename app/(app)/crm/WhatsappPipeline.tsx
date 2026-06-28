@@ -16,13 +16,25 @@ export type PipelineOpportunity = {
   contactName: string | null;
   contactNumber: string;
   leadStatusId: string | null;
+  assignedToName: string | null;
   title: string | null;
   stageId: string | null;
   dealValue: number;
   wonAt: string | null;
+  createdAt: string;
+  stageEnteredAt: string;
   lastMessage: string | null;
   updatedAt: string;
 };
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function daysSince(iso: string): number {
+  const ms = Date.now() - new Date(iso).getTime();
+  return Math.max(0, Math.floor(ms / (1000 * 60 * 60 * 24)));
+}
 type PipelineTheme = "dark" | "light";
 
 const PIPELINE_THEMES = {
@@ -97,6 +109,15 @@ function Card({
         />
       </div>
       <p className={`text-xs truncate mt-1 ${t.cardSecondary}`}>{opp.title || opp.lastMessage || "—"}</p>
+      <div className={`flex items-center justify-between gap-2 mt-1.5 text-[10px] ${t.cardSecondary}`}>
+        <span>Aberta em {formatDate(opp.createdAt)}</span>
+        <span className={daysSince(opp.stageEnteredAt) >= 7 ? "text-amber-500 font-medium" : ""}>
+          {daysSince(opp.stageEnteredAt)}d nessa etapa
+        </span>
+      </div>
+      {opp.assignedToName && (
+        <p className={`text-[10px] mt-0.5 truncate ${t.cardSecondary}`}>Vendedor: {opp.assignedToName}</p>
+      )}
       {editingValue ? (
         <input
           autoFocus
@@ -225,9 +246,9 @@ export function WhatsappPipeline({
     if (!stageId) return;
 
     const opp = localOpportunities.find(o => o.id === oppId);
-    if (!opp) return;
+    if (!opp || opp.stageId === stageId) return;
 
-    setLocalOpportunities(prev => prev.map(o => o.id === oppId ? { ...o, stageId } : o));
+    setLocalOpportunities(prev => prev.map(o => o.id === oppId ? { ...o, stageId, stageEnteredAt: new Date().toISOString() } : o));
     await fetch(`/api/ferramentas/whatsapp/conversas/${opp.conversationId}/oportunidades/${oppId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },

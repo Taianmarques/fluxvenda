@@ -43,7 +43,12 @@ export default async function PipelinePage() {
       },
       orderBy: { updatedAt: "desc" },
       include: {
-        conversation: { include: { messages: { where: { role: { not: "note" } }, orderBy: { createdAt: "desc" }, take: 1 } } },
+        conversation: {
+          include: {
+            messages: { where: { role: { not: "note" } }, orderBy: { createdAt: "desc" }, take: 1 },
+            assignedTo: { select: { name: true } },
+          },
+        },
       },
     }),
     prisma.leadStatus.findMany({ where: { agentConfigId: config.id }, orderBy: { order: "asc" } }),
@@ -64,10 +69,13 @@ export default async function PipelinePage() {
         contactName: o.conversation.contactName,
         contactNumber: o.conversation.contactNumber,
         leadStatusId: o.conversation.leadStatusId,
+        assignedToName: o.conversation.assignedTo?.name ?? null,
         title: o.title,
         stageId: o.stageId,
         dealValue: o.dealValue,
         wonAt: o.wonAt?.toISOString() ?? null,
+        createdAt: o.createdAt.toISOString(),
+        stageEnteredAt: o.stageEnteredAt.toISOString(),
         updatedAt: o.updatedAt.toISOString(),
         lastMessage: o.conversation.messages[0]?.content ?? null,
       }))}

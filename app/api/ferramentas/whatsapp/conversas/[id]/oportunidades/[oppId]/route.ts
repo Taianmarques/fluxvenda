@@ -39,12 +39,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!stage) return NextResponse.json({ error: "Etapa não encontrada" }, { status: 404 });
   }
 
+  const stageChanged = body.data.stageId !== undefined && body.data.stageId !== opportunity.stageId;
+
   const updated = await prisma.opportunity.update({
     where: { id: oppId },
     data: {
       ...(body.data.title !== undefined && { title: body.data.title }),
       ...(body.data.dealValue !== undefined && { dealValue: body.data.dealValue }),
       ...(body.data.stageId !== undefined && { stageId: body.data.stageId }),
+      ...(stageChanged && { stageEnteredAt: new Date() }),
     },
   });
 

@@ -23,7 +23,10 @@ export async function GET() {
     orderBy: { updatedAt: "desc" },
     include: {
       conversation: {
-        include: { messages: { where: { role: { not: "note" } }, orderBy: { createdAt: "desc" }, take: 1 } },
+        include: {
+          messages: { where: { role: { not: "note" } }, orderBy: { createdAt: "desc" }, take: 1 },
+          assignedTo: { select: { name: true } },
+        },
       },
     },
   });
@@ -35,10 +38,13 @@ export async function GET() {
       contactName: o.conversation.contactName,
       contactNumber: o.conversation.contactNumber,
       leadStatusId: o.conversation.leadStatusId,
+      assignedToName: o.conversation.assignedTo?.name ?? null,
       title: o.title,
       stageId: o.stageId,
       dealValue: o.dealValue,
       wonAt: o.wonAt,
+      createdAt: o.createdAt,
+      stageEnteredAt: o.stageEnteredAt,
       updatedAt: o.updatedAt,
       lastMessage: o.conversation.messages[0]?.content ?? null,
     })),

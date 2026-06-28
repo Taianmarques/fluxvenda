@@ -750,8 +750,9 @@ model Opportunity {
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
-  stageId String?
-  stage   PipelineStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
+  stageId        String?
+  stage          PipelineStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
+  stageEnteredAt DateTime       @default(now()) // atualizado sempre que stageId muda, pra calcular "dias parado nessa etapa"
 
   title     String? // nome opcional pra diferenciar quando há mais de uma, ex: "Plano anual"
   dealValue Float
