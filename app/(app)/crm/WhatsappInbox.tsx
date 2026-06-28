@@ -150,7 +150,7 @@ export function WhatsappInbox({
 }) {
   const [theme, setTheme] = useState<ChatTheme>("dark");
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"todos" | "ativos" | "pendentes" | "finalizados">("todos");
+  const [statusFilter, setStatusFilter] = useState<"ativos" | "pendentes" | "finalizados">("ativos");
   const [conversations, setConversations] = useState(initialConversations);
   const [leadStatuses, setLeadStatuses] = useState(initialLeadStatuses);
   const [attendants, setAttendants] = useState<Attendant[]>([]);
@@ -482,7 +482,6 @@ export function WhatsappInbox({
   }
 
   const statusCounts = {
-    todos: conversations.length,
     ativos: conversations.filter(c => c.humanTakeover && c.status !== "FINALIZADO").length,
     pendentes: conversations.filter(c => !c.humanTakeover && c.status !== "FINALIZADO").length,
     finalizados: conversations.filter(c => c.status === "FINALIZADO").length,
@@ -491,8 +490,7 @@ export function WhatsappInbox({
   const statusFiltered = conversations.filter(c => {
     if (statusFilter === "ativos") return c.humanTakeover && c.status !== "FINALIZADO";
     if (statusFilter === "pendentes") return !c.humanTakeover && c.status !== "FINALIZADO";
-    if (statusFilter === "finalizados") return c.status === "FINALIZADO";
-    return true;
+    return c.status === "FINALIZADO";
   });
 
   const filteredConversations = search.trim()
@@ -526,7 +524,6 @@ export function WhatsappInbox({
             <div className={`px-3 py-2.5 border-b ${t.sidebar} flex-shrink-0 space-y-2`}>
               <div className="flex items-center gap-1.5 overflow-x-auto">
                 {([
-                  ["todos", "Todos"],
                   ["ativos", "Ativos"],
                   ["pendentes", "Pendentes"],
                   ["finalizados", "Finalizados"],
