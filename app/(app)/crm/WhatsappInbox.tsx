@@ -81,6 +81,7 @@ const THEMES = {
     toggleBar: "bg-gray-900",
     toggleActive: "bg-gray-700 text-white",
     toggleInactive: "text-gray-400 hover:text-gray-200",
+    statusActive: "border-blue-600 bg-blue-950/40 text-blue-300",
     sidebar: "border-gray-800",
     listItemBorder: "border-gray-900 hover:bg-gray-900",
     listItemSelected: "bg-gray-900",
@@ -101,6 +102,7 @@ const THEMES = {
     toggleBar: "bg-gray-200",
     toggleActive: "bg-white text-gray-900 shadow-sm",
     toggleInactive: "text-gray-600 hover:text-gray-900",
+    statusActive: "border-blue-500 bg-blue-50 text-blue-700",
     sidebar: "border-gray-200 bg-white",
     listItemBorder: "border-gray-100 hover:bg-gray-100",
     listItemSelected: "bg-gray-100",
@@ -533,7 +535,7 @@ export function WhatsappInbox({
                     onClick={() => setStatusFilter(key)}
                     className={`flex-shrink-0 text-xs font-medium px-2.5 py-1.5 rounded-full border transition-colors ${
                       statusFilter === key
-                        ? "border-blue-600 bg-blue-950/30 text-blue-300"
+                        ? t.statusActive
                         : `border-transparent ${t.toggleBar} ${t.toggleInactive}`
                     }`}
                   >
