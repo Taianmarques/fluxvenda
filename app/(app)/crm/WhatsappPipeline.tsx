@@ -6,8 +6,9 @@ import {
   type DragEndEvent, type DragStartEvent,
 } from "@dnd-kit/core";
 import { useDroppable, useDraggable } from "@dnd-kit/core";
-import { ThumbsUp } from "lucide-react";
+import { ThumbsUp, MessageCircle } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
+import { ConversationPopup } from "./ConversationPopup";
 
 export type Stage = { id: string; name: string; color: string; order: number };
 export type PipelineOpportunity = {
@@ -67,13 +68,14 @@ function formatBRL(value: number): string {
 }
 
 function Card({
-  opp, onClick, onValueChange, onLeadStatusChange, onMarcarGanho, leadStatuses, onLeadStatusesChange, dark, t,
+  opp, onClick, onValueChange, onLeadStatusChange, onMarcarGanho, onOpenChat, leadStatuses, onLeadStatusesChange, dark, t,
 }: {
   opp: PipelineOpportunity;
   onClick: () => void;
   onValueChange: (id: string, value: number) => void;
   onLeadStatusChange: (conversationId: string, leadStatusId: string | null) => void;
   onMarcarGanho: (id: string) => void;
+  onOpenChat: (conversationId: string) => void;
   leadStatuses: LeadStatus[];
   onLeadStatusesChange: () => void;
   dark: boolean;
@@ -99,7 +101,15 @@ function Card({
       className={`border rounded-xl p-3 cursor-pointer transition-colors ${t.card} ${isDragging ? "opacity-30" : ""}`}
     >
       <div className="flex items-center justify-between gap-2">
-        <p className="font-medium text-sm truncate">{opp.contactName || opp.contactNumber}</p>
+        <p className="font-medium text-sm truncate flex-1">{opp.contactName || opp.contactNumber}</p>
+        <button
+          onClick={e => { e.stopPropagation(); onOpenChat(opp.conversationId); }}
+          onPointerDown={e => e.stopPropagation()}
+          title="Abrir conversa"
+          className={`p-1 rounded flex-shrink-0 ${dark ? "text-gray-400 hover:text-white hover:bg-gray-800" : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"}`}
+        >
+          <MessageCircle size={14} />
+        </button>
         <LeadStatusBadge
           leadStatusId={opp.leadStatusId}
           statuses={leadStatuses}
@@ -156,7 +166,7 @@ function Card({
 }
 
 function Column({
-  stage, opportunities, onClickCard, onRename, onDelete, onValueChange, onLeadStatusChange, onMarcarGanho, leadStatuses, onLeadStatusesChange, dark, t,
+  stage, opportunities, onClickCard, onRename, onDelete, onValueChange, onLeadStatusChange, onMarcarGanho, onOpenChat, leadStatuses, onLeadStatusesChange, dark, t,
 }: {
   stage: Stage;
   opportunities: PipelineOpportunity[];
@@ -166,6 +176,7 @@ function Column({
   onValueChange: (id: string, value: number) => void;
   onLeadStatusChange: (conversationId: string, leadStatusId: string | null) => void;
   onMarcarGanho: (id: string) => void;
+  onOpenChat: (conversationId: string) => void;
   leadStatuses: LeadStatus[];
   onLeadStatusesChange: () => void;
   dark: boolean;
@@ -203,7 +214,7 @@ function Column({
         {opportunities.map(o => (
           <Card
             key={o.id} opp={o} onClick={() => onClickCard(o.conversationId)} onValueChange={onValueChange}
-            onLeadStatusChange={onLeadStatusChange} onMarcarGanho={onMarcarGanho} leadStatuses={leadStatuses} onLeadStatusesChange={onLeadStatusesChange}
+            onLeadStatusChange={onLeadStatusChange} onMarcarGanho={onMarcarGanho} onOpenChat={onOpenChat} leadStatuses={leadStatuses} onLeadStatusesChange={onLeadStatusesChange}
             dark={dark} t={t}
           />
         ))}
@@ -225,6 +236,7 @@ export function WhatsappPipeline({
   onLeadStatusesChange: () => void;
 }) {
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [chatConversationId, setChatConversationId] = useState<string | null>(null);
   const [newStageName, setNewStageName] = useState("");
   const [localOpportunities, setLocalOpportunities] = useState(opportunities);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
@@ -314,6 +326,7 @@ export function WhatsappPipeline({
   const activeOpp = activeId ? localOpportunities.find(o => o.id === activeId) : null;
 
   return (
+    <>
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="flex-1 overflow-x-auto overflow-y-hidden p-4">
         <div className="flex gap-3 h-full">
@@ -327,6 +340,7 @@ export function WhatsappPipeline({
               onValueChange={handleValueChange}
               onLeadStatusChange={handleLeadStatusChange}
               onMarcarGanho={handleMarcarGanho}
+              onOpenChat={setChatConversationId}
               leadStatuses={leadStatuses}
               onLeadStatusesChange={onLeadStatusesChange}
               dark={theme === "dark"}
@@ -344,6 +358,7 @@ export function WhatsappPipeline({
               onValueChange={handleValueChange}
               onLeadStatusChange={handleLeadStatusChange}
               onMarcarGanho={handleMarcarGanho}
+              onOpenChat={setChatConversationId}
               leadStatuses={leadStatuses}
               onLeadStatusesChange={onLeadStatusesChange}
               dark={theme === "dark"}
@@ -373,5 +388,13 @@ export function WhatsappPipeline({
         )}
       </DragOverlay>
     </DndContext>
+    {chatConversationId && (
+      <ConversationPopup
+        conversationId={chatConversationId}
+        onClose={() => setChatConversationId(null)}
+        dark={theme === "dark"}
+      />
+    )}
+    </>
   );
 }
