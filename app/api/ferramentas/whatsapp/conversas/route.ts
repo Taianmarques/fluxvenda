@@ -18,7 +18,10 @@ export async function GET() {
       ...(isManager ? {} : { OR: [{ assignedToId: userId }, { assignedToId: null }] }),
     },
     orderBy: { updatedAt: "desc" },
-    include: { messages: { where: { role: { not: "note" } }, orderBy: { createdAt: "desc" }, take: 1 } },
+    include: {
+      messages: { where: { role: { not: "note" } }, orderBy: { createdAt: "desc" }, take: 1 },
+      opportunities: { orderBy: { createdAt: "asc" } },
+    },
   });
 
   return NextResponse.json({ conversations });

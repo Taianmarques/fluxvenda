@@ -1,38 +1,44 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
-import { getOwnAgentConfig } from "@/lib/team";
+import { getOwnAgentConfigWithRole } from "@/lib/team";
 import { levelFromXP } from "@/lib/utils";
 
 const DEAL_WON_XP = 150;
 
 // Marca a negociação como ganha: move pro estágio "Fechado" do pipeline atual (se existir)
-// e credita XP ao gestor, conectando com a gamificação/dashboard de vendas.
-export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+// e credita XP a quem marcou, conectando com a gamificação/dashboard de vendas.
+export async function POST(_req: Request, { params }: { params: Promise<{ id: string; oppId: string }> }) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const config = await getOwnAgentConfig(userId);
-  if (!config) return NextResponse.json({ error: "Agente não encontrado" }, { status: 404 });
+  const result = await getOwnAgentConfigWithRole(userId);
+  if (!result) return NextResponse.json({ error: "Agente não encontrado" }, { status: 404 });
+  const { config, isManager } = result;
 
-  const { id } = await params;
-  const conversation = await prisma.conversation.findFirst({
-    where: { id, agentConfigId: config.id },
+  const { id, oppId } = await params;
+  const conversation = await prisma.conversation.findFirst({ where: { id, agentConfigId: config.id } });
+  if (!conversation) return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
+  if (!isManager && conversation.assignedToId && conversation.assignedToId !== userId) {
+    return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
+  }
+
+  const opportunity = await prisma.opportunity.findFirst({
+    where: { id: oppId, conversationId: id },
     include: { stage: { include: { pipeline: true } } },
   });
-  if (!conversation) return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
-  if (conversation.dealValue == null) return NextResponse.json({ error: "Defina o valor negociado antes de marcar como ganho" }, { status: 400 });
-  if (conversation.wonAt) return NextResponse.json({ error: "Essa negociação já foi marcada como ganha" }, { status: 400 });
+  if (!opportunity) return NextResponse.json({ error: "Oportunidade não encontrada" }, { status: 404 });
+  if (opportunity.wonAt) return NextResponse.json({ error: "Essa negociação já foi marcada como ganha" }, { status: 400 });
 
-  const pipelineId = conversation.stage?.pipelineId
+  const pipelineId = opportunity.stage?.pipelineId
     ?? (await prisma.pipeline.findFirst({ where: { agentConfigId: config.id }, orderBy: { order: "asc" } }))?.id;
 
   const closedStage = pipelineId
     ? await prisma.pipelineStage.findFirst({ where: { pipelineId, name: { equals: "Fechado", mode: "insensitive" } } })
     : null;
 
-  const updated = await prisma.conversation.update({
-    where: { id },
+  const updated = await prisma.opportunity.update({
+    where: { id: oppId },
     data: { wonAt: new Date(), ...(closedStage && { stageId: closedStage.id }) },
   });
 
@@ -53,5 +59,5 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     await prisma.profile.update({ where: { id: userId }, data: { level: newLevel } });
   }
 
-  return NextResponse.json({ conversation: updated, xpGained: DEAL_WON_XP });
+  return NextResponse.json({ opportunity: updated, xpGained: DEAL_WON_XP });
 }

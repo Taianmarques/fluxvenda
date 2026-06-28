@@ -42,7 +42,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const count = await prisma.pipeline.count({ where: { agentConfigId: config.id } });
   if (count <= 1) return NextResponse.json({ error: "Não é possível excluir o único pipeline" }, { status: 400 });
 
-  // Etapas desse pipeline são removidas em cascata; conversas dessas etapas ficam sem etapa (stageId null)
+  // Etapas desse pipeline são removidas em cascata; oportunidades dessas etapas ficam sem etapa (stageId null)
   await prisma.pipeline.delete({ where: { id } });
 
   return NextResponse.json({ ok: true });

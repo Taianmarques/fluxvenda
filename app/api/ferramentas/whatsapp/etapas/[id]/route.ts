@@ -40,7 +40,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const stage = await prisma.pipelineStage.findFirst({ where: { id, pipeline: { agentConfigId: config.id } } });
   if (!stage) return NextResponse.json({ error: "Etapa não encontrada" }, { status: 404 });
 
-  // Conversas dessa etapa ficam sem etapa (stageId null) — onDelete: SetNull no schema
+  // Oportunidades dessa etapa ficam sem etapa (stageId null) — onDelete: SetNull no schema
   await prisma.pipelineStage.delete({ where: { id } });
 
   return NextResponse.json({ ok: true });

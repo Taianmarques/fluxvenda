@@ -6,16 +6,19 @@ import {
   type DragEndEvent, type DragStartEvent,
 } from "@dnd-kit/core";
 import { useDroppable, useDraggable } from "@dnd-kit/core";
+import { ThumbsUp } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 
 export type Stage = { id: string; name: string; color: string; order: number };
-export type PipelineConversation = {
+export type PipelineOpportunity = {
   id: string;
+  conversationId: string;
   contactName: string | null;
   contactNumber: string;
-  stageId: string | null;
   leadStatusId: string | null;
-  dealValue: number | null;
+  title: string | null;
+  stageId: string | null;
+  dealValue: number;
   wonAt: string | null;
   lastMessage: string | null;
   updatedAt: string;
@@ -52,27 +55,27 @@ function formatBRL(value: number): string {
 }
 
 function Card({
-  conv, onClick, onValueChange, onLeadStatusChange, onMarcarGanho, leadStatuses, onLeadStatusesChange, dark, t,
+  opp, onClick, onValueChange, onLeadStatusChange, onMarcarGanho, leadStatuses, onLeadStatusesChange, dark, t,
 }: {
-  conv: PipelineConversation;
+  opp: PipelineOpportunity;
   onClick: () => void;
-  onValueChange: (id: string, value: number | null) => void;
-  onLeadStatusChange: (id: string, leadStatusId: string | null) => void;
+  onValueChange: (id: string, value: number) => void;
+  onLeadStatusChange: (conversationId: string, leadStatusId: string | null) => void;
   onMarcarGanho: (id: string) => void;
   leadStatuses: LeadStatus[];
   onLeadStatusesChange: () => void;
   dark: boolean;
   t: typeof PIPELINE_THEMES.dark;
 }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: conv.id });
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: opp.id });
   const [editingValue, setEditingValue] = useState(false);
-  const [valueInput, setValueInput] = useState(conv.dealValue != null ? String(conv.dealValue) : "");
+  const [valueInput, setValueInput] = useState(String(opp.dealValue));
 
   function commitValue() {
     setEditingValue(false);
-    const raw = valueInput.trim() === "" ? null : Number(valueInput.replace(",", "."));
-    const parsed = raw !== null && Number.isFinite(raw) ? raw : null;
-    if (parsed !== conv.dealValue) onValueChange(conv.id, parsed);
+    const parsed = Number(valueInput.replace(",", "."));
+    if (Number.isFinite(parsed) && parsed > 0 && parsed !== opp.dealValue) onValueChange(opp.id, parsed);
+    else setValueInput(String(opp.dealValue));
   }
 
   return (
@@ -84,16 +87,16 @@ function Card({
       className={`border rounded-xl p-3 cursor-pointer transition-colors ${t.card} ${isDragging ? "opacity-30" : ""}`}
     >
       <div className="flex items-center justify-between gap-2">
-        <p className="font-medium text-sm truncate">{conv.contactName || conv.contactNumber}</p>
+        <p className="font-medium text-sm truncate">{opp.contactName || opp.contactNumber}</p>
         <LeadStatusBadge
-          leadStatusId={conv.leadStatusId}
+          leadStatusId={opp.leadStatusId}
           statuses={leadStatuses}
-          onChange={id => onLeadStatusChange(conv.id, id)}
+          onChange={id => onLeadStatusChange(opp.conversationId, id)}
           onStatusesChange={onLeadStatusesChange}
           dark={dark}
         />
       </div>
-      <p className={`text-xs truncate mt-1 ${t.cardSecondary}`}>{conv.lastMessage || "—"}</p>
+      <p className={`text-xs truncate mt-1 ${t.cardSecondary}`}>{opp.title || opp.lastMessage || "—"}</p>
       {editingValue ? (
         <input
           autoFocus
@@ -113,16 +116,16 @@ function Card({
             onClick={e => { e.stopPropagation(); setEditingValue(true); }}
             onPointerDown={e => e.stopPropagation()}
           >
-            {conv.dealValue != null ? (conv.wonAt ? `🏆 ${formatBRL(conv.dealValue)}` : formatBRL(conv.dealValue)) : "+ valor negociado"}
+            {opp.wonAt ? `🏆 ${formatBRL(opp.dealValue)}` : formatBRL(opp.dealValue)}
           </p>
-          {conv.dealValue != null && !conv.wonAt && (
+          {!opp.wonAt && (
             <button
-              onClick={e => { e.stopPropagation(); onMarcarGanho(conv.id); }}
+              onClick={e => { e.stopPropagation(); onMarcarGanho(opp.id); }}
               onPointerDown={e => e.stopPropagation()}
               title="Marcar como ganho"
-              className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-green-900/40 text-green-300 border border-green-800/50 hover:bg-green-900/70 flex-shrink-0"
+              className="p-1 rounded bg-green-900/40 text-green-300 border border-green-800/50 hover:bg-green-900/70 flex-shrink-0"
             >
-              Dar ganho
+              <ThumbsUp size={11} />
             </button>
           )}
         </div>
@@ -132,15 +135,15 @@ function Card({
 }
 
 function Column({
-  stage, conversations, onClickCard, onRename, onDelete, onValueChange, onLeadStatusChange, onMarcarGanho, leadStatuses, onLeadStatusesChange, dark, t,
+  stage, opportunities, onClickCard, onRename, onDelete, onValueChange, onLeadStatusChange, onMarcarGanho, leadStatuses, onLeadStatusesChange, dark, t,
 }: {
   stage: Stage;
-  conversations: PipelineConversation[];
-  onClickCard: (id: string) => void;
+  opportunities: PipelineOpportunity[];
+  onClickCard: (conversationId: string) => void;
   onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
-  onValueChange: (id: string, value: number | null) => void;
-  onLeadStatusChange: (id: string, leadStatusId: string | null) => void;
+  onValueChange: (id: string, value: number) => void;
+  onLeadStatusChange: (conversationId: string, leadStatusId: string | null) => void;
   onMarcarGanho: (id: string) => void;
   leadStatuses: LeadStatus[];
   onLeadStatusesChange: () => void;
@@ -151,7 +154,7 @@ function Column({
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(stage.name);
 
-  const total = conversations.reduce((sum, c) => sum + (c.dealValue ?? 0), 0);
+  const total = opportunities.reduce((sum, o) => sum + o.dealValue, 0);
 
   return (
     <div ref={setNodeRef} className={`w-72 flex-shrink-0 flex flex-col rounded-2xl border ${isOver ? "border-blue-500" : t.column}`}>
@@ -170,15 +173,15 @@ function Column({
           ) : (
             <p className="flex-1 font-medium text-sm truncate cursor-text" onClick={() => setEditing(true)}>{stage.name}</p>
           )}
-          <span className={`text-xs ${t.columnCount}`}>{conversations.length}</span>
+          <span className={`text-xs ${t.columnCount}`}>{opportunities.length}</span>
           <button onClick={() => onDelete(stage.id)} className="text-gray-500 hover:text-red-400 text-xs">✕</button>
         </div>
         {total > 0 && <p className="text-xs font-semibold text-green-500 mt-1.5">{formatBRL(total)}</p>}
       </div>
       <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[120px]">
-        {conversations.map(c => (
+        {opportunities.map(o => (
           <Card
-            key={c.id} conv={c} onClick={() => onClickCard(c.id)} onValueChange={onValueChange}
+            key={o.id} opp={o} onClick={() => onClickCard(o.conversationId)} onValueChange={onValueChange}
             onLeadStatusChange={onLeadStatusChange} onMarcarGanho={onMarcarGanho} leadStatuses={leadStatuses} onLeadStatusesChange={onLeadStatusesChange}
             dark={dark} t={t}
           />
@@ -189,12 +192,12 @@ function Column({
 }
 
 export function WhatsappPipeline({
-  pipelineId, stages, leadStatuses, conversations, theme, onSelectConversation, onStagesChange, onLeadStatusesChange,
+  pipelineId, stages, leadStatuses, opportunities, theme, onSelectConversation, onStagesChange, onLeadStatusesChange,
 }: {
   pipelineId: string;
   stages: Stage[];
   leadStatuses: LeadStatus[];
-  conversations: PipelineConversation[];
+  opportunities: PipelineOpportunity[];
   theme: PipelineTheme;
   onSelectConversation: (id: string) => void;
   onStagesChange: () => void;
@@ -202,14 +205,14 @@ export function WhatsappPipeline({
 }) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [newStageName, setNewStageName] = useState("");
-  const [localConversations, setLocalConversations] = useState(conversations);
+  const [localOpportunities, setLocalOpportunities] = useState(opportunities);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const t = PIPELINE_THEMES[theme];
 
   // sincroniza quando o pai atualiza (polling)
-  useEffect(() => setLocalConversations(conversations), [conversations]);
+  useEffect(() => setLocalOpportunities(opportunities), [opportunities]);
 
-  const semEtapa = localConversations.filter(c => !c.stageId || !stages.some(s => s.id === c.stageId));
+  const semEtapa = localOpportunities.filter(o => !o.stageId || !stages.some(s => s.id === o.stageId));
 
   function handleDragStart(e: DragStartEvent) {
     setActiveId(String(e.active.id));
@@ -217,21 +220,26 @@ export function WhatsappPipeline({
 
   async function handleDragEnd(e: DragEndEvent) {
     setActiveId(null);
-    const conversationId = String(e.active.id);
+    const oppId = String(e.active.id);
     const stageId = e.over ? String(e.over.id) : null;
     if (!stageId) return;
 
-    setLocalConversations(prev => prev.map(c => c.id === conversationId ? { ...c, stageId } : c));
-    await fetch(`/api/ferramentas/whatsapp/conversas/${conversationId}`, {
+    const opp = localOpportunities.find(o => o.id === oppId);
+    if (!opp) return;
+
+    setLocalOpportunities(prev => prev.map(o => o.id === oppId ? { ...o, stageId } : o));
+    await fetch(`/api/ferramentas/whatsapp/conversas/${opp.conversationId}/oportunidades/${oppId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ stageId }),
     });
   }
 
-  async function handleValueChange(conversationId: string, value: number | null) {
-    setLocalConversations(prev => prev.map(c => c.id === conversationId ? { ...c, dealValue: value } : c));
-    await fetch(`/api/ferramentas/whatsapp/conversas/${conversationId}`, {
+  async function handleValueChange(oppId: string, value: number) {
+    const opp = localOpportunities.find(o => o.id === oppId);
+    if (!opp) return;
+    setLocalOpportunities(prev => prev.map(o => o.id === oppId ? { ...o, dealValue: value } : o));
+    await fetch(`/api/ferramentas/whatsapp/conversas/${opp.conversationId}/oportunidades/${oppId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ dealValue: value }),
@@ -239,7 +247,7 @@ export function WhatsappPipeline({
   }
 
   async function handleLeadStatusChange(conversationId: string, leadStatusId: string | null) {
-    setLocalConversations(prev => prev.map(c => c.id === conversationId ? { ...c, leadStatusId } : c));
+    setLocalOpportunities(prev => prev.map(o => o.conversationId === conversationId ? { ...o, leadStatusId } : o));
     await fetch(`/api/ferramentas/whatsapp/conversas/${conversationId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -247,11 +255,13 @@ export function WhatsappPipeline({
     });
   }
 
-  async function handleMarcarGanho(conversationId: string) {
-    const res = await fetch(`/api/ferramentas/whatsapp/conversas/${conversationId}/ganho`, { method: "POST" });
+  async function handleMarcarGanho(oppId: string) {
+    const opp = localOpportunities.find(o => o.id === oppId);
+    if (!opp) return;
+    const res = await fetch(`/api/ferramentas/whatsapp/conversas/${opp.conversationId}/oportunidades/${oppId}/ganho`, { method: "POST" });
     const data = await res.json();
     if (!res.ok) { alert(data.error ?? "Não foi possível marcar como ganho."); return; }
-    setLocalConversations(prev => prev.map(c => c.id === conversationId ? { ...c, wonAt: data.conversation.wonAt, stageId: data.conversation.stageId } : c));
+    setLocalOpportunities(prev => prev.map(o => o.id === oppId ? { ...o, wonAt: data.opportunity.wonAt, stageId: data.opportunity.stageId } : o));
   }
 
   async function handleAddStage() {
@@ -275,12 +285,12 @@ export function WhatsappPipeline({
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Excluir essa etapa? As conversas dela ficam sem etapa.")) return;
+    if (!confirm("Excluir essa etapa? As oportunidades dela ficam sem etapa.")) return;
     await fetch(`/api/ferramentas/whatsapp/etapas/${id}`, { method: "DELETE" });
     onStagesChange();
   }
 
-  const activeConv = activeId ? localConversations.find(c => c.id === activeId) : null;
+  const activeOpp = activeId ? localOpportunities.find(o => o.id === activeId) : null;
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -289,7 +299,7 @@ export function WhatsappPipeline({
           {semEtapa.length > 0 && (
             <Column
               stage={{ id: "__sem_etapa__", name: "Sem etapa", color: "#6b7280", order: -1 }}
-              conversations={semEtapa}
+              opportunities={semEtapa}
               onClickCard={onSelectConversation}
               onRename={() => {}}
               onDelete={() => {}}
@@ -306,7 +316,7 @@ export function WhatsappPipeline({
             <Column
               key={stage.id}
               stage={stage}
-              conversations={localConversations.filter(c => c.stageId === stage.id)}
+              opportunities={localOpportunities.filter(o => o.stageId === stage.id)}
               onClickCard={onSelectConversation}
               onRename={handleRename}
               onDelete={handleDelete}
@@ -335,9 +345,9 @@ export function WhatsappPipeline({
       </div>
 
       <DragOverlay>
-        {activeConv && (
+        {activeOpp && (
           <div className={`border rounded-xl p-3 w-64 shadow-xl ${t.overlay}`}>
-            <p className="font-medium text-sm truncate">{activeConv.contactName || activeConv.contactNumber}</p>
+            <p className="font-medium text-sm truncate">{activeOpp.contactName || activeOpp.contactNumber}</p>
           </div>
         )}
       </DragOverlay>

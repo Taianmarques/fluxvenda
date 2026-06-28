@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { WhatsappPipeline, type Stage, type PipelineConversation } from "../WhatsappPipeline";
+import { WhatsappPipeline, type Stage, type PipelineOpportunity } from "../WhatsappPipeline";
 import { type LeadStatus } from "../LeadStatusBadge";
 
 type PipelineSummary = { id: string; name: string; order: number; stages: Stage[] };
@@ -11,18 +11,18 @@ type ChatTheme = "dark" | "light";
 const THEME_STORAGE_KEY = "whatsapp-chat-theme";
 
 export function PipelineBoard({
-  initialPipelines, initialLeadStatuses, initialConversations,
+  initialPipelines, initialLeadStatuses, initialOpportunities,
 }: {
   initialPipelines: PipelineSummary[];
   initialLeadStatuses: LeadStatus[];
-  initialConversations: PipelineConversation[];
+  initialOpportunities: PipelineOpportunity[];
 }) {
   const router = useRouter();
   const [theme, setTheme] = useState<ChatTheme>("dark");
   const [pipelines, setPipelines] = useState(initialPipelines);
   const [activeId, setActiveId] = useState<string | null>(initialPipelines[0]?.id ?? null);
   const [leadStatuses, setLeadStatuses] = useState(initialLeadStatuses);
-  const [conversations, setConversations] = useState(initialConversations);
+  const [opportunities, setOpportunities] = useState(initialOpportunities);
   const [newPipelineName, setNewPipelineName] = useState("");
   const [showNewPipeline, setShowNewPipeline] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -45,20 +45,14 @@ export function PipelineBoard({
     if (data.statuses) setLeadStatuses(data.statuses);
   }
 
-  async function refreshConversations() {
-    const res = await fetch("/api/ferramentas/whatsapp/conversas");
+  async function refreshOpportunities() {
+    const res = await fetch("/api/ferramentas/whatsapp/oportunidades");
     const data = await res.json();
-    if (data.conversations) {
-      setConversations(data.conversations.map((c: any) => ({
-        id: c.id, contactName: c.contactName, contactNumber: c.contactNumber,
-        stageId: c.stageId, leadStatusId: c.leadStatusId, dealValue: c.dealValue, wonAt: c.wonAt, updatedAt: c.updatedAt,
-        lastMessage: c.messages[0]?.content ?? null,
-      })));
-    }
+    if (data.opportunities) setOpportunities(data.opportunities);
   }
 
   useEffect(() => {
-    const interval = setInterval(refreshConversations, 5000);
+    const interval = setInterval(refreshOpportunities, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -97,10 +91,10 @@ export function PipelineBoard({
 
   const active = pipelines.find(p => p.id === activeId) ?? pipelines[0] ?? null;
 
-  // Uma conversa só aparece em "Sem etapa" se realmente não tiver etapa, ou se a etapa dela
-  // for desse pipeline — sem isso, conversas de OUTROS pipelines vazavam pra "Sem etapa" aqui.
-  const relevantConversations = active
-    ? conversations.filter(c => !c.stageId || active.stages.some(s => s.id === c.stageId))
+  // Uma oportunidade só aparece em "Sem etapa" se realmente não tiver etapa, ou se a etapa dela
+  // for desse pipeline — sem isso, oportunidades de OUTROS pipelines vazavam pra "Sem etapa" aqui.
+  const relevantOpportunities = active
+    ? opportunities.filter(o => !o.stageId || active.stages.some(s => s.id === o.stageId))
     : [];
 
   return (
@@ -163,7 +157,7 @@ export function PipelineBoard({
           pipelineId={active.id}
           stages={active.stages}
           leadStatuses={leadStatuses}
-          conversations={relevantConversations}
+          opportunities={relevantOpportunities}
           theme={theme}
           onSelectConversation={id => router.push(`/crm?c=${id}`)}
           onStagesChange={refreshPipelines}

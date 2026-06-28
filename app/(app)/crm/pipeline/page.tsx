@@ -28,19 +28,23 @@ export default async function PipelinePage() {
     );
   }
 
-  const [pipelines, conversations, leadStatuses] = await Promise.all([
+  const [pipelines, opportunities, leadStatuses] = await Promise.all([
     prisma.pipeline.findMany({
       where: { agentConfigId: config.id },
       orderBy: { order: "asc" },
       include: { stages: { orderBy: { order: "asc" } } },
     }),
-    prisma.conversation.findMany({
+    prisma.opportunity.findMany({
       where: {
-        agentConfigId: config.id,
-        ...(isManager ? {} : { OR: [{ assignedToId: user.id }, { assignedToId: null }] }),
+        conversation: {
+          agentConfigId: config.id,
+          ...(isManager ? {} : { OR: [{ assignedToId: user.id }, { assignedToId: null }] }),
+        },
       },
       orderBy: { updatedAt: "desc" },
-      include: { messages: { where: { role: { not: "note" } }, orderBy: { createdAt: "desc" }, take: 1 } },
+      include: {
+        conversation: { include: { messages: { where: { role: { not: "note" } }, orderBy: { createdAt: "desc" }, take: 1 } } },
+      },
     }),
     prisma.leadStatus.findMany({ where: { agentConfigId: config.id }, orderBy: { order: "asc" } }),
   ]);
@@ -54,16 +58,18 @@ export default async function PipelinePage() {
         stages: p.stages.map(s => ({ id: s.id, name: s.name, color: s.color, order: s.order })),
       }))}
       initialLeadStatuses={leadStatuses.map(s => ({ id: s.id, name: s.name, color: s.color, order: s.order }))}
-      initialConversations={conversations.map(c => ({
-        id: c.id,
-        contactName: c.contactName,
-        contactNumber: c.contactNumber,
-        stageId: c.stageId,
-        leadStatusId: c.leadStatusId,
-        dealValue: c.dealValue,
-        wonAt: c.wonAt?.toISOString() ?? null,
-        updatedAt: c.updatedAt.toISOString(),
-        lastMessage: c.messages[0]?.content ?? null,
+      initialOpportunities={opportunities.map(o => ({
+        id: o.id,
+        conversationId: o.conversationId,
+        contactName: o.conversation.contactName,
+        contactNumber: o.conversation.contactNumber,
+        leadStatusId: o.conversation.leadStatusId,
+        title: o.title,
+        stageId: o.stageId,
+        dealValue: o.dealValue,
+        wonAt: o.wonAt?.toISOString() ?? null,
+        updatedAt: o.updatedAt.toISOString(),
+        lastMessage: o.conversation.messages[0]?.content ?? null,
       }))}
     />
   );

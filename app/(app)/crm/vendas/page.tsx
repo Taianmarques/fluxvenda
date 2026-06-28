@@ -30,12 +30,13 @@ export default async function VendasPage() {
     );
   }
 
-  const wonDeals = await prisma.conversation.findMany({
-    where: { agentConfigId: config.id, wonAt: { not: null } },
+  const wonDeals = await prisma.opportunity.findMany({
+    where: { wonAt: { not: null }, conversation: { agentConfigId: config.id } },
     orderBy: { wonAt: "desc" },
+    include: { conversation: { select: { contactName: true, contactNumber: true } } },
   });
 
-  const total = wonDeals.reduce((sum, d) => sum + (d.dealValue ?? 0), 0);
+  const total = wonDeals.reduce((sum, d) => sum + d.dealValue, 0);
   const count = wonDeals.length;
   const ticketMedio = count > 0 ? total / count : 0;
 
@@ -46,7 +47,7 @@ export default async function VendasPage() {
     return { year: d.getFullYear(), month: d.getMonth(), mes: d.toLocaleDateString("pt-BR", { month: "short" }), total: 0 };
   });
   for (const deal of wonDeals) {
-    if (!deal.wonAt || !deal.dealValue) continue;
+    if (!deal.wonAt) continue;
     const bucket = monthly.find(m => m.year === deal.wonAt!.getFullYear() && m.month === deal.wonAt!.getMonth());
     if (bucket) bucket.total += deal.dealValue;
   }
@@ -89,10 +90,10 @@ export default async function VendasPage() {
               {wonDeals.map(d => (
                 <div key={d.id} className="flex items-center justify-between px-5 py-3">
                   <div>
-                    <p className="text-sm font-medium">{d.contactName || d.contactNumber}</p>
+                    <p className="text-sm font-medium">{d.conversation.contactName || d.conversation.contactNumber}{d.title && ` — ${d.title}`}</p>
                     <p className="text-xs text-gray-500">{d.wonAt!.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })}</p>
                   </div>
-                  <p className="text-sm font-semibold text-green-400">{formatBRL(d.dealValue ?? 0)}</p>
+                  <p className="text-sm font-semibold text-green-400">{formatBRL(d.dealValue)}</p>
                 </div>
               ))}
             </div>

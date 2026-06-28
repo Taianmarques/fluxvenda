@@ -685,7 +685,7 @@ model PipelineStage {
   color String @default("#3b82f6")
   order Int    @default(0)
 
-  conversations Conversation[]
+  opportunities Opportunity[]
 }
 
 model LeadStatus {
@@ -715,14 +715,8 @@ model Conversation {
   status         ConversationStatus @default(ATIVO)
   humanTakeover  Boolean            @default(false) // true = atendente humano assumiu, agente para de responder
 
-  stageId String?
-  stage   PipelineStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
-
   leadStatusId String?
   leadStatus   LeadStatus? @relation(fields: [leadStatusId], references: [id], onDelete: SetNull)
-
-  dealValue Float?    // valor negociado nesse atendimento (R$)
-  wonAt     DateTime? // quando a negociação foi marcada como ganha (null = não ganha)
 
   // Atendente responsável por essa conversa — null = ainda não atribuída (qualquer atendente
   // pode ver e assumir). Quem atribui/quando depende do leadDistributionMode do AgentConfig.
@@ -739,10 +733,29 @@ model Conversation {
   pendingServiceId      String?
   pendingService        Service?      @relation(fields: [pendingServiceId], references: [id], onDelete: SetNull)
 
-  messages     Message[]
-  appointments Appointment[]
+  messages      Message[]
+  appointments  Appointment[]
+  opportunities Opportunity[]
 
   @@unique([agentConfigId, contactNumber])
+}
+
+// Uma negociação dentro de uma conversa — um mesmo cliente pode ter várias (ex: comprou,
+// depois volta pra negociar outra coisa). Cada uma tem seu próprio valor, etapa e status de ganho.
+model Opportunity {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  stageId String?
+  stage   PipelineStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
+
+  title     String? // nome opcional pra diferenciar quando há mais de uma, ex: "Plano anual"
+  dealValue Float
+  wonAt     DateTime? // quando foi marcada como ganha (null = ainda em negociação)
 }
 
 enum ConversationStatus {

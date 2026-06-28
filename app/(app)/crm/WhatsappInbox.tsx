@@ -3,11 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import {
   MessageCircle, Search, X, Trophy, Lock, Unlock, Bot, User,
-  FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap, StickyNote, ArrowRightLeft, ThumbsUp,
+  FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap, StickyNote, ArrowRightLeft, HandCoins,
 } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { EmojiPicker } from "./EmojiPicker";
 import { QuickReplies, type QuickReply } from "./QuickReplies";
+import { OpportunitiesPanel, type Opportunity } from "./OpportunitiesPanel";
 
 type ConversationSummary = {
   id: string;
@@ -15,10 +16,8 @@ type ConversationSummary = {
   contactNumber: string;
   status: string;
   humanTakeover: boolean;
-  stageId: string | null;
   leadStatusId: string | null;
-  dealValue: number | null;
-  wonAt: string | null;
+  opportunities: Opportunity[];
   assignedToId: string | null;
   updatedAt: string;
   lastMessage: string | null;
@@ -64,9 +63,8 @@ type ConversationDetail = {
   contactNumber: string;
   status: string;
   humanTakeover: boolean;
-  dealValue: number | null;
-  wonAt: string | null;
   assignedToId: string | null;
+  opportunities: Opportunity[];
   messages: Message[];
 };
 
@@ -169,6 +167,7 @@ export function WhatsappInbox({
   const [showQuickReplies, setShowQuickReplies] = useState(false);
   const [noteMode, setNoteMode] = useState(false);
   const [showTransferMenu, setShowTransferMenu] = useState(false);
+  const [showOpportunities, setShowOpportunities] = useState(false);
   const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -203,8 +202,8 @@ export function WhatsappInbox({
       if (data.conversations) {
         setConversations(data.conversations.map((c: any) => ({
           id: c.id, contactName: c.contactName, contactNumber: c.contactNumber,
-          status: c.status, humanTakeover: c.humanTakeover, stageId: c.stageId, leadStatusId: c.leadStatusId,
-          dealValue: c.dealValue, wonAt: c.wonAt, assignedToId: c.assignedToId, updatedAt: c.updatedAt,
+          status: c.status, humanTakeover: c.humanTakeover, leadStatusId: c.leadStatusId,
+          opportunities: c.opportunities, assignedToId: c.assignedToId, updatedAt: c.updatedAt,
           lastMessage: c.messages[0]?.content ?? null,
         })));
       }
@@ -410,15 +409,6 @@ export function WhatsappInbox({
     await refreshDetail(selectedId);
   }
 
-  async function handleMarcarGanho() {
-    if (!selectedId) return;
-    const res = await fetch(`/api/ferramentas/whatsapp/conversas/${selectedId}/ganho`, { method: "POST" });
-    const data = await res.json();
-    if (!res.ok) { alert(data.error ?? "Não foi possível marcar como ganho."); return; }
-    await refreshDetail(selectedId);
-    await refreshList();
-  }
-
   async function handleAssign(assignedToId: string | null) {
     if (!selectedId) return;
     const res = await fetch(`/api/ferramentas/whatsapp/conversas/${selectedId}`, {
@@ -576,9 +566,11 @@ export function WhatsappInbox({
                       ) : null}
                     </div>
                     <p className={`text-xs truncate mt-0.5 ${t.listSecondary}`}>{c.lastMessage || "—"}</p>
-                    {c.dealValue != null && (
-                      <p className={`text-xs font-semibold mt-1 flex items-center gap-1 ${c.wonAt ? "text-green-500" : "text-gray-400"}`}>
-                        {c.wonAt && <Trophy size={11} />}{formatBRL(c.dealValue)}
+                    {c.opportunities.length > 0 && (
+                      <p className={`text-xs font-semibold mt-1 flex items-center gap-1 ${c.opportunities.some(o => o.wonAt) ? "text-green-500" : "text-gray-400"}`}>
+                        {c.opportunities.some(o => o.wonAt) && <Trophy size={11} />}
+                        {formatBRL(c.opportunities.reduce((sum, o) => sum + o.dealValue, 0))}
+                        {c.opportunities.length > 1 && ` (${c.opportunities.length})`}
                       </p>
                     )}
                     <div className="flex items-center justify-between mt-1.5">
@@ -609,18 +601,33 @@ export function WhatsappInbox({
                   <div>
                     <p className="font-semibold">{detail.contactName || detail.contactNumber}</p>
                     <p className={`text-xs ${t.subtitle}`}>{detail.contactNumber}</p>
-                    {detail.dealValue != null && (
-                      <p className={`text-xs font-semibold mt-1 flex items-center gap-1 ${detail.wonAt ? "text-green-500" : "text-gray-400"}`}>
-                        {detail.wonAt ? <><Trophy size={12} /> Ganho — {formatBRL(detail.dealValue)}</> : formatBRL(detail.dealValue)}
+                    {detail.opportunities.length > 0 && (
+                      <p className={`text-xs font-semibold mt-1 flex items-center gap-1 ${detail.opportunities.some(o => o.wonAt) ? "text-green-500" : "text-gray-400"}`}>
+                        {detail.opportunities.some(o => o.wonAt) && <Trophy size={12} />}
+                        {formatBRL(detail.opportunities.reduce((sum, o) => sum + o.dealValue, 0))}
+                        {detail.opportunities.length > 1 && ` (${detail.opportunities.length})`}
                       </p>
                     )}
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                    {detail.dealValue != null && !detail.wonAt && detail.status !== "FINALIZADO" && (
-                      <button onClick={handleMarcarGanho} title="Dar ganho" className="p-2 rounded-lg bg-green-600 text-white">
-                        <ThumbsUp size={16} />
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowOpportunities(s => !s)}
+                        title="Oportunidades"
+                        className={`p-2 rounded-lg ${detail.opportunities.some(o => !o.wonAt) ? "bg-green-600 text-white" : `${t.toggleInactive} hover:bg-black/10`}`}
+                      >
+                        <HandCoins size={16} />
                       </button>
-                    )}
+                      {showOpportunities && (
+                        <OpportunitiesPanel
+                          conversationId={detail.id}
+                          opportunities={detail.opportunities}
+                          onChange={() => refreshDetail(detail.id)}
+                          onClose={() => setShowOpportunities(false)}
+                          dark={theme === "dark"}
+                        />
+                      )}
+                    </div>
 
                     <div className="relative">
                       <button

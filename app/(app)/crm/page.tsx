@@ -41,7 +41,10 @@ export default async function WhatsappInboxPage({
         ...(isManager ? {} : { OR: [{ assignedToId: user.id }, { assignedToId: null }] }),
       },
       orderBy: { updatedAt: "desc" },
-      include: { messages: { where: { role: { not: "note" } }, orderBy: { createdAt: "desc" }, take: 1 } },
+      include: {
+        messages: { where: { role: { not: "note" } }, orderBy: { createdAt: "desc" }, take: 1 },
+        opportunities: { orderBy: { createdAt: "asc" } },
+      },
     }),
     prisma.leadStatus.findMany({ where: { agentConfigId: config.id }, orderBy: { order: "asc" } }),
   ]);
@@ -60,10 +63,8 @@ export default async function WhatsappInboxPage({
         contactNumber: c.contactNumber,
         status: c.status,
         humanTakeover: c.humanTakeover,
-        stageId: c.stageId,
         leadStatusId: c.leadStatusId,
-        dealValue: c.dealValue,
-        wonAt: c.wonAt?.toISOString() ?? null,
+        opportunities: c.opportunities.map(o => ({ id: o.id, title: o.title, dealValue: o.dealValue, wonAt: o.wonAt?.toISOString() ?? null })),
         assignedToId: c.assignedToId,
         updatedAt: c.updatedAt.toISOString(),
         lastMessage: c.messages[0]?.content ?? null,

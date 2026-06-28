@@ -199,13 +199,7 @@ export async function POST(req: NextRequest) {
   const conversation = await prisma.conversation.upsert({
     where: { agentConfigId_contactNumber: { agentConfigId: config.id, contactNumber } },
     update: { status: "ATIVO", followupCount: 0, ...(contactName && { contactName }) },
-    create: {
-      agentConfigId: config.id, contactNumber, contactName, status: "ATIVO",
-      stageId: (await prisma.pipelineStage.findFirst({
-        where: { pipeline: { agentConfigId: config.id } },
-        orderBy: [{ pipeline: { order: "asc" } }, { order: "asc" }],
-      }))?.id,
-    },
+    create: { agentConfigId: config.id, contactNumber, contactName, status: "ATIVO" },
   });
 
   // Notas internas nunca entram no contexto da IA nem são contadas aqui — são só pra equipe ver

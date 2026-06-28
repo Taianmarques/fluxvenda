@@ -15,7 +15,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const conversation = await prisma.conversation.findFirst({
     where: { id, agentConfigId: config.id },
-    include: { messages: { orderBy: { createdAt: "asc" }, include: { sender: { select: { name: true } } } } },
+    include: {
+      messages: { orderBy: { createdAt: "asc" }, include: { sender: { select: { name: true } } } },
+      opportunities: { orderBy: { createdAt: "asc" } },
+    },
   });
   if (!conversation) return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
   if (!isManager && conversation.assignedToId && conversation.assignedToId !== userId) {
@@ -26,14 +29,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 }
 
 const patchSchema = z.object({
-  stageId: z.string().nullable().optional(),
   leadStatusId: z.string().nullable().optional(),
-  dealValue: z.number().nullable().optional(),
   assignedToId: z.string().nullable().optional(),
   status: z.enum(["ATIVO", "AGUARDANDO", "FINALIZADO"]).optional(),
 });
 
-// Move a conversa para outra etapa do pipeline, muda o status do lead, o valor negociado e/ou o atendente responsável
+// Muda o status do lead, o status da conversa e/ou o atendente responsável.
+// Etapa do pipeline e valor negociado agora vivem em Opportunity, não aqui.
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -45,11 +47,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params;
   const body = patchSchema.safeParse(await req.json());
   if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
-
-  if (body.data.stageId) {
-    const stage = await prisma.pipelineStage.findFirst({ where: { id: body.data.stageId, pipeline: { agentConfigId: config.id } } });
-    if (!stage) return NextResponse.json({ error: "Etapa não encontrada" }, { status: 404 });
-  }
 
   if (body.data.leadStatusId) {
     const status = await prisma.leadStatus.findFirst({ where: { id: body.data.leadStatusId, agentConfigId: config.id } });
@@ -76,9 +73,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const updated = await prisma.conversation.update({
     where: { id },
     data: {
-      ...(body.data.stageId !== undefined && { stageId: body.data.stageId }),
       ...(body.data.leadStatusId !== undefined && { leadStatusId: body.data.leadStatusId }),
-      ...(body.data.dealValue !== undefined && { dealValue: body.data.dealValue }),
       ...(body.data.assignedToId !== undefined && { assignedToId: body.data.assignedToId }),
       ...(body.data.status !== undefined && { status: body.data.status }),
     },
