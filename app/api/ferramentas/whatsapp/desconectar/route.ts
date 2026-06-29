@@ -16,7 +16,7 @@ export async function POST() {
   const team = await prisma.team.findUnique({ where: { managerId: userId } });
   if (!team) return NextResponse.json({ error: "Equipe não encontrada" }, { status: 404 });
 
-  const config = await prisma.agentConfig.findUnique({ where: { teamId: team.id } });
+  const config = await prisma.agentConfig.findFirst({ where: { teamId: team.id }, orderBy: { createdAt: "asc" } });
   if (!config?.uazapiToken) return NextResponse.json({ error: "Agente não encontrado" }, { status: 404 });
 
   await disconnectInstance(config.uazapiToken);

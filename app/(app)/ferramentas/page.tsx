@@ -13,11 +13,13 @@ export default async function FerramentasPage() {
 
   const team = await prisma.team.findUnique({
     where: { managerId: user.id },
-    include: { agentConfig: true },
+    include: { agentConfigs: true },
   });
+  // TODO(fase 2/5): listar todos os agentes da equipe; por ora mantém o comportamento singleton
+  const agentConfig = team?.agentConfigs?.[0];
 
-  const whatsappConfigured = Boolean(team?.agentConfig?.active);
-  const schedulingEnabled = Boolean(team?.agentConfig?.schedulingEnabled);
+  const whatsappConfigured = Boolean(agentConfig?.active);
+  const schedulingEnabled = Boolean(agentConfig?.schedulingEnabled);
 
   const TOOLS = [
     {

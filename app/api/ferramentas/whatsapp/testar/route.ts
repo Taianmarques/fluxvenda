@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   const team = await prisma.team.findUnique({ where: { managerId: userId } });
   if (!team) return NextResponse.json({ error: "Equipe não encontrada" }, { status: 404 });
 
-  const config = await prisma.agentConfig.findUnique({ where: { teamId: team.id } });
+  const config = await prisma.agentConfig.findFirst({ where: { teamId: team.id }, orderBy: { createdAt: "asc" } });
   if (!config?.systemPrompt) return NextResponse.json({ error: "Agente ainda não configurado" }, { status: 400 });
 
   const body = schema.safeParse(await req.json());

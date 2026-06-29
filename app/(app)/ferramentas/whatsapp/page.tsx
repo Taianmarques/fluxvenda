@@ -25,7 +25,8 @@ export default async function WhatsappAgentPage() {
   const team = await prisma.team.findUnique({ where: { managerId: user.id } });
   if (!team) redirect("/dashboard");
 
-  const config = await prisma.agentConfig.findUnique({ where: { teamId: team.id } });
+  // TODO(fase 4): vira /ferramentas/whatsapp/[agentId]; por ora mantém "o" agente da equipe
+  const config = await prisma.agentConfig.findFirst({ where: { teamId: team.id }, orderBy: { createdAt: "asc" } });
 
   if (!config?.uazapiToken) {
     return (

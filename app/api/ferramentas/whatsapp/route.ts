@@ -32,7 +32,9 @@ export async function GET() {
   const team = await getOwnTeam(userId);
   if (!team) return NextResponse.json({ error: "Equipe não encontrada" }, { status: 404 });
 
-  const config = await prisma.agentConfig.findUnique({ where: { teamId: team.id } });
+  // TODO(fase 3/4): este endpoint ainda assume "o" agente da equipe (o mais antigo) —
+  // vira /api/agentes/[agentId] explícito quando a UI de múltiplos agentes existir.
+  const config = await prisma.agentConfig.findFirst({ where: { teamId: team.id }, orderBy: { createdAt: "asc" } });
   return NextResponse.json({ config });
 }
 
@@ -51,7 +53,7 @@ export async function POST(req: NextRequest) {
     followupEnabled, followupDelaysMinutes,
   } = body.data;
 
-  const existing = await prisma.agentConfig.findUnique({ where: { teamId: team.id } });
+  const existing = await prisma.agentConfig.findFirst({ where: { teamId: team.id }, orderBy: { createdAt: "asc" } });
 
   // Só regenera o system prompt se a personalidade/informações da empresa realmente mudaram
   const personaChanged = !existing
@@ -78,17 +80,23 @@ export async function POST(req: NextRequest) {
     uazapiToken = created.token;
   }
 
-  const config = await prisma.agentConfig.upsert({
-    where: { teamId: team.id },
-    update: {
-      nome, tom, servicos, objecoes, horario, descricaoEmpresa, precos, enderecoContato,
-      systemPrompt, uazapiInstance, uazapiToken, followupEnabled, followupDelaysMinutes,
-    },
-    create: {
-      teamId: team.id, nome, tom, servicos, objecoes, horario, descricaoEmpresa, precos, enderecoContato,
-      systemPrompt, uazapiInstance, uazapiToken, active: false, followupEnabled, followupDelaysMinutes,
-    },
-  });
+  // teamId não é mais @unique (uma equipe pode ter vários agentes) — upsert por teamId não
+  // compila mais; como esse endpoint ainda é "o" agente da equipe (fase 1), decide manualmente
+  // entre update (achou um existing) e create.
+  const config = existing
+    ? await prisma.agentConfig.update({
+        where: { id: existing.id },
+        data: {
+          nome, tom, servicos, objecoes, horario, descricaoEmpresa, precos, enderecoContato,
+          systemPrompt, uazapiInstance, uazapiToken, followupEnabled, followupDelaysMinutes,
+        },
+      })
+    : await prisma.agentConfig.create({
+        data: {
+          teamId: team.id, nome, tom, servicos, objecoes, horario, descricaoEmpresa, precos, enderecoContato,
+          systemPrompt, uazapiInstance, uazapiToken, active: false, followupEnabled, followupDelaysMinutes,
+        },
+      });
 
   if (!existing) {
     await seedDefaultPipeline(config.id);

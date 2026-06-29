@@ -480,7 +480,7 @@ model Team {
   members       TeamMember[]
   goals         Goal[]
   announcements Announcement[]
-  agentConfig   AgentConfig?
+  agentConfigs  AgentConfig[]
 }
 
 model TeamMember {
@@ -529,7 +529,8 @@ model AgentConfig {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  teamId String @unique
+  // Sem @unique: uma equipe pode ter vários agentes (cada um seu número de WhatsApp e CRM)
+  teamId String
   team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
   nome     String   @default("Assistente")
@@ -537,6 +538,10 @@ model AgentConfig {
   servicos String[] @default([])
   objecoes String[] @default([])
   horario  String   @default("")
+
+  // Setor desse agente (taxonomia de lib/segments.ts) — usado pra personalizar o system prompt
+  segmento    String @default("")
+  subsegmento String @default("")
 
   descricaoEmpresa String @default("") // história, diferenciais, público-alvo
   precos           String @default("") // valores, formas de pagamento, parcelamento, garantias
@@ -570,6 +575,8 @@ model AgentConfig {
   professionals  Professional[]
   services       Service[]
   quickReplies   QuickReply[]
+
+  @@index([teamId])
 }
 
 enum LeadDistributionMode {
