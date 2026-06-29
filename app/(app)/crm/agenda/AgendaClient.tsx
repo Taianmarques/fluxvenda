@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Calendar, Users, Settings, ArrowLeft, ArrowRight } from "lucide-react";
 
 type AvailabilityRule = { dayOfWeek: number; start: string; end: string };
 type Appointment = {
@@ -303,17 +304,17 @@ export function AgendaClient({
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
             <p className="text-gray-400 text-sm">Atendimento</p>
-            <h1 className="text-3xl font-bold mt-1">📅 Agenda</h1>
+            <h1 className="text-3xl font-bold mt-1 flex items-center gap-2"><Calendar size={28} className="text-blue-400" /> Agenda</h1>
           </div>
           <div className="flex gap-2">
             <button onClick={() => setShowNewForm(s => !s)} className="bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-2.5 text-sm font-medium">
               + Novo agendamento
             </button>
-            <button onClick={() => setShowTeam(s => !s)} className="bg-gray-800 hover:bg-gray-700 rounded-xl px-4 py-2.5 text-sm font-medium">
-              👤 Serviços e profissionais
+            <button onClick={() => setShowTeam(s => !s)} className="bg-gray-800 hover:bg-gray-700 rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-1.5">
+              <Users size={15} /> Serviços e profissionais
             </button>
-            <button onClick={() => setShowSettings(s => !s)} className="bg-gray-800 hover:bg-gray-700 rounded-xl px-4 py-2.5 text-sm font-medium">
-              ⚙️ Configurar disponibilidade
+            <button onClick={() => setShowSettings(s => !s)} className="bg-gray-800 hover:bg-gray-700 rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-1.5">
+              <Settings size={15} /> Configurar disponibilidade
             </button>
           </div>
         </div>
@@ -428,9 +429,9 @@ export function AgendaClient({
         )}
 
         <div className="flex items-center justify-between">
-          <button onClick={() => setWeekStart(d => new Date(d.getTime() - 7 * 86400000))} className="text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-lg bg-gray-900 border border-gray-800">← Semana anterior</button>
+          <button onClick={() => setWeekStart(d => new Date(d.getTime() - 7 * 86400000))} className="text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-lg bg-gray-900 border border-gray-800 flex items-center gap-1.5"><ArrowLeft size={14} /> Semana anterior</button>
           <p className="text-sm text-gray-400">{days[0].toLocaleDateString("pt-BR")} – {days[6].toLocaleDateString("pt-BR")}</p>
-          <button onClick={() => setWeekStart(d => new Date(d.getTime() + 7 * 86400000))} className="text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-lg bg-gray-900 border border-gray-800">Próxima semana →</button>
+          <button onClick={() => setWeekStart(d => new Date(d.getTime() + 7 * 86400000))} className="text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-lg bg-gray-900 border border-gray-800 flex items-center gap-1.5">Próxima semana <ArrowRight size={14} /></button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
