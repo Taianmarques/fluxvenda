@@ -287,6 +287,18 @@ export const COMMERCE_TOOLS = [
       parameters: { type: "object", properties: {}, required: [] },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "enviar_foto_produto",
+      description: "Envia a foto de um produto do catálogo direto no WhatsApp. Use quando o cliente pedir pra ver o produto ou perguntar se tem foto.",
+      parameters: {
+        type: "object",
+        properties: { produto: { type: "string", description: "Nome do produto, igual ao retornado por consultar_produtos" } },
+        required: ["produto"],
+      },
+    },
+  },
 ];
 
 // Roda o agente com acesso a ferramentas (ex: agendamento) — chama o modelo em loop até ele

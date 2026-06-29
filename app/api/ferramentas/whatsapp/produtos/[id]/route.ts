@@ -10,6 +10,8 @@ const patchSchema = z.object({
   price: z.number().min(0).optional(),
   stock: z.number().int().min(0).nullable().optional(),
   active: z.boolean().optional(),
+  imagemBase64: z.string().max(3_000_000).nullable().optional(),
+  imagemMimeType: z.string().nullable().optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

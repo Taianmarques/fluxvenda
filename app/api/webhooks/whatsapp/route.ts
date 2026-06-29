@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { runAgent, runAgentWithImage, runAgentWithTools, transcribeAudio, classifyLeadQualified, SCHEDULING_TOOLS, COMMERCE_TOOLS } from "@/lib/agent-engine";
-import { sendWhatsAppTextAsTeam, downloadMessageMedia } from "@/lib/whatsapp";
+import { sendWhatsAppTextAsTeam, sendMediaAsTeam, downloadMessageMedia } from "@/lib/whatsapp";
 import { getAvailableSlots, isSlotAvailable, formatSlotsForAgent, type AvailabilityRule } from "@/lib/scheduling";
 import { assignNextAttendant } from "@/lib/assignment";
 import { createAsaasCustomer, createAsaasCharge, getAsaasPixQrCode } from "@/lib/asaas";
@@ -75,6 +75,7 @@ Quando o cliente quiser comprar algo:
 - Se for cartão: ${buildInstallmentNote(config)}
 - Use gerar_cobranca só depois que o cliente confirmar o pedido, a forma de pagamento, o CPF/CNPJ e (se cartão) as parcelas. Se for Pix, explique que ele pode pagar com o código copia-e-cola retornado. Se for cartão, mande o link de checkout retornado e explique que ele deve abrir o link pra digitar os dados do cartão — NUNCA peça número de cartão direto no WhatsApp.
 - Se o cliente perguntar sobre um pedido já feito, use consultar_status_pedido.
+- Se o cliente pedir pra ver o produto ou perguntar se tem foto, use enviar_foto_produto.
 - IMPORTANTE: quando o cliente já confirmou tudo que falta (itens, forma de pagamento, CPF/CNPJ e parcelas se for cartão), chame a ferramenta JÁ NESSA MESMA RESPOSTA — nunca diga "vou gerar" ou "um momento" sem ter chamado a ferramenta antes de responder. Você só tem essa resposta pra agir, não existe uma próxima rodada automática.`;
 }
 
@@ -290,6 +291,21 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       return orders
         .map(o => `Pedido ${o.id.slice(-6)} — status: ${o.status} — total: R$ ${o.total.toFixed(2)} — itens: ${o.items.map(i => `${i.quantity}x ${i.name}`).join(", ")}`)
         .join("\n\n");
+    }
+
+    if (name === "enviar_foto_produto") {
+      const nomeBuscado = String(args?.produto ?? "");
+      const product = await prisma.product.findFirst({ where: { agentConfigId, active: true, name: { equals: nomeBuscado, mode: "insensitive" } } });
+      if (!product) return `Não encontrei o produto "${nomeBuscado}" no catálogo.`;
+      if (!product.imagemBase64 || !config.uazapiToken) return `Esse produto ainda não tem foto cadastrada.`;
+
+      try {
+        await sendMediaAsTeam(config.uazapiToken, contactNumber, "image", product.imagemBase64, { caption: product.name });
+        return `Foto de "${product.name}" enviada.`;
+      } catch (err) {
+        console.error("[whatsapp-webhook] erro ao enviar foto do produto:", err);
+        return "Não foi possível enviar a foto agora.";
+      }
     }
 
     return "Ferramenta desconhecida.";

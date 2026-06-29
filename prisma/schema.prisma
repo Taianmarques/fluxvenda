@@ -648,6 +648,11 @@ model Product {
   stock       Int? // null = não controla estoque
   active      Boolean @default(true)
 
+  // Foto guardada como base64 direto no banco (sem prefixo "data:...;base64,") — o projeto
+  // não tem storage de blob hoje, e o envio pelo WhatsApp (sendMediaAsTeam) já pede base64 puro.
+  imagemBase64   String? @db.Text
+  imagemMimeType String?
+
   orderItems OrderItem[]
 }
 

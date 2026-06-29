@@ -24,6 +24,8 @@ const schema = z.object({
   description: z.string().default(""),
   price: z.number().min(0),
   stock: z.number().int().min(0).nullable().optional(),
+  imagemBase64: z.string().max(3_000_000).nullable().optional(),
+  imagemMimeType: z.string().nullable().optional(),
 });
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {
@@ -43,6 +45,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
       description: body.data.description,
       price: body.data.price,
       stock: body.data.stock ?? null,
+      imagemBase64: body.data.imagemBase64 ?? null,
+      imagemMimeType: body.data.imagemMimeType ?? null,
     },
   });
 

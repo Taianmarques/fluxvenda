@@ -1,9 +1,23 @@
 "use client";
 
-import { useState } from "react";
-import { ShoppingCart, Settings, Copy } from "lucide-react";
+import { useRef, useState } from "react";
+import { ShoppingCart, Settings, Copy, Image as ImageIcon } from "lucide-react";
 
-type Product = { id: string; name: string; description: string; price: number; stock: number | null; active: boolean };
+const MAX_PHOTO_MB = 2;
+
+function readFileAsBase64(file: File): Promise<{ base64: string; mimeType: string }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      resolve({ base64: dataUrl.split(",")[1] ?? "", mimeType: file.type });
+    };
+    reader.onerror = () => reject(new Error("Não foi possível ler o arquivo."));
+    reader.readAsDataURL(file);
+  });
+}
+
+type Product = { id: string; name: string; description: string; price: number; stock: number | null; active: boolean; imagemBase64?: string | null; imagemMimeType?: string | null };
 type OrderItem = { id: string; name: string; unitPrice: number; quantity: number };
 type Order = { id: string; contactName: string; contactNumber: string; status: string; total: number; asaasInvoiceUrl: string | null; createdAt: string; items: OrderItem[] };
 
@@ -57,6 +71,10 @@ export function ComercioClient({
   const [newDescription, setNewDescription] = useState("");
   const [newPrice, setNewPrice] = useState("");
   const [newStock, setNewStock] = useState("");
+  const [newImage, setNewImage] = useState<{ base64: string; mimeType: string } | null>(null);
+  const [photoError, setPhotoError] = useState("");
+  const editPhotoInputRef = useRef<HTMLInputElement>(null);
+  const [editingPhotoId, setEditingPhotoId] = useState<string | null>(null);
 
   async function loadProducts() {
     const res = await fetch(`/api/agentes/${agentId}/produtos`);
@@ -85,6 +103,46 @@ export function ComercioClient({
     }
   }
 
+  async function handleSelectNewImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setPhotoError("");
+    if (file.size > MAX_PHOTO_MB * 1024 * 1024) {
+      setPhotoError(`Imagem muito grande (máx. ${MAX_PHOTO_MB}MB).`);
+      return;
+    }
+    try {
+      setNewImage(await readFileAsBase64(file));
+    } catch {
+      setPhotoError("Não foi possível ler a imagem.");
+    }
+  }
+
+  async function handleUploadExistingPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    const productId = editingPhotoId;
+    e.target.value = "";
+    setEditingPhotoId(null);
+    if (!file || !productId) return;
+    setPhotoError("");
+    if (file.size > MAX_PHOTO_MB * 1024 * 1024) {
+      setPhotoError(`Imagem muito grande (máx. ${MAX_PHOTO_MB}MB).`);
+      return;
+    }
+    try {
+      const { base64, mimeType } = await readFileAsBase64(file);
+      await fetch(`/api/ferramentas/whatsapp/produtos/${productId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imagemBase64: base64, imagemMimeType: mimeType }),
+      });
+      loadProducts();
+    } catch {
+      setPhotoError("Não foi possível enviar a imagem.");
+    }
+  }
+
   async function handleAddProduct() {
     const price = Number(newPrice.replace(",", "."));
     if (!newName.trim() || !Number.isFinite(price) || price < 0) return;
@@ -94,9 +152,10 @@ export function ComercioClient({
       body: JSON.stringify({
         name: newName.trim(), description: newDescription.trim(), price,
         stock: newStock.trim() ? Math.max(0, Number(newStock)) : null,
+        imagemBase64: newImage?.base64 ?? null, imagemMimeType: newImage?.mimeType ?? null,
       }),
     });
-    setNewName(""); setNewDescription(""); setNewPrice(""); setNewStock(""); setShowNewProduct(false);
+    setNewName(""); setNewDescription(""); setNewPrice(""); setNewStock(""); setNewImage(null); setShowNewProduct(false);
     loadProducts();
   }
 
@@ -144,6 +203,14 @@ export function ComercioClient({
               <input placeholder="Estoque (opcional)" value={newStock} onChange={e => setNewStock(e.target.value)} className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
             </div>
             <input placeholder="Descrição (opcional)" value={newDescription} onChange={e => setNewDescription(e.target.value)} className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
+            <div className="flex items-center gap-3">
+              {newImage && <img src={`data:${newImage.mimeType};base64,${newImage.base64}`} alt="" className="w-12 h-12 rounded-lg object-cover border border-gray-800" />}
+              <label className="text-sm text-blue-400 hover:text-blue-300 cursor-pointer flex items-center gap-1.5">
+                <ImageIcon size={14} /> {newImage ? "Trocar foto" : "Adicionar foto (opcional)"}
+                <input type="file" accept="image/*" onChange={handleSelectNewImage} className="hidden" />
+              </label>
+            </div>
+            {photoError && <p className="text-xs text-red-400">{photoError}</p>}
             <button onClick={handleAddProduct} className="bg-green-700 hover:bg-green-600 rounded-xl px-4 py-2 text-sm font-medium">Salvar</button>
           </div>
         )}
@@ -240,13 +307,21 @@ export function ComercioClient({
             <div className="divide-y divide-gray-800">
               {products.map(p => (
                 <div key={p.id} className="flex items-center justify-between gap-3 px-5 py-3">
-                  <div className="min-w-0">
-                    <p className={`text-sm font-medium ${!p.active ? "text-gray-500 line-through" : ""}`}>{p.name}</p>
-                    <p className="text-xs text-gray-500 truncate">
-                      {formatBRL(p.price)}{p.stock !== null && ` · estoque: ${p.stock}`}{p.description && ` · ${p.description}`}
-                    </p>
+                  <div className="flex items-center gap-3 min-w-0">
+                    {p.imagemBase64 ? (
+                      <img src={`data:${p.imagemMimeType};base64,${p.imagemBase64}`} alt="" className="w-10 h-10 rounded-lg object-cover border border-gray-800 flex-shrink-0" />
+                    ) : (
+                      <span className="w-10 h-10 rounded-lg bg-gray-950 border border-gray-800 flex items-center justify-center text-gray-600 flex-shrink-0"><ImageIcon size={16} /></span>
+                    )}
+                    <div className="min-w-0">
+                      <p className={`text-sm font-medium ${!p.active ? "text-gray-500 line-through" : ""}`}>{p.name}</p>
+                      <p className="text-xs text-gray-500 truncate">
+                        {formatBRL(p.price)}{p.stock !== null && ` · estoque: ${p.stock}`}{p.description && ` · ${p.description}`}
+                      </p>
+                    </div>
                   </div>
                   <div className="flex gap-2 text-xs flex-shrink-0">
+                    <button onClick={() => { setEditingPhotoId(p.id); editPhotoInputRef.current?.click(); }} className="text-blue-400 hover:text-blue-300">Foto</button>
                     <button onClick={() => handleToggleProduct(p)} className="text-gray-400 hover:text-white">{p.active ? "Desativar" : "Ativar"}</button>
                     <button onClick={() => handleDeleteProduct(p)} className="text-red-400 hover:text-red-300">Remover</button>
                   </div>
@@ -254,6 +329,7 @@ export function ComercioClient({
               ))}
             </div>
           )}
+          <input ref={editPhotoInputRef} type="file" accept="image/*" onChange={handleUploadExistingPhoto} className="hidden" />
         </div>
 
         <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
