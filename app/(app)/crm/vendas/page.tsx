@@ -2,7 +2,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Wallet, TrendingUp, Handshake, Receipt } from "lucide-react";
+import { Wallet, TrendingUp, Handshake, Receipt, Clock, KanbanSquare } from "lucide-react";
 import { getOwnAgentConfig } from "@/lib/team";
 import { VendasChart } from "./VendasChart";
 
@@ -41,6 +41,30 @@ export default async function VendasPage() {
   const count = wonDeals.length;
   const ticketMedio = count > 0 ? total / count : 0;
 
+  const openDeals = await prisma.opportunity.findMany({
+    where: { wonAt: null, conversation: { agentConfigId: config.id } },
+    include: { stage: true },
+  });
+
+  const totalAberto = openDeals.reduce((sum, d) => sum + d.dealValue, 0);
+
+  // Agrupa as negociações abertas por etapa do pipeline, na ordem da etapa; sem etapa fica por último
+  const stageGroups = new Map<string, { name: string; color: string; order: number; count: number; total: number }>();
+  for (const deal of openDeals) {
+    const key = deal.stage?.id ?? "__sem_etapa__";
+    const group = stageGroups.get(key) ?? {
+      name: deal.stage?.name ?? "Sem etapa",
+      color: deal.stage?.color ?? "#6b7280",
+      order: deal.stage?.order ?? Number.MAX_SAFE_INTEGER,
+      count: 0,
+      total: 0,
+    };
+    group.count += 1;
+    group.total += deal.dealValue;
+    stageGroups.set(key, group);
+  }
+  const openByStage = Array.from(stageGroups.values()).sort((a, b) => a.order - b.order);
+
   // Receita ganha nos últimos 6 meses, mais antigo primeiro
   const now = new Date();
   const monthly = Array.from({ length: 6 }, (_, i) => {
@@ -62,7 +86,7 @@ export default async function VendasPage() {
           <p className="text-gray-400 mt-1">Negociações marcadas como ganhas a partir do CRM de WhatsApp.</p>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
             <span className="inline-flex p-2 rounded-xl bg-green-500/10 text-green-400 mb-2"><TrendingUp size={18} /></span>
             <p className="text-3xl font-bold text-green-400">{formatBRL(total)}</p>
@@ -78,11 +102,36 @@ export default async function VendasPage() {
             <p className="text-3xl font-bold text-purple-400">{formatBRL(ticketMedio)}</p>
             <p className="text-xs text-gray-500 mt-1">Ticket médio</p>
           </div>
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+            <span className="inline-flex p-2 rounded-xl bg-amber-500/10 text-amber-400 mb-2"><Clock size={18} /></span>
+            <p className="text-3xl font-bold text-amber-400">{formatBRL(totalAberto)}</p>
+            <p className="text-xs text-gray-500 mt-1">Total em aberto</p>
+          </div>
         </div>
 
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
           <p className="font-semibold mb-3">Receita ganha por mês</p>
           <VendasChart data={monthly.map(m => ({ mes: m.mes, total: m.total }))} />
+        </div>
+
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+          <p className="font-semibold p-5 pb-3 flex items-center gap-2"><KanbanSquare size={18} className="text-amber-400" /> Negócios abertos por etapa</p>
+          {openByStage.length === 0 ? (
+            <p className="text-sm text-gray-500 px-5 pb-5">Nenhuma negociação em aberto no momento.</p>
+          ) : (
+            <div className="divide-y divide-gray-800">
+              {openByStage.map(stage => (
+                <div key={stage.name} className="flex items-center justify-between px-5 py-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: stage.color }} />
+                    <p className="text-sm font-medium">{stage.name}</p>
+                    <span className="text-xs text-gray-500">{stage.count} {stage.count === 1 ? "negócio" : "negócios"}</span>
+                  </div>
+                  <p className="text-sm font-semibold text-amber-400">{formatBRL(stage.total)}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
