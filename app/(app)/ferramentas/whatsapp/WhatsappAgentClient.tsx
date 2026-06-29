@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, FlaskConical, Sparkles } from "lucide-react";
+import { AGENT_WIZARD_QUESTIONS, DEFAULT_WIZARD_QUESTIONS } from "@/lib/agent-wizard-questions";
 
 type InitialConfig = {
   nome: string;
@@ -95,12 +96,14 @@ export function WhatsappAgentClient({
 }) {
   const router = useRouter();
   const isConfigured = Boolean(initialConfig?.hasToken);
+  const q = AGENT_WIZARD_QUESTIONS[segmento?.segmento ?? ""] ?? DEFAULT_WIZARD_QUESTIONS;
 
   const [editing, setEditing] = useState(!isConfigured);
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [suggesting, setSuggesting] = useState(false);
+  const autoSuggested = useRef(false);
 
   const [nome, setNome] = useState(initialConfig?.nome ?? "Sofia");
   const [tom, setTom] = useState(initialConfig?.tom ?? "CONSULTIVO");
@@ -109,7 +112,7 @@ export function WhatsappAgentClient({
   const [servicos, setServicos] = useState((initialConfig?.servicos ?? []).join("\n"));
   const [precos, setPrecos] = useState(initialConfig?.precos ?? "");
   const [objecoes, setObjecoes] = useState((initialConfig?.objecoes ?? []).join("\n"));
-  const [horario, setHorario] = useState(initialConfig?.horario ?? "Segunda a sexta, 9h às 18h");
+  const [horario, setHorario] = useState(initialConfig?.horario ?? q.horarioDefault);
   const [followupEnabled, setFollowupEnabled] = useState(initialConfig?.followupEnabled ?? true);
   const [followupDelays, setFollowupDelays] = useState<DelayRow[]>(
     (initialConfig?.followupDelaysMinutes ?? [1440, 1440]).map(minutesToRow)
@@ -188,6 +191,16 @@ export function WhatsappAgentClient({
       setSuggesting(false);
     }
   }
+
+  // Na primeira vez que o usuário abre a config de um agente novo de um setor conhecido,
+  // já sugere o preenchimento sozinho — sem precisar clicar em "Sugerir com IA".
+  useEffect(() => {
+    if (autoSuggested.current) return;
+    if (!editing || !segmento?.segmento) return;
+    if (servicos.trim() || objecoes.trim()) return;
+    autoSuggested.current = true;
+    handleSuggest();
+  }, [editing]);
 
   async function handleSubmit() {
     setSaving(true);
@@ -378,10 +391,10 @@ export function WhatsappAgentClient({
           <p className="font-semibold">2. Sobre a empresa</p>
           <p className="text-sm text-gray-400">Quanto mais detalhes você der aqui, mais o agente vai saber responder sem inventar nada.</p>
           <div>
-            <label className="text-sm text-gray-400 block mb-1">Conte sobre sua empresa</label>
+            <label className="text-sm text-gray-400 block mb-1">{q.descricaoEmpresaLabel}</label>
             <textarea
               value={descricaoEmpresa} onChange={e => setDescricaoEmpresa(e.target.value)} rows={4}
-              placeholder="História, diferenciais, público-alvo, o que vocês fazem de melhor..."
+              placeholder={q.descricaoEmpresaPlaceholder}
               className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-600"
             />
           </div>
@@ -400,20 +413,28 @@ export function WhatsappAgentClient({
         <div className="space-y-4">
           <p className="font-semibold">3. Configuração comercial</p>
           <div>
-            <label className="text-sm text-gray-400 block mb-1">Serviços/produtos (um por linha)</label>
-            <textarea value={servicos} onChange={e => setServicos(e.target.value)} rows={3} className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-600" />
-          </div>
-          <div>
-            <label className="text-sm text-gray-400 block mb-1">Preços e condições</label>
+            <label className="text-sm text-gray-400 block mb-1">{q.servicosLabel}</label>
             <textarea
-              value={precos} onChange={e => setPrecos(e.target.value)} rows={3}
-              placeholder="Valores, formas de pagamento, parcelamento, garantias..."
+              value={servicos} onChange={e => setServicos(e.target.value)} rows={3}
+              placeholder={q.servicosPlaceholder}
               className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-600"
             />
           </div>
           <div>
-            <label className="text-sm text-gray-400 block mb-1">Objeções comuns (uma por linha)</label>
-            <textarea value={objecoes} onChange={e => setObjecoes(e.target.value)} rows={3} className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-600" />
+            <label className="text-sm text-gray-400 block mb-1">{q.precosLabel}</label>
+            <textarea
+              value={precos} onChange={e => setPrecos(e.target.value)} rows={3}
+              placeholder={q.precosPlaceholder}
+              className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-600"
+            />
+          </div>
+          <div>
+            <label className="text-sm text-gray-400 block mb-1">{q.objecoesLabel}</label>
+            <textarea
+              value={objecoes} onChange={e => setObjecoes(e.target.value)} rows={3}
+              placeholder={q.objecoesPlaceholder}
+              className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-600"
+            />
           </div>
           <div>
             <label className="text-sm text-gray-400 block mb-1">Horário de atendimento</label>

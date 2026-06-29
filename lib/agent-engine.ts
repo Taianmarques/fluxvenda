@@ -1,4 +1,5 @@
 import { openai, MODEL } from "@/lib/openai";
+import { AGENT_WIZARD_QUESTIONS, DEFAULT_WIZARD_QUESTIONS } from "@/lib/agent-wizard-questions";
 
 export async function transcribeAudio(fileURL: string, mimetype: string): Promise<string> {
   const res = await fetch(fileURL);
@@ -96,14 +97,15 @@ export type AgentTemplateSuggestion = {
 // antes de salvar.
 export async function generateAgentTemplate(segmento: string, subsegmento: string): Promise<AgentTemplateSuggestion> {
   const setor = [segmento, subsegmento].filter(Boolean).join(" > ");
+  const q = AGENT_WIZARD_QUESTIONS[segmento] ?? DEFAULT_WIZARD_QUESTIONS;
 
   const prompt = `Você ajuda a configurar um agente de atendimento via WhatsApp para uma empresa do setor "${setor}".
 
-Sugira um ponto de partida GENÉRICO e típico desse setor (a empresa real vai revisar e ajustar depois):
+Sugira um ponto de partida GENÉRICO e típico desse setor (a empresa real vai revisar e ajustar depois), preenchendo exatamente estes campos da wizard:
 - tom de voz mais comum nesse setor: FORMAL, PROXIMO ou CONSULTIVO
-- 4 a 6 serviços/produtos típicos desse setor (nomes curtos e genéricos, não específicos de uma empresa real)
-- 3 a 5 objeções comuns de clientes desse setor (curtas, como o cliente diria)
-- um horário de atendimento típico (texto curto, ex: "Segunda a sexta, 9h às 18h")
+- de 4 a 6 itens pro campo "${q.servicosLabel}" (nomes curtos e genéricos, não específicos de uma empresa real)
+- de 3 a 5 itens pro campo "${q.objecoesLabel}" (curtos, como o cliente diria)
+- um valor pro campo "Horário de atendimento" (texto curto, ex: "${q.horarioDefault}")
 
 Responda APENAS em JSON, no formato exato:
 {"tom": "FORMAL|PROXIMO|CONSULTIVO", "servicos": ["..."], "objecoes": ["..."], "horario": "..."}`;
