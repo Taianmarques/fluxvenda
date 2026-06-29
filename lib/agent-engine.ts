@@ -25,6 +25,7 @@ export type AgentConfigInput = {
   precos?: string;
   enderecoContato?: string;
   segmento?: string;
+  subsegmento?: string;
   empresa?: string;
 };
 
@@ -49,8 +50,9 @@ function buildFatosEmpresa(config: AgentConfigInput): string {
 
 export async function generateSystemPrompt(config: AgentConfigInput): Promise<string> {
   const fatosEmpresa = buildFatosEmpresa(config);
+  const setor = [config.segmento, config.subsegmento].filter(Boolean).join(" > ");
 
-  const prompt = `Crie um system prompt em português para um agente de IA chamado "${config.nome}" que atende clientes via WhatsApp em nome da empresa "${config.empresa ?? "a empresa"}" (segmento: ${config.segmento ?? "não informado"}).
+  const prompt = `Crie um system prompt em português para um agente de IA chamado "${config.nome}" que atende clientes via WhatsApp em nome da empresa "${config.empresa ?? "a empresa"}" (segmento: ${setor || "não informado"}).
 
 Tom de voz do agente: ${TOM_LABEL[config.tom] ?? config.tom}
 
@@ -65,7 +67,8 @@ O system prompt final deve:
 - instruir a responder objeções comuns com argumentos realistas baseados nos fatos
 - instruir a ser direto e usar mensagens curtas, adequadas ao WhatsApp (poucas frases por resposta)
 - instruir a avisar quando estiver fora do horário de atendimento, se perguntado
-- instruir a NUNCA inventar preços, endereços, prazos ou qualquer informação que não esteja nos fatos acima — se perguntado algo fora disso, admitir que não tem essa informação e oferecer encaminhar para um humano
+- instruir a NUNCA inventar preços, endereços, prazos ou qualquer informação que não esteja nos fatos acima — se perguntado algo fora disso, admitir que não tem essa informação e oferecer encaminhar para um humano${setor ? `
+- incluir uma seção com 2-4 boas práticas de condução de conversa e qualificação TÍPICAS do subsetor "${setor}" (ex: que perguntas fazer, que sinais de interesse buscar, que próximo passo sugerir) — isso é só sobre COMO conduzir a conversa, nunca para inventar fatos, preços ou políticas específicas dessa empresa que não foram informados acima` : ""}
 
 Responda APENAS com o texto final do system prompt, sem comentários adicionais.`;
 

@@ -53,12 +53,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
     || JSON.stringify(existing.servicos) !== JSON.stringify(servicos)
     || JSON.stringify(existing.objecoes) !== JSON.stringify(objecoes);
 
-  // TODO(fase 6): generateSystemPrompt ainda só aceita "segmento" — passa a usar
-  // existing.subsegmento também quando o meta-prompt for ajustado.
   const systemPrompt = personaChanged
     ? await generateSystemPrompt({
         nome, tom, servicos, objecoes, horario, descricaoEmpresa, precos, enderecoContato,
-        segmento: existing.segmento || existing.subsegmento, empresa: team?.name,
+        segmento: existing.segmento, subsegmento: existing.subsegmento, empresa: team?.name,
       })
     : existing.systemPrompt;
 
