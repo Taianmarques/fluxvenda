@@ -24,21 +24,21 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
   const config = await getAgentConfigAsManager(user.id, agentId);
   if (!config) redirect("/ferramentas");
 
-  if (!config.uazapiToken) {
+  if (!config.systemPrompt) {
     return (
       <div className="min-h-screen bg-gray-950 text-white p-6">
         <div className="max-w-3xl mx-auto space-y-6">
           <div>
             <Link href="/ferramentas" className="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1 w-fit"><ArrowLeft size={12} /> Ferramentas</Link>
             <h1 className="text-3xl font-bold mt-2 flex items-center gap-2"><Bot size={28} className="text-blue-400" /> Agente de Atendimento — WhatsApp</h1>
-            <p className="text-gray-400 mt-1">Configure seu agente de IA para atender leads e clientes automaticamente pelo WhatsApp da sua empresa.</p>
+            <p className="text-gray-400 mt-1">Configure seu agente de IA antes de conectar o WhatsApp da sua empresa — a conexão é o último passo.</p>
           </div>
           <WhatsappAgentClient
             agentId={config.id}
             segmento={{ segmento: config.segmento, subsegmento: config.subsegmento }}
             initialConfig={{
               nome: config.nome, tom: config.tom, servicos: config.servicos, objecoes: config.objecoes,
-              horario: config.horario, uazapiInstance: config.uazapiInstance, hasToken: Boolean(config.uazapiToken),
+              horario: config.horario, uazapiInstance: config.uazapiInstance, isConfigured: Boolean(config.systemPrompt),
               descricaoEmpresa: config.descricaoEmpresa, precos: config.precos, enderecoContato: config.enderecoContato,
               followupEnabled: config.followupEnabled, followupDelaysMinutes: config.followupDelaysMinutes as unknown as number[],
             }}
@@ -48,7 +48,9 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
     );
   }
 
-  const instanceStatus = await getInstanceStatus(config.uazapiToken).catch(() => ({ connected: false }));
+  const instanceStatus = config.uazapiToken
+    ? await getInstanceStatus(config.uazapiToken).catch(() => ({ connected: false }))
+    : { connected: false };
 
   if (!instanceStatus.connected) {
     return (
@@ -56,8 +58,8 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
         <div className="max-w-md mx-auto space-y-6">
           <div>
             <Link href="/ferramentas" className="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1 w-fit"><ArrowLeft size={12} /> Ferramentas</Link>
-            <h1 className="text-2xl font-bold mt-2 flex items-center gap-2"><Smartphone size={24} className="text-blue-400" /> Conecte o WhatsApp</h1>
-            <p className="text-gray-400 mt-1">Escaneie o QR code com o WhatsApp do número <span className="text-gray-300">{config.uazapiInstance}</span> para ativar o agente.</p>
+            <h1 className="text-2xl font-bold mt-2 flex items-center gap-2"><Smartphone size={24} className="text-blue-400" /> Último passo: conecte o WhatsApp</h1>
+            <p className="text-gray-400 mt-1">{config.nome} já está configurado. Escaneie o QR code com o WhatsApp do número <span className="text-gray-300">{config.uazapiInstance}</span> para ativar o agente.</p>
           </div>
           <QrConnect agentId={config.id} />
         </div>
@@ -124,7 +126,7 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
             segmento={{ segmento: config.segmento, subsegmento: config.subsegmento }}
             initialConfig={{
               nome: config.nome, tom: config.tom, servicos: config.servicos, objecoes: config.objecoes,
-              horario: config.horario, uazapiInstance: config.uazapiInstance, hasToken: Boolean(config.uazapiToken),
+              horario: config.horario, uazapiInstance: config.uazapiInstance, isConfigured: Boolean(config.systemPrompt),
               descricaoEmpresa: config.descricaoEmpresa, precos: config.precos, enderecoContato: config.enderecoContato,
               followupEnabled: config.followupEnabled, followupDelaysMinutes: config.followupDelaysMinutes as unknown as number[],
             }}

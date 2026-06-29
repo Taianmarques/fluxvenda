@@ -12,7 +12,7 @@ type InitialConfig = {
   objecoes: string[];
   horario: string;
   uazapiInstance: string | null;
-  hasToken: boolean;
+  isConfigured: boolean;
   descricaoEmpresa: string;
   precos: string;
   enderecoContato: string;
@@ -95,7 +95,7 @@ export function WhatsappAgentClient({
   initialConfig: InitialConfig;
 }) {
   const router = useRouter();
-  const isConfigured = Boolean(initialConfig?.hasToken);
+  const isConfigured = Boolean(initialConfig?.isConfigured);
   const q = AGENT_WIZARD_QUESTIONS[segmento?.segmento ?? ""] ?? DEFAULT_WIZARD_QUESTIONS;
 
   const [editing, setEditing] = useState(!isConfigured);
