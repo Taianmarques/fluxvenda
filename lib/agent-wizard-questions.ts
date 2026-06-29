@@ -100,4 +100,15 @@ export const AGENT_WIZARD_QUESTIONS: Record<string, WizardQuestions> = {
     objecoesPlaceholder: "Ex: Taxa muito alta, Não confio, Já tenho em outro banco...",
     horarioDefault: "Segunda a sexta, 9h às 18h",
   },
+  "Automotivo e Veículos": {
+    descricaoEmpresaLabel: "Conte sobre sua loja/oficina",
+    descricaoEmpresaPlaceholder: "Marcas/modelos que trabalha, anos de mercado, diferenciais...",
+    servicosLabel: "Veículos/serviços oferecidos (um por linha)",
+    servicosPlaceholder: "Ex: Carros 0km, Seminovos, Revisão completa, Troca de óleo...",
+    precosLabel: "Preços e condições",
+    precosPlaceholder: "Faixa de preço, financiamento, entrada + parcelas, garantia...",
+    objecoesLabel: "Objeções comuns (uma por linha)",
+    objecoesPlaceholder: "Ex: Achei caro, Quero ver o carro pessoalmente, Não sei se fecho hoje...",
+    horarioDefault: "Segunda a sábado, 8h às 18h",
+  },
 };
