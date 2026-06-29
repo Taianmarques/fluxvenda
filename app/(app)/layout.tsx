@@ -21,19 +21,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const isTeamMember = isGestor || Boolean(await prisma.teamMember.findUnique({ where: { profileId: user.id } }));
 
   const NAV = [
-    { href: "/dashboard",  label: "Dashboard",  icon: "🏠", show: true },
-    { href: "/scanner",    label: "Scanner",    icon: "📊", show: true },
-    { href: "/missoes",    label: "Plano de Ação", icon: "🎯", show: true },
-    { href: "/simulacao",  label: "Simulação",  icon: "🎮", show: true },
-    { href: "/trilhas",    label: "Trilhas",    icon: "📚", show: true },
-    { href: "/objecoes",   label: "Objeções",   icon: "💬", show: true },
-    { href: "/scripts",    label: "Scripts",    icon: "✍️", show: true },
-    { href: "/playbook",   label: "Playbook",   icon: "📖", show: true },
-    { href: "/ranking",    label: "Ranking",    icon: "🏆", show: true },
-    { href: "/gestor",      label: "Equipe",      icon: "👥", show: isGestor },
-    { href: "/crm",         label: "CRM",         icon: "🟢", show: isTeamMember },
-    { href: "/ferramentas", label: "Ferramentas", icon: "🧰", show: isGestor },
-    { href: "/admin",       label: "Super Admin", icon: "🛠️", show: isAdmin },
+    { href: "/dashboard",  label: "Dashboard",  icon: "dashboard" as const, show: true },
+    { href: "/scanner",    label: "Scanner",    icon: "scanner" as const, show: true },
+    { href: "/missoes",    label: "Plano de Ação", icon: "missoes" as const, show: true },
+    { href: "/simulacao",  label: "Simulação",  icon: "simulacao" as const, show: true },
+    { href: "/trilhas",    label: "Trilhas",    icon: "trilhas" as const, show: true },
+    { href: "/objecoes",   label: "Objeções",   icon: "objecoes" as const, show: true },
+    { href: "/scripts",    label: "Scripts",    icon: "scripts" as const, show: true },
+    { href: "/playbook",   label: "Playbook",   icon: "playbook" as const, show: true },
+    { href: "/ranking",    label: "Ranking",    icon: "ranking" as const, show: true },
+    { href: "/gestor",      label: "Equipe",      icon: "equipe" as const, show: isGestor },
+    { href: "/crm",         label: "CRM",         icon: "crm" as const, show: isTeamMember },
+    { href: "/ferramentas", label: "Ferramentas", icon: "ferramentas" as const, show: isGestor },
+    { href: "/admin",       label: "Super Admin", icon: "admin" as const, show: isAdmin },
   ];
 
   return (
