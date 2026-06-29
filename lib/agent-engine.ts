@@ -267,12 +267,13 @@ export const COMMERCE_TOOLS = [
     type: "function" as const,
     function: {
       name: "gerar_cobranca",
-      description: "Gera a cobrança do pedido atual em andamento dessa conversa, depois que o cliente confirmou os itens, escolheu a forma de pagamento (Pix ou cartão) E informou o CPF/CNPJ (exigido pra qualquer cobrança). Se for Pix, retorna o código copia-e-cola pra enviar direto no chat. Se for cartão, retorna um link de checkout seguro pro cliente abrir e digitar os dados do cartão lá — NUNCA peça número de cartão pelo WhatsApp.",
+      description: "Gera a cobrança do pedido atual em andamento dessa conversa, depois que o cliente confirmou os itens, escolheu a forma de pagamento (Pix ou cartão), informou o CPF/CNPJ (exigido pra qualquer cobrança) e — se for cartão e a empresa permitir parcelamento — escolheu em quantas vezes quer pagar. Se for Pix, retorna o código copia-e-cola pra enviar direto no chat. Se for cartão, retorna um link de checkout seguro pro cliente abrir e digitar os dados do cartão lá — NUNCA peça número de cartão pelo WhatsApp.",
       parameters: {
         type: "object",
         properties: {
           formaPagamento: { type: "string", enum: ["PIX", "CARTAO"], description: "Forma de pagamento escolhida pelo cliente" },
           cpfCnpj: { type: "string", description: "CPF ou CNPJ do cliente, só números" },
+          parcelas: { type: "number", description: "Número de parcelas escolhido pelo cliente, só pra pagamento com cartão (1 = à vista). Use o limite informado no contexto." },
         },
         required: ["formaPagamento", "cpfCnpj"],
       },
@@ -303,7 +304,10 @@ export async function runAgentWithTools(
     { role: "user", content: newMessage },
   ];
 
-  for (let round = 0; round < 3; round++) {
+  // 6 rounds (não 3): fluxos de comércio costumam encadear vários tool calls num só turno
+  // (consultar produto, montar pedido, gerar cobrança) e ainda precisam de uma rodada extra
+  // só para compor a resposta final em texto.
+  for (let round = 0; round < 6; round++) {
     const completion = await openai.chat.completions.create({
       model: MODEL,
       max_tokens: 400,

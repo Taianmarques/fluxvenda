@@ -19,6 +19,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ age
     hasAsaasApiKey: Boolean(config.asaasApiKey),
     asaasWebhookToken: config.asaasWebhookToken,
     webhookPath: `/api/webhooks/asaas/${agentId}`,
+    installmentsEnabled: config.installmentsEnabled,
+    maxInstallments: config.maxInstallments,
+    interestFreeInstallments: config.interestFreeInstallments,
+    installmentInterestRate: config.installmentInterestRate,
   });
 }
 
@@ -26,6 +30,10 @@ const schema = z.object({
   commerceEnabled: z.boolean().optional(),
   asaasApiKey: z.string().min(1).optional(),
   asaasSandbox: z.boolean().optional(),
+  installmentsEnabled: z.boolean().optional(),
+  maxInstallments: z.number().int().min(1).max(21).optional(),
+  interestFreeInstallments: z.number().int().min(0).max(21).optional(),
+  installmentInterestRate: z.number().min(0).max(100).optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {
@@ -53,5 +61,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
     hasAsaasApiKey: Boolean(updated.asaasApiKey),
     asaasWebhookToken: updated.asaasWebhookToken,
     webhookPath: `/api/webhooks/asaas/${agentId}`,
+    installmentsEnabled: updated.installmentsEnabled,
+    maxInstallments: updated.maxInstallments,
+    interestFreeInstallments: updated.interestFreeInstallments,
+    installmentInterestRate: updated.installmentInterestRate,
   });
 }

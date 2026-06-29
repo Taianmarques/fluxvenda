@@ -46,6 +46,10 @@ export default async function ComercioPage({ params }: { params: Promise<{ agent
       initialAsaasSandbox={config.asaasSandbox}
       initialHasAsaasApiKey={Boolean(config.asaasApiKey)}
       initialAsaasWebhookToken={config.asaasWebhookToken}
+      initialInstallmentsEnabled={config.installmentsEnabled}
+      initialMaxInstallments={config.maxInstallments}
+      initialInterestFreeInstallments={config.interestFreeInstallments}
+      initialInstallmentInterestRate={config.installmentInterestRate}
       initialProducts={products.map(p => ({ id: p.id, name: p.name, description: p.description, price: p.price, stock: p.stock, active: p.active }))}
       initialOrders={orders.map(o => ({
         id: o.id,

@@ -41,7 +41,23 @@ Você também pode receber, no meio da conversa, um lembrete automático pergunt
 - Se ele disser que não pode ir ou quer cancelar, use cancelar_agendamento e, na mesma resposta, já ofereça reagendar — pergunte o novo dia/período de preferência (ou, se ele já tiver dito, use consultar_horarios_disponiveis e siga o fluxo normal de agendamento).`;
 }
 
-async function buildCommerceContext(agentConfigId: string): Promise<string> {
+function buildInstallmentNote(config: {
+  installmentsEnabled: boolean; maxInstallments: number; interestFreeInstallments: number; installmentInterestRate: number;
+}): string {
+  if (!config.installmentsEnabled || config.maxInstallments <= 1) {
+    return "Pagamento com cartão é sempre à vista (parcelamento não disponível) — não ofereça parcelas.";
+  }
+  const semJuros = Math.min(config.interestFreeInstallments, config.maxInstallments);
+  const temJuros = config.installmentInterestRate > 0 && semJuros < config.maxInstallments;
+  return `Cartão pode ser parcelado em até ${config.maxInstallments}x. Pergunte em quantas vezes o cliente quer pagar e passe esse número em "parcelas".`
+    + (temJuros
+      ? ` Até ${semJuros}x não tem acréscimo; a partir de ${semJuros + 1}x tem acréscimo de ${config.installmentInterestRate}% por parcela — avise o cliente disso antes de gerar a cobrança.`
+      : ` Sem acréscimo em nenhuma quantidade de parcelas até o limite.`);
+}
+
+async function buildCommerceContext(agentConfigId: string, config: {
+  installmentsEnabled: boolean; maxInstallments: number; interestFreeInstallments: number; installmentInterestRate: number;
+}): Promise<string> {
   const products = await prisma.product.findMany({ where: { agentConfigId, active: true }, select: { name: true, price: true } });
   const catalogo = products.length > 0
     ? products.map(p => `- ${p.name}: R$ ${p.price.toFixed(2)}`).join("\n")
@@ -56,8 +72,10 @@ Quando o cliente quiser comprar algo:
 - Use montar_pedido sempre que o cliente definir ou mudar os itens — passe a lista COMPLETA de itens desejados (substitui o pedido anterior, não é incremental).
 - Confirme com o cliente os itens e o total antes de gerar a cobrança.
 - Pergunte a forma de pagamento (Pix ou cartão) e peça o CPF/CNPJ do cliente (exigido pra qualquer cobrança), se ele ainda não tiver informado.
-- Use gerar_cobranca só depois que o cliente confirmar o pedido, a forma de pagamento E o CPF/CNPJ. Se for Pix, explique que ele pode pagar com o código copia-e-cola retornado. Se for cartão, mande o link de checkout retornado e explique que ele deve abrir o link pra digitar os dados do cartão — NUNCA peça número de cartão direto no WhatsApp.
-- Se o cliente perguntar sobre um pedido já feito, use consultar_status_pedido.`;
+- Se for cartão: ${buildInstallmentNote(config)}
+- Use gerar_cobranca só depois que o cliente confirmar o pedido, a forma de pagamento, o CPF/CNPJ e (se cartão) as parcelas. Se for Pix, explique que ele pode pagar com o código copia-e-cola retornado. Se for cartão, mande o link de checkout retornado e explique que ele deve abrir o link pra digitar os dados do cartão — NUNCA peça número de cartão direto no WhatsApp.
+- Se o cliente perguntar sobre um pedido já feito, use consultar_status_pedido.
+- IMPORTANTE: quando o cliente já confirmou tudo que falta (itens, forma de pagamento, CPF/CNPJ e parcelas se for cartão), chame a ferramenta JÁ NESSA MESMA RESPOSTA — nunca diga "vou gerar" ou "um momento" sem ter chamado a ferramenta antes de responder. Você só tem essa resposta pra agir, não existe uma próxima rodada automática.`;
 }
 
 function makeExecuteTool(agentConfigId: string, conversationId: string, contactName: string | undefined, contactNumber: string) {
@@ -215,6 +233,16 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       const order = await prisma.order.findFirst({ where: { agentConfigId, conversationId, status: "ABERTO" }, include: { items: true } });
       if (!order || order.items.length === 0) return "Ainda não há nenhum pedido montado pra gerar a cobrança. Monte o pedido primeiro.";
 
+      // Parcelamento só se aplica a cartão, e só dentro do limite configurado pra esse agente
+      let parcelas = 1;
+      let totalComJuros = order.total;
+      if (formaPagamento === "CARTAO" && config.installmentsEnabled && config.maxInstallments > 1) {
+        const pedido = Math.round(Number(args?.parcelas) || 1);
+        parcelas = Math.min(Math.max(1, pedido), config.maxInstallments);
+        const parcelasComJuros = Math.max(0, parcelas - config.interestFreeInstallments);
+        totalComJuros = order.total * (1 + (config.installmentInterestRate / 100) * parcelasComJuros);
+      }
+
       try {
         const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
         let asaasCustomerId = conversation?.asaasCustomerId ?? null;
@@ -225,14 +253,17 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
         }
 
         const billingType = formaPagamento === "CARTAO" ? "CREDIT_CARD" : "PIX";
-        const payment = await createAsaasCharge(config.asaasApiKey, config.asaasSandbox, asaasCustomerId, order.total, `Pedido ${order.id.slice(-6)}`, billingType);
+        const payment = await createAsaasCharge(
+          config.asaasApiKey, config.asaasSandbox, asaasCustomerId, totalComJuros, `Pedido ${order.id.slice(-6)}`, billingType, parcelas
+        );
 
         if (formaPagamento === "CARTAO") {
           await prisma.order.update({
             where: { id: order.id },
-            data: { status: "AGUARDANDO_PAGAMENTO", asaasPaymentId: payment.id, asaasInvoiceUrl: payment.invoiceUrl },
+            data: { status: "AGUARDANDO_PAGAMENTO", total: totalComJuros, asaasPaymentId: payment.id, asaasInvoiceUrl: payment.invoiceUrl, asaasInstallmentId: payment.installment ?? null },
           });
-          return `Cobrança gerada, total R$ ${order.total.toFixed(2)}. Link seguro pra pagar com cartão:\n${payment.invoiceUrl}`;
+          const parcelaInfo = parcelas > 1 ? ` em ${parcelas}x de R$ ${(totalComJuros / parcelas).toFixed(2)}` : "";
+          return `Cobrança gerada, total R$ ${totalComJuros.toFixed(2)}${parcelaInfo}. Link seguro pra pagar com cartão:\n${payment.invoiceUrl}`;
         }
 
         const qr = await getAsaasPixQrCode(config.asaasApiKey, config.asaasSandbox, payment.id);
@@ -362,7 +393,7 @@ export async function POST(req: NextRequest) {
     reply = await runAgentWithImage(config.systemPrompt, historyForAgent, imageUrl, caption);
   } else if (tools.length > 0) {
     const extraContext = (config.schedulingEnabled ? await buildSchedulingContext(config.id) : "")
-      + (config.commerceEnabled ? await buildCommerceContext(config.id) : "");
+      + (config.commerceEnabled ? await buildCommerceContext(config.id, config) : "");
     reply = await runAgentWithTools(
       config.systemPrompt + extraContext,
       historyForAgent,

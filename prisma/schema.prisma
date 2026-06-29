@@ -568,11 +568,18 @@ model AgentConfig {
   // Quando ativo, mensagens manuais de atendentes saem no WhatsApp assinadas com o nome de quem mandou
   signatureEnabled Boolean @default(false)
 
-  // Catálogo/pedidos via WhatsApp com pagamento Pix (Asaas) — cada equipe usa a própria conta
+  // Catálogo/pedidos via WhatsApp com pagamento Pix/cartão (Asaas) — cada equipe usa a própria conta
   commerceEnabled  Boolean @default(false)
   asaasApiKey      String? // colada pelo gestor, nunca exibida de volta na UI
   asaasSandbox     Boolean @default(true)
   asaasWebhookToken String? // gerado ao ativar; valida o webhook de confirmação de pagamento
+
+  // Parcelamento no cartão — o acréscimo de juros é calculado por nós (não pela conta Asaas)
+  // e embutido no valor total enviado, pra não depender de configuração externa
+  installmentsEnabled     Boolean @default(false)
+  maxInstallments         Int     @default(1)
+  interestFreeInstallments Int    @default(1) // até quantas parcelas não tem acréscimo
+  installmentInterestRate Float   @default(0) // % de acréscimo por parcela além das sem juros
 
   conversations Conversation[]
   pipelines      Pipeline[]
@@ -671,6 +678,7 @@ model Order {
   asaasPaymentId  String?
   asaasPixPayload String? // código Pix copia-e-cola
   asaasInvoiceUrl String? // link de checkout hospedado (usado pra pagamento por cartão)
+  asaasInstallmentId String? // id do plano de parcelas no Asaas, quando a cobrança é parcelada
   paidAt          DateTime?
 
   items OrderItem[]

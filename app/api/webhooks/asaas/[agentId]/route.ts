@@ -16,10 +16,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
   const body = await req.json().catch(() => null);
   const event = body?.event as string | undefined;
   const paymentId = body?.payment?.id as string | undefined;
+  const installmentId = body?.payment?.installment as string | undefined;
   if (!paymentId) return NextResponse.json({ ok: true });
 
   if (event === "PAYMENT_RECEIVED" || event === "PAYMENT_CONFIRMED") {
-    const order = await prisma.order.findFirst({ where: { agentConfigId: agentId, asaasPaymentId: paymentId } });
+    // Pra cobrança parcelada, cada parcela paga gera um payment.id diferente do que guardamos
+    // (o da 1ª parcela) — por isso também casamos pelo id do plano de parcelas (installment).
+    // Simplificação: marca o pedido como PAGO já na 1ª parcela confirmada, sem rastrear parcela a parcela.
+    const order = await prisma.order.findFirst({
+      where: { agentConfigId: agentId, OR: [{ asaasPaymentId: paymentId }, ...(installmentId ? [{ asaasInstallmentId: installmentId }] : [])] },
+    });
     if (order && order.status !== "PAGO") {
       await prisma.order.update({ where: { id: order.id }, data: { status: "PAGO", paidAt: new Date() } });
       if (config.uazapiToken) {

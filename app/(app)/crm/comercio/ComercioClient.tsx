@@ -22,13 +22,19 @@ function formatBRL(value: number): string {
 }
 
 export function ComercioClient({
-  agentId, initialCommerceEnabled, initialAsaasSandbox, initialHasAsaasApiKey, initialAsaasWebhookToken, initialProducts, initialOrders,
+  agentId, initialCommerceEnabled, initialAsaasSandbox, initialHasAsaasApiKey, initialAsaasWebhookToken,
+  initialInstallmentsEnabled, initialMaxInstallments, initialInterestFreeInstallments, initialInstallmentInterestRate,
+  initialProducts, initialOrders,
 }: {
   agentId: string;
   initialCommerceEnabled: boolean;
   initialAsaasSandbox: boolean;
   initialHasAsaasApiKey: boolean;
   initialAsaasWebhookToken: string | null;
+  initialInstallmentsEnabled: boolean;
+  initialMaxInstallments: number;
+  initialInterestFreeInstallments: number;
+  initialInstallmentInterestRate: number;
   initialProducts: Product[];
   initialOrders: Order[];
 }) {
@@ -38,6 +44,10 @@ export function ComercioClient({
   const [hasAsaasApiKey, setHasAsaasApiKey] = useState(initialHasAsaasApiKey);
   const [asaasWebhookToken, setAsaasWebhookToken] = useState(initialAsaasWebhookToken);
   const [asaasApiKeyInput, setAsaasApiKeyInput] = useState("");
+  const [installmentsEnabled, setInstallmentsEnabled] = useState(initialInstallmentsEnabled);
+  const [maxInstallments, setMaxInstallments] = useState(initialMaxInstallments);
+  const [interestFreeInstallments, setInterestFreeInstallments] = useState(initialInterestFreeInstallments);
+  const [installmentInterestRate, setInstallmentInterestRate] = useState(initialInstallmentInterestRate);
   const [savingSettings, setSavingSettings] = useState(false);
 
   const [products, setProducts] = useState<Product[]>(initialProducts);
@@ -62,6 +72,7 @@ export function ComercioClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           commerceEnabled, asaasSandbox,
+          installmentsEnabled, maxInstallments, interestFreeInstallments, installmentInterestRate,
           ...(asaasApiKeyInput.trim() ? { asaasApiKey: asaasApiKeyInput.trim() } : {}),
         }),
       });
@@ -161,6 +172,43 @@ export function ComercioClient({
                 className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
               />
               <p className="text-xs text-gray-500 mt-1">Gerada no painel do Asaas em Configurações → Integrações → API. Nunca é exibida de volta aqui.</p>
+            </div>
+
+            <div className="border-t border-gray-800 pt-4 space-y-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={installmentsEnabled} onChange={e => setInstallmentsEnabled(e.target.checked)} className="w-4 h-4" />
+                <span className="text-sm font-medium">Permitir parcelamento no cartão</span>
+              </label>
+
+              {installmentsEnabled && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Máximo de parcelas</label>
+                    <input
+                      type="number" min={1} max={21} value={maxInstallments}
+                      onChange={e => setMaxInstallments(Math.min(21, Math.max(1, Number(e.target.value))))}
+                      className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Parcelas sem juros</label>
+                    <input
+                      type="number" min={0} max={maxInstallments} value={interestFreeInstallments}
+                      onChange={e => setInterestFreeInstallments(Math.min(maxInstallments, Math.max(0, Number(e.target.value))))}
+                      className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-xs text-gray-400 block mb-1">Juros por parcela adicional, a partir da parcela {interestFreeInstallments + 1} (%)</label>
+                    <input
+                      type="number" min={0} max={100} step={0.1} value={installmentInterestRate}
+                      onChange={e => setInstallmentInterestRate(Math.min(100, Math.max(0, Number(e.target.value))))}
+                      className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">O acréscimo é calculado por nós e embutido no valor cobrado — não depende de configuração da sua conta Asaas.</p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {asaasWebhookToken && (
