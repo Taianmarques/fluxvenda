@@ -13,9 +13,9 @@ export default async function FerramentasPage() {
 
   const team = await prisma.team.findUnique({
     where: { managerId: user.id },
-    include: { agentConfigs: true },
+    include: { agentConfigs: { orderBy: { createdAt: "asc" } } },
   });
-  // TODO(fase 2/5): listar todos os agentes da equipe; por ora mantém o comportamento singleton
+  // TODO(fase 5): listar todos os agentes da equipe + "+ Novo agente"; por ora mostra o mais antigo
   const agentConfig = team?.agentConfigs?.[0];
 
   const whatsappConfigured = Boolean(agentConfig?.active);
