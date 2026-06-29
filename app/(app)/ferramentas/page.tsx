@@ -27,34 +27,39 @@ export default async function FerramentasPage() {
           <p className="text-gray-400 mt-1">Cada agente tem seu próprio número de WhatsApp e seu próprio CRM. Crie um agente para cada setor ou frente de atendimento da sua empresa.</p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-4">
-          {agentConfigs.map(agent => {
-            const status = agent.active ? "Ativo" : agent.uazapiToken ? "Pausado" : "Não conectado";
-            const statusColor = agent.active
-              ? "bg-green-900/40 text-green-300 border-green-800/50"
-              : "bg-gray-800 text-gray-400 border-gray-700";
-            return (
-              <Link
-                key={agent.id}
-                href={`/ferramentas/whatsapp/${agent.id}`}
-                className="bg-gray-900 border border-gray-800 rounded-2xl p-6 hover:border-blue-700 transition-colors flex flex-col gap-3"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <span className="p-2.5 rounded-xl bg-blue-500/10 text-blue-400">
-                    <Bot size={22} />
-                  </span>
-                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${statusColor}`}>{status}</span>
-                </div>
-                <p className="font-semibold text-lg">{agent.nome}</p>
-                {agent.segmento && (
-                  <p className="text-sm text-gray-400">{agent.segmento}{agent.subsegmento && ` · ${agent.subsegmento}`}</p>
-                )}
-              </Link>
-            );
-          })}
+        {agentConfigs.length > 0 && (
+          <div className="space-y-3">
+            <p className="text-sm font-semibold text-gray-300">Seus agentes</p>
+            <div className="grid md:grid-cols-2 gap-4">
+              {agentConfigs.map(agent => {
+                const status = agent.active ? "Ativo" : agent.uazapiToken ? "Pausado" : "Não conectado";
+                const statusColor = agent.active
+                  ? "bg-green-900/40 text-green-300 border-green-800/50"
+                  : "bg-gray-800 text-gray-400 border-gray-700";
+                return (
+                  <Link
+                    key={agent.id}
+                    href={`/ferramentas/whatsapp/${agent.id}`}
+                    className="bg-gray-900 border border-gray-800 rounded-2xl p-6 hover:border-blue-700 transition-colors flex flex-col gap-3"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="p-2.5 rounded-xl bg-blue-500/10 text-blue-400">
+                        <Bot size={22} />
+                      </span>
+                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${statusColor}`}>{status}</span>
+                    </div>
+                    <p className="font-semibold text-lg">{agent.nome}</p>
+                    {agent.segmento && (
+                      <p className="text-sm text-gray-400">{agent.segmento}{agent.subsegmento && ` · ${agent.subsegmento}`}</p>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
-          <NovoAgenteCard />
-        </div>
+        <NovoAgenteCard />
       </div>
     </div>
   );
