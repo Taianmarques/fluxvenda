@@ -81,6 +81,52 @@ Responda APENAS com o texto final do system prompt, sem comentários adicionais.
   return completion.choices[0]?.message?.content?.trim() ?? "";
 }
 
+const AGENT_TEMPLATE_TOM = ["FORMAL", "PROXIMO", "CONSULTIVO"] as const;
+
+export type AgentTemplateSuggestion = {
+  tom: "FORMAL" | "PROXIMO" | "CONSULTIVO";
+  servicos: string[];
+  objecoes: string[];
+  horario: string;
+};
+
+// Sugere um ponto de partida (tom, serviços/produtos típicos, objeções comuns, horário
+// usual) pra um agente novo com base só no setor — nunca inventa fatos específicos da
+// empresa real (preço, endereço, nome de serviço exato): isso o usuário ainda revisa/edita
+// antes de salvar.
+export async function generateAgentTemplate(segmento: string, subsegmento: string): Promise<AgentTemplateSuggestion> {
+  const setor = [segmento, subsegmento].filter(Boolean).join(" > ");
+
+  const prompt = `Você ajuda a configurar um agente de atendimento via WhatsApp para uma empresa do setor "${setor}".
+
+Sugira um ponto de partida GENÉRICO e típico desse setor (a empresa real vai revisar e ajustar depois):
+- tom de voz mais comum nesse setor: FORMAL, PROXIMO ou CONSULTIVO
+- 4 a 6 serviços/produtos típicos desse setor (nomes curtos e genéricos, não específicos de uma empresa real)
+- 3 a 5 objeções comuns de clientes desse setor (curtas, como o cliente diria)
+- um horário de atendimento típico (texto curto, ex: "Segunda a sexta, 9h às 18h")
+
+Responda APENAS em JSON, no formato exato:
+{"tom": "FORMAL|PROXIMO|CONSULTIVO", "servicos": ["..."], "objecoes": ["..."], "horario": "..."}`;
+
+  const completion = await openai.chat.completions.create({
+    model: MODEL,
+    max_tokens: 500,
+    response_format: { type: "json_object" },
+    messages: [{ role: "user", content: prompt }],
+  });
+
+  const raw = completion.choices[0]?.message?.content?.trim() ?? "{}";
+  let parsed: any = {};
+  try { parsed = JSON.parse(raw); } catch {}
+
+  return {
+    tom: AGENT_TEMPLATE_TOM.includes(parsed.tom) ? parsed.tom : "CONSULTIVO",
+    servicos: Array.isArray(parsed.servicos) ? parsed.servicos.filter((s: unknown) => typeof s === "string") : [],
+    objecoes: Array.isArray(parsed.objecoes) ? parsed.objecoes.filter((s: unknown) => typeof s === "string") : [],
+    horario: typeof parsed.horario === "string" ? parsed.horario : "",
+  };
+}
+
 export async function runAgent(
   systemPrompt: string,
   history: { role: "user" | "assistant"; content: string }[],

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, FlaskConical } from "lucide-react";
+import { ArrowLeft, FlaskConical, Sparkles } from "lucide-react";
 
 type InitialConfig = {
   nome: string;
@@ -86,7 +86,13 @@ type ChatMsg = { role: "user" | "assistant"; content: string };
 
 const TOTAL_STEPS = 4;
 
-export function WhatsappAgentClient({ agentId, initialConfig }: { agentId: string; initialConfig: InitialConfig }) {
+export function WhatsappAgentClient({
+  agentId, segmento, initialConfig,
+}: {
+  agentId: string;
+  segmento?: { segmento: string; subsegmento: string };
+  initialConfig: InitialConfig;
+}) {
   const router = useRouter();
   const isConfigured = Boolean(initialConfig?.hasToken);
 
@@ -94,6 +100,7 @@ export function WhatsappAgentClient({ agentId, initialConfig }: { agentId: strin
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [suggesting, setSuggesting] = useState(false);
 
   const [nome, setNome] = useState(initialConfig?.nome ?? "Sofia");
   const [tom, setTom] = useState(initialConfig?.tom ?? "CONSULTIVO");
@@ -162,6 +169,24 @@ export function WhatsappAgentClient({ agentId, initialConfig }: { agentId: strin
 
   function splitLines(v: string) {
     return v.split("\n").map(s => s.trim()).filter(Boolean);
+  }
+
+  async function handleSuggest() {
+    setSuggesting(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/agentes/${agentId}/sugestao`, { method: "POST" });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setTom(data.tom);
+      setServicos(data.servicos.join("\n"));
+      setObjecoes(data.objecoes.join("\n"));
+      setHorario(data.horario);
+    } catch {
+      setError("Não foi possível gerar sugestões agora. Tente novamente.");
+    } finally {
+      setSuggesting(false);
+    }
   }
 
   async function handleSubmit() {
@@ -308,7 +333,24 @@ export function WhatsappAgentClient({ agentId, initialConfig }: { agentId: strin
 
       {step === 1 && (
         <div className="space-y-4">
-          <p className="font-semibold">1. Personalidade do agente</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="font-semibold">1. Personalidade do agente</p>
+            {segmento?.segmento && (
+              <button
+                onClick={handleSuggest}
+                disabled={suggesting}
+                className="text-xs font-medium text-blue-400 hover:text-blue-300 disabled:opacity-50 flex items-center gap-1.5 flex-shrink-0"
+              >
+                <Sparkles size={13} /> {suggesting ? "Gerando sugestões..." : "Sugerir com IA"}
+              </button>
+            )}
+          </div>
+          {segmento?.segmento && (
+            <p className="text-xs text-gray-500">
+              Preenche tom, serviços, objeções e horário com um ponto de partida típico de {segmento.segmento}
+              {segmento.subsegmento && ` > ${segmento.subsegmento}`} — revise tudo antes de salvar.
+            </p>
+          )}
           <div>
             <label className="text-sm text-gray-400 block mb-1">Nome do agente</label>
             <input value={nome} onChange={e => setNome(e.target.value)} className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-600" />

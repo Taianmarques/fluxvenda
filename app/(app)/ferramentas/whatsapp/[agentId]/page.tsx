@@ -35,6 +35,7 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
           </div>
           <WhatsappAgentClient
             agentId={config.id}
+            segmento={{ segmento: config.segmento, subsegmento: config.subsegmento }}
             initialConfig={{
               nome: config.nome, tom: config.tom, servicos: config.servicos, objecoes: config.objecoes,
               horario: config.horario, uazapiInstance: config.uazapiInstance, hasToken: Boolean(config.uazapiToken),
@@ -120,6 +121,7 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
           <h2 className="text-xl font-bold mb-4">Configurações do agente</h2>
           <WhatsappAgentClient
             agentId={config.id}
+            segmento={{ segmento: config.segmento, subsegmento: config.subsegmento }}
             initialConfig={{
               nome: config.nome, tom: config.tom, servicos: config.servicos, objecoes: config.objecoes,
               horario: config.horario, uazapiInstance: config.uazapiInstance, hasToken: Boolean(config.uazapiToken),
