@@ -42,25 +42,3 @@ export async function userBelongsToAgentConfig(userId: string, agentConfigId: st
   const result = await getAgentConfigWithRole(userId, agentConfigId);
   return result !== null;
 }
-
-// --- Compatibilidade temporária (fase 1) ---
-// As funções abaixo existem só pra não quebrar as ~30 rotas/páginas que ainda assumem "o"
-// agente único da equipe. Devolvem o primeiro agente (criado há mais tempo) como fallback.
-// Removidas nas fases 3/4, quando cada rota/página passa a receber o agentConfigId explícito.
-
-export async function getOwnAgentConfigWithRole(userId: string) {
-  const result = await listMyAgentConfigs(userId);
-  if (!result || result.configs.length === 0) return null;
-  return { config: result.configs[0], isManager: result.isManager };
-}
-
-export async function getOwnAgentConfig(userId: string) {
-  const result = await getOwnAgentConfigWithRole(userId);
-  return result?.config ?? null;
-}
-
-export async function getOwnAgentConfigAsManager(userId: string) {
-  const result = await listMyAgentConfigs(userId);
-  if (!result || !result.isManager || result.configs.length === 0) return null;
-  return result.configs[0];
-}
