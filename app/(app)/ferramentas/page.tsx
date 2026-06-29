@@ -23,7 +23,7 @@ export default async function FerramentasPage() {
 
   const TOOLS = [
     {
-      href: "/ferramentas/whatsapp",
+      href: agentConfig ? `/ferramentas/whatsapp/${agentConfig.id}` : "/ferramentas",
       icon: Bot,
       title: "Agente de Atendimento — WhatsApp",
       description: "Conecte o WhatsApp da sua empresa a um agente de IA treinado para qualificar leads e responder objeções automaticamente.",
@@ -31,7 +31,7 @@ export default async function FerramentasPage() {
       statusColor: whatsappConfigured ? "bg-green-900/40 text-green-300 border-green-800/50" : "bg-gray-800 text-gray-400 border-gray-700",
     },
     {
-      href: "/crm/agenda",
+      href: agentConfig ? `/crm/${agentConfig.id}/agenda` : "/ferramentas",
       icon: Calendar,
       title: "Agendamento via WhatsApp",
       description: "O agente de IA consulta sua disponibilidade real e marca compromissos direto na conversa, sem precisar de confirmação manual.",

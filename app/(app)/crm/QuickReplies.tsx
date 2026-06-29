@@ -5,8 +5,9 @@ import { useEffect, useRef, useState } from "react";
 export type QuickReply = { id: string; title: string; content: string };
 
 export function QuickReplies({
-  quickReplies, onSelect, onChange, onClose, dark,
+  agentId, quickReplies, onSelect, onChange, onClose, dark,
 }: {
+  agentId: string;
   quickReplies: QuickReply[];
   onSelect: (content: string) => void;
   onChange: () => void;
@@ -31,7 +32,7 @@ export function QuickReplies({
     if (!title.trim() || !content.trim()) return;
     setSaving(true);
     try {
-      await fetch("/api/ferramentas/whatsapp/respostas-rapidas", {
+      await fetch(`/api/agentes/${agentId}/respostas-rapidas`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: title.trim(), content: content.trim() }),

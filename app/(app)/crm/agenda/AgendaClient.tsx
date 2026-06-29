@@ -139,8 +139,9 @@ function fmtDate(d: Date): string {
 }
 
 export function AgendaClient({
-  initialSchedulingEnabled, initialSlotDurationMinutes, initialAvailability, initialAppointmentReminderHours,
+  agentId, initialSchedulingEnabled, initialSlotDurationMinutes, initialAvailability, initialAppointmentReminderHours,
 }: {
+  agentId: string;
   initialSchedulingEnabled: boolean;
   initialSlotDurationMinutes: number;
   initialAvailability: AvailabilityRule[];
@@ -179,7 +180,7 @@ export function AgendaClient({
     try {
       const from = fmtDate(weekStart);
       const to = fmtDate(new Date(weekStart.getTime() + 7 * 86400000));
-      const res = await fetch(`/api/ferramentas/whatsapp/agendamentos?from=${from}&to=${to}`);
+      const res = await fetch(`/api/agentes/${agentId}/agendamentos?from=${from}&to=${to}`);
       const data = await res.json();
       setAppointments(data.appointments ?? []);
     } finally {
@@ -188,13 +189,13 @@ export function AgendaClient({
   }
 
   async function loadProfessionals() {
-    const res = await fetch("/api/ferramentas/whatsapp/profissionais");
+    const res = await fetch(`/api/agentes/${agentId}/profissionais`);
     const data = await res.json();
     setProfessionals(data.professionals ?? []);
   }
 
   async function loadServices() {
-    const res = await fetch("/api/ferramentas/whatsapp/servicos");
+    const res = await fetch(`/api/agentes/${agentId}/servicos`);
     const data = await res.json();
     setServices(data.services ?? []);
   }
@@ -204,7 +205,7 @@ export function AgendaClient({
 
   async function handleAddProfessional() {
     if (!newProfessionalName.trim()) return;
-    await fetch("/api/ferramentas/whatsapp/profissionais", {
+    await fetch(`/api/agentes/${agentId}/profissionais`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: newProfessionalName.trim() }),
@@ -215,7 +216,7 @@ export function AgendaClient({
 
   async function handleAddService() {
     if (!newServiceName.trim()) return;
-    await fetch("/api/ferramentas/whatsapp/servicos", {
+    await fetch(`/api/agentes/${agentId}/servicos`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: newServiceName.trim(), durationMinutes: newServiceDuration }),
@@ -244,7 +245,7 @@ export function AgendaClient({
     try {
       const availability = rulesToAvailability(rules);
 
-      await fetch("/api/ferramentas/whatsapp/agenda", {
+      await fetch(`/api/agentes/${agentId}/agenda`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ schedulingEnabled, slotDurationMinutes, availability, appointmentReminderHours }),
@@ -270,7 +271,7 @@ export function AgendaClient({
       setNewError("Data, horário e número do contato são obrigatórios.");
       return;
     }
-    const res = await fetch("/api/ferramentas/whatsapp/agendamentos", {
+    const res = await fetch(`/api/agentes/${agentId}/agendamentos`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

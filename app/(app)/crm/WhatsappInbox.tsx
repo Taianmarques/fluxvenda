@@ -144,8 +144,9 @@ function MediaContent({ mediaUrl, mediaType, content }: { mediaUrl: string; medi
 }
 
 export function WhatsappInbox({
-  agentName, initialConversations, initialLeadStatuses, initialSelectedId, currentUserId, isManager, initialSignatureEnabled,
+  agentId, agentName, initialConversations, initialLeadStatuses, initialSelectedId, currentUserId, isManager, initialSignatureEnabled,
 }: {
+  agentId: string;
   agentName: string;
   initialConversations: ConversationSummary[];
   initialLeadStatuses: LeadStatus[];
@@ -193,7 +194,7 @@ export function WhatsappInbox({
   }, []);
 
   useEffect(() => {
-    fetch("/api/ferramentas/whatsapp/atendentes")
+    fetch(`/api/agentes/${agentId}/atendentes`)
       .then(res => res.json())
       .then(data => { if (data.attendants) setAttendants(data.attendants); })
       .catch(() => {});
@@ -208,7 +209,7 @@ export function WhatsappInbox({
 
   async function refreshList() {
     try {
-      const res = await fetch("/api/ferramentas/whatsapp/conversas");
+      const res = await fetch(`/api/agentes/${agentId}/conversas`);
       const data = await res.json();
       if (data.conversations) {
         setConversations(data.conversations.map((c: any) => ({
@@ -226,7 +227,7 @@ export function WhatsappInbox({
 
   async function refreshLeadStatuses() {
     try {
-      const res = await fetch("/api/ferramentas/whatsapp/status");
+      const res = await fetch(`/api/agentes/${agentId}/status`);
       const data = await res.json();
       if (data.statuses) setLeadStatuses(data.statuses);
     } catch {}
@@ -234,7 +235,7 @@ export function WhatsappInbox({
 
   async function refreshQuickReplies() {
     try {
-      const res = await fetch("/api/ferramentas/whatsapp/respostas-rapidas");
+      const res = await fetch(`/api/agentes/${agentId}/respostas-rapidas`);
       const data = await res.json();
       if (data.quickReplies) setQuickReplies(data.quickReplies);
     } catch {}
@@ -481,7 +482,7 @@ export function WhatsappInbox({
     const next = !signatureEnabled;
     setSignatureSaving(true);
     try {
-      await fetch("/api/ferramentas/whatsapp/assinatura", {
+      await fetch(`/api/agentes/${agentId}/assinatura`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ signatureEnabled: next }),
@@ -632,6 +633,7 @@ export function WhatsappInbox({
                     <div className="flex items-center justify-between mt-1.5">
                       <p className={`text-[10px] ${t.listTertiary}`}>{timeAgo(c.updatedAt)}</p>
                       <LeadStatusBadge
+                        agentId={agentId}
                         leadStatusId={c.leadStatusId}
                         statuses={leadStatuses}
                         onChange={id => handleLeadStatusChange(c.id, id)}
@@ -829,6 +831,7 @@ export function WhatsappInbox({
                       )}
                       {showQuickReplies && (
                         <QuickReplies
+                          agentId={agentId}
                           quickReplies={quickReplies}
                           onSelect={handleSelectQuickReply}
                           onChange={refreshQuickReplies}

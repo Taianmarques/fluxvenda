@@ -16,7 +16,7 @@ function toImageSrc(qrcode: string): string {
   return qrcode.startsWith("data:") ? qrcode : `data:image/png;base64,${qrcode}`;
 }
 
-export function QrConnect() {
+export function QrConnect({ agentId }: { agentId: string }) {
   const router = useRouter();
   const [status, setStatus] = useState<Status | null>(null);
   const [error, setError] = useState("");
@@ -25,7 +25,7 @@ export function QrConnect() {
   async function startConnect() {
     setError("");
     try {
-      const res = await fetch("/api/ferramentas/whatsapp/conectar", { method: "POST" });
+      const res = await fetch(`/api/agentes/${agentId}/conectar`, { method: "POST" });
       if (!res.ok) throw new Error();
       const data: Status = await res.json();
       setStatus(data);
@@ -36,7 +36,7 @@ export function QrConnect() {
 
   async function poll() {
     try {
-      const res = await fetch("/api/ferramentas/whatsapp/conectar");
+      const res = await fetch(`/api/agentes/${agentId}/conectar`);
       if (!res.ok) return;
       const data: Status = await res.json();
       setStatus(data);

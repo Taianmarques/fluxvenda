@@ -86,7 +86,7 @@ type ChatMsg = { role: "user" | "assistant"; content: string };
 
 const TOTAL_STEPS = 4;
 
-export function WhatsappAgentClient({ initialConfig }: { initialConfig: InitialConfig }) {
+export function WhatsappAgentClient({ agentId, initialConfig }: { agentId: string; initialConfig: InitialConfig }) {
   const router = useRouter();
   const isConfigured = Boolean(initialConfig?.hasToken);
 
@@ -132,8 +132,8 @@ export function WhatsappAgentClient({ initialConfig }: { initialConfig: InitialC
     setSavingQuickFollowup(true);
     setError("");
     try {
-      const res = await fetch("/api/ferramentas/whatsapp", {
-        method: "POST",
+      const res = await fetch(`/api/agentes/${agentId}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nome, tom,
@@ -168,8 +168,8 @@ export function WhatsappAgentClient({ initialConfig }: { initialConfig: InitialC
     setSaving(true);
     setError("");
     try {
-      const res = await fetch("/api/ferramentas/whatsapp", {
-        method: "POST",
+      const res = await fetch(`/api/agentes/${agentId}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nome, tom,
@@ -200,7 +200,7 @@ export function WhatsappAgentClient({ initialConfig }: { initialConfig: InitialC
     setChatInput("");
     setChatLoading(true);
     try {
-      const res = await fetch("/api/ferramentas/whatsapp/testar", {
+      const res = await fetch(`/api/agentes/${agentId}/testar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message, history: chat }),

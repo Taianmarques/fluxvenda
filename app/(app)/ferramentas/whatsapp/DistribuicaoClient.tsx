@@ -10,7 +10,7 @@ const MODES = [
   { value: "IA_QUALIFICACAO", label: "IA qualifica antes de atribuir", description: "A IA analisa a conversa e só atribui (em rodízio) quando o cliente demonstrar interesse real de compra." },
 ];
 
-export function DistribuicaoClient({ initialMode }: { initialMode: string }) {
+export function DistribuicaoClient({ agentId, initialMode }: { agentId: string; initialMode: string }) {
   const [mode, setMode] = useState(initialMode);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -20,7 +20,7 @@ export function DistribuicaoClient({ initialMode }: { initialMode: string }) {
     setSaving(true);
     setSaved(false);
     try {
-      await fetch("/api/ferramentas/whatsapp/distribuicao", {
+      await fetch(`/api/agentes/${agentId}/distribuicao`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ leadDistributionMode: value }),

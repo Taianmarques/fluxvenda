@@ -68,8 +68,9 @@ function formatBRL(value: number): string {
 }
 
 function Card({
-  opp, onClick, onValueChange, onLeadStatusChange, onMarcarGanho, onOpenChat, leadStatuses, onLeadStatusesChange, dark, t,
+  agentId, opp, onClick, onValueChange, onLeadStatusChange, onMarcarGanho, onOpenChat, leadStatuses, onLeadStatusesChange, dark, t,
 }: {
+  agentId: string;
   opp: PipelineOpportunity;
   onClick: () => void;
   onValueChange: (id: string, value: number) => void;
@@ -111,6 +112,7 @@ function Card({
           <MessageCircle size={14} />
         </button>
         <LeadStatusBadge
+          agentId={agentId}
           leadStatusId={opp.leadStatusId}
           statuses={leadStatuses}
           onChange={id => onLeadStatusChange(opp.conversationId, id)}
@@ -166,8 +168,9 @@ function Card({
 }
 
 function Column({
-  stage, opportunities, onClickCard, onRename, onDelete, onValueChange, onLeadStatusChange, onMarcarGanho, onOpenChat, leadStatuses, onLeadStatusesChange, dark, t,
+  agentId, stage, opportunities, onClickCard, onRename, onDelete, onValueChange, onLeadStatusChange, onMarcarGanho, onOpenChat, leadStatuses, onLeadStatusesChange, dark, t,
 }: {
+  agentId: string;
   stage: Stage;
   opportunities: PipelineOpportunity[];
   onClickCard: (conversationId: string) => void;
@@ -213,7 +216,7 @@ function Column({
       <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[120px]">
         {opportunities.map(o => (
           <Card
-            key={o.id} opp={o} onClick={() => onClickCard(o.conversationId)} onValueChange={onValueChange}
+            key={o.id} agentId={agentId} opp={o} onClick={() => onClickCard(o.conversationId)} onValueChange={onValueChange}
             onLeadStatusChange={onLeadStatusChange} onMarcarGanho={onMarcarGanho} onOpenChat={onOpenChat} leadStatuses={leadStatuses} onLeadStatusesChange={onLeadStatusesChange}
             dark={dark} t={t}
           />
@@ -224,8 +227,9 @@ function Column({
 }
 
 export function WhatsappPipeline({
-  pipelineId, stages, leadStatuses, opportunities, theme, onSelectConversation, onStagesChange, onLeadStatusesChange,
+  agentId, pipelineId, stages, leadStatuses, opportunities, theme, onSelectConversation, onStagesChange, onLeadStatusesChange,
 }: {
+  agentId: string;
   pipelineId: string;
   stages: Stage[];
   leadStatuses: LeadStatus[];
@@ -332,6 +336,7 @@ export function WhatsappPipeline({
         <div className="flex gap-3 h-full">
           {semEtapa.length > 0 && (
             <Column
+              agentId={agentId}
               stage={{ id: "__sem_etapa__", name: "Sem etapa", color: "#6b7280", order: -1 }}
               opportunities={semEtapa}
               onClickCard={onSelectConversation}
@@ -350,6 +355,7 @@ export function WhatsappPipeline({
           {stages.map(stage => (
             <Column
               key={stage.id}
+              agentId={agentId}
               stage={stage}
               opportunities={localOpportunities.filter(o => o.stageId === stage.id)}
               onClickCard={onSelectConversation}

@@ -7,8 +7,9 @@ export type LeadStatus = { id: string; name: string; color: string; order: numbe
 const PALETTE = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#3b82f6", "#8b5cf6", "#ec4899", "#6b7280"];
 
 export function LeadStatusBadge({
-  leadStatusId, statuses, onChange, onStatusesChange, dark,
+  agentId, leadStatusId, statuses, onChange, onStatusesChange, dark,
 }: {
+  agentId: string;
   leadStatusId: string | null;
   statuses: LeadStatus[];
   onChange: (id: string | null) => void;
@@ -22,7 +23,7 @@ export function LeadStatusBadge({
   async function handleCreate() {
     if (!newName.trim()) return;
     const color = PALETTE[statuses.length % PALETTE.length];
-    const res = await fetch("/api/ferramentas/whatsapp/status", {
+    const res = await fetch(`/api/agentes/${agentId}/status`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: newName.trim(), color }),

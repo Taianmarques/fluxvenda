@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pause, Play, Unplug } from "lucide-react";
 
-export function AgentActions({ active }: { active: boolean }) {
+export function AgentActions({ agentId, active }: { agentId: string; active: boolean }) {
   const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -13,7 +13,7 @@ export function AgentActions({ active }: { active: boolean }) {
     setLoading(path);
     setError("");
     try {
-      const res = await fetch(`/api/ferramentas/whatsapp/${path}`, { method: "POST" });
+      const res = await fetch(`/api/agentes/${agentId}/${path}`, { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Erro");
       router.refresh();

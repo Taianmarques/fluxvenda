@@ -11,8 +11,9 @@ type ChatTheme = "dark" | "light";
 const THEME_STORAGE_KEY = "whatsapp-chat-theme";
 
 export function PipelineBoard({
-  initialPipelines, initialLeadStatuses, initialOpportunities,
+  agentId, initialPipelines, initialLeadStatuses, initialOpportunities,
 }: {
+  agentId: string;
   initialPipelines: PipelineSummary[];
   initialLeadStatuses: LeadStatus[];
   initialOpportunities: PipelineOpportunity[];
@@ -34,19 +35,19 @@ export function PipelineBoard({
   }, []);
 
   async function refreshPipelines() {
-    const res = await fetch("/api/ferramentas/whatsapp/pipelines");
+    const res = await fetch(`/api/agentes/${agentId}/pipelines`);
     const data = await res.json();
     if (data.pipelines) setPipelines(data.pipelines);
   }
 
   async function refreshLeadStatuses() {
-    const res = await fetch("/api/ferramentas/whatsapp/status");
+    const res = await fetch(`/api/agentes/${agentId}/status`);
     const data = await res.json();
     if (data.statuses) setLeadStatuses(data.statuses);
   }
 
   async function refreshOpportunities() {
-    const res = await fetch("/api/ferramentas/whatsapp/oportunidades");
+    const res = await fetch(`/api/agentes/${agentId}/oportunidades`);
     const data = await res.json();
     if (data.opportunities) setOpportunities(data.opportunities);
   }
@@ -58,7 +59,7 @@ export function PipelineBoard({
 
   async function handleCreatePipeline() {
     if (!newPipelineName.trim()) return;
-    const res = await fetch("/api/ferramentas/whatsapp/pipelines", {
+    const res = await fetch(`/api/agentes/${agentId}/pipelines`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: newPipelineName.trim() }),
@@ -154,12 +155,13 @@ export function PipelineBoard({
         <div className="flex-1 flex items-center justify-center text-gray-500">Crie um pipeline para começar.</div>
       ) : (
         <WhatsappPipeline
+          agentId={agentId}
           pipelineId={active.id}
           stages={active.stages}
           leadStatuses={leadStatuses}
           opportunities={relevantOpportunities}
           theme={theme}
-          onSelectConversation={id => router.push(`/crm?c=${id}`)}
+          onSelectConversation={id => router.push(`/crm/${agentId}?c=${id}`)}
           onStagesChange={refreshPipelines}
           onLeadStatusesChange={refreshLeadStatuses}
         />
