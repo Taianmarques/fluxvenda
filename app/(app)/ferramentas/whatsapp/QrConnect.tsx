@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { CheckCircle2 } from "lucide-react";
 
 type Status = {
   connected: boolean;
@@ -55,7 +56,7 @@ export function QrConnect() {
   if (status?.connected) {
     return (
       <div className="bg-gray-900 border border-green-800/50 rounded-2xl p-6 text-center space-y-2">
-        <p className="text-3xl">✅</p>
+        <CheckCircle2 size={32} className="mx-auto text-green-400" />
         <p className="font-semibold text-green-300">Conectado!</p>
         <p className="text-sm text-gray-400">{status.profileName ?? "WhatsApp"} pareado com sucesso. Ativando o agente...</p>
       </div>

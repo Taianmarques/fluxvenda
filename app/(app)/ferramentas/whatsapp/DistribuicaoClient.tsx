@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Users } from "lucide-react";
 
 const MODES = [
   { value: "MANUAL", label: "Manual", description: "Ninguém é atribuído automaticamente — o gestor ou o próprio atendente escolhem quem fica com cada conversa." },
@@ -33,7 +34,7 @@ export function DistribuicaoClient({ initialMode }: { initialMode: string }) {
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
       <div className="flex items-center justify-between">
-        <p className="font-semibold">👥 Distribuição de leads entre atendentes</p>
+        <p className="font-semibold flex items-center gap-2"><Users size={16} /> Distribuição de leads entre atendentes</p>
         {saving ? <span className="text-xs text-gray-500">Salvando...</span> : saved ? <span className="text-xs text-green-400">Salvo</span> : null}
       </div>
       <div className="grid sm:grid-cols-2 gap-2">

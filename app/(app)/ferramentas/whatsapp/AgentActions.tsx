@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Pause, Play, Unplug } from "lucide-react";
 
 export function AgentActions({ active }: { active: boolean }) {
   const router = useRouter();
@@ -35,25 +36,25 @@ export function AgentActions({ active }: { active: boolean }) {
           <button
             onClick={() => call("pausar")}
             disabled={loading !== null}
-            className="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 disabled:opacity-50"
+            className="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 disabled:opacity-50 flex items-center gap-1.5"
           >
-            {loading === "pausar" ? "Pausando..." : "⏸ Pausar agente"}
+            {loading === "pausar" ? "Pausando..." : <><Pause size={13} /> Pausar agente</>}
           </button>
         ) : (
           <button
             onClick={() => call("ativar")}
             disabled={loading !== null}
-            className="text-xs font-medium px-3 py-1.5 rounded-lg bg-green-700 hover:bg-green-600 text-white disabled:opacity-50"
+            className="text-xs font-medium px-3 py-1.5 rounded-lg bg-green-700 hover:bg-green-600 text-white disabled:opacity-50 flex items-center gap-1.5"
           >
-            {loading === "ativar" ? "Ativando..." : "▶ Reativar agente"}
+            {loading === "ativar" ? "Ativando..." : <><Play size={13} /> Reativar agente</>}
           </button>
         )}
         <button
           onClick={handleDesconectar}
           disabled={loading !== null}
-          className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-950/50 hover:bg-red-900/60 text-red-300 border border-red-800/50 disabled:opacity-50"
+          className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-950/50 hover:bg-red-900/60 text-red-300 border border-red-800/50 disabled:opacity-50 flex items-center gap-1.5"
         >
-          {loading === "desconectar" ? "Desconectando..." : "🔌 Desconectar WhatsApp"}
+          {loading === "desconectar" ? "Desconectando..." : <><Unplug size={13} /> Desconectar WhatsApp</>}
         </button>
       </div>
       {error && <p className="text-xs text-red-400">{error}</p>}

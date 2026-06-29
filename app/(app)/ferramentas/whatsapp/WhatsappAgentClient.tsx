@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ArrowLeft, FlaskConical } from "lucide-react";
 
 type InitialConfig = {
   nome: string;
@@ -261,9 +262,9 @@ export function WhatsappAgentClient({ initialConfig }: { initialConfig: InitialC
 
         <button
           onClick={() => setShowTest(s => !s)}
-          className="text-sm font-medium text-blue-400 hover:text-blue-300"
+          className="text-sm font-medium text-blue-400 hover:text-blue-300 flex items-center gap-1.5"
         >
-          {showTest ? "Ocultar teste do agente" : "🧪 Testar agente"}
+          {showTest ? "Ocultar teste do agente" : <><FlaskConical size={14} /> Testar agente</>}
         </button>
 
         {showTest && (
@@ -402,9 +403,9 @@ export function WhatsappAgentClient({ initialConfig }: { initialConfig: InitialC
       <div className="flex justify-between pt-2">
         <button
           onClick={() => (step === 1 ? isConfigured && setEditing(false) : setStep(step - 1))}
-          className="text-sm text-gray-400 hover:text-gray-200"
+          className="text-sm text-gray-400 hover:text-gray-200 flex items-center gap-1"
         >
-          {step === 1 ? (isConfigured ? "Cancelar" : "") : "← Voltar"}
+          {step === 1 ? (isConfigured ? "Cancelar" : "") : <><ArrowLeft size={14} /> Voltar</>}
         </button>
         {step < TOTAL_STEPS ? (
           <button onClick={() => setStep(step + 1)} className="bg-blue-600 hover:bg-blue-500 rounded-xl px-5 py-2 text-sm font-medium">

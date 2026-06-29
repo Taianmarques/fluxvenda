@@ -2,6 +2,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { ArrowLeft, ArrowRight, Bot, Smartphone, MessageCircle } from "lucide-react";
 import { WhatsappAgentClient } from "./WhatsappAgentClient";
 import { DistribuicaoClient } from "./DistribuicaoClient";
 import { QrConnect } from "./QrConnect";
@@ -31,8 +32,8 @@ export default async function WhatsappAgentPage() {
       <div className="min-h-screen bg-gray-950 text-white p-6">
         <div className="max-w-3xl mx-auto space-y-6">
           <div>
-            <Link href="/ferramentas" className="text-xs text-gray-500 hover:text-gray-300">← Ferramentas</Link>
-            <h1 className="text-3xl font-bold mt-2">🤖 Agente de Atendimento — WhatsApp</h1>
+            <Link href="/ferramentas" className="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1 w-fit"><ArrowLeft size={12} /> Ferramentas</Link>
+            <h1 className="text-3xl font-bold mt-2 flex items-center gap-2"><Bot size={28} className="text-blue-400" /> Agente de Atendimento — WhatsApp</h1>
             <p className="text-gray-400 mt-1">Configure seu agente de IA para atender leads e clientes automaticamente pelo WhatsApp da sua empresa.</p>
           </div>
           <WhatsappAgentClient
@@ -55,8 +56,8 @@ export default async function WhatsappAgentPage() {
       <div className="min-h-screen bg-gray-950 text-white p-6">
         <div className="max-w-md mx-auto space-y-6">
           <div>
-            <Link href="/ferramentas" className="text-xs text-gray-500 hover:text-gray-300">← Ferramentas</Link>
-            <h1 className="text-2xl font-bold mt-2">📲 Conecte o WhatsApp</h1>
+            <Link href="/ferramentas" className="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1 w-fit"><ArrowLeft size={12} /> Ferramentas</Link>
+            <h1 className="text-2xl font-bold mt-2 flex items-center gap-2"><Smartphone size={24} className="text-blue-400" /> Conecte o WhatsApp</h1>
             <p className="text-gray-400 mt-1">Escaneie o QR code com o WhatsApp do número <span className="text-gray-300">{config.uazapiInstance}</span> para ativar o agente.</p>
           </div>
           <QrConnect />
@@ -76,15 +77,16 @@ export default async function WhatsappAgentPage() {
       <div className="max-w-4xl mx-auto space-y-8">
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
-            <Link href="/ferramentas" className="text-xs text-gray-500 hover:text-gray-300">← Ferramentas</Link>
-            <h1 className="text-3xl font-bold mt-2">🤖 {config.nome}</h1>
+            <Link href="/ferramentas" className="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1 w-fit"><ArrowLeft size={12} /> Ferramentas</Link>
+            <h1 className="text-3xl font-bold mt-2 flex items-center gap-2"><Bot size={28} className="text-blue-400" /> {config.nome}</h1>
             <p className="text-gray-400 mt-1">Agente de atendimento conectado ao WhatsApp da sua empresa.</p>
           </div>
           <div className="flex items-center gap-3">
-            <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${
+            <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border flex items-center gap-1.5 ${
               config.active ? "bg-green-900/40 text-green-300 border-green-800/50" : "bg-yellow-900/40 text-yellow-300 border-yellow-800/50"
             }`}>
-              {config.active ? "● Ativo" : "⏸ Pausado"}
+              <span className={`w-1.5 h-1.5 rounded-full ${config.active ? "bg-green-400" : "bg-yellow-400"}`} />
+              {config.active ? "Ativo" : "Pausado"}
             </span>
             <AgentActions active={config.active} />
           </div>
@@ -108,10 +110,10 @@ export default async function WhatsappAgentPage() {
           className="flex items-center justify-between gap-4 bg-gradient-to-r from-green-950/40 to-emerald-950/40 border border-green-800/50 rounded-2xl p-5 hover:border-green-600 transition-colors"
         >
           <div>
-            <p className="font-semibold text-green-300">💬 Abrir CRM</p>
+            <p className="font-semibold text-green-300 flex items-center gap-2"><MessageCircle size={18} /> Abrir CRM</p>
             <p className="text-sm text-gray-400 mt-1">Veja as conversas em tempo real, a agenda e assuma o atendimento manualmente quando precisar.</p>
           </div>
-          <span className="text-green-400 text-xl">→</span>
+          <ArrowRight size={20} className="text-green-400 flex-shrink-0" />
         </Link>
 
         <DistribuicaoClient initialMode={config.leadDistributionMode} />

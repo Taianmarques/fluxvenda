@@ -2,6 +2,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { Bot, Calendar, Sparkles } from "lucide-react";
 
 export default async function FerramentasPage() {
   const user = await currentUser();
@@ -21,7 +22,7 @@ export default async function FerramentasPage() {
   const TOOLS = [
     {
       href: "/ferramentas/whatsapp",
-      icon: "🤖",
+      icon: Bot,
       title: "Agente de Atendimento — WhatsApp",
       description: "Conecte o WhatsApp da sua empresa a um agente de IA treinado para qualificar leads e responder objeções automaticamente.",
       status: whatsappConfigured ? "Ativo" : "Não configurado",
@@ -29,7 +30,7 @@ export default async function FerramentasPage() {
     },
     {
       href: "/crm/agenda",
-      icon: "📅",
+      icon: Calendar,
       title: "Agendamento via WhatsApp",
       description: "O agente de IA consulta sua disponibilidade real e marca compromissos direto na conversa, sem precisar de confirmação manual.",
       status: !whatsappConfigured ? "Requer WhatsApp ativo" : schedulingEnabled ? "Ativo" : "Não configurado",
@@ -51,10 +52,12 @@ export default async function FerramentasPage() {
             <Link
               key={tool.href}
               href={tool.href}
-              className="bg-gray-900 border border-gray-800 rounded-2xl p-6 hover:border-gray-600 transition-colors flex flex-col gap-3"
+              className="bg-gray-900 border border-gray-800 rounded-2xl p-6 hover:border-blue-700 transition-colors flex flex-col gap-3"
             >
               <div className="flex items-start justify-between gap-3">
-                <span className="text-3xl">{tool.icon}</span>
+                <span className="p-2.5 rounded-xl bg-blue-500/10 text-blue-400">
+                  <tool.icon size={22} />
+                </span>
                 <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${tool.statusColor}`}>{tool.status}</span>
               </div>
               <p className="font-semibold text-lg">{tool.title}</p>
@@ -63,7 +66,7 @@ export default async function FerramentasPage() {
           ))}
 
           <div className="bg-gray-900/50 border border-dashed border-gray-800 rounded-2xl p-6 flex flex-col items-center justify-center text-center gap-2 text-gray-600">
-            <span className="text-3xl">✨</span>
+            <Sparkles size={26} />
             <p className="text-sm">Mais ferramentas em breve</p>
           </div>
         </div>
