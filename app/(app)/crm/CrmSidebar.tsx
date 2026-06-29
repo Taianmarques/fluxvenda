@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { MessageCircle, KanbanSquare, Calendar, Wallet, ArrowLeft } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { MessageCircle, KanbanSquare, Calendar, Wallet, ArrowLeft, ChevronDown } from "lucide-react";
+import { useState } from "react";
 
-export function CrmSidebar({ agentId }: { agentId: string }) {
+export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id: string; nome: string }[] }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [showSwitcher, setShowSwitcher] = useState(false);
 
   const CRM_NAV = [
     { href: `/crm/${agentId}`, label: "Mensagens", icon: MessageCircle },
@@ -14,6 +17,14 @@ export function CrmSidebar({ agentId }: { agentId: string }) {
     { href: `/crm/${agentId}/vendas`, label: "Vendas", icon: Wallet },
   ];
 
+  const currentAgent = agents.find(a => a.id === agentId);
+
+  function switchAgent(newAgentId: string) {
+    setShowSwitcher(false);
+    const suffix = pathname.split(`/crm/${agentId}`)[1] ?? "";
+    router.push(`/crm/${newAgentId}${suffix}`);
+  }
+
   return (
     <aside className="w-56 flex-shrink-0 border-r border-gray-800 bg-black flex flex-col">
       <div className="px-5 py-5 border-b border-gray-800">
@@ -21,6 +32,34 @@ export function CrmSidebar({ agentId }: { agentId: string }) {
           <span className="text-blue-400">CRM</span>
         </p>
       </div>
+
+      {agents.length > 1 && (
+        <div className="relative px-3 py-3 border-b border-gray-800">
+          <button
+            onClick={() => setShowSwitcher(s => !s)}
+            className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-gray-900 hover:bg-gray-800 text-sm text-left transition-colors"
+          >
+            <span className="truncate">{currentAgent?.nome ?? "Agente"}</span>
+            <ChevronDown size={15} className="text-gray-500 flex-shrink-0" />
+          </button>
+          {showSwitcher && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setShowSwitcher(false)} />
+              <div className="absolute z-20 left-3 right-3 top-full mt-1 bg-gray-900 border border-gray-800 rounded-xl shadow-xl p-1 space-y-0.5">
+                {agents.map(a => (
+                  <button
+                    key={a.id}
+                    onClick={() => switchAgent(a.id)}
+                    className={`w-full text-left text-sm px-3 py-2 rounded-lg truncate ${a.id === agentId ? "text-blue-400 bg-blue-500/10" : "text-gray-300 hover:bg-gray-800"}`}
+                  >
+                    {a.nome}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">
         {CRM_NAV.map(item => {
