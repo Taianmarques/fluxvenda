@@ -53,6 +53,7 @@ export default async function ComercioPage({ params }: { params: Promise<{ agent
         contactNumber: o.contactNumber,
         status: o.status,
         total: o.total,
+        asaasInvoiceUrl: o.asaasInvoiceUrl,
         createdAt: o.createdAt.toISOString(),
         items: o.items.map(i => ({ id: i.id, name: i.name, unitPrice: i.unitPrice, quantity: i.quantity })),
       }))}

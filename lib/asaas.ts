@@ -24,13 +24,13 @@ export async function createAsaasCustomer(apiKey: string, sandbox: boolean, name
   });
 }
 
-export async function createAsaasPixCharge(
-  apiKey: string, sandbox: boolean, customerId: string, value: number, description: string
-): Promise<{ id: string }> {
+export async function createAsaasCharge(
+  apiKey: string, sandbox: boolean, customerId: string, value: number, description: string, billingType: "PIX" | "CREDIT_CARD"
+): Promise<{ id: string; invoiceUrl: string }> {
   const dueDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   return asaasFetch(apiKey, sandbox, "/payments", {
     method: "POST",
-    body: JSON.stringify({ customer: customerId, billingType: "PIX", value, description, dueDate }),
+    body: JSON.stringify({ customer: customerId, billingType, value, description, dueDate }),
   });
 }
 

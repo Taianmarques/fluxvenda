@@ -5,7 +5,7 @@ import { ShoppingCart, Settings, Copy } from "lucide-react";
 
 type Product = { id: string; name: string; description: string; price: number; stock: number | null; active: boolean };
 type OrderItem = { id: string; name: string; unitPrice: number; quantity: number };
-type Order = { id: string; contactName: string; contactNumber: string; status: string; total: number; createdAt: string; items: OrderItem[] };
+type Order = { id: string; contactName: string; contactNumber: string; status: string; total: number; asaasInvoiceUrl: string | null; createdAt: string; items: OrderItem[] };
 
 const STATUS_LABEL: Record<string, { label: string; color: string }> = {
   ABERTO: { label: "Aberto", color: "bg-gray-800 text-gray-400 border-gray-700" },
@@ -224,6 +224,11 @@ export function ComercioClient({
                     </div>
                     <p className="text-xs text-gray-500">{o.items.map(i => `${i.quantity}x ${i.name}`).join(", ")}</p>
                     <p className="text-xs text-gray-400">{formatBRL(o.total)} · {new Date(o.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })}</p>
+                    {o.asaasInvoiceUrl && (
+                      <a href={o.asaasInvoiceUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:text-blue-300 underline">
+                        Ver cobrança no Asaas
+                      </a>
+                    )}
                   </div>
                 );
               })}

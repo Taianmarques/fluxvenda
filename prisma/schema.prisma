@@ -670,6 +670,7 @@ model Order {
 
   asaasPaymentId  String?
   asaasPixPayload String? // código Pix copia-e-cola
+  asaasInvoiceUrl String? // link de checkout hospedado (usado pra pagamento por cartão)
   paidAt          DateTime?
 
   items OrderItem[]

@@ -4,7 +4,7 @@ import { runAgent, runAgentWithImage, runAgentWithTools, transcribeAudio, classi
 import { sendWhatsAppTextAsTeam, downloadMessageMedia } from "@/lib/whatsapp";
 import { getAvailableSlots, isSlotAvailable, formatSlotsForAgent, type AvailabilityRule } from "@/lib/scheduling";
 import { assignNextAttendant } from "@/lib/assignment";
-import { createAsaasCustomer, createAsaasPixCharge, getAsaasPixQrCode } from "@/lib/asaas";
+import { createAsaasCustomer, createAsaasCharge, getAsaasPixQrCode } from "@/lib/asaas";
 
 function mediaMimetype(message: any): string | null {
   return typeof message?.content === "object" && typeof message.content?.mimetype === "string"
@@ -55,8 +55,8 @@ Quando o cliente quiser comprar algo:
 - Use consultar_produtos pra confirmar nome exato, preço e estoque antes de montar o pedido — nunca invente produto, preço ou estoque fora dessa lista.
 - Use montar_pedido sempre que o cliente definir ou mudar os itens — passe a lista COMPLETA de itens desejados (substitui o pedido anterior, não é incremental).
 - Confirme com o cliente os itens e o total antes de gerar a cobrança.
-- Antes de gerar a cobrança, peça o CPF ou CNPJ do cliente (exigência do Pix) se ele ainda não tiver informado.
-- Use gerar_cobranca_pix só depois que o cliente confirmar o pedido E informar o CPF/CNPJ — explique que ele pode pagar com o código Pix copia-e-cola retornado.
+- Pergunte a forma de pagamento (Pix ou cartão) e peça o CPF/CNPJ do cliente (exigido pra qualquer cobrança), se ele ainda não tiver informado.
+- Use gerar_cobranca só depois que o cliente confirmar o pedido, a forma de pagamento E o CPF/CNPJ. Se for Pix, explique que ele pode pagar com o código copia-e-cola retornado. Se for cartão, mande o link de checkout retornado e explique que ele deve abrir o link pra digitar os dados do cartão — NUNCA peça número de cartão direto no WhatsApp.
 - Se o cliente perguntar sobre um pedido já feito, use consultar_status_pedido.`;
 }
 
@@ -203,11 +203,14 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       return `Pedido atualizado:\n${resumo}\nTotal: R$ ${total.toFixed(2)}`;
     }
 
-    if (name === "gerar_cobranca_pix") {
-      if (!config.asaasApiKey) return "Erro interno: pagamento via Pix não está configurado pra essa empresa.";
+    if (name === "gerar_cobranca") {
+      if (!config.asaasApiKey) return "Erro interno: pagamento não está configurado pra essa empresa.";
+
+      const formaPagamento = args?.formaPagamento === "CARTAO" ? "CARTAO" : args?.formaPagamento === "PIX" ? "PIX" : null;
+      if (!formaPagamento) return "Erro: pergunte ao cliente se ele quer pagar com Pix ou cartão antes de gerar a cobrança.";
 
       const cpfCnpj = typeof args?.cpfCnpj === "string" ? args.cpfCnpj.replace(/\D/g, "") : "";
-      if (!cpfCnpj) return "Erro: peça o CPF ou CNPJ do cliente antes de gerar a cobrança — é exigido pelo Pix.";
+      if (!cpfCnpj) return "Erro: peça o CPF ou CNPJ do cliente antes de gerar a cobrança — é exigido pra qualquer forma de pagamento.";
 
       const order = await prisma.order.findFirst({ where: { agentConfigId, conversationId, status: "ABERTO" }, include: { items: true } });
       if (!order || order.items.length === 0) return "Ainda não há nenhum pedido montado pra gerar a cobrança. Monte o pedido primeiro.";
@@ -221,18 +224,27 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
           await prisma.conversation.update({ where: { id: conversationId }, data: { asaasCustomerId } });
         }
 
-        const payment = await createAsaasPixCharge(config.asaasApiKey, config.asaasSandbox, asaasCustomerId, order.total, `Pedido ${order.id.slice(-6)}`);
-        const qr = await getAsaasPixQrCode(config.asaasApiKey, config.asaasSandbox, payment.id);
+        const billingType = formaPagamento === "CARTAO" ? "CREDIT_CARD" : "PIX";
+        const payment = await createAsaasCharge(config.asaasApiKey, config.asaasSandbox, asaasCustomerId, order.total, `Pedido ${order.id.slice(-6)}`, billingType);
 
+        if (formaPagamento === "CARTAO") {
+          await prisma.order.update({
+            where: { id: order.id },
+            data: { status: "AGUARDANDO_PAGAMENTO", asaasPaymentId: payment.id, asaasInvoiceUrl: payment.invoiceUrl },
+          });
+          return `Cobrança gerada, total R$ ${order.total.toFixed(2)}. Link seguro pra pagar com cartão:\n${payment.invoiceUrl}`;
+        }
+
+        const qr = await getAsaasPixQrCode(config.asaasApiKey, config.asaasSandbox, payment.id);
         await prisma.order.update({
           where: { id: order.id },
-          data: { status: "AGUARDANDO_PAGAMENTO", asaasPaymentId: payment.id, asaasPixPayload: qr.payload },
+          data: { status: "AGUARDANDO_PAGAMENTO", asaasPaymentId: payment.id, asaasPixPayload: qr.payload, asaasInvoiceUrl: payment.invoiceUrl },
         });
 
         return `Cobrança Pix gerada, total R$ ${order.total.toFixed(2)}. Código Pix copia-e-cola:\n${qr.payload}`;
       } catch (err) {
-        console.error("[whatsapp-webhook] erro ao gerar cobrança Pix:", err);
-        return "Não foi possível gerar a cobrança Pix agora. Avise que vai encaminhar pra um atendente confirmar o pagamento.";
+        console.error("[whatsapp-webhook] erro ao gerar cobrança:", err);
+        return "Não foi possível gerar a cobrança agora. Avise que vai encaminhar pra um atendente confirmar o pagamento.";
       }
     }
 
