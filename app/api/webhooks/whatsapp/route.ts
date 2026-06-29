@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { runAgent, runAgentWithImage, runAgentWithTools, transcribeAudio, classifyLeadQualified, SCHEDULING_TOOLS } from "@/lib/agent-engine";
+import { runAgent, runAgentWithImage, runAgentWithTools, transcribeAudio, classifyLeadQualified, SCHEDULING_TOOLS, COMMERCE_TOOLS } from "@/lib/agent-engine";
 import { sendWhatsAppTextAsTeam, downloadMessageMedia } from "@/lib/whatsapp";
 import { getAvailableSlots, isSlotAvailable, formatSlotsForAgent, type AvailabilityRule } from "@/lib/scheduling";
 import { assignNextAttendant } from "@/lib/assignment";
+import { createAsaasCustomer, createAsaasPixCharge, getAsaasPixQrCode } from "@/lib/asaas";
 
 function mediaMimetype(message: any): string | null {
   return typeof message?.content === "object" && typeof message.content?.mimetype === "string"
@@ -38,6 +39,25 @@ Quando o cliente quiser agendar algo:
 Você também pode receber, no meio da conversa, um lembrete automático perguntando se o cliente confirma presença num agendamento já marcado:
 - Se o cliente confirmar (ex: "sim", "confirmado", "pode contar comigo"), apenas agradeça brevemente, sem chamar nenhuma ferramenta.
 - Se ele disser que não pode ir ou quer cancelar, use cancelar_agendamento e, na mesma resposta, já ofereça reagendar — pergunte o novo dia/período de preferência (ou, se ele já tiver dito, use consultar_horarios_disponiveis e siga o fluxo normal de agendamento).`;
+}
+
+async function buildCommerceContext(agentConfigId: string): Promise<string> {
+  const products = await prisma.product.findMany({ where: { agentConfigId, active: true }, select: { name: true, price: true } });
+  const catalogo = products.length > 0
+    ? products.map(p => `- ${p.name}: R$ ${p.price.toFixed(2)}`).join("\n")
+    : "Nenhum produto cadastrado ainda.";
+
+  return `\n\nFERRAMENTAS DE COMÉRCIO:
+Catálogo de produtos (use consultar_produtos pra confirmar — esse resumo pode estar desatualizado):
+${catalogo}
+
+Quando o cliente quiser comprar algo:
+- Use consultar_produtos pra confirmar nome exato, preço e estoque antes de montar o pedido — nunca invente produto, preço ou estoque fora dessa lista.
+- Use montar_pedido sempre que o cliente definir ou mudar os itens — passe a lista COMPLETA de itens desejados (substitui o pedido anterior, não é incremental).
+- Confirme com o cliente os itens e o total antes de gerar a cobrança.
+- Antes de gerar a cobrança, peça o CPF ou CNPJ do cliente (exigência do Pix) se ele ainda não tiver informado.
+- Use gerar_cobranca_pix só depois que o cliente confirmar o pedido E informar o CPF/CNPJ — explique que ele pode pagar com o código Pix copia-e-cola retornado.
+- Se o cliente perguntar sobre um pedido já feito, use consultar_status_pedido.`;
 }
 
 function makeExecuteTool(agentConfigId: string, conversationId: string, contactName: string | undefined, contactNumber: string) {
@@ -136,6 +156,99 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       return "Agendamento cancelado com sucesso.";
     }
 
+    if (name === "consultar_produtos") {
+      const busca = typeof args?.busca === "string" ? args.busca : undefined;
+      const products = await prisma.product.findMany({
+        where: { agentConfigId, active: true, ...(busca ? { name: { contains: busca, mode: "insensitive" } } : {}) },
+        orderBy: { createdAt: "asc" },
+      });
+      if (products.length === 0) return "Nenhum produto encontrado no catálogo.";
+      return products
+        .map(p => `${p.name} — R$ ${p.price.toFixed(2)}${p.stock !== null ? ` (estoque: ${p.stock})` : ""}${p.description ? ` — ${p.description}` : ""}`)
+        .join("\n");
+    }
+
+    if (name === "montar_pedido") {
+      const itensArg = Array.isArray(args?.itens) ? args.itens : [];
+      if (itensArg.length === 0) return "Erro: nenhum item informado.";
+
+      const resolved: { product: { id: string; name: string; price: number } | null; nomeBuscado: string; quantidade: number }[] = [];
+      for (const item of itensArg) {
+        const nomeBuscado = String(item?.produto ?? "");
+        const quantidade = Math.max(1, Number(item?.quantidade) || 1);
+        const product = await prisma.product.findFirst({ where: { agentConfigId, active: true, name: { equals: nomeBuscado, mode: "insensitive" } } });
+        resolved.push({ product, nomeBuscado, quantidade });
+      }
+
+      const naoEncontrados = resolved.filter(r => !r.product).map(r => r.nomeBuscado);
+      if (naoEncontrados.length > 0) {
+        return `Não encontrei esse(s) produto(s) no catálogo: ${naoEncontrados.join(", ")}. Use consultar_produtos pra ver os nomes certos.`;
+      }
+
+      const total = resolved.reduce((sum, r) => sum + r.product!.price * r.quantidade, 0);
+
+      let order = await prisma.order.findFirst({ where: { agentConfigId, conversationId, status: "ABERTO" } });
+      if (!order) {
+        order = await prisma.order.create({ data: { agentConfigId, conversationId, contactName: contactName ?? "", contactNumber, status: "ABERTO", total } });
+      } else {
+        await prisma.orderItem.deleteMany({ where: { orderId: order.id } });
+        order = await prisma.order.update({ where: { id: order.id }, data: { total } });
+      }
+
+      await prisma.orderItem.createMany({
+        data: resolved.map(r => ({ orderId: order!.id, productId: r.product!.id, name: r.product!.name, unitPrice: r.product!.price, quantity: r.quantidade })),
+      });
+
+      const resumo = resolved.map(r => `${r.quantidade}x ${r.product!.name} (R$ ${(r.product!.price * r.quantidade).toFixed(2)})`).join("\n");
+      return `Pedido atualizado:\n${resumo}\nTotal: R$ ${total.toFixed(2)}`;
+    }
+
+    if (name === "gerar_cobranca_pix") {
+      if (!config.asaasApiKey) return "Erro interno: pagamento via Pix não está configurado pra essa empresa.";
+
+      const cpfCnpj = typeof args?.cpfCnpj === "string" ? args.cpfCnpj.replace(/\D/g, "") : "";
+      if (!cpfCnpj) return "Erro: peça o CPF ou CNPJ do cliente antes de gerar a cobrança — é exigido pelo Pix.";
+
+      const order = await prisma.order.findFirst({ where: { agentConfigId, conversationId, status: "ABERTO" }, include: { items: true } });
+      if (!order || order.items.length === 0) return "Ainda não há nenhum pedido montado pra gerar a cobrança. Monte o pedido primeiro.";
+
+      try {
+        const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
+        let asaasCustomerId = conversation?.asaasCustomerId ?? null;
+        if (!asaasCustomerId) {
+          const customer = await createAsaasCustomer(config.asaasApiKey, config.asaasSandbox, contactName || contactNumber, contactNumber, cpfCnpj);
+          asaasCustomerId = customer.id;
+          await prisma.conversation.update({ where: { id: conversationId }, data: { asaasCustomerId } });
+        }
+
+        const payment = await createAsaasPixCharge(config.asaasApiKey, config.asaasSandbox, asaasCustomerId, order.total, `Pedido ${order.id.slice(-6)}`);
+        const qr = await getAsaasPixQrCode(config.asaasApiKey, config.asaasSandbox, payment.id);
+
+        await prisma.order.update({
+          where: { id: order.id },
+          data: { status: "AGUARDANDO_PAGAMENTO", asaasPaymentId: payment.id, asaasPixPayload: qr.payload },
+        });
+
+        return `Cobrança Pix gerada, total R$ ${order.total.toFixed(2)}. Código Pix copia-e-cola:\n${qr.payload}`;
+      } catch (err) {
+        console.error("[whatsapp-webhook] erro ao gerar cobrança Pix:", err);
+        return "Não foi possível gerar a cobrança Pix agora. Avise que vai encaminhar pra um atendente confirmar o pagamento.";
+      }
+    }
+
+    if (name === "consultar_status_pedido") {
+      const orders = await prisma.order.findMany({
+        where: { agentConfigId, conversationId, status: { not: "ABERTO" } },
+        orderBy: { createdAt: "desc" },
+        take: 3,
+        include: { items: true },
+      });
+      if (orders.length === 0) return "Não encontrei nenhum pedido em andamento pra essa conversa.";
+      return orders
+        .map(o => `Pedido ${o.id.slice(-6)} — status: ${o.status} — total: R$ ${o.total.toFixed(2)} — itens: ${o.items.map(i => `${i.quantity}x ${i.name}`).join(", ")}`)
+        .join("\n\n");
+    }
+
     return "Ferramenta desconhecida.";
   };
 }
@@ -227,15 +340,22 @@ export async function POST(req: NextRequest) {
   // de tudo que já foi dito pela empresa, mesmo no período em que esteve em atendimento manual.
   const historyForAgent = history.map(m => ({ role: m.role === "user" ? "user" as const : "assistant" as const, content: m.content }));
 
+  const tools = [
+    ...(config.schedulingEnabled ? SCHEDULING_TOOLS : []),
+    ...(config.commerceEnabled ? COMMERCE_TOOLS : []),
+  ];
+
   let reply: string;
   if (imageUrl) {
     reply = await runAgentWithImage(config.systemPrompt, historyForAgent, imageUrl, caption);
-  } else if (config.schedulingEnabled) {
+  } else if (tools.length > 0) {
+    const extraContext = (config.schedulingEnabled ? await buildSchedulingContext(config.id) : "")
+      + (config.commerceEnabled ? await buildCommerceContext(config.id) : "");
     reply = await runAgentWithTools(
-      config.systemPrompt + await buildSchedulingContext(config.id),
+      config.systemPrompt + extraContext,
       historyForAgent,
       text,
-      SCHEDULING_TOOLS,
+      tools,
       makeExecuteTool(config.id, conversation.id, contactName, contactNumber)
     );
   } else {

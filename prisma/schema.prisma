@@ -568,6 +568,12 @@ model AgentConfig {
   // Quando ativo, mensagens manuais de atendentes saem no WhatsApp assinadas com o nome de quem mandou
   signatureEnabled Boolean @default(false)
 
+  // Catálogo/pedidos via WhatsApp com pagamento Pix (Asaas) — cada equipe usa a própria conta
+  commerceEnabled  Boolean @default(false)
+  asaasApiKey      String? // colada pelo gestor, nunca exibida de volta na UI
+  asaasSandbox     Boolean @default(true)
+  asaasWebhookToken String? // gerado ao ativar; valida o webhook de confirmação de pagamento
+
   conversations Conversation[]
   pipelines      Pipeline[]
   leadStatuses   LeadStatus[]
@@ -575,6 +581,8 @@ model AgentConfig {
   professionals  Professional[]
   services       Service[]
   quickReplies   QuickReply[]
+  products       Product[]
+  orders         Order[]
 
   @@index([teamId])
 }
@@ -617,6 +625,66 @@ model Service {
 
   appointments           Appointment[]
   pendingInConversations Conversation[]
+}
+
+// Catálogo do agente de comércio — o agente consulta isso antes de informar preço/estoque,
+// nunca inventa produto ou valor fora dessa lista.
+model Product {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+  agentConfigId String
+  agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String  @default("")
+  price       Float
+  stock       Int? // null = não controla estoque
+  active      Boolean @default(true)
+
+  orderItems OrderItem[]
+}
+
+enum OrderStatus {
+  ABERTO // carrinho em montagem, ainda sem cobrança gerada
+  AGUARDANDO_PAGAMENTO
+  PAGO
+  EM_PREPARO
+  ENVIADO
+  ENTREGUE
+  CANCELADO
+}
+
+model Order {
+  id             String   @id @default(cuid())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  agentConfigId  String
+  agentConfig    AgentConfig @relation(fields: [agentConfigId], references: [id], onDelete: Cascade)
+  conversationId String?
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  contactName   String
+  contactNumber String
+  status        OrderStatus @default(ABERTO)
+  total         Float       @default(0)
+
+  asaasPaymentId  String?
+  asaasPixPayload String? // código Pix copia-e-cola
+  paidAt          DateTime?
+
+  items OrderItem[]
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  name      String // snapshot do nome no momento do pedido
+  unitPrice Float  // snapshot do preço no momento do pedido
+  quantity  Int
 }
 
 // Textos prontos que qualquer atendente pode inserir rápido no chat (ex: saudações,
@@ -745,10 +813,14 @@ model Conversation {
   pendingServiceId      String?
   pendingService        Service?      @relation(fields: [pendingServiceId], references: [id], onDelete: SetNull)
 
+  // Cacheia o customer já criado no Asaas pra esse contato, evita recriar a cada pedido
+  asaasCustomerId String?
+
   messages          Message[]
   appointments      Appointment[]
   opportunities     Opportunity[]
   scheduledMessages ScheduledMessage[]
+  orders            Order[]
 
   @@unique([agentConfigId, contactNumber])
 }

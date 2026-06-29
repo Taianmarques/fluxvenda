@@ -226,13 +226,72 @@ export const SCHEDULING_TOOLS = [
   },
 ];
 
+export const COMMERCE_TOOLS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "consultar_produtos",
+      description: "Lista os produtos disponíveis no catálogo dessa empresa, com preço e estoque. Use SEMPRE antes de informar preço ou disponibilidade — nunca invente produto ou valor fora dessa lista.",
+      parameters: {
+        type: "object",
+        properties: { busca: { type: "string", description: "Termo opcional pra filtrar produtos pelo nome" } },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "montar_pedido",
+      description: "Cria ou atualiza o pedido em andamento dessa conversa com os itens que o cliente quer comprar. Chame de novo (substituindo a lista inteira de itens) sempre que o cliente mudar o pedido.",
+      parameters: {
+        type: "object",
+        properties: {
+          itens: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                produto: { type: "string", description: "Nome do produto, igual ao retornado por consultar_produtos" },
+                quantidade: { type: "number" },
+              },
+              required: ["produto", "quantidade"],
+            },
+          },
+        },
+        required: ["itens"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "gerar_cobranca_pix",
+      description: "Gera a cobrança Pix do pedido atual em andamento dessa conversa, depois que o cliente confirmou os itens E informou o CPF/CNPJ (exigido pelo Pix). Retorna o código Pix copia-e-cola pra enviar ao cliente.",
+      parameters: {
+        type: "object",
+        properties: { cpfCnpj: { type: "string", description: "CPF ou CNPJ do cliente, só números" } },
+        required: ["cpfCnpj"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "consultar_status_pedido",
+      description: "Consulta o status do(s) pedido(s) dessa conversa (em preparo, pago, enviado, etc). Use quando o cliente perguntar sobre um pedido já feito.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+];
+
 // Roda o agente com acesso a ferramentas (ex: agendamento) — chama o modelo em loop até ele
 // parar de pedir ferramentas e devolver uma resposta final em texto.
 export async function runAgentWithTools(
   systemPrompt: string,
   history: { role: "user" | "assistant"; content: string }[],
   newMessage: string,
-  tools: typeof SCHEDULING_TOOLS,
+  tools: any[],
   executeTool: (name: string, args: any) => Promise<string>
 ): Promise<string> {
   const messages: any[] = [
