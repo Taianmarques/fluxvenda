@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
-import { getOwnAgentConfig } from "@/lib/team";
+import { userBelongsToAgentConfig } from "@/lib/team";
 import { z } from "zod";
 
 const patchSchema = z.object({
@@ -14,12 +14,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const config = await getOwnAgentConfig(userId);
-  if (!config) return NextResponse.json({ error: "Agente não encontrado" }, { status: 404 });
-
   const { id } = await params;
-  const appointment = await prisma.appointment.findFirst({ where: { id, agentConfigId: config.id } });
-  if (!appointment) return NextResponse.json({ error: "Agendamento não encontrado" }, { status: 404 });
+  const appointment = await prisma.appointment.findUnique({ where: { id } });
+  if (!appointment || !(await userBelongsToAgentConfig(userId, appointment.agentConfigId))) {
+    return NextResponse.json({ error: "Agendamento não encontrado" }, { status: 404 });
+  }
 
   const body = patchSchema.safeParse(await req.json());
   if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
@@ -40,12 +39,11 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const config = await getOwnAgentConfig(userId);
-  if (!config) return NextResponse.json({ error: "Agente não encontrado" }, { status: 404 });
-
   const { id } = await params;
-  const appointment = await prisma.appointment.findFirst({ where: { id, agentConfigId: config.id } });
-  if (!appointment) return NextResponse.json({ error: "Agendamento não encontrado" }, { status: 404 });
+  const appointment = await prisma.appointment.findUnique({ where: { id } });
+  if (!appointment || !(await userBelongsToAgentConfig(userId, appointment.agentConfigId))) {
+    return NextResponse.json({ error: "Agendamento não encontrado" }, { status: 404 });
+  }
 
   await prisma.appointment.delete({ where: { id } });
 

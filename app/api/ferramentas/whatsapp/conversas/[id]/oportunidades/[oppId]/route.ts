@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
-import { getOwnAgentConfigWithRole } from "@/lib/team";
+import { getAgentConfigWithRole } from "@/lib/team";
 import { z } from "zod";
 
-async function loadOpportunity(id: string, oppId: string, config: { id: string }, userId: string, isManager: boolean) {
-  const conversation = await prisma.conversation.findFirst({ where: { id, agentConfigId: config.id } });
+async function loadOpportunity(id: string, oppId: string, userId: string) {
+  const conversation = await prisma.conversation.findUnique({ where: { id } });
   if (!conversation) return null;
-  if (!isManager && conversation.assignedToId && conversation.assignedToId !== userId) return null;
+  const result = await getAgentConfigWithRole(userId, conversation.agentConfigId);
+  if (!result) return null;
+  if (!result.isManager && conversation.assignedToId && conversation.assignedToId !== userId) return null;
   const opportunity = await prisma.opportunity.findFirst({ where: { id: oppId, conversationId: id } });
   if (!opportunity) return null;
-  return opportunity;
+  return { opportunity, config: result.config };
 }
 
 const patchSchema = z.object({
@@ -23,13 +25,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const result = await getOwnAgentConfigWithRole(userId);
-  if (!result) return NextResponse.json({ error: "Agente não encontrado" }, { status: 404 });
-  const { config, isManager } = result;
-
   const { id, oppId } = await params;
-  const opportunity = await loadOpportunity(id, oppId, config, userId, isManager);
-  if (!opportunity) return NextResponse.json({ error: "Oportunidade não encontrada" }, { status: 404 });
+  const loaded = await loadOpportunity(id, oppId, userId);
+  if (!loaded) return NextResponse.json({ error: "Oportunidade não encontrada" }, { status: 404 });
+  const { opportunity, config } = loaded;
 
   const body = patchSchema.safeParse(await req.json());
   if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
@@ -58,13 +57,9 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const result = await getOwnAgentConfigWithRole(userId);
-  if (!result) return NextResponse.json({ error: "Agente não encontrado" }, { status: 404 });
-  const { config, isManager } = result;
-
   const { id, oppId } = await params;
-  const opportunity = await loadOpportunity(id, oppId, config, userId, isManager);
-  if (!opportunity) return NextResponse.json({ error: "Oportunidade não encontrada" }, { status: 404 });
+  const loaded = await loadOpportunity(id, oppId, userId);
+  if (!loaded) return NextResponse.json({ error: "Oportunidade não encontrada" }, { status: 404 });
 
   await prisma.opportunity.delete({ where: { id: oppId } });
   return NextResponse.json({ ok: true });

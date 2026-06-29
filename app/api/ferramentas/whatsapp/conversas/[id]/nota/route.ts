@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
-import { getOwnAgentConfigWithRole } from "@/lib/team";
+import { getAgentConfigWithRole } from "@/lib/team";
 import { z } from "zod";
 
 const schema = z.object({ content: z.string().min(1).max(2000) });
@@ -12,13 +12,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const result = await getOwnAgentConfigWithRole(userId);
-  if (!result) return NextResponse.json({ error: "Agente não encontrado" }, { status: 404 });
-  const { config, isManager } = result;
-
   const { id } = await params;
-  const conversation = await prisma.conversation.findFirst({ where: { id, agentConfigId: config.id } });
+  const conversation = await prisma.conversation.findUnique({ where: { id } });
   if (!conversation) return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
+
+  const result = await getAgentConfigWithRole(userId, conversation.agentConfigId);
+  if (!result) return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
+  const { isManager } = result;
   if (!isManager && conversation.assignedToId && conversation.assignedToId !== userId) {
     return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
   }

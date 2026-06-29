@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
-import { getOwnAgentConfig } from "@/lib/team";
+import { userBelongsToAgentConfig } from "@/lib/team";
 import { z } from "zod";
 
 const patchSchema = z.object({
@@ -13,12 +13,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const config = await getOwnAgentConfig(userId);
-  if (!config) return NextResponse.json({ error: "Agente não encontrado" }, { status: 404 });
-
   const { id } = await params;
-  const pipeline = await prisma.pipeline.findFirst({ where: { id, agentConfigId: config.id } });
-  if (!pipeline) return NextResponse.json({ error: "Pipeline não encontrado" }, { status: 404 });
+  const pipeline = await prisma.pipeline.findUnique({ where: { id } });
+  if (!pipeline || !(await userBelongsToAgentConfig(userId, pipeline.agentConfigId))) {
+    return NextResponse.json({ error: "Pipeline não encontrado" }, { status: 404 });
+  }
 
   const body = patchSchema.safeParse(await req.json());
   if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
@@ -32,14 +31,13 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const config = await getOwnAgentConfig(userId);
-  if (!config) return NextResponse.json({ error: "Agente não encontrado" }, { status: 404 });
-
   const { id } = await params;
-  const pipeline = await prisma.pipeline.findFirst({ where: { id, agentConfigId: config.id } });
-  if (!pipeline) return NextResponse.json({ error: "Pipeline não encontrado" }, { status: 404 });
+  const pipeline = await prisma.pipeline.findUnique({ where: { id } });
+  if (!pipeline || !(await userBelongsToAgentConfig(userId, pipeline.agentConfigId))) {
+    return NextResponse.json({ error: "Pipeline não encontrado" }, { status: 404 });
+  }
 
-  const count = await prisma.pipeline.count({ where: { agentConfigId: config.id } });
+  const count = await prisma.pipeline.count({ where: { agentConfigId: pipeline.agentConfigId } });
   if (count <= 1) return NextResponse.json({ error: "Não é possível excluir o único pipeline" }, { status: 400 });
 
   // Etapas desse pipeline são removidas em cascata; oportunidades dessas etapas ficam sem etapa (stageId null)

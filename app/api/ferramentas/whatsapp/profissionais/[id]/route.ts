@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
-import { getOwnAgentConfig } from "@/lib/team";
+import { userBelongsToAgentConfig } from "@/lib/team";
 import { z } from "zod";
 
 const ruleSchema = z.object({
@@ -20,12 +20,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const config = await getOwnAgentConfig(userId);
-  if (!config) return NextResponse.json({ error: "Agente não encontrado" }, { status: 404 });
-
   const { id } = await params;
-  const professional = await prisma.professional.findFirst({ where: { id, agentConfigId: config.id } });
-  if (!professional) return NextResponse.json({ error: "Profissional não encontrado" }, { status: 404 });
+  const professional = await prisma.professional.findUnique({ where: { id } });
+  if (!professional || !(await userBelongsToAgentConfig(userId, professional.agentConfigId))) {
+    return NextResponse.json({ error: "Profissional não encontrado" }, { status: 404 });
+  }
 
   const body = patchSchema.safeParse(await req.json());
   if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
@@ -38,12 +37,11 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const config = await getOwnAgentConfig(userId);
-  if (!config) return NextResponse.json({ error: "Agente não encontrado" }, { status: 404 });
-
   const { id } = await params;
-  const professional = await prisma.professional.findFirst({ where: { id, agentConfigId: config.id } });
-  if (!professional) return NextResponse.json({ error: "Profissional não encontrado" }, { status: 404 });
+  const professional = await prisma.professional.findUnique({ where: { id } });
+  if (!professional || !(await userBelongsToAgentConfig(userId, professional.agentConfigId))) {
+    return NextResponse.json({ error: "Profissional não encontrado" }, { status: 404 });
+  }
 
   await prisma.professional.delete({ where: { id } });
   return NextResponse.json({ ok: true });

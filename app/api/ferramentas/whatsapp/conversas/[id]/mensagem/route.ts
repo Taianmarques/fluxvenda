@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
-import { getOwnAgentConfig } from "@/lib/team";
+import { userBelongsToAgentConfig } from "@/lib/team";
 import { sendWhatsAppTextAsTeam, sendMediaAsTeam, downloadMessageMedia } from "@/lib/whatsapp";
 import { z } from "zod";
 
@@ -19,12 +19,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const config = await getOwnAgentConfig(userId);
-  if (!config?.uazapiToken) return NextResponse.json({ error: "Agente não encontrado" }, { status: 404 });
-
   const { id } = await params;
-  const conversation = await prisma.conversation.findFirst({ where: { id, agentConfigId: config.id } });
+  const conversation = await prisma.conversation.findUnique({ where: { id } });
   if (!conversation) return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
+  if (!(await userBelongsToAgentConfig(userId, conversation.agentConfigId))) {
+    return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
+  }
+
+  const config = await prisma.agentConfig.findUnique({ where: { id: conversation.agentConfigId } });
+  if (!config?.uazapiToken) return NextResponse.json({ error: "Agente não encontrado" }, { status: 404 });
 
   const body = schema.safeParse(await req.json());
   if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });

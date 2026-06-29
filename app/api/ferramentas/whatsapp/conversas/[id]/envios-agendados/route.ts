@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
-import { getOwnAgentConfigWithRole } from "@/lib/team";
+import { getAgentConfigWithRole } from "@/lib/team";
 import { z } from "zod";
 
-async function loadConversation(id: string, config: { id: string }, userId: string, isManager: boolean) {
-  const conversation = await prisma.conversation.findFirst({ where: { id, agentConfigId: config.id } });
+async function loadConversation(id: string, userId: string) {
+  const conversation = await prisma.conversation.findUnique({ where: { id } });
   if (!conversation) return null;
-  if (!isManager && conversation.assignedToId && conversation.assignedToId !== userId) return null;
+  const result = await getAgentConfigWithRole(userId, conversation.agentConfigId);
+  if (!result) return null;
+  if (!result.isManager && conversation.assignedToId && conversation.assignedToId !== userId) return null;
   return conversation;
 }
 
@@ -15,12 +17,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const result = await getOwnAgentConfigWithRole(userId);
-  if (!result) return NextResponse.json({ error: "Agente não encontrado" }, { status: 404 });
-  const { config, isManager } = result;
-
   const { id } = await params;
-  const conversation = await loadConversation(id, config, userId, isManager);
+  const conversation = await loadConversation(id, userId);
   if (!conversation) return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
 
   const scheduledMessages = await prisma.scheduledMessage.findMany({
@@ -41,12 +39,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const result = await getOwnAgentConfigWithRole(userId);
-  if (!result) return NextResponse.json({ error: "Agente não encontrado" }, { status: 404 });
-  const { config, isManager } = result;
-
   const { id } = await params;
-  const conversation = await loadConversation(id, config, userId, isManager);
+  const conversation = await loadConversation(id, userId);
   if (!conversation) return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
 
   const body = schema.safeParse(await req.json());

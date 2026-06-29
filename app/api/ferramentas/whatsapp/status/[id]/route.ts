@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
-import { getOwnAgentConfig } from "@/lib/team";
+import { userBelongsToAgentConfig } from "@/lib/team";
 import { z } from "zod";
 
 const patchSchema = z.object({
@@ -14,12 +14,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const config = await getOwnAgentConfig(userId);
-  if (!config) return NextResponse.json({ error: "Agente não encontrado" }, { status: 404 });
-
   const { id } = await params;
-  const status = await prisma.leadStatus.findFirst({ where: { id, agentConfigId: config.id } });
-  if (!status) return NextResponse.json({ error: "Status não encontrado" }, { status: 404 });
+  const status = await prisma.leadStatus.findUnique({ where: { id } });
+  if (!status || !(await userBelongsToAgentConfig(userId, status.agentConfigId))) {
+    return NextResponse.json({ error: "Status não encontrado" }, { status: 404 });
+  }
 
   const body = patchSchema.safeParse(await req.json());
   if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
@@ -33,12 +32,11 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const config = await getOwnAgentConfig(userId);
-  if (!config) return NextResponse.json({ error: "Agente não encontrado" }, { status: 404 });
-
   const { id } = await params;
-  const status = await prisma.leadStatus.findFirst({ where: { id, agentConfigId: config.id } });
-  if (!status) return NextResponse.json({ error: "Status não encontrado" }, { status: 404 });
+  const status = await prisma.leadStatus.findUnique({ where: { id } });
+  if (!status || !(await userBelongsToAgentConfig(userId, status.agentConfigId))) {
+    return NextResponse.json({ error: "Status não encontrado" }, { status: 404 });
+  }
 
   // Conversas com esse status ficam sem status (leadStatusId null) — onDelete: SetNull no schema
   await prisma.leadStatus.delete({ where: { id } });
