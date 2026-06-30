@@ -530,7 +530,7 @@ export async function POST(req: NextRequest) {
   });
   const history = recentMessages.reverse();
 
-  await prisma.message.create({ data: { conversationId: conversation.id, role: "user", content: text, mediaUrl, mediaType } });
+  const savedMsg = await prisma.message.create({ data: { conversationId: conversation.id, role: "user", content: text, mediaUrl, mediaType } });
 
   // Conversa nova + rodízio ativo: já nasce atribuída a um atendente, em ordem
   const isNewConversation = conversation.createdAt.getTime() === conversation.updatedAt.getTime();
@@ -541,6 +541,21 @@ export async function POST(req: NextRequest) {
   // Atendente humano assumiu essa conversa — apenas registra a mensagem, sem o agente responder
   if (conversation.humanTakeover) {
     return NextResponse.json({ ok: true });
+  }
+
+  // Debounce: aguarda antes de chamar a IA para contextualizar mensagens enviadas em partes.
+  // Se outra mensagem do mesmo contato chegar nesse intervalo, ela é salva no banco e esta
+  // chamada retorna sem responder — a mais recente processará o histórico completo.
+  const debounceMs = Number(process.env.MESSAGE_DEBOUNCE_MS ?? "8000");
+  if (debounceMs > 0) {
+    await new Promise(resolve => setTimeout(resolve, debounceMs));
+    const latestUserMsg = await prisma.message.findFirst({
+      where: { conversationId: conversation.id, role: "user" },
+      orderBy: { createdAt: "desc" },
+    });
+    if (latestUserMsg?.id !== savedMsg.id) {
+      return NextResponse.json({ ok: true }); // mensagem mais nova chegou, ela assumirá o contexto
+    }
   }
 
   // Mensagens do atendente humano entram como "assistant" para o agente manter o contexto
