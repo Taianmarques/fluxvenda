@@ -36,7 +36,7 @@ function formatBRL(value: number): string {
 }
 
 export function ComercioClient({
-  agentId, initialCommerceEnabled, initialAsaasSandbox, initialHasAsaasApiKey, initialAsaasWebhookToken,
+  agentId, initialCommerceEnabled, initialCatalogOnly, initialAsaasSandbox, initialHasAsaasApiKey, initialAsaasWebhookToken,
   initialInstallmentsEnabled, initialMaxInstallments, initialInterestFreeInstallments, initialInstallmentInterestRate,
   initialProducts, initialOrders,
 }: {
@@ -45,6 +45,7 @@ export function ComercioClient({
   initialAsaasSandbox: boolean;
   initialHasAsaasApiKey: boolean;
   initialAsaasWebhookToken: string | null;
+  initialCatalogOnly: boolean;
   initialInstallmentsEnabled: boolean;
   initialMaxInstallments: number;
   initialInterestFreeInstallments: number;
@@ -54,6 +55,7 @@ export function ComercioClient({
 }) {
   const [showSettings, setShowSettings] = useState(false);
   const [commerceEnabled, setCommerceEnabled] = useState(initialCommerceEnabled);
+  const [catalogOnly, setCatalogOnly] = useState(initialCatalogOnly);
   const [asaasSandbox, setAsaasSandbox] = useState(initialAsaasSandbox);
   const [hasAsaasApiKey, setHasAsaasApiKey] = useState(initialHasAsaasApiKey);
   const [asaasWebhookToken, setAsaasWebhookToken] = useState(initialAsaasWebhookToken);
@@ -92,7 +94,7 @@ export function ComercioClient({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          commerceEnabled, asaasSandbox,
+          commerceEnabled, catalogOnly, asaasSandbox,
           installmentsEnabled, maxInstallments, interestFreeInstallments, installmentInterestRate,
           ...(asaasApiKeyInput.trim() ? { asaasApiKey: asaasApiKeyInput.trim() } : {}),
         }),
@@ -256,7 +258,13 @@ export function ComercioClient({
           <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-4">
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={commerceEnabled} onChange={e => setCommerceEnabled(e.target.checked)} className="w-4 h-4" />
-              <span className="text-sm font-medium">Ativar pedidos e pagamento via Pix pelo agente de IA</span>
+              <span className="text-sm font-medium">Ativar catálogo de produtos pelo agente de IA</span>
+            </label>
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={catalogOnly} onChange={e => setCatalogOnly(e.target.checked)} className="w-4 h-4" />
+              <span className="text-sm">Somente catálogo — sem pagamento online</span>
+              {catalogOnly && <span className="text-xs text-gray-500">(a IA anota o pedido e avisa que um atendente combinará o pagamento)</span>}
             </label>
 
             <label className="flex items-center gap-2 cursor-pointer">

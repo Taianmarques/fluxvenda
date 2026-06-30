@@ -15,6 +15,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ age
 
   return NextResponse.json({
     commerceEnabled: config.commerceEnabled,
+    catalogOnly: config.catalogOnly,
     asaasSandbox: config.asaasSandbox,
     hasAsaasApiKey: Boolean(config.asaasApiKey),
     asaasWebhookToken: config.asaasWebhookToken,
@@ -28,6 +29,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ age
 
 const schema = z.object({
   commerceEnabled: z.boolean().optional(),
+  catalogOnly: z.boolean().optional(),
   asaasApiKey: z.string().min(1).optional(),
   asaasSandbox: z.boolean().optional(),
   installmentsEnabled: z.boolean().optional(),

@@ -570,6 +570,7 @@ model AgentConfig {
 
   // Catálogo/pedidos via WhatsApp com pagamento Pix/cartão (Asaas) — cada equipe usa a própria conta
   commerceEnabled  Boolean @default(false)
+  catalogOnly      Boolean @default(false) // true = só catálogo/pedidos, sem gerar cobrança online
   asaasApiKey      String? // colada pelo gestor, nunca exibida de volta na UI
   asaasSandbox     Boolean @default(true)
   asaasWebhookToken String? // gerado ao ativar; valida o webhook de confirmação de pagamento

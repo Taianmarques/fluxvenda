@@ -56,12 +56,20 @@ function buildInstallmentNote(config: {
 }
 
 async function buildCommerceContext(agentConfigId: string, config: {
-  installmentsEnabled: boolean; maxInstallments: number; interestFreeInstallments: number; installmentInterestRate: number;
+  catalogOnly: boolean; installmentsEnabled: boolean; maxInstallments: number; interestFreeInstallments: number; installmentInterestRate: number;
 }): Promise<string> {
   const products = await prisma.product.findMany({ where: { agentConfigId, active: true }, select: { name: true, price: true } });
   const catalogo = products.length > 0
     ? products.map(p => `- ${p.name}: R$ ${p.price.toFixed(2)}`).join("\n")
     : "Nenhum produto cadastrado ainda.";
+
+  const pagamentoBlock = config.catalogOnly
+    ? `- Esta loja não processa pagamentos online pelo WhatsApp. Depois de registrar os itens desejados com montar_pedido, informe ao cliente que um atendente entrará em contato para combinar o pagamento.`
+    : `- Confirme com o cliente os itens e o total antes de gerar a cobrança.
+- Pergunte a forma de pagamento (Pix ou cartão) e peça o CPF/CNPJ do cliente (exigido pra qualquer cobrança), se ele ainda não tiver informado.
+- Se for cartão: ${buildInstallmentNote(config)}
+- Use gerar_cobranca só depois que o cliente confirmar o pedido, a forma de pagamento, o CPF/CNPJ e (se cartão) as parcelas. Se for Pix, explique que ele pode pagar com o código copia-e-cola retornado. Se for cartão, mande o link de checkout retornado e explique que ele deve abrir o link pra digitar os dados do cartão — NUNCA peça número de cartão direto no WhatsApp.
+- IMPORTANTE: quando o cliente já confirmou tudo que falta (itens, forma de pagamento, CPF/CNPJ e parcelas se for cartão), chame a ferramenta JÁ NESSA MESMA RESPOSTA — nunca diga "vou gerar" ou "um momento" sem ter chamado a ferramenta antes de responder.`;
 
   return `\n\nFERRAMENTAS DE COMÉRCIO:
 Catálogo de produtos (use consultar_produtos pra confirmar — esse resumo pode estar desatualizado):
@@ -70,13 +78,9 @@ ${catalogo}
 Quando o cliente quiser comprar algo:
 - Use consultar_produtos pra confirmar nome exato, preço e estoque antes de montar o pedido — nunca invente produto, preço ou estoque fora dessa lista.
 - Use montar_pedido sempre que o cliente definir ou mudar os itens — passe a lista COMPLETA de itens desejados (substitui o pedido anterior, não é incremental).
-- Confirme com o cliente os itens e o total antes de gerar a cobrança.
-- Pergunte a forma de pagamento (Pix ou cartão) e peça o CPF/CNPJ do cliente (exigido pra qualquer cobrança), se ele ainda não tiver informado.
-- Se for cartão: ${buildInstallmentNote(config)}
-- Use gerar_cobranca só depois que o cliente confirmar o pedido, a forma de pagamento, o CPF/CNPJ e (se cartão) as parcelas. Se for Pix, explique que ele pode pagar com o código copia-e-cola retornado. Se for cartão, mande o link de checkout retornado e explique que ele deve abrir o link pra digitar os dados do cartão — NUNCA peça número de cartão direto no WhatsApp.
+${pagamentoBlock}
 - Se o cliente perguntar sobre um pedido já feito, use consultar_status_pedido.
-- Se o cliente pedir pra ver o produto ou perguntar se tem foto, use enviar_foto_produto.
-- IMPORTANTE: quando o cliente já confirmou tudo que falta (itens, forma de pagamento, CPF/CNPJ e parcelas se for cartão), chame a ferramenta JÁ NESSA MESMA RESPOSTA — nunca diga "vou gerar" ou "um momento" sem ter chamado a ferramenta antes de responder. Você só tem essa resposta pra agir, não existe uma próxima rodada automática.`;
+- Se o cliente pedir pra ver o produto ou perguntar se tem foto, use enviar_foto_produto.`;
 }
 
 function makeExecuteTool(agentConfigId: string, conversationId: string, contactName: string | undefined, contactNumber: string) {
@@ -413,10 +417,10 @@ export async function POST(req: NextRequest) {
   // de tudo que já foi dito pela empresa, mesmo no período em que esteve em atendimento manual.
   const historyForAgent = history.map(m => ({ role: m.role === "user" ? "user" as const : "assistant" as const, content: m.content }));
 
-  const tools = [
-    ...(config.schedulingEnabled ? SCHEDULING_TOOLS : []),
-    ...(config.commerceEnabled ? COMMERCE_TOOLS : []),
-  ];
+  const commerceTools = config.commerceEnabled
+    ? (config.catalogOnly ? COMMERCE_TOOLS.filter(t => t.function.name !== "gerar_cobranca") : COMMERCE_TOOLS)
+    : [];
+  const tools = [...(config.schedulingEnabled ? SCHEDULING_TOOLS : []), ...commerceTools];
 
   let reply: string;
   if (imageUrl) {

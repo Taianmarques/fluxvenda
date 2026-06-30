@@ -43,6 +43,7 @@ export default async function ComercioPage({ params }: { params: Promise<{ agent
     <ComercioClient
       agentId={config.id}
       initialCommerceEnabled={config.commerceEnabled}
+      initialCatalogOnly={config.catalogOnly}
       initialAsaasSandbox={config.asaasSandbox}
       initialHasAsaasApiKey={Boolean(config.asaasApiKey)}
       initialAsaasWebhookToken={config.asaasWebhookToken}
