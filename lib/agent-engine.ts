@@ -301,6 +301,41 @@ export const COMMERCE_TOOLS = [
   },
 ];
 
+export const BILLING_TOOLS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "consultar_cobrancas",
+      description: "Lista as cobranças em aberto ou vencidas do devedor dessa conversa. Use quando o cliente perguntar sobre o que deve ou quiser pagar.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "enviar_boleto",
+      description: "Gera (se ainda não gerado) e envia o link do boleto de uma cobrança específica pro devedor via WhatsApp. Use quando o cliente quiser pagar ou pedir o boleto.",
+      parameters: {
+        type: "object",
+        properties: { cobrancaId: { type: "string", description: "ID da cobrança retornado por consultar_cobrancas" } },
+        required: ["cobrancaId"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "consultar_status_boleto",
+      description: "Verifica no Asaas se o boleto de uma cobrança foi pago. Use quando o cliente disser que já pagou ou perguntar se o pagamento foi confirmado.",
+      parameters: {
+        type: "object",
+        properties: { cobrancaId: { type: "string", description: "ID da cobrança" } },
+        required: ["cobrancaId"],
+      },
+    },
+  },
+];
+
 // Roda o agente com acesso a ferramentas (ex: agendamento) — chama o modelo em loop até ele
 // parar de pedir ferramentas e devolver uma resposta final em texto.
 export async function runAgentWithTools(

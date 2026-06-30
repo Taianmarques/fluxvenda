@@ -30,6 +30,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ age
 const schema = z.object({
   commerceEnabled: z.boolean().optional(),
   catalogOnly: z.boolean().optional(),
+  cobrancaEnabled: z.boolean().optional(),
   asaasApiKey: z.string().min(1).optional(),
   asaasSandbox: z.boolean().optional(),
   installmentsEnabled: z.boolean().optional(),

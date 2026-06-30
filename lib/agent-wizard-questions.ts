@@ -111,4 +111,15 @@ export const AGENT_WIZARD_QUESTIONS: Record<string, WizardQuestions> = {
     objecoesPlaceholder: "Ex: Achei caro, Quero ver o carro pessoalmente, Não sei se fecho hoje...",
     horarioDefault: "Segunda a sábado, 8h às 18h",
   },
+  "Cobrança": {
+    descricaoEmpresaLabel: "Conte sobre sua empresa",
+    descricaoEmpresaPlaceholder: "Tipo de dívida cobrada, como surgem as inadimplências, tom que quer usar com devedores...",
+    servicosLabel: "Tipo de dívida cobrada (um por linha)",
+    servicosPlaceholder: "Ex: Mensalidade em atraso, Parcela de empréstimo, Aluguel vencido...",
+    precosLabel: "Condições de negociação (se houver)",
+    precosPlaceholder: "Aceita parcelamento da dívida? Desconto por pagamento à vista? Prazo máximo?",
+    objecoesLabel: "Objeções comuns de devedores (uma por linha)",
+    objecoesPlaceholder: "Ex: Não tenho dinheiro agora, Já paguei, Não reconheço essa dívida...",
+    horarioDefault: "Segunda a sexta, 9h às 18h",
+  },
 };

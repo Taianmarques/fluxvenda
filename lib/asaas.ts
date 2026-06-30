@@ -29,8 +29,8 @@ export async function createAsaasCustomer(apiKey: string, sandbox: boolean, name
 // Asaas dividir esse total em N parcelas iguais.
 export async function createAsaasCharge(
   apiKey: string, sandbox: boolean, customerId: string, value: number, description: string,
-  billingType: "PIX" | "CREDIT_CARD", installmentCount?: number
-): Promise<{ id: string; invoiceUrl: string; installment?: string }> {
+  billingType: "PIX" | "CREDIT_CARD" | "BOLETO", installmentCount?: number
+): Promise<{ id: string; invoiceUrl: string; bankSlipUrl?: string; installment?: string }> {
   const dueDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const body: Record<string, unknown> = { customer: customerId, billingType, description, dueDate };
   if (installmentCount && installmentCount > 1) {

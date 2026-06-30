@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { MessageCircle, KanbanSquare, Calendar, Wallet, ShoppingCart, ArrowLeft, ChevronDown } from "lucide-react";
+import { MessageCircle, KanbanSquare, Calendar, Wallet, ShoppingCart, Landmark, ArrowLeft, ChevronDown } from "lucide-react";
 import { useState } from "react";
 
 export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id: string; nome: string }[] }) {
@@ -16,6 +16,7 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
     { href: `/crm/${agentId}/agenda`, label: "Agenda", icon: Calendar },
     { href: `/crm/${agentId}/vendas`, label: "Vendas", icon: Wallet },
     { href: `/crm/${agentId}/comercio`, label: "Comércio", icon: ShoppingCart },
+    { href: `/crm/${agentId}/cobranca`, label: "Cobranças", icon: Landmark },
   ];
 
   const currentAgent = agents.find(a => a.id === agentId);

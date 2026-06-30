@@ -575,6 +575,8 @@ model AgentConfig {
   asaasSandbox     Boolean @default(true)
   asaasWebhookToken String? // gerado ao ativar; valida o webhook de confirmação de pagamento
 
+  cobrancaEnabled Boolean @default(false) // agente dedicado a cobrança de dívidas/boletos
+
   // Parcelamento no cartão — o acréscimo de juros é calculado por nós (não pela conta Asaas)
   // e embutido no valor total enviado, pra não depender de configuração externa
   installmentsEnabled     Boolean @default(false)
@@ -591,6 +593,7 @@ model AgentConfig {
   quickReplies   QuickReply[]
   products       Product[]
   orders         Order[]
+  cobrancas      Cobranca[]
 
   @@index([teamId])
 }
@@ -635,6 +638,50 @@ model Service {
   pendingInConversations Conversation[]
 }
 
+// ─── Agente de Cobrança ──────────────────────────────────────────────────────
+
+enum CobrancaStatus {
+  PENDENTE       // registrada, ainda não enviou boleto
+  BOLETO_GERADO  // boleto gerado e enviado ao devedor
+  PAGO           // confirmação de pagamento recebida
+  VENCIDA        // prazo expirou e não foi pago
+  CANCELADA
+}
+
+enum RecorrenciaCobranca {
+  UNICA
+  SEMANAL
+  QUINZENAL
+  MENSAL
+  ANUAL
+}
+
+model Cobranca {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  agentConfigId String
+  agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id], onDelete: Cascade)
+
+  nomeDevedor   String
+  contactNumber String   // WhatsApp do devedor, só números
+  cpfCnpj       String?  // CPF ou CNPJ do devedor (exigido pelo Asaas para gerar boleto)
+  valor         Float
+  descricao     String   @default("")
+  vencimento    DateTime
+  status        CobrancaStatus      @default(PENDENTE)
+  recorrencia   RecorrenciaCobranca @default(UNICA)
+
+  asaasCustomerId String?
+  asaasPaymentId  String?
+  boletoUrl       String?  // bankSlipUrl retornado pelo Asaas
+
+  paidAt         DateTime?
+  reminderCount  Int      @default(0) // quantos lembretes de follow-up já foram enviados
+  lastReminderAt DateTime?
+}
+
+// ─── Catálogo do agente de comércio ──────────────────────────────────────────
 // Catálogo do agente de comércio — o agente consulta isso antes de informar preço/estoque,
 // nunca inventa produto ou valor fora dessa lista.
 model Product {

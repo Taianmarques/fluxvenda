@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { runAgent, runAgentWithImage, runAgentWithTools, transcribeAudio, classifyLeadQualified, SCHEDULING_TOOLS, COMMERCE_TOOLS } from "@/lib/agent-engine";
+import { runAgent, runAgentWithImage, runAgentWithTools, transcribeAudio, classifyLeadQualified, SCHEDULING_TOOLS, COMMERCE_TOOLS, BILLING_TOOLS } from "@/lib/agent-engine";
 import { sendWhatsAppTextAsTeam, sendMediaAsTeam, downloadMessageMedia } from "@/lib/whatsapp";
 import { getAvailableSlots, isSlotAvailable, formatSlotsForAgent, type AvailabilityRule } from "@/lib/scheduling";
 import { assignNextAttendant } from "@/lib/assignment";
@@ -81,6 +81,28 @@ Quando o cliente quiser comprar algo:
 ${pagamentoBlock}
 - Se o cliente perguntar sobre um pedido já feito, use consultar_status_pedido.
 - Se o cliente pedir pra ver o produto ou perguntar se tem foto, use enviar_foto_produto.`;
+}
+
+async function buildBillingContext(agentConfigId: string, contactNumber: string): Promise<string> {
+  const cobrancas = await prisma.cobranca.findMany({
+    where: { agentConfigId, contactNumber, status: { in: ["PENDENTE", "BOLETO_GERADO", "VENCIDA"] } },
+    orderBy: { vencimento: "asc" },
+  });
+  const lista = cobrancas.length > 0
+    ? cobrancas.map(c => `- ID ${c.id.slice(-6)} | R$ ${c.valor.toFixed(2)} | Venc: ${c.vencimento.toLocaleDateString("pt-BR")} | Status: ${c.status}`)
+      .join("\n")
+    : "Nenhuma cobrança em aberto encontrada para esse contato.";
+
+  return `\n\nFERRAMENTAS DE COBRANÇA:
+Cobranças desse devedor:
+${lista}
+
+Como conduzir a conversa de cobrança:
+- Seja cordial mas firme. Não prometa descontos ou prazos que não estejam configurados como política da empresa.
+- Se o devedor quiser pagar, use enviar_boleto com o ID da cobrança correspondente.
+- Se o devedor disser que já pagou, use consultar_status_boleto pra confirmar antes de afirmar que recebeu.
+- NUNCA invente valores, vencimentos ou status que não venham das ferramentas.
+- Se o devedor pedir negociação além do que está configurado, informe que vai consultar um atendente e encerre cordialmente.`;
 }
 
 function makeExecuteTool(agentConfigId: string, conversationId: string, contactName: string | undefined, contactNumber: string) {
@@ -326,6 +348,71 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       }
     }
 
+    if (name === "consultar_cobrancas") {
+      const cobrancas = await prisma.cobranca.findMany({
+        where: { agentConfigId, contactNumber, status: { in: ["PENDENTE", "BOLETO_GERADO", "VENCIDA"] } },
+        orderBy: { vencimento: "asc" },
+      });
+      if (cobrancas.length === 0) return "Nenhuma cobrança em aberto encontrada para esse contato.";
+      return cobrancas
+        .map(c => `ID: ${c.id.slice(-6)} | R$ ${c.valor.toFixed(2)} | Venc: ${c.vencimento.toLocaleDateString("pt-BR")} | Status: ${c.status}${c.boletoUrl ? ` | Boleto: ${c.boletoUrl}` : ""}`)
+        .join("\n");
+    }
+
+    if (name === "enviar_boleto") {
+      const cid = typeof args?.cobrancaId === "string" ? args.cobrancaId : "";
+      const suffix = cid.length === 6 ? cid : null;
+      const cobranca = await prisma.cobranca.findFirst({
+        where: { agentConfigId, contactNumber, ...(suffix ? { id: { endsWith: suffix } } : { id: cid }) },
+      });
+      if (!cobranca) return "Cobrança não encontrada.";
+      if (!config.asaasApiKey || !config.uazapiToken) return "Pagamento não configurado pra essa empresa.";
+
+      try {
+        let { asaasCustomerId, asaasPaymentId, boletoUrl } = cobranca;
+        if (!asaasPaymentId) {
+          if (!asaasCustomerId) {
+            const customer = await createAsaasCustomer(config.asaasApiKey, config.asaasSandbox, cobranca.nomeDevedor, cobranca.contactNumber, cobranca.cpfCnpj || "00000000000");
+            asaasCustomerId = customer.id;
+          }
+          const payment = await createAsaasCharge(config.asaasApiKey, config.asaasSandbox, asaasCustomerId, cobranca.valor, cobranca.descricao || `Cobrança ${cobranca.nomeDevedor}`, "BOLETO");
+          asaasPaymentId = payment.id;
+          boletoUrl = payment.bankSlipUrl ?? payment.invoiceUrl;
+          await prisma.cobranca.update({ where: { id: cobranca.id }, data: { status: "BOLETO_GERADO", asaasCustomerId, asaasPaymentId, boletoUrl } });
+        }
+        const link = boletoUrl ?? "Link não disponível";
+        await sendWhatsAppTextAsTeam(config.uazapiToken, contactNumber, `Segue o boleto de R$ ${cobranca.valor.toFixed(2)} com vencimento em ${cobranca.vencimento.toLocaleDateString("pt-BR")}:\n${link}`);
+        return `Boleto enviado: ${link}`;
+      } catch (err) {
+        console.error("[whatsapp-webhook] erro ao enviar boleto:", err);
+        return "Não foi possível gerar o boleto agora. Um atendente irá ajudar.";
+      }
+    }
+
+    if (name === "consultar_status_boleto") {
+      const cid = typeof args?.cobrancaId === "string" ? args.cobrancaId : "";
+      const suffix = cid.length === 6 ? cid : null;
+      const cobranca = await prisma.cobranca.findFirst({
+        where: { agentConfigId, contactNumber, ...(suffix ? { id: { endsWith: suffix } } : { id: cid }) },
+      });
+      if (!cobranca) return "Cobrança não encontrada.";
+      if (!cobranca.asaasPaymentId || !config.asaasApiKey) return `Status atual: ${cobranca.status}`;
+
+      try {
+        const res = await fetch(`${config.asaasSandbox ? "https://api-sandbox.asaas.com/v3" : "https://api.asaas.com/v3"}/payments/${cobranca.asaasPaymentId}`, {
+          headers: { "Content-Type": "application/json", access_token: config.asaasApiKey },
+        });
+        const data = await res.json();
+        if (data.status === "RECEIVED" || data.status === "CONFIRMED") {
+          await prisma.cobranca.update({ where: { id: cobranca.id }, data: { status: "PAGO", paidAt: new Date() } });
+          return "Pagamento confirmado! Obrigado.";
+        }
+        return `Status do boleto: ${data.status ?? cobranca.status}`;
+      } catch {
+        return `Status atual: ${cobranca.status}`;
+      }
+    }
+
     return "Ferramenta desconhecida.";
   };
 }
@@ -420,14 +507,19 @@ export async function POST(req: NextRequest) {
   const commerceTools = config.commerceEnabled
     ? (config.catalogOnly ? COMMERCE_TOOLS.filter(t => t.function.name !== "gerar_cobranca") : COMMERCE_TOOLS)
     : [];
-  const tools = [...(config.schedulingEnabled ? SCHEDULING_TOOLS : []), ...commerceTools];
+  const tools = [
+    ...(config.schedulingEnabled ? SCHEDULING_TOOLS : []),
+    ...commerceTools,
+    ...(config.cobrancaEnabled ? BILLING_TOOLS : []),
+  ];
 
   let reply: string;
   if (imageUrl) {
     reply = await runAgentWithImage(config.systemPrompt, historyForAgent, imageUrl, caption);
   } else if (tools.length > 0) {
     const extraContext = (config.schedulingEnabled ? await buildSchedulingContext(config.id) : "")
-      + (config.commerceEnabled ? await buildCommerceContext(config.id, config) : "");
+      + (config.commerceEnabled ? await buildCommerceContext(config.id, config) : "")
+      + (config.cobrancaEnabled ? await buildBillingContext(config.id, contactNumber) : "");
     reply = await runAgentWithTools(
       config.systemPrompt + extraContext,
       historyForAgent,
