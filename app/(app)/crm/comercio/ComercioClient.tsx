@@ -17,7 +17,7 @@ function readFileAsBase64(file: File): Promise<{ base64: string; mimeType: strin
   });
 }
 
-type Product = { id: string; name: string; description: string; price: number; stock: number | null; active: boolean; imagemBase64?: string | null; imagemMimeType?: string | null };
+type Product = { id: string; name: string; description: string; price: number; precoPromocional?: number | null; stock: number | null; active: boolean; imagemBase64?: string | null; imagemMimeType?: string | null };
 type OrderItem = { id: string; name: string; unitPrice: number; quantity: number };
 type Order = { id: string; contactName: string; contactNumber: string; status: string; total: number; asaasInvoiceUrl: string | null; createdAt: string; items: OrderItem[] };
 
@@ -71,10 +71,13 @@ export function ComercioClient({
   const [newDescription, setNewDescription] = useState("");
   const [newPrice, setNewPrice] = useState("");
   const [newStock, setNewStock] = useState("");
+  const [newPrecoPromo, setNewPrecoPromo] = useState("");
   const [newImage, setNewImage] = useState<{ base64: string; mimeType: string } | null>(null);
   const [photoError, setPhotoError] = useState("");
   const editPhotoInputRef = useRef<HTMLInputElement>(null);
   const [editingPhotoId, setEditingPhotoId] = useState<string | null>(null);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [editFields, setEditFields] = useState<{ name: string; description: string; price: string; precoPromo: string; stock: string }>({ name: "", description: "", price: "", precoPromo: "", stock: "" });
 
   async function loadProducts() {
     const res = await fetch(`/api/agentes/${agentId}/produtos`);
@@ -146,16 +149,49 @@ export function ComercioClient({
   async function handleAddProduct() {
     const price = Number(newPrice.replace(",", "."));
     if (!newName.trim() || !Number.isFinite(price) || price < 0) return;
+    const promo = newPrecoPromo.trim() ? Number(newPrecoPromo.replace(",", ".")) : null;
     await fetch(`/api/agentes/${agentId}/produtos`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: newName.trim(), description: newDescription.trim(), price,
+        precoPromocional: promo != null && promo >= 0 ? promo : null,
         stock: newStock.trim() ? Math.max(0, Number(newStock)) : null,
         imagemBase64: newImage?.base64 ?? null, imagemMimeType: newImage?.mimeType ?? null,
       }),
     });
-    setNewName(""); setNewDescription(""); setNewPrice(""); setNewStock(""); setNewImage(null); setShowNewProduct(false);
+    setNewName(""); setNewDescription(""); setNewPrice(""); setNewStock(""); setNewPrecoPromo(""); setNewImage(null); setShowNewProduct(false);
+    loadProducts();
+  }
+
+  function startEdit(p: Product) {
+    setEditingProductId(p.id);
+    setEditFields({
+      name: p.name,
+      description: p.description,
+      price: String(p.price),
+      precoPromo: p.precoPromocional != null ? String(p.precoPromocional) : "",
+      stock: p.stock != null ? String(p.stock) : "",
+    });
+  }
+
+  async function handleSaveEdit() {
+    if (!editingProductId) return;
+    const price = Number(editFields.price.replace(",", "."));
+    if (!editFields.name.trim() || !Number.isFinite(price) || price < 0) return;
+    const promo = editFields.precoPromo.trim() ? Number(editFields.precoPromo.replace(",", ".")) : null;
+    await fetch(`/api/ferramentas/whatsapp/produtos/${editingProductId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: editFields.name.trim(),
+        description: editFields.description.trim(),
+        price,
+        precoPromocional: promo != null && promo >= 0 ? promo : null,
+        stock: editFields.stock.trim() ? Math.max(0, Number(editFields.stock)) : null,
+      }),
+    });
+    setEditingProductId(null);
     loadProducts();
   }
 
@@ -201,6 +237,7 @@ export function ComercioClient({
               <input placeholder="Nome do produto" value={newName} onChange={e => setNewName(e.target.value)} className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm md:col-span-2" />
               <input placeholder="Preço (R$)" value={newPrice} onChange={e => setNewPrice(e.target.value)} className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
               <input placeholder="Estoque (opcional)" value={newStock} onChange={e => setNewStock(e.target.value)} className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
+              <input placeholder="Preço promo (opcional)" value={newPrecoPromo} onChange={e => setNewPrecoPromo(e.target.value)} className="bg-gray-950 border border-amber-800/50 rounded-xl px-3 py-2 text-sm md:col-span-2" title="Deixe vazio para sem promoção" />
             </div>
             <input placeholder="Descrição (opcional)" value={newDescription} onChange={e => setNewDescription(e.target.value)} className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
             <div className="flex items-center gap-3">
@@ -306,25 +343,47 @@ export function ComercioClient({
           ) : (
             <div className="divide-y divide-gray-800">
               {products.map(p => (
-                <div key={p.id} className="flex items-center justify-between gap-3 px-5 py-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    {p.imagemBase64 ? (
-                      <img src={`data:${p.imagemMimeType};base64,${p.imagemBase64}`} alt="" className="w-10 h-10 rounded-lg object-cover border border-gray-800 flex-shrink-0" />
-                    ) : (
-                      <span className="w-10 h-10 rounded-lg bg-gray-950 border border-gray-800 flex items-center justify-center text-gray-600 flex-shrink-0"><ImageIcon size={16} /></span>
-                    )}
-                    <div className="min-w-0">
-                      <p className={`text-sm font-medium ${!p.active ? "text-gray-500 line-through" : ""}`}>{p.name}</p>
-                      <p className="text-xs text-gray-500 truncate">
-                        {formatBRL(p.price)}{p.stock !== null && ` · estoque: ${p.stock}`}{p.description && ` · ${p.description}`}
-                      </p>
+                <div key={p.id} className="border-b border-gray-800 last:border-0">
+                  {editingProductId === p.id ? (
+                    <div className="px-5 py-3 space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <input value={editFields.name} onChange={e => setEditFields(f => ({ ...f, name: e.target.value }))} placeholder="Nome" className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm col-span-2" />
+                        <input value={editFields.price} onChange={e => setEditFields(f => ({ ...f, price: e.target.value }))} placeholder="Preço (R$)" className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
+                        <input value={editFields.stock} onChange={e => setEditFields(f => ({ ...f, stock: e.target.value }))} placeholder="Estoque (opcional)" className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
+                        <input value={editFields.precoPromo} onChange={e => setEditFields(f => ({ ...f, precoPromo: e.target.value }))} placeholder="Preço promo (vazio = sem promo)" className="bg-gray-950 border border-amber-800/50 rounded-xl px-3 py-2 text-sm col-span-2" />
+                        <input value={editFields.description} onChange={e => setEditFields(f => ({ ...f, description: e.target.value }))} placeholder="Descrição (opcional)" className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm col-span-2" />
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={handleSaveEdit} className="bg-blue-600 hover:bg-blue-500 rounded-lg px-3 py-1.5 text-xs font-medium">Salvar</button>
+                        <button onClick={() => setEditingProductId(null)} className="text-xs text-gray-400 hover:text-white">Cancelar</button>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex gap-2 text-xs flex-shrink-0">
-                    <button onClick={() => { setEditingPhotoId(p.id); editPhotoInputRef.current?.click(); }} className="text-blue-400 hover:text-blue-300">Foto</button>
-                    <button onClick={() => handleToggleProduct(p)} className="text-gray-400 hover:text-white">{p.active ? "Desativar" : "Ativar"}</button>
-                    <button onClick={() => handleDeleteProduct(p)} className="text-red-400 hover:text-red-300">Remover</button>
-                  </div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-3 px-5 py-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {p.imagemBase64 ? (
+                          <img src={`data:${p.imagemMimeType};base64,${p.imagemBase64}`} alt="" className="w-10 h-10 rounded-lg object-cover border border-gray-800 flex-shrink-0" />
+                        ) : (
+                          <span className="w-10 h-10 rounded-lg bg-gray-950 border border-gray-800 flex items-center justify-center text-gray-600 flex-shrink-0"><ImageIcon size={16} /></span>
+                        )}
+                        <div className="min-w-0">
+                          <p className={`text-sm font-medium ${!p.active ? "text-gray-500 line-through" : ""}`}>{p.name}</p>
+                          <p className="text-xs text-gray-500 truncate">
+                            {p.precoPromocional != null ? (
+                              <><span className="text-amber-400 font-medium">{formatBRL(p.precoPromocional)}</span> <span className="line-through">{formatBRL(p.price)}</span></>
+                            ) : formatBRL(p.price)}
+                            {p.stock !== null && ` · estoque: ${p.stock}`}{p.description && ` · ${p.description}`}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 text-xs flex-shrink-0">
+                        <button onClick={() => startEdit(p)} className="text-gray-400 hover:text-white">Editar</button>
+                        <button onClick={() => { setEditingPhotoId(p.id); editPhotoInputRef.current?.click(); }} className="text-blue-400 hover:text-blue-300">Foto</button>
+                        <button onClick={() => handleToggleProduct(p)} className="text-gray-400 hover:text-white">{p.active ? "Desativar" : "Ativar"}</button>
+                        <button onClick={() => handleDeleteProduct(p)} className="text-red-400 hover:text-red-300">Remover</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

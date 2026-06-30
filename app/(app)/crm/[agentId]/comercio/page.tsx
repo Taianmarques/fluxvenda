@@ -51,8 +51,8 @@ export default async function ComercioPage({ params }: { params: Promise<{ agent
       initialInterestFreeInstallments={config.interestFreeInstallments}
       initialInstallmentInterestRate={config.installmentInterestRate}
       initialProducts={products.map(p => ({
-        id: p.id, name: p.name, description: p.description, price: p.price, stock: p.stock, active: p.active,
-        imagemBase64: p.imagemBase64, imagemMimeType: p.imagemMimeType,
+        id: p.id, name: p.name, description: p.description, price: p.price, precoPromocional: p.precoPromocional,
+        stock: p.stock, active: p.active, imagemBase64: p.imagemBase64, imagemMimeType: p.imagemMimeType,
       }))}
       initialOrders={orders.map(o => ({
         id: o.id,

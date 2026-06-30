@@ -183,7 +183,12 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       });
       if (products.length === 0) return "Nenhum produto encontrado no catálogo.";
       return products
-        .map(p => `${p.name} — R$ ${p.price.toFixed(2)}${p.stock !== null ? ` (estoque: ${p.stock})` : ""}${p.description ? ` — ${p.description}` : ""}`)
+        .map(p => {
+          const preco = p.precoPromocional != null
+            ? `R$ ${p.precoPromocional.toFixed(2)} (PROMOÇÃO, de R$ ${p.price.toFixed(2)})`
+            : `R$ ${p.price.toFixed(2)}`;
+          return `${p.name} — ${preco}${p.stock !== null ? ` (estoque: ${p.stock})` : ""}${p.description ? ` — ${p.description}` : ""}`;
+        })
         .join("\n");
     }
 
@@ -191,7 +196,7 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       const itensArg = Array.isArray(args?.itens) ? args.itens : [];
       if (itensArg.length === 0) return "Erro: nenhum item informado.";
 
-      const resolved: { product: { id: string; name: string; price: number } | null; nomeBuscado: string; quantidade: number }[] = [];
+      const resolved: { product: Awaited<ReturnType<typeof prisma.product.findFirst>>; nomeBuscado: string; quantidade: number }[] = [];
       for (const item of itensArg) {
         const nomeBuscado = String(item?.produto ?? "");
         const quantidade = Math.max(1, Number(item?.quantidade) || 1);
@@ -204,7 +209,11 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
         return `Não encontrei esse(s) produto(s) no catálogo: ${naoEncontrados.join(", ")}. Use consultar_produtos pra ver os nomes certos.`;
       }
 
-      const total = resolved.reduce((sum, r) => sum + r.product!.price * r.quantidade, 0);
+      // Usa o preço promocional quando disponível (snapshot no momento do pedido)
+      const getPreco = (p: NonNullable<(typeof resolved)[number]["product"]>) =>
+        p.precoPromocional != null ? p.precoPromocional : p.price;
+
+      const total = resolved.reduce((sum, r) => sum + getPreco(r.product!) * r.quantidade, 0);
 
       let order = await prisma.order.findFirst({ where: { agentConfigId, conversationId, status: "ABERTO" } });
       if (!order) {
@@ -215,10 +224,15 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       }
 
       await prisma.orderItem.createMany({
-        data: resolved.map(r => ({ orderId: order!.id, productId: r.product!.id, name: r.product!.name, unitPrice: r.product!.price, quantity: r.quantidade })),
+        data: resolved.map(r => ({ orderId: order!.id, productId: r.product!.id, name: r.product!.name, unitPrice: getPreco(r.product!), quantity: r.quantidade })),
       });
 
-      const resumo = resolved.map(r => `${r.quantidade}x ${r.product!.name} (R$ ${(r.product!.price * r.quantidade).toFixed(2)})`).join("\n");
+      const resumo = resolved.map(r => {
+        const p = r.product!;
+        const preco = getPreco(p);
+        const promoTag = p.precoPromocional != null ? " (PROMOÇÃO)" : "";
+        return `${r.quantidade}x ${p.name} (R$ ${(preco * r.quantidade).toFixed(2)}${promoTag})`;
+      }).join("\n");
       return `Pedido atualizado:\n${resumo}\nTotal: R$ ${total.toFixed(2)}`;
     }
 
