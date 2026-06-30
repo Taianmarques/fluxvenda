@@ -567,6 +567,7 @@ model AgentConfig {
 
   // Quando ativo, mensagens manuais de atendentes saem no WhatsApp assinadas com o nome de quem mandou
   signatureEnabled Boolean @default(false)
+  emojiEnabled     Boolean @default(false) // permite que o agente de IA use emojis nas respostas
 
   // Catálogo/pedidos via WhatsApp com pagamento Pix/cartão (Asaas) — cada equipe usa a própria conta
   commerceEnabled  Boolean @default(false)

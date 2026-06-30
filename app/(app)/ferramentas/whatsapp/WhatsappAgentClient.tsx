@@ -18,6 +18,7 @@ type InitialConfig = {
   enderecoContato: string;
   followupEnabled: boolean;
   followupDelaysMinutes: number[];
+  emojiEnabled: boolean;
 } | null;
 
 type DelayUnit = "horas" | "minutos";
@@ -114,6 +115,7 @@ export function WhatsappAgentClient({
   const [objecoes, setObjecoes] = useState((initialConfig?.objecoes ?? []).join("\n"));
   const [horario, setHorario] = useState(initialConfig?.horario ?? q.horarioDefault);
   const [followupEnabled, setFollowupEnabled] = useState(initialConfig?.followupEnabled ?? true);
+  const [emojiEnabled, setEmojiEnabled] = useState(initialConfig?.emojiEnabled ?? false);
   const [followupDelays, setFollowupDelays] = useState<DelayRow[]>(
     (initialConfig?.followupDelaysMinutes ?? [1440, 1440]).map(minutesToRow)
   );
@@ -153,6 +155,7 @@ export function WhatsappAgentClient({
           horario,
           followupEnabled,
           followupDelaysMinutes: followupDelays.map(rowToMinutes),
+          emojiEnabled,
         }),
       });
       if (!res.ok) throw new Error();
@@ -217,6 +220,7 @@ export function WhatsappAgentClient({
           horario,
           followupEnabled,
           followupDelaysMinutes: followupDelays.map(rowToMinutes),
+          emojiEnabled,
         }),
       });
       if (!res.ok) throw new Error();
@@ -257,7 +261,7 @@ export function WhatsappAgentClient({
       <div className="space-y-4">
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
           <div className="flex items-center justify-between">
-            <p className="font-semibold">{nome} • tom {tom.toLowerCase()}</p>
+            <p className="font-semibold">{nome} • tom {tom.toLowerCase()} • {emojiEnabled ? "com emojis" : "sem emojis"}</p>
             <button onClick={() => setEditing(true)} className="text-sm text-blue-400 hover:text-blue-300">Editar configurações</button>
           </div>
           <p className="text-sm text-gray-400">Instância conectada: <span className="text-gray-300">{initialConfig?.uazapiInstance || "—"}</span></p>
@@ -381,6 +385,26 @@ export function WhatsappAgentClient({
                   <p className="text-xs text-gray-500 mt-0.5">{o.description}</p>
                 </button>
               ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm text-gray-400 block mb-2">Emojis nas respostas</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setEmojiEnabled(false)}
+                className={`text-left p-3 rounded-xl border text-sm ${!emojiEnabled ? "border-blue-600 bg-blue-950/30" : "border-gray-800 hover:border-gray-700"}`}
+              >
+                <p className="font-medium">Sem emojis</p>
+                <p className="text-xs text-gray-500 mt-0.5">Texto limpo, postura profissional</p>
+              </button>
+              <button
+                onClick={() => setEmojiEnabled(true)}
+                className={`text-left p-3 rounded-xl border text-sm ${emojiEnabled ? "border-blue-600 bg-blue-950/30" : "border-gray-800 hover:border-gray-700"}`}
+              >
+                <p className="font-medium">Com emojis</p>
+                <p className="text-xs text-gray-500 mt-0.5">Tom mais amigável e expressivo</p>
+              </button>
             </div>
           </div>
         </div>

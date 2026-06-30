@@ -40,7 +40,7 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
               nome: config.nome, tom: config.tom, servicos: config.servicos, objecoes: config.objecoes,
               horario: config.horario, uazapiInstance: config.uazapiInstance, isConfigured: Boolean(config.systemPrompt),
               descricaoEmpresa: config.descricaoEmpresa, precos: config.precos, enderecoContato: config.enderecoContato,
-              followupEnabled: config.followupEnabled, followupDelaysMinutes: config.followupDelaysMinutes as unknown as number[],
+              followupEnabled: config.followupEnabled, followupDelaysMinutes: config.followupDelaysMinutes as unknown as number[], emojiEnabled: config.emojiEnabled,
             }}
           />
         </div>
@@ -128,7 +128,7 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
               nome: config.nome, tom: config.tom, servicos: config.servicos, objecoes: config.objecoes,
               horario: config.horario, uazapiInstance: config.uazapiInstance, isConfigured: Boolean(config.systemPrompt),
               descricaoEmpresa: config.descricaoEmpresa, precos: config.precos, enderecoContato: config.enderecoContato,
-              followupEnabled: config.followupEnabled, followupDelaysMinutes: config.followupDelaysMinutes as unknown as number[],
+              followupEnabled: config.followupEnabled, followupDelaysMinutes: config.followupDelaysMinutes as unknown as number[], emojiEnabled: config.emojiEnabled,
             }}
           />
         </div>

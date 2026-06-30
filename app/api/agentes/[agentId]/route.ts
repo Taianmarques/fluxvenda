@@ -27,6 +27,7 @@ const schema = z.object({
   enderecoContato: z.string().default(""),
   followupEnabled: z.boolean().default(true),
   followupDelaysMinutes: z.array(z.number().int().min(1).max(43200)).max(10).default([1440]),
+  emojiEnabled: z.boolean().default(false),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {
@@ -42,7 +43,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
 
   const {
     nome, tom, servicos, objecoes, horario, descricaoEmpresa, precos, enderecoContato,
-    followupEnabled, followupDelaysMinutes,
+    followupEnabled, followupDelaysMinutes, emojiEnabled,
   } = body.data;
 
   const team = await prisma.team.findUnique({ where: { id: existing.teamId } });
@@ -64,7 +65,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
     where: { id: agentId },
     data: {
       nome, tom, servicos, objecoes, horario, descricaoEmpresa, precos, enderecoContato,
-      systemPrompt, followupEnabled, followupDelaysMinutes,
+      systemPrompt, followupEnabled, followupDelaysMinutes, emojiEnabled,
     },
   });
 

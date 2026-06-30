@@ -571,22 +571,28 @@ export async function POST(req: NextRequest) {
     ...(config.cobrancaEnabled ? BILLING_TOOLS : []),
   ];
 
+  // Instrução de emoji injetada em tempo de execução — não exige regenerar o systemPrompt
+  const emojiInstruction = config.emojiEnabled
+    ? "\n\nEmojis: você PODE e DEVE usar emojis nas respostas para tornar a conversa mais amigável e expressiva."
+    : "\n\nEmojis: NUNCA use emojis nas respostas. Mantenha o texto limpo, sem símbolos especiais.";
+  const activeSystemPrompt = config.systemPrompt + emojiInstruction;
+
   let reply: string;
   if (imageUrl) {
-    reply = await runAgentWithImage(config.systemPrompt, historyForAgent, imageUrl, caption);
+    reply = await runAgentWithImage(activeSystemPrompt, historyForAgent, imageUrl, caption);
   } else if (tools.length > 0) {
     const extraContext = (config.schedulingEnabled ? await buildSchedulingContext(config.id) : "")
       + (config.commerceEnabled ? await buildCommerceContext(config.id, config) : "")
       + (config.cobrancaEnabled ? await buildBillingContext(config.id, contactNumber) : "");
     reply = await runAgentWithTools(
-      config.systemPrompt + extraContext,
+      activeSystemPrompt + extraContext,
       historyForAgent,
       text,
       tools,
       makeExecuteTool(config.id, conversation.id, contactName, contactNumber)
     );
   } else {
-    reply = await runAgent(config.systemPrompt, historyForAgent, text);
+    reply = await runAgent(activeSystemPrompt, historyForAgent, text);
   }
 
   await prisma.message.create({ data: { conversationId: conversation.id, role: "assistant", content: reply } });
