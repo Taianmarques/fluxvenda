@@ -320,7 +320,7 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
           await sendWhatsAppTextAsTeam(config.uazapiToken, contactNumber, qr.payload).catch(() => {});
         }
 
-        return `Cobrança Pix gerada, total R$ ${order.total.toFixed(2)}. O código Pix foi enviado em uma mensagem separada para facilitar a cópia — é só copiar e colar no app do banco.`;
+        return `[SISTEMA] Pix gerado com sucesso (R$ ${order.total.toFixed(2)}). O código Pix copia-e-cola foi enviado automaticamente como mensagem separada. Na SUA RESPOSTA ao cliente, apenas confirme que o Pix foi gerado e que o código está na mensagem acima — NÃO inclua o código, NÃO escreva "[código gerado]" nem qualquer placeholder.`;
       } catch (err) {
         console.error("[whatsapp-webhook] erro ao gerar cobrança:", err);
         return "Não foi possível gerar a cobrança agora. Avise que vai encaminhar pra um atendente confirmar o pagamento.";
