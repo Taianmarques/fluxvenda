@@ -4,7 +4,7 @@ import { runAgent, runAgentWithImage, runAgentWithTools, transcribeAudio, classi
 import { sendWhatsAppTextAsTeam, sendMediaAsTeam, downloadMessageMedia } from "@/lib/whatsapp";
 import { getAvailableSlots, isSlotAvailable, formatSlotsForAgent, type AvailabilityRule } from "@/lib/scheduling";
 import { assignNextAttendant } from "@/lib/assignment";
-import { createAsaasCustomer, createAsaasCharge, getAsaasPixQrCode } from "@/lib/asaas";
+import { createAsaasCustomer, createAsaasCharge, cancelAsaasCharge, getAsaasPixQrCode } from "@/lib/asaas";
 
 function mediaMimetype(message: any): string | null {
   return typeof message?.content === "object" && typeof message.content?.mimetype === "string"
@@ -100,6 +100,8 @@ ${lista}
 Como conduzir a conversa de cobrança:
 - Seja cordial mas firme. Não prometa descontos ou prazos que não estejam configurados como política da empresa.
 - Se o devedor quiser pagar, use enviar_boleto com o ID da cobrança correspondente.
+- Se o devedor quiser uma segunda via (re-envio do mesmo boleto), use enviar_boleto — não gera novo boleto, só reenvia o link já existente.
+- Se o devedor pedir prazo extra ou nova data de vencimento, use prorrogar_boleto com a nova data confirmada.
 - Se o devedor disser que já pagou, use consultar_status_boleto pra confirmar antes de afirmar que recebeu.
 - NUNCA invente valores, vencimentos ou status que não venham das ferramentas.
 - Se o devedor pedir negociação além do que está configurado, informe que vai consultar um atendente e encerre cordialmente.`;
@@ -375,7 +377,7 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
             const customer = await createAsaasCustomer(config.asaasApiKey, config.asaasSandbox, cobranca.nomeDevedor, cobranca.contactNumber, cobranca.cpfCnpj || "00000000000");
             asaasCustomerId = customer.id;
           }
-          const payment = await createAsaasCharge(config.asaasApiKey, config.asaasSandbox, asaasCustomerId, cobranca.valor, cobranca.descricao || `Cobrança ${cobranca.nomeDevedor}`, "BOLETO");
+          const payment = await createAsaasCharge(config.asaasApiKey, config.asaasSandbox, asaasCustomerId, cobranca.valor, cobranca.descricao || `Cobrança ${cobranca.nomeDevedor}`, "BOLETO", undefined, cobranca.vencimento.toISOString().slice(0, 10));
           asaasPaymentId = payment.id;
           boletoUrl = payment.bankSlipUrl ?? payment.invoiceUrl;
           await prisma.cobranca.update({ where: { id: cobranca.id }, data: { status: "BOLETO_GERADO", asaasCustomerId, asaasPaymentId, boletoUrl } });
@@ -410,6 +412,42 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
         return `Status do boleto: ${data.status ?? cobranca.status}`;
       } catch {
         return `Status atual: ${cobranca.status}`;
+      }
+    }
+
+    if (name === "prorrogar_boleto") {
+      const cid = typeof args?.cobrancaId === "string" ? args.cobrancaId : "";
+      const novaData = typeof args?.novaData === "string" ? args.novaData : "";
+      if (!novaData.match(/^\d{4}-\d{2}-\d{2}$/)) return "Erro: informe a nova data no formato YYYY-MM-DD.";
+
+      const suffix = cid.length === 6 ? cid : null;
+      const cobranca = await prisma.cobranca.findFirst({
+        where: { agentConfigId, contactNumber, ...(suffix ? { id: { endsWith: suffix } } : { id: cid }) },
+      });
+      if (!cobranca) return "Cobrança não encontrada.";
+      if (!config.asaasApiKey || !config.uazapiToken) return "Pagamento não configurado pra essa empresa.";
+
+      try {
+        // Cancela o boleto atual no Asaas (se existir) e gera um novo com a nova data
+        if (cobranca.asaasPaymentId) {
+          await cancelAsaasCharge(config.asaasApiKey, config.asaasSandbox, cobranca.asaasPaymentId);
+        }
+        let asaasCustomerId = cobranca.asaasCustomerId;
+        if (!asaasCustomerId) {
+          const customer = await createAsaasCustomer(config.asaasApiKey, config.asaasSandbox, cobranca.nomeDevedor, cobranca.contactNumber, cobranca.cpfCnpj || "00000000000");
+          asaasCustomerId = customer.id;
+        }
+        const payment = await createAsaasCharge(config.asaasApiKey, config.asaasSandbox, asaasCustomerId, cobranca.valor, cobranca.descricao || `Cobrança ${cobranca.nomeDevedor}`, "BOLETO", undefined, novaData);
+        const boletoUrl = payment.bankSlipUrl ?? payment.invoiceUrl;
+        await prisma.cobranca.update({
+          where: { id: cobranca.id },
+          data: { vencimento: new Date(novaData), status: "BOLETO_GERADO", asaasCustomerId, asaasPaymentId: payment.id, boletoUrl, reminderCount: 0, lastReminderAt: null },
+        });
+        await sendWhatsAppTextAsTeam(config.uazapiToken, contactNumber, `Boleto reemitido com novo vencimento em ${new Date(novaData).toLocaleDateString("pt-BR")}. Valor: R$ ${cobranca.valor.toFixed(2)}.\nLink:\n${boletoUrl}`);
+        return `Boleto prorrogado para ${novaData}. Novo link enviado.`;
+      } catch (err) {
+        console.error("[whatsapp-webhook] erro ao prorrogar boleto:", err);
+        return "Não foi possível prorrogar o boleto agora. Um atendente irá verificar.";
       }
     }
 

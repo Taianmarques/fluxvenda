@@ -334,6 +334,21 @@ export const BILLING_TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "prorrogar_boleto",
+      description: "Cancela o boleto atual e emite uma segunda via com nova data de vencimento. Use quando o devedor pedir prazo, segunda via com nova data ou renegociação de vencimento.",
+      parameters: {
+        type: "object",
+        properties: {
+          cobrancaId: { type: "string", description: "ID da cobrança" },
+          novaData: { type: "string", description: "Nova data de vencimento no formato YYYY-MM-DD" },
+        },
+        required: ["cobrancaId", "novaData"],
+      },
+    },
+  },
 ];
 
 // Roda o agente com acesso a ferramentas (ex: agendamento) — chama o modelo em loop até ele

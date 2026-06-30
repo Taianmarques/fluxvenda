@@ -95,6 +95,17 @@ export function CobrancaClient({ agentId, initialCobrancaEnabled, initialCobranc
     loadCobrancas();
   }
 
+  async function handleProrrogar(id: string) {
+    const novaData = prompt("Nova data de vencimento (AAAA-MM-DD):");
+    if (!novaData || !novaData.match(/^\d{4}-\d{2}-\d{2}$/)) return;
+    const res = await fetch(`/api/ferramentas/whatsapp/cobrancas/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ novaData }),
+    });
+    if (!res.ok) { alert("Não foi possível prorrogar o boleto."); return; }
+    loadCobrancas();
+  }
+
   const RECORRENCIA_OPTIONS = [
     { value: "UNICA", label: "Única" }, { value: "SEMANAL", label: "Semanal" },
     { value: "QUINZENAL", label: "Quinzenal" }, { value: "MENSAL", label: "Mensal" }, { value: "ANUAL", label: "Anual" },
@@ -179,7 +190,10 @@ export function CobrancaClient({ agentId, initialCobrancaEnabled, initialCobranc
                     )}
                     <div className="flex gap-3 text-xs pt-1">
                       {(c.status === "PENDENTE" || c.status === "BOLETO_GERADO") && (
-                        <button onClick={() => handleEnviarAgora(c.id)} className="text-blue-400 hover:text-blue-300">Enviar agora</button>
+                        <button onClick={() => handleEnviarAgora(c.id)} className="text-blue-400 hover:text-blue-300">2ª via</button>
+                      )}
+                      {(c.status === "PENDENTE" || c.status === "BOLETO_GERADO" || c.status === "VENCIDA") && (
+                        <button onClick={() => handleProrrogar(c.id)} className="text-amber-400 hover:text-amber-300">Prorrogar</button>
                       )}
                       {c.status !== "PAGO" && c.status !== "CANCELADA" && (
                         <button onClick={() => handleMarcarPago(c.id)} className="text-green-400 hover:text-green-300">Marcar pago</button>

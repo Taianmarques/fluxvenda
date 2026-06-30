@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
             const customer = await createAsaasCustomer(config.asaasApiKey!, config.asaasSandbox, c.nomeDevedor, c.contactNumber, c.cpfCnpj || "00000000000");
             asaasCustomerId = customer.id;
           }
-          const payment = await createAsaasCharge(config.asaasApiKey!, config.asaasSandbox, asaasCustomerId, c.valor, c.descricao || `Cobrança ${c.nomeDevedor}`, "BOLETO");
+          const payment = await createAsaasCharge(config.asaasApiKey!, config.asaasSandbox, asaasCustomerId, c.valor, c.descricao || `Cobrança ${c.nomeDevedor}`, "BOLETO", undefined, c.vencimento.toISOString().slice(0, 10));
           const boletoUrl = payment.bankSlipUrl ?? payment.invoiceUrl;
           await prisma.cobranca.update({
             where: { id: c.id },

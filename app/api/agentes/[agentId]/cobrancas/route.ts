@@ -77,7 +77,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
   if (config.asaasApiKey && config.uazapiToken) {
     try {
       const customer = await createAsaasCustomer(config.asaasApiKey, config.asaasSandbox, nomeDevedor, contactNumber, cpfCnpj || "00000000000");
-      const payment = await createAsaasCharge(config.asaasApiKey, config.asaasSandbox, customer.id, valor, descricao || `Cobrança ${nomeDevedor}`, "BOLETO");
+      const payment = await createAsaasCharge(config.asaasApiKey, config.asaasSandbox, customer.id, valor, descricao || `Cobrança ${nomeDevedor}`, "BOLETO", undefined, firstDue.toISOString().slice(0, 10));
       await prisma.cobranca.update({
         where: { id: primeira.id },
         data: { status: "BOLETO_GERADO", asaasCustomerId: customer.id, asaasPaymentId: payment.id, boletoUrl: payment.bankSlipUrl ?? null },
