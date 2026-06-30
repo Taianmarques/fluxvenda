@@ -315,7 +315,12 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
           data: { status: "AGUARDANDO_PAGAMENTO", asaasPaymentId: payment.id, asaasPixPayload: qr.payload, asaasInvoiceUrl: payment.invoiceUrl },
         });
 
-        return `Cobrança Pix gerada, total R$ ${order.total.toFixed(2)}. Código Pix copia-e-cola:\n${qr.payload}`;
+        // Envia o código Pix como mensagem separada pra o cliente conseguir copiar facilmente
+        if (config.uazapiToken) {
+          await sendWhatsAppTextAsTeam(config.uazapiToken, contactNumber, qr.payload).catch(() => {});
+        }
+
+        return `Cobrança Pix gerada, total R$ ${order.total.toFixed(2)}. O código Pix foi enviado em uma mensagem separada para facilitar a cópia — é só copiar e colar no app do banco.`;
       } catch (err) {
         console.error("[whatsapp-webhook] erro ao gerar cobrança:", err);
         return "Não foi possível gerar a cobrança agora. Avise que vai encaminhar pra um atendente confirmar o pagamento.";
