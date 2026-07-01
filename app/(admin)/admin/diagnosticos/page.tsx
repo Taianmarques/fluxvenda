@@ -112,8 +112,10 @@ export default async function AdminDiagnosticosPage({
                   return (
                     <tr key={d.id} className="hover:bg-gray-800/50 transition-colors">
                       <td className="px-5 py-3">
-                        <p className="font-medium truncate max-w-[200px]">{d.companyName}</p>
-                        <p className="text-xs text-gray-500 truncate max-w-[200px]">{d.profile.name} • {d.profile.email}</p>
+                        <Link href={`/admin/diagnosticos/${d.id}`} className="hover:text-blue-400 transition-colors">
+                          <p className="font-medium truncate max-w-[200px]">{d.companyName}</p>
+                          <p className="text-xs text-gray-500 truncate max-w-[200px]">{d.profile.name} • {d.profile.email}</p>
+                        </Link>
                       </td>
                       <td className="px-4 py-3">
                         <span className={`text-xs font-semibold px-2 py-1 rounded-full border ${d.diagnosticType === "EMPRESA" ? "bg-purple-900/30 text-purple-300 border-purple-800/50" : "bg-amber-900/30 text-amber-300 border-amber-800/50"}`}>
@@ -134,8 +136,11 @@ export default async function AdminDiagnosticosPage({
                           <span className="text-gray-600 text-xs">—</span>
                         )}
                       </td>
-                      <td className="px-5 py-3 text-right text-xs text-gray-500">
-                        {new Date(d.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                      <td className="px-5 py-3 text-right">
+                        <p className="text-xs text-gray-500">{new Date(d.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })}</p>
+                        <Link href={`/admin/diagnosticos/${d.id}`} className="text-xs text-blue-400 hover:text-blue-300 font-medium">
+                          Ver →
+                        </Link>
                       </td>
                     </tr>
                   );
