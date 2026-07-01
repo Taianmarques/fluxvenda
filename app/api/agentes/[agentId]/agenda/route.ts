@@ -33,6 +33,8 @@ const schema = z.object({
   appointmentReminderHours: z.number().int().min(1).max(168).optional(),
   requisitosAgendamento: z.string().max(500).optional(),
   restricoesAgendamento: z.string().max(500).optional(),
+  atendimentoEspecialEnabled: z.boolean().optional(),
+  atendimentoEspecialDescricao: z.string().max(500).optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {

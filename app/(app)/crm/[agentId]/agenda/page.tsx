@@ -37,6 +37,8 @@ export default async function AgendaPage({ params }: { params: Promise<{ agentId
       initialAppointmentReminderHours={config.appointmentReminderHours}
       initialRequisitosAgendamento={config.requisitosAgendamento}
       initialRestricoesAgendamento={config.restricoesAgendamento}
+      initialAtendimentoEspecialEnabled={config.atendimentoEspecialEnabled}
+      initialAtendimentoEspecialDescricao={config.atendimentoEspecialDescricao}
     />
   );
 }

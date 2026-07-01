@@ -139,7 +139,7 @@ function fmtDate(d: Date): string {
 }
 
 export function AgendaClient({
-  agentId, initialSchedulingEnabled, initialSlotDurationMinutes, initialAvailability, initialAppointmentReminderHours, initialRequisitosAgendamento, initialRestricoesAgendamento,
+  agentId, initialSchedulingEnabled, initialSlotDurationMinutes, initialAvailability, initialAppointmentReminderHours, initialRequisitosAgendamento, initialRestricoesAgendamento, initialAtendimentoEspecialEnabled, initialAtendimentoEspecialDescricao,
 }: {
   agentId: string;
   initialSchedulingEnabled: boolean;
@@ -148,6 +148,8 @@ export function AgendaClient({
   initialAppointmentReminderHours: number;
   initialRequisitosAgendamento: string;
   initialRestricoesAgendamento: string;
+  initialAtendimentoEspecialEnabled: boolean;
+  initialAtendimentoEspecialDescricao: string;
 }) {
   const [showSettings, setShowSettings] = useState(false);
   const [showTeam, setShowTeam] = useState(false);
@@ -156,6 +158,8 @@ export function AgendaClient({
   const [appointmentReminderHours, setAppointmentReminderHours] = useState(initialAppointmentReminderHours);
   const [requisitosAgendamento, setRequisitosAgendamento] = useState(initialRequisitosAgendamento);
   const [restricoesAgendamento, setRestricoesAgendamento] = useState(initialRestricoesAgendamento);
+  const [atendimentoEspecialEnabled, setAtendimentoEspecialEnabled] = useState(initialAtendimentoEspecialEnabled);
+  const [atendimentoEspecialDescricao, setAtendimentoEspecialDescricao] = useState(initialAtendimentoEspecialDescricao);
   const [rules, setRules] = useState(() => rulesFromAvailability(initialAvailability));
   const [savingSettings, setSavingSettings] = useState(false);
 
@@ -252,7 +256,7 @@ export function AgendaClient({
       await fetch(`/api/agentes/${agentId}/agenda`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ schedulingEnabled, slotDurationMinutes, availability, appointmentReminderHours, requisitosAgendamento, restricoesAgendamento }),
+        body: JSON.stringify({ schedulingEnabled, slotDurationMinutes, availability, appointmentReminderHours, requisitosAgendamento, restricoesAgendamento, atendimentoEspecialEnabled, atendimentoEspecialDescricao }),
       });
     } finally {
       setSavingSettings(false);
@@ -448,6 +452,36 @@ export function AgendaClient({
                 maxLength={500}
               />
               <p className="text-xs text-gray-500 mt-1">O agente vai seguir essas restrições durante toda a conversa de agendamento.</p>
+            </div>
+
+            <div className="border border-gray-800 rounded-xl p-4 space-y-3">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={atendimentoEspecialEnabled}
+                  onChange={e => setAtendimentoEspecialEnabled(e.target.checked)}
+                  className="w-4 h-4"
+                />
+                <div>
+                  <p className="text-sm font-medium">Permitir atendimento especial fora do horário comercial</p>
+                  <p className="text-xs text-gray-500">Quando ativo, o agente informa ao cliente que é possível verificar um horário especial fora da disponibilidade normal.</p>
+                </div>
+              </label>
+              {atendimentoEspecialEnabled && (
+                <div>
+                  <label className="text-sm text-gray-400 block mb-1">
+                    Condições do atendimento especial <span className="text-gray-600">(opcional)</span>
+                  </label>
+                  <textarea
+                    value={atendimentoEspecialDescricao}
+                    onChange={e => setAtendimentoEspecialDescricao(e.target.value)}
+                    rows={2}
+                    placeholder="Ex: somente emergências, sujeito a confirmação por telefone, taxa adicional de R$ 50..."
+                    className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+                    maxLength={500}
+                  />
+                </div>
+              )}
             </div>
 
             <div>
