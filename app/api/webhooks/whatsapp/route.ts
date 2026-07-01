@@ -12,7 +12,7 @@ function mediaMimetype(message: any): string | null {
     : null;
 }
 
-async function buildSchedulingContext(agentConfigId: string, requisitosAgendamento?: string): Promise<string> {
+async function buildSchedulingContext(agentConfigId: string, requisitosAgendamento?: string, restricoesAgendamento?: string): Promise<string> {
   const now = new Date();
   const dateStr = now.toLocaleDateString("pt-BR");
   const weekday = now.toLocaleDateString("pt-BR", { weekday: "long" });
@@ -34,7 +34,7 @@ Quando o cliente quiser agendar algo:${requisitosAgendamento ? `\n- Antes de con
 - Pergunte primeiro o dia e período (manhã/tarde/noite) de preferência, se ele não tiver dito.
 - Use a ferramenta consultar_horarios_disponiveis para saber os horários reais — nunca invente ou suponha horários livres.
 - NUNCA liste todos os horários disponíveis de uma vez. Escolha no máximo 2 ou 3 opções relevantes (próximas ao que o cliente pediu) e ofereça de forma curta e natural, como faria pelo WhatsApp.
-- Depois que o cliente escolher um horário, use agendar_horario para confirmar. Só diga que o agendamento foi confirmado depois que essa ferramenta retornar sucesso.
+- Depois que o cliente escolher um horário, use agendar_horario para confirmar. Só diga que o agendamento foi confirmado depois que essa ferramenta retornar sucesso.${restricoesAgendamento ? `\n\nRESTRIÇÕES — o que você NÃO deve fazer neste agendamento:\n${restricoesAgendamento}` : ""}
 
 Você também pode receber, no meio da conversa, um lembrete automático perguntando se o cliente confirma presença num agendamento já marcado:
 - Se o cliente confirmar (ex: "sim", "confirmado", "pode contar comigo"), apenas agradeça brevemente, sem chamar nenhuma ferramenta.
@@ -581,7 +581,7 @@ export async function POST(req: NextRequest) {
   if (imageUrl) {
     reply = await runAgentWithImage(activeSystemPrompt, historyForAgent, imageUrl, caption);
   } else if (tools.length > 0) {
-    const extraContext = (config.schedulingEnabled ? await buildSchedulingContext(config.id, config.requisitosAgendamento || undefined) : "")
+    const extraContext = (config.schedulingEnabled ? await buildSchedulingContext(config.id, config.requisitosAgendamento || undefined, config.restricoesAgendamento || undefined) : "")
       + (config.commerceEnabled ? await buildCommerceContext(config.id, config) : "")
       + (config.cobrancaEnabled ? await buildBillingContext(config.id, contactNumber) : "");
     reply = await runAgentWithTools(

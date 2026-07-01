@@ -139,7 +139,7 @@ function fmtDate(d: Date): string {
 }
 
 export function AgendaClient({
-  agentId, initialSchedulingEnabled, initialSlotDurationMinutes, initialAvailability, initialAppointmentReminderHours, initialRequisitosAgendamento,
+  agentId, initialSchedulingEnabled, initialSlotDurationMinutes, initialAvailability, initialAppointmentReminderHours, initialRequisitosAgendamento, initialRestricoesAgendamento,
 }: {
   agentId: string;
   initialSchedulingEnabled: boolean;
@@ -147,6 +147,7 @@ export function AgendaClient({
   initialAvailability: AvailabilityRule[];
   initialAppointmentReminderHours: number;
   initialRequisitosAgendamento: string;
+  initialRestricoesAgendamento: string;
 }) {
   const [showSettings, setShowSettings] = useState(false);
   const [showTeam, setShowTeam] = useState(false);
@@ -154,6 +155,7 @@ export function AgendaClient({
   const [slotDurationMinutes, setSlotDurationMinutes] = useState(initialSlotDurationMinutes);
   const [appointmentReminderHours, setAppointmentReminderHours] = useState(initialAppointmentReminderHours);
   const [requisitosAgendamento, setRequisitosAgendamento] = useState(initialRequisitosAgendamento);
+  const [restricoesAgendamento, setRestricoesAgendamento] = useState(initialRestricoesAgendamento);
   const [rules, setRules] = useState(() => rulesFromAvailability(initialAvailability));
   const [savingSettings, setSavingSettings] = useState(false);
 
@@ -250,7 +252,7 @@ export function AgendaClient({
       await fetch(`/api/agentes/${agentId}/agenda`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ schedulingEnabled, slotDurationMinutes, availability, appointmentReminderHours, requisitosAgendamento }),
+        body: JSON.stringify({ schedulingEnabled, slotDurationMinutes, availability, appointmentReminderHours, requisitosAgendamento, restricoesAgendamento }),
       });
     } finally {
       setSavingSettings(false);
@@ -431,6 +433,21 @@ export function AgendaClient({
                 maxLength={500}
               />
               <p className="text-xs text-gray-500 mt-1">O agente vai pedir essas informações ao cliente antes de confirmar o horário.</p>
+            </div>
+
+            <div>
+              <label className="text-sm text-gray-400 block mb-1">
+                O que NÃO fazer no agendamento <span className="text-gray-600">(opcional)</span>
+              </label>
+              <textarea
+                value={restricoesAgendamento}
+                onChange={e => setRestricoesAgendamento(e.target.value)}
+                rows={3}
+                placeholder="Ex: não agendar para menores de 18 anos sem responsável, não aceitar agendamentos no mesmo dia, não remarcar mais de uma vez..."
+                className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+                maxLength={500}
+              />
+              <p className="text-xs text-gray-500 mt-1">O agente vai seguir essas restrições durante toda a conversa de agendamento.</p>
             </div>
 
             <div>

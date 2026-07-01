@@ -561,6 +561,7 @@ model AgentConfig {
   availability             Json    @default("[]") // [{ dayOfWeek: 0-6, start: "09:00", end: "18:00" }]
   appointmentReminderHours Int     @default(24) // quantas horas antes do compromisso enviar a confirmação
   requisitosAgendamento    String  @default("") // informações que o agente deve coletar antes de confirmar o horário
+  restricoesAgendamento    String  @default("") // o que o agente NÃO deve fazer no agendamento
 
   // Como conversas novas são distribuídas entre os atendentes da equipe
   leadDistributionMode LeadDistributionMode @default(MANUAL)
