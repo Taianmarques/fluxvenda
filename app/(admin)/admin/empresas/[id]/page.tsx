@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { EditEmpresaForm } from "./EditEmpresaForm";
 
 export default async function AdminEmpresaDetailPage({
   params,
@@ -44,9 +45,25 @@ export default async function AdminEmpresaDetailPage({
               <h1 className="text-3xl font-bold">{team.name}</h1>
               <p className="text-gray-400">{team.businessModel} • {team.segment || "—"}{team.subsegment ? ` / ${team.subsegment}` : ""} • {team.size} pessoas</p>
             </div>
-            <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-blue-900/40 text-blue-300 border border-blue-800/50">
-              Plano {team.manager.plan}
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-blue-900/40 text-blue-300 border border-blue-800/50">
+                Plano {team.manager.plan}
+              </span>
+              <EditEmpresaForm
+                teamId={team.id}
+                initial={{
+                  name: team.name,
+                  businessModel: team.businessModel,
+                  segment: team.segment,
+                  subsegment: team.subsegment ?? "",
+                  size: team.size,
+                  managerName: team.manager.name,
+                  managerPhone: team.manager.phone ?? "",
+                  managerPlan: team.manager.plan,
+                  managerPlanExpiresAt: team.manager.planExpiresAt?.toISOString() ?? null,
+                }}
+              />
+            </div>
           </div>
         </div>
 
