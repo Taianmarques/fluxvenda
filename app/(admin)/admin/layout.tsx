@@ -15,8 +15,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (profile?.role !== "ADMIN") redirect("/dashboard");
 
   const NAV = [
-    { href: "/admin",          label: "Dashboard", icon: "📈" },
-    { href: "/admin/empresas", label: "Empresas",  icon: "🏢" },
+    { href: "/admin",               label: "Dashboard",    icon: "📈" },
+    { href: "/admin/empresas",      label: "Empresas",     icon: "🏢" },
+    { href: "/admin/diagnosticos",  label: "Diagnósticos", icon: "🔍" },
   ];
 
   return (
