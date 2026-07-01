@@ -95,9 +95,26 @@ export function formatSlotsForAgent(slots: { date: string; weekday: string; slot
   return slots
     .slice(0, 5)
     .map(s => {
-      const preview = s.slots.slice(0, 4).join(", ");
-      const extra = s.slots.length > 4 ? ` (e mais ${s.slots.length - 4} horários nesse dia)` : "";
-      return `${s.date} (${s.weekday}): ${preview}${extra}`;
+      const all = s.slots;
+      // Distribui os horários ao longo do dia em vez de mostrar só os primeiros
+      // (que seriam todos da manhã) — garante que manhã, tarde e noite apareçam para a IA.
+      let preview: string[];
+      if (all.length <= 6) {
+        preview = all;
+      } else {
+        const step = Math.floor((all.length - 1) / 4);
+        preview = [
+          all[0],
+          all[step],
+          all[step * 2],
+          all[step * 3],
+          all[all.length - 1],
+        ].filter((v, i, a) => a.indexOf(v) === i);
+      }
+      const extra = all.length > preview.length
+        ? ` (outros horários disponíveis entre ${all[0]} e ${all[all.length - 1]})`
+        : "";
+      return `${s.date} (${s.weekday}): ${preview.join(", ")}${extra}`;
     })
     .join("\n");
 }
