@@ -139,19 +139,21 @@ function fmtDate(d: Date): string {
 }
 
 export function AgendaClient({
-  agentId, initialSchedulingEnabled, initialSlotDurationMinutes, initialAvailability, initialAppointmentReminderHours,
+  agentId, initialSchedulingEnabled, initialSlotDurationMinutes, initialAvailability, initialAppointmentReminderHours, initialRequisitosAgendamento,
 }: {
   agentId: string;
   initialSchedulingEnabled: boolean;
   initialSlotDurationMinutes: number;
   initialAvailability: AvailabilityRule[];
   initialAppointmentReminderHours: number;
+  initialRequisitosAgendamento: string;
 }) {
   const [showSettings, setShowSettings] = useState(false);
   const [showTeam, setShowTeam] = useState(false);
   const [schedulingEnabled, setSchedulingEnabled] = useState(initialSchedulingEnabled);
   const [slotDurationMinutes, setSlotDurationMinutes] = useState(initialSlotDurationMinutes);
   const [appointmentReminderHours, setAppointmentReminderHours] = useState(initialAppointmentReminderHours);
+  const [requisitosAgendamento, setRequisitosAgendamento] = useState(initialRequisitosAgendamento);
   const [rules, setRules] = useState(() => rulesFromAvailability(initialAvailability));
   const [savingSettings, setSavingSettings] = useState(false);
 
@@ -248,7 +250,7 @@ export function AgendaClient({
       await fetch(`/api/agentes/${agentId}/agenda`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ schedulingEnabled, slotDurationMinutes, availability, appointmentReminderHours }),
+        body: JSON.stringify({ schedulingEnabled, slotDurationMinutes, availability, appointmentReminderHours, requisitosAgendamento }),
       });
     } finally {
       setSavingSettings(false);
@@ -414,6 +416,21 @@ export function AgendaClient({
                 className="w-32 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
               />
               <p className="text-xs text-gray-500 mt-1">O agente pergunta se o cliente confirma presença. Se ele disser que não pode ir, a IA cancela e já oferece reagendar.</p>
+            </div>
+
+            <div>
+              <label className="text-sm text-gray-400 block mb-1">
+                Informações necessárias para o agendamento <span className="text-gray-600">(opcional)</span>
+              </label>
+              <textarea
+                value={requisitosAgendamento}
+                onChange={e => setRequisitosAgendamento(e.target.value)}
+                rows={3}
+                placeholder="Ex: nome completo, convênio, tipo de consulta, nome do pet e raça..."
+                className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+                maxLength={500}
+              />
+              <p className="text-xs text-gray-500 mt-1">O agente vai pedir essas informações ao cliente antes de confirmar o horário.</p>
             </div>
 
             <div>

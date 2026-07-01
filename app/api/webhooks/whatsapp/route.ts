@@ -12,7 +12,7 @@ function mediaMimetype(message: any): string | null {
     : null;
 }
 
-async function buildSchedulingContext(agentConfigId: string): Promise<string> {
+async function buildSchedulingContext(agentConfigId: string, requisitosAgendamento?: string): Promise<string> {
   const now = new Date();
   const dateStr = now.toLocaleDateString("pt-BR");
   const weekday = now.toLocaleDateString("pt-BR", { weekday: "long" });
@@ -30,7 +30,7 @@ async function buildSchedulingContext(agentConfigId: string): Promise<string> {
   return `\n\nFERRAMENTAS DE AGENDAMENTO:
 Hoje é ${dateStr} (${weekday}), agora são ${timeStr}. ${selectionNote}
 
-Quando o cliente quiser agendar algo:
+Quando o cliente quiser agendar algo:${requisitosAgendamento ? `\n- Antes de consultar horários, colete as seguintes informações obrigatórias do cliente (se ainda não tiver): ${requisitosAgendamento}` : ""}
 - Pergunte primeiro o dia e período (manhã/tarde/noite) de preferência, se ele não tiver dito.
 - Use a ferramenta consultar_horarios_disponiveis para saber os horários reais — nunca invente ou suponha horários livres.
 - NUNCA liste todos os horários disponíveis de uma vez. Escolha no máximo 2 ou 3 opções relevantes (próximas ao que o cliente pediu) e ofereça de forma curta e natural, como faria pelo WhatsApp.
@@ -581,7 +581,7 @@ export async function POST(req: NextRequest) {
   if (imageUrl) {
     reply = await runAgentWithImage(activeSystemPrompt, historyForAgent, imageUrl, caption);
   } else if (tools.length > 0) {
-    const extraContext = (config.schedulingEnabled ? await buildSchedulingContext(config.id) : "")
+    const extraContext = (config.schedulingEnabled ? await buildSchedulingContext(config.id, config.requisitosAgendamento || undefined) : "")
       + (config.commerceEnabled ? await buildCommerceContext(config.id, config) : "")
       + (config.cobrancaEnabled ? await buildBillingContext(config.id, contactNumber) : "");
     reply = await runAgentWithTools(
