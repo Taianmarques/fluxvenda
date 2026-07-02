@@ -71,6 +71,9 @@ echo "==> Aplicando migrations do banco..."
 npx prisma generate
 npx prisma migrate deploy
 
+echo "==> Instalando Chromium do Playwright (agente de prospecção)..."
+npx playwright install chromium --with-deps || true
+
 echo "==> Build de produção..."
 npm run build
 

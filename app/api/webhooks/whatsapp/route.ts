@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { runAgent, runAgentWithImage, runAgentWithTools, transcribeAudio, classifyLeadQualified, SCHEDULING_TOOLS, COMMERCE_TOOLS, BILLING_TOOLS } from "@/lib/agent-engine";
+import { runAgent, runAgentWithImage, runAgentWithTools, transcribeAudio, classifyLeadQualified, SCHEDULING_TOOLS, COMMERCE_TOOLS, BILLING_TOOLS, PROSPECTING_TOOLS } from "@/lib/agent-engine";
 import { sendWhatsAppTextAsTeam, sendMediaAsTeam, downloadMessageMedia } from "@/lib/whatsapp";
 import { getAvailableSlots, isSlotAvailable, formatSlotsForAgent, type AvailabilityRule } from "@/lib/scheduling";
 import { assignNextAttendant } from "@/lib/assignment";
@@ -105,6 +105,26 @@ Como conduzir a conversa de cobrança:
 - Se o devedor disser que já pagou, use consultar_status_boleto pra confirmar antes de afirmar que recebeu.
 - NUNCA invente valores, vencimentos ou status que não venham das ferramentas.
 - Se o devedor pedir negociação além do que está configurado, informe que vai consultar um atendente e encerre cordialmente.`;
+}
+
+async function buildProspeccaoContext(agentConfigId: string, contactNumber: string): Promise<string | null> {
+  const prospect = await prisma.prospect.findFirst({
+    where: { agentConfigId, telefone: contactNumber, status: { in: ["ABORDADO", "RESPONDEU"] } },
+  });
+  if (!prospect) return null;
+
+  return `\n\nCONTEXTO DE PROSPECÇÃO:
+Você está em uma conversa de prospecção ativa. O prospect é: ${prospect.nome}${prospect.empresa ? ` (${prospect.empresa})` : ""}, segmento: ${prospect.segmento || "não informado"}.
+
+Seu objetivo é qualificar esse prospect usando o método BANT:
+- **Budget (Orçamento)**: Ele tem budget disponível para resolver esse problema?
+- **Authority (Autoridade)**: Ele é quem toma a decisão de compra, ou precisa de aprovação?
+- **Need (Necessidade)**: Qual a dor principal? Por que ele precisaria do nosso produto/serviço?
+- **Timeline (Prazo)**: Quando ele pretende resolver isso?
+
+Conduza a conversa de forma natural — não pareça um questionário. Quando tiver informação suficiente para avaliar, use registrar_qualificacao. Se ele estiver qualificado e quiser avançar, use encaminhar_para_atendente. Se demonstrar interesse em reunião/demo, use registrar_interesse_reuniao.
+
+Notas anteriores: ${prospect.notas || "nenhuma"}.`;
 }
 
 function makeExecuteTool(agentConfigId: string, conversationId: string, contactName: string | undefined, contactNumber: string) {
@@ -456,6 +476,40 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       }
     }
 
+    if (name === "registrar_qualificacao") {
+      const nivel = args?.nivel as string;
+      const notas = typeof args?.notas === "string" ? args.notas : "";
+      const statusMap: Record<string, "QUALIFICADO" | "DESCARTADO" | "RESPONDEU"> = {
+        QUALIFICADO: "QUALIFICADO",
+        NAO_QUALIFICADO: "DESCARTADO",
+        REQUER_MAIS_INFO: "RESPONDEU",
+      };
+      const novoStatus = statusMap[nivel] ?? "RESPONDEU";
+      await prisma.prospect.updateMany({
+        where: { agentConfigId, telefone: contactNumber, status: { in: ["ABORDADO", "RESPONDEU"] } },
+        data: { status: novoStatus, notas },
+      });
+      return `Qualificação registrada: ${nivel}${notas ? ` — ${notas}` : ""}`;
+    }
+
+    if (name === "encaminhar_para_atendente") {
+      await prisma.prospect.updateMany({
+        where: { agentConfigId, telefone: contactNumber },
+        data: { status: "QUALIFICADO" },
+      });
+      await assignNextAttendant(agentConfigId, config.teamId, conversationId);
+      return "Prospect encaminhado para um atendente humano.";
+    }
+
+    if (name === "registrar_interesse_reuniao") {
+      const notas = typeof args?.notas === "string" ? args.notas : "";
+      await prisma.prospect.updateMany({
+        where: { agentConfigId, telefone: contactNumber },
+        data: { status: "REUNIAO_AGENDADA", ...(notas ? { notas } : {}) },
+      });
+      return "Interesse em reunião registrado.";
+    }
+
     return "Ferramenta desconhecida.";
   };
 }
@@ -515,12 +569,18 @@ export async function POST(req: NextRequest) {
   const contactNumber: string = String(message.sender_pn || message.chatid).split("@")[0];
   const contactName: string | undefined = message.senderName || body.chat?.wa_contactName || body.chat?.name;
 
-  // Cliente respondeu — zera o contador de follow-up
+  // Cliente respondeu — zera o contador de follow-up e marca prospect como RESPONDEU se aplicável
   const conversation = await prisma.conversation.upsert({
     where: { agentConfigId_contactNumber: { agentConfigId: config.id, contactNumber } },
     update: { status: "ATIVO", followupCount: 0, ...(contactName && { contactName }) },
     create: { agentConfigId: config.id, contactNumber, contactName, status: "ATIVO" },
   });
+  if (config.prospeccaoEnabled) {
+    await prisma.prospect.updateMany({
+      where: { agentConfigId: config.id, telefone: contactNumber, status: "ABORDADO" },
+      data: { status: "RESPONDEU" },
+    });
+  }
 
   // Notas internas nunca entram no contexto da IA nem são contadas aqui — são só pra equipe ver
   const recentMessages = await prisma.message.findMany({
@@ -565,10 +625,15 @@ export async function POST(req: NextRequest) {
   const commerceTools = config.commerceEnabled
     ? (config.catalogOnly ? COMMERCE_TOOLS.filter(t => t.function.name !== "gerar_cobranca") : COMMERCE_TOOLS)
     : [];
+  // Prospecção: inclui as ferramentas se o agente tem prospecção ativa E o contato é um prospect
+  const isProspect = config.prospeccaoEnabled
+    ? await prisma.prospect.findFirst({ where: { agentConfigId: config.id, telefone: contactNumber, status: { in: ["ABORDADO", "RESPONDEU"] } } })
+    : null;
   const tools = [
     ...(config.schedulingEnabled ? SCHEDULING_TOOLS : []),
     ...commerceTools,
     ...(config.cobrancaEnabled ? BILLING_TOOLS : []),
+    ...(isProspect ? PROSPECTING_TOOLS : []),
   ];
 
   // Instrução de emoji injetada em tempo de execução — não exige regenerar o systemPrompt
@@ -583,7 +648,8 @@ export async function POST(req: NextRequest) {
   } else if (tools.length > 0) {
     const extraContext = (config.schedulingEnabled ? await buildSchedulingContext(config.id, config.requisitosAgendamento || undefined, config.restricoesAgendamento || undefined, { enabled: config.atendimentoEspecialEnabled, descricao: config.atendimentoEspecialDescricao }) : "")
       + (config.commerceEnabled ? await buildCommerceContext(config.id, config) : "")
-      + (config.cobrancaEnabled ? await buildBillingContext(config.id, contactNumber) : "");
+      + (config.cobrancaEnabled ? await buildBillingContext(config.id, contactNumber) : "")
+      + (isProspect ? (await buildProspeccaoContext(config.id, contactNumber) ?? "") : "");
     reply = await runAgentWithTools(
       activeSystemPrompt + extraContext,
       historyForAgent,

@@ -351,6 +351,44 @@ export const BILLING_TOOLS = [
   },
 ];
 
+export const PROSPECTING_TOOLS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "registrar_qualificacao",
+      description: "Registra o resultado da qualificação do prospect após conduzir o BANT (Budget, Authority, Need, Timeline). Use quando tiver informação suficiente para avaliar o fit.",
+      parameters: {
+        type: "object",
+        properties: {
+          nivel: { type: "string", enum: ["QUALIFICADO", "NAO_QUALIFICADO", "REQUER_MAIS_INFO"], description: "Resultado da qualificação" },
+          notas: { type: "string", description: "Resumo do que foi levantado: orçamento, autoridade, necessidade, prazo" },
+        },
+        required: ["nivel"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "encaminhar_para_atendente",
+      description: "Encaminha o prospect qualificado para um atendente humano da equipe de vendas. Use somente após registrar_qualificacao com nivel QUALIFICADO.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "registrar_interesse_reuniao",
+      description: "Registra que o prospect demonstrou interesse em marcar uma reunião ou demo. Use quando o prospect aceitar uma call ou visita.",
+      parameters: {
+        type: "object",
+        properties: { notas: { type: "string", description: "Preferência de data/horário mencionada, se houver" } },
+        required: [],
+      },
+    },
+  },
+];
+
 // Roda o agente com acesso a ferramentas (ex: agendamento) — chama o modelo em loop até ele
 // parar de pedir ferramentas e devolver uma resposta final em texto.
 export async function runAgentWithTools(

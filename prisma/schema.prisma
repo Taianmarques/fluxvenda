@@ -582,6 +582,13 @@ model AgentConfig {
 
   cobrancaEnabled Boolean @default(false) // agente dedicado a cobrança de dívidas/boletos
 
+  // Prospecção ativa via Google Maps + WhatsApp
+  prospeccaoEnabled          Boolean @default(false)
+  prospeccaoSegmento         String  @default("") // ex: "dentistas"
+  prospeccaoRegiao           String  @default("") // ex: "São Paulo SP"
+  prospeccaoMensagemInicial  String  @default("") // template da 1ª mensagem ao prospect
+  prospeccaoFollowupDias     Json    @default("[3,7,14]") // dias entre follow-ups
+
   // Parcelamento no cartão — o acréscimo de juros é calculado por nós (não pela conta Asaas)
   // e embutido no valor total enviado, pra não depender de configuração externa
   installmentsEnabled     Boolean @default(false)
@@ -599,6 +606,7 @@ model AgentConfig {
   products       Product[]
   orders         Order[]
   cobrancas      Cobranca[]
+  prospects      Prospect[]
 
   @@index([teamId])
 }
@@ -641,6 +649,40 @@ model Service {
 
   appointments           Appointment[]
   pendingInConversations Conversation[]
+}
+
+// ─── Agente de Prospecção ────────────────────────────────────────────────────
+
+enum ProspectStatus {
+  NOVO            // scraped, ainda não abordado
+  ABORDADO        // primeira mensagem enviada, aguardando resposta
+  RESPONDEU       // prospect mandou mensagem, IA qualificando
+  QUALIFICADO     // lead bom, encaminhado para atendente humano
+  REUNIAO_AGENDADA
+  DESCARTADO      // sem perfil ou pediu para parar
+  ENCERRADO       // follow-ups esgotados sem resposta
+}
+
+model Prospect {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  agentConfigId String
+  agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id], onDelete: Cascade)
+
+  nome           String
+  empresa        String @default("")
+  telefone       String
+  segmento       String @default("")
+  regiao         String @default("")
+  sourceUrl      String @default("") // URL da ficha no Google Maps
+  status         ProspectStatus @default(NOVO)
+  notas          String @default("")  // anotações da qualificação pela IA
+
+  abordagemCount  Int      @default(0) // total de mensagens proativas enviadas
+  lastAbordagemAt DateTime?
+
+  @@unique([agentConfigId, telefone]) // evita duplicar o mesmo número no mesmo agente
 }
 
 // ─── Agente de Cobrança ──────────────────────────────────────────────────────
