@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Target, Settings, Search } from "lucide-react";
+import { useRef, useState } from "react";
+import { Target, Settings, Search, Upload, X } from "lucide-react";
 
 type Prospect = {
   id: string; nome: string; empresa: string; telefone: string;
@@ -50,7 +50,15 @@ export function ProspeccaoClient({
   const [scrapeError, setScrapeError] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
 
-  // Cadastro manual
+  // Import de planilha (CSV)
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showImport, setShowImport] = useState(false);
+  const [csvRows, setCsvRows] = useState<{ nome: string; telefone: string; empresa: string; segmento: string; regiao: string }[]>([]);
+  const [csvError, setCsvError] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ novos: number; duplicatas: number } | null>(null);
+
+  // Cadastro manual (1 contato)
   const [showManual, setShowManual] = useState(false);
   const [manNome, setManNome] = useState("");
   const [manEmpresa, setManEmpresa] = useState("");
@@ -85,6 +93,68 @@ export function ProspeccaoClient({
       setShowManual(false);
       loadProspects();
     } finally { setSavingManual(false); }
+  }
+
+  function parseCSV(text: string) {
+    const lines = text.trim().split(/\r?\n/);
+    if (lines.length < 2) return [];
+    // detecta separador ; ou ,
+    const sep = lines[0].includes(";") ? ";" : ",";
+    const headers = lines[0].split(sep).map(h => h.trim().toLowerCase().replace(/['"]/g, ""));
+    const colMap = {
+      nome:      headers.findIndex(h => /nome|name|contato/.test(h)),
+      telefone:  headers.findIndex(h => /tel|fone|phone|whatsapp|celular/.test(h)),
+      empresa:   headers.findIndex(h => /empresa|company|negoc/.test(h)),
+      segmento:  headers.findIndex(h => /segmento|segment|categoria|ramo/.test(h)),
+      regiao:    headers.findIndex(h => /regiao|região|cidade|city|local/.test(h)),
+    };
+    return lines.slice(1).map(line => {
+      const cols = line.split(sep).map(c => c.trim().replace(/^["']|["']$/g, ""));
+      return {
+        nome:     colMap.nome >= 0     ? (cols[colMap.nome]     ?? "") : "",
+        telefone: colMap.telefone >= 0 ? (cols[colMap.telefone] ?? "") : "",
+        empresa:  colMap.empresa >= 0  ? (cols[colMap.empresa]  ?? "") : "",
+        segmento: colMap.segmento >= 0 ? (cols[colMap.segmento] ?? "") : initialSegmento,
+        regiao:   colMap.regiao >= 0   ? (cols[colMap.regiao]   ?? "") : initialRegiao,
+      };
+    }).filter(r => r.nome || r.telefone);
+  }
+
+  function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    setCsvError(""); setCsvRows([]); setImportResult(null);
+    if (!file) return;
+    if (!file.name.match(/\.(csv|txt)$/i)) {
+      setCsvError("Selecione um arquivo CSV. Para Excel, exporte como CSV primeiro (Arquivo → Salvar como → CSV).");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const rows = parseCSV(reader.result as string);
+      if (rows.length === 0) { setCsvError("Nenhuma linha válida encontrada. Verifique se o CSV tem colunas 'nome' e 'telefone'."); return; }
+      setCsvRows(rows);
+    };
+    reader.onerror = () => setCsvError("Não foi possível ler o arquivo.");
+    reader.readAsText(file, "UTF-8");
+  }
+
+  async function handleImport() {
+    if (csvRows.length === 0) return;
+    setImporting(true); setImportResult(null);
+    try {
+      const res = await fetch(`/api/agentes/${agentId}/prospects/importar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prospects: csvRows }),
+      });
+      const d = await res.json();
+      if (!res.ok) { setCsvError(d.error ?? "Erro ao importar."); return; }
+      setImportResult({ novos: d.novos, duplicatas: d.duplicatas });
+      setCsvRows([]);
+      loadProspects();
+    } catch { setCsvError("Falha na conexão."); }
+    finally { setImporting(false); }
   }
 
   async function handleSaveSettings() {
@@ -146,8 +216,11 @@ export function ProspeccaoClient({
             <p className="text-gray-400 text-sm">Atendimento</p>
             <h1 className="text-3xl font-bold mt-1 flex items-center gap-2"><Target size={28} className="text-blue-400" /> Prospecção</h1>
           </div>
-          <button onClick={() => { setShowManual(s => !s); setShowSettings(false); }} className="bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-2.5 text-sm font-medium">
-            + Adicionar manualmente
+          <button onClick={() => { setShowImport(s => !s); setShowManual(false); setShowSettings(false); }} className="bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-1.5">
+            <Upload size={15} /> Importar planilha
+          </button>
+          <button onClick={() => { setShowManual(s => !s); setShowImport(false); setShowSettings(false); }} className="bg-gray-700 hover:bg-gray-600 rounded-xl px-4 py-2.5 text-sm font-medium">
+            + Adicionar 1
           </button>
           <button onClick={() => { setShowSettings(s => !s); setShowManual(false); }} className="bg-gray-800 hover:bg-gray-700 rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-1.5">
             <Settings size={15} /> Configurar
@@ -184,6 +257,72 @@ export function ProspeccaoClient({
             <button onClick={handleSaveSettings} disabled={savingSettings} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl px-5 py-2 text-sm font-medium">
               {savingSettings ? "Salvando..." : "Salvar configurações"}
             </button>
+          </div>
+        )}
+
+        {/* Import de planilha */}
+        {showImport && (
+          <div className="bg-gray-900 border border-blue-800/50 rounded-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="font-semibold">Importar planilha de prospects</p>
+              <button onClick={() => { setShowImport(false); setCsvRows([]); setCsvError(""); setImportResult(null); }} className="text-gray-500 hover:text-gray-300"><X size={18} /></button>
+            </div>
+            <div className="bg-gray-950 border border-gray-800 rounded-xl p-4 text-sm text-gray-400 space-y-1">
+              <p className="text-gray-300 font-medium">Formato esperado (CSV):</p>
+              <p>O arquivo deve ter colunas com esses nomes (em qualquer ordem, separadas por <code className="text-gray-300">,</code> ou <code className="text-gray-300">;</code>):</p>
+              <p><code className="text-white">nome</code> e <code className="text-white">telefone</code> — obrigatórios</p>
+              <p><code className="text-gray-300">empresa</code>, <code className="text-gray-300">segmento</code>, <code className="text-gray-300">regiao</code> — opcionais</p>
+              <p className="text-xs text-gray-500 mt-1">Para Excel: Arquivo → Salvar como → CSV (separado por vírgulas).</p>
+            </div>
+
+            <input ref={fileInputRef} type="file" accept=".csv,.txt" onChange={handleFileSelected} className="hidden" />
+            {csvRows.length === 0 && !importResult && (
+              <button onClick={() => fileInputRef.current?.click()} className="w-full border-2 border-dashed border-gray-700 hover:border-blue-600 rounded-xl py-8 text-sm text-gray-400 hover:text-blue-400 transition-colors flex flex-col items-center gap-2">
+                <Upload size={24} />
+                Clique para selecionar o arquivo CSV
+              </button>
+            )}
+
+            {csvError && <p className="text-sm text-red-400">{csvError}</p>}
+
+            {csvRows.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-gray-300">{csvRows.length} contato(s) encontrados no arquivo:</p>
+                  <button onClick={() => { setCsvRows([]); setCsvError(""); }} className="text-xs text-gray-500 hover:text-gray-300">Limpar</button>
+                </div>
+                <div className="bg-gray-950 rounded-xl overflow-auto max-h-48">
+                  <table className="w-full text-xs">
+                    <thead><tr className="text-gray-500 border-b border-gray-800">
+                      <th className="text-left px-3 py-2">Nome</th>
+                      <th className="text-left px-3 py-2">Telefone</th>
+                      <th className="text-left px-3 py-2">Empresa</th>
+                      <th className="text-left px-3 py-2">Segmento</th>
+                    </tr></thead>
+                    <tbody className="divide-y divide-gray-900">
+                      {csvRows.slice(0, 8).map((r, i) => (
+                        <tr key={i}>
+                          <td className="px-3 py-1.5 truncate max-w-[150px]">{r.nome}</td>
+                          <td className="px-3 py-1.5">{r.telefone}</td>
+                          <td className="px-3 py-1.5 truncate max-w-[120px] text-gray-500">{r.empresa}</td>
+                          <td className="px-3 py-1.5 text-gray-500">{r.segmento}</td>
+                        </tr>
+                      ))}
+                      {csvRows.length > 8 && <tr><td colSpan={4} className="px-3 py-1.5 text-gray-600">… e mais {csvRows.length - 8} contatos</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+                <button onClick={handleImport} disabled={importing} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl px-5 py-2 text-sm font-medium">
+                  {importing ? "Importando..." : `Importar ${csvRows.length} contatos`}
+                </button>
+              </div>
+            )}
+
+            {importResult && (
+              <p className="text-sm text-green-400">
+                {importResult.novos} contato(s) importado(s) com sucesso!{importResult.duplicatas > 0 ? ` (${importResult.duplicatas} já existiam e foram ignorados)` : ""}
+              </p>
+            )}
           </div>
         )}
 
