@@ -50,10 +50,41 @@ export function ProspeccaoClient({
   const [scrapeError, setScrapeError] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
 
+  // Cadastro manual
+  const [showManual, setShowManual] = useState(false);
+  const [manNome, setManNome] = useState("");
+  const [manEmpresa, setManEmpresa] = useState("");
+  const [manTelefone, setManTelefone] = useState("");
+  const [manSegmento, setManSegmento] = useState(initialSegmento);
+  const [manRegiao, setManRegiao] = useState(initialRegiao);
+  const [savingManual, setSavingManual] = useState(false);
+  const [manError, setManError] = useState("");
+
   async function loadProspects() {
     const res = await fetch(`/api/agentes/${agentId}/prospects${filterStatus ? `?status=${filterStatus}` : ""}`);
     const d = await res.json();
     setProspects(d.prospects ?? []);
+  }
+
+  async function handleAddManual() {
+    setManError("");
+    if (!manNome.trim() || !manTelefone.trim()) { setManError("Nome e telefone são obrigatórios."); return; }
+    setSavingManual(true);
+    try {
+      const res = await fetch(`/api/agentes/${agentId}/prospects`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nome: manNome.trim(), empresa: manEmpresa.trim(),
+          telefone: manTelefone.trim().replace(/\D/g, ""),
+          segmento: manSegmento.trim(), regiao: manRegiao.trim(),
+        }),
+      });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); setManError(d.error ?? "Erro ao salvar."); return; }
+      setManNome(""); setManEmpresa(""); setManTelefone(""); setManError("");
+      setShowManual(false);
+      loadProspects();
+    } finally { setSavingManual(false); }
   }
 
   async function handleSaveSettings() {
@@ -115,7 +146,10 @@ export function ProspeccaoClient({
             <p className="text-gray-400 text-sm">Atendimento</p>
             <h1 className="text-3xl font-bold mt-1 flex items-center gap-2"><Target size={28} className="text-blue-400" /> Prospecção</h1>
           </div>
-          <button onClick={() => setShowSettings(s => !s)} className="bg-gray-800 hover:bg-gray-700 rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-1.5">
+          <button onClick={() => { setShowManual(s => !s); setShowSettings(false); }} className="bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-2.5 text-sm font-medium">
+            + Adicionar manualmente
+          </button>
+          <button onClick={() => { setShowSettings(s => !s); setShowManual(false); }} className="bg-gray-800 hover:bg-gray-700 rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-1.5">
             <Settings size={15} /> Configurar
           </button>
         </div>
@@ -150,6 +184,27 @@ export function ProspeccaoClient({
             <button onClick={handleSaveSettings} disabled={savingSettings} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl px-5 py-2 text-sm font-medium">
               {savingSettings ? "Salvando..." : "Salvar configurações"}
             </button>
+          </div>
+        )}
+
+        {/* Cadastro manual */}
+        {showManual && (
+          <div className="bg-gray-900 border border-blue-800/50 rounded-2xl p-5 space-y-3">
+            <p className="font-semibold">Adicionar prospect manualmente</p>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <input value={manNome} onChange={e => setManNome(e.target.value)} placeholder="Nome do contato *" className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm md:col-span-2" />
+              <input value={manTelefone} onChange={e => setManTelefone(e.target.value)} placeholder="Telefone/WhatsApp *" className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
+              <input value={manEmpresa} onChange={e => setManEmpresa(e.target.value)} placeholder="Empresa (opcional)" className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
+              <input value={manSegmento} onChange={e => setManSegmento(e.target.value)} placeholder="Segmento" className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
+              <input value={manRegiao} onChange={e => setManRegiao(e.target.value)} placeholder="Região/Cidade" className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
+            </div>
+            {manError && <p className="text-sm text-red-400">{manError}</p>}
+            <div className="flex gap-2">
+              <button onClick={handleAddManual} disabled={savingManual} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl px-4 py-2 text-sm font-medium">
+                {savingManual ? "Salvando..." : "Salvar prospect"}
+              </button>
+              <button onClick={() => { setShowManual(false); setManError(""); }} className="text-sm text-gray-400 hover:text-white">Cancelar</button>
+            </div>
           </div>
         )}
 
