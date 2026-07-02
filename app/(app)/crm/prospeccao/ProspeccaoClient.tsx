@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Target, Settings, Search, Upload, X } from "lucide-react";
+import { Target, Settings, Search, Upload, X, Download } from "lucide-react";
 
 type Prospect = {
   id: string; nome: string; empresa: string; telefone: string;
@@ -139,6 +139,20 @@ export function ProspeccaoClient({
     reader.readAsText(file, "UTF-8");
   }
 
+  function downloadModeloCSV() {
+    const csv = [
+      "nome;telefone;empresa;segmento;regiao",
+      "Ana Oliveira;11912345678;Clínica Sorriso;odontologia;São Paulo SP",
+      "Carlos Mendes;11987654321;Estúdio Beleza;beleza;Campinas SP",
+      "Maria Santos;11998765432;Farmácia Central;farmácia;Rio de Janeiro RJ",
+    ].join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "modelo_prospects.csv"; a.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function handleImport() {
     if (csvRows.length === 0) return;
     setImporting(true); setImportResult(null);
@@ -273,6 +287,9 @@ export function ProspeccaoClient({
               <p><code className="text-white">nome</code> e <code className="text-white">telefone</code> — obrigatórios</p>
               <p><code className="text-gray-300">empresa</code>, <code className="text-gray-300">segmento</code>, <code className="text-gray-300">regiao</code> — opcionais</p>
               <p className="text-xs text-gray-500 mt-1">Para Excel: Arquivo → Salvar como → CSV (separado por vírgulas).</p>
+              <button onClick={downloadModeloCSV} className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 mt-2">
+                <Download size={13} /> Baixar modelo de planilha
+              </button>
             </div>
 
             <input ref={fileInputRef} type="file" accept=".csv,.txt" onChange={handleFileSelected} className="hidden" />
