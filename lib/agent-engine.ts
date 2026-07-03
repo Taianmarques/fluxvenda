@@ -394,18 +394,53 @@ export const FINANCING_TOOLS = [
     type: "function" as const,
     function: {
       name: "simular_financiamento",
-      description: "Executa uma simulação de financiamento veicular no Banco BV com os dados do cliente. Colete todos os dados obrigatórios antes de chamar esta ferramenta.",
+      description: "Consulta as condições de financiamento veicular disponíveis no Banco BV e calcula a parcela estimada. Colete todos os dados obrigatórios antes de chamar. Dados obrigatórios: categoria do veículo, ano do modelo, cilindradas, se é 0km, tipo de pessoa (física/jurídica), valor do veículo e valor de entrada.",
       parameters: {
         type: "object",
         properties: {
-          cpf:               { type: "string", description: "CPF do cliente (apenas dígitos, sem pontos ou traço)" },
-          dataNascimento:    { type: "string", description: "Data de nascimento no formato DD/MM/AAAA" },
-          possuiHabilitacao: { type: "boolean", description: "Se o cliente possui CNH (Carteira Nacional de Habilitação)" },
-          valorVeiculo:      { type: "number", description: "Valor do veículo em reais" },
-          valorEntrada:      { type: "number", description: "Valor da entrada em reais" },
-          prazoMeses:        { type: "number", description: "Prazo de financiamento em meses (24, 36, 48 ou 60)" },
+          vehicleCategoryDescription: {
+            type: "string",
+            description: "Categoria do veículo: 'AUTOMOVEL', 'MOTO', 'CAMINHAO', 'UTILITARIO', 'ONIBUS', etc."
+          },
+          vehicleModelYear: {
+            type: "string",
+            description: "Ano do modelo do veículo (4 dígitos, ex: '2022')"
+          },
+          cylinderQuantity: {
+            type: "number",
+            description: "Cilindradas do motor (ex: 1000 para 1.0, 1600 para 1.6, 160 para moto 160cc)"
+          },
+          zeroVehicle: {
+            type: "boolean",
+            description: "true = veículo 0km (novo), false = veículo usado/seminovo"
+          },
+          personType: {
+            type: "string",
+            enum: ["F", "J"],
+            description: "Tipo de pessoa: F = Pessoa Física, J = Pessoa Jurídica"
+          },
+          valorVeiculo: {
+            type: "number",
+            description: "Valor total do veículo em reais"
+          },
+          valorEntrada: {
+            type: "number",
+            description: "Valor da entrada em reais (pode ser 0)"
+          },
+          prazoMeses: {
+            type: "number",
+            description: "Prazo desejado em meses (ex: 24, 36, 48, 60). Se não informado, usa o prazo padrão disponível."
+          },
+          vehicleBrandDescription: {
+            type: "string",
+            description: "Marca do veículo (ex: 'HONDA', 'TOYOTA', 'VOLKSWAGEN') — opcional"
+          },
+          fullVehicleModelVersionDescription: {
+            type: "string",
+            description: "Descrição completa do modelo (ex: 'CIVIC EXL 2.0 16V CVT') — opcional"
+          },
         },
-        required: ["cpf", "dataNascimento", "possuiHabilitacao", "valorVeiculo", "valorEntrada", "prazoMeses"],
+        required: ["vehicleCategoryDescription", "vehicleModelYear", "cylinderQuantity", "zeroVehicle", "personType", "valorVeiculo", "valorEntrada"],
       },
     },
   },
@@ -413,7 +448,7 @@ export const FINANCING_TOOLS = [
     type: "function" as const,
     function: {
       name: "registrar_interesse_financiamento",
-      description: "Registra que o cliente demonstrou interesse em prosseguir com o financiamento após ver a simulação. Use quando o cliente confirmar que quer continuar.",
+      description: "Registra que o cliente demonstrou interesse em prosseguir com o financiamento após ver as condições. Use quando o cliente confirmar que quer continuar.",
       parameters: {
         type: "object",
         properties: {

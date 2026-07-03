@@ -1,103 +1,154 @@
-// Integração com a API Open Banking do Banco BV para simulação de financiamento veicular.
-// Documentação: https://developers-sandbox.bvopen.com.br/api/70
-// Autenticação: OAuth 2.0 Client Credentials
+// Integração com a API Open Banking do Banco BV — Condições de Financiamento Veicular.
+// Spec: POST /partner-funding/v1/financing-conditions
+// Sandbox: https://apige-uat-sbx.bancobv.com.br
+// Auth: OAuth 2.0 Client Credentials (Bearer JWT)
 
-const BV_SANDBOX_URL = "https://developers-sandbox.bvopen.com.br";
-const BV_PROD_URL = "https://api.bvopen.com.br";
+const BV_SANDBOX_BASE = "https://apige-uat-sbx.bancobv.com.br";
+const BV_PROD_BASE = "https://apige.bancobv.com.br"; // confirmar URL de produção no portal BV
 
-export type BvSimulationParams = {
-  cpf: string;
-  dataNascimento: string; // "DD/MM/AAAA"
-  possuiHabilitacao: boolean;
-  valorVeiculo: number;
-  valorEntrada: number;
-  prazoMeses: number; // 24, 36, 48 ou 60
+// O endpoint OAuth do BV pode estar num host diferente — ajustar se necessário.
+// Padrão observado na sandbox: mesmo host do gateway.
+const bvOAuthUrl = (sandbox: boolean) =>
+  `${sandbox ? BV_SANDBOX_BASE : BV_PROD_BASE}/oauth/token`;
+
+const bvApiUrl = (sandbox: boolean) =>
+  `${sandbox ? BV_SANDBOX_BASE : BV_PROD_BASE}/partner-funding/v1`;
+
+// ─── Tipos do contrato BV ────────────────────────────────────────────────────
+
+export type BvFinancingRequest = {
+  // Obrigatórios (conforme spec BV)
+  zeroVehicle: boolean;                    // true = 0km, false = usado
+  personType: "F" | "J";                  // F = Física, J = Jurídica
+  vehicleCategoryDescription: string;     // "AUTOMOVEL", "MOTO", etc.
+  commercialPartnerCode: string;          // código do parceiro/loja no BV
+  cylinderQuantity: number;               // cilindradas do motor (inteiro)
+  financingEntryDate: string;             // "YYYY-MM-DD" — data de entrada do financiamento
+  vehicleModelYear: string;               // "2023" — 4 dígitos
+  // Opcionais
+  financingTableCode?: string;
+  vehicleBrandDescription?: string;       // "HONDA", "TOYOTA", etc.
+  fullVehicleModelVersionDescription?: string; // "KA SEDAN SE PLUS 1.0 12V 4P"
+  vehicleSubCategoryDescription?: string;
 };
 
-export type BvSimulationResult = {
-  valorParcela: number;
-  taxaMensal: number; // % ao mês
-  cet: number; // Custo Efetivo Total % ao ano
-  valorTotal: number;
-  raw: unknown; // resposta JSON completa da API BV para auditoria
+type BvReturnRate = {
+  code: number;
+  description: string;
+  value: number;   // taxa (% — verificar se mensal ou anual com BV)
+  default: boolean;
 };
+
+type BvFinancingTerm = {
+  financingTerm: number; // prazo em meses
+  default: boolean;
+};
+
+type BvFinancingTable = {
+  code: string;
+  commercialDescription: string;
+  minimumEntryValuePercentage: number;
+  minimumFinancingGraceDate: string;
+  maximumFinancingGraceDate: string;
+  plusPercentage: string;
+  financingReturnRateDataList: BvReturnRate[];
+  financingTermDataList: BvFinancingTerm[];
+  default: boolean;
+};
+
+export type BvFinancingConditionsResult = {
+  tables: BvFinancingTable[];
+  defaultTable: BvFinancingTable | null;
+  defaultRate: number | null;    // taxa da tabela padrão com default: true
+  availableTerms: number[];      // prazos disponíveis em meses (ordenados)
+  defaultTerm: number | null;
+  raw: unknown;                  // resposta JSON completa para auditoria
+};
+
+// ─── PMT — cálculo local de parcela estimada ─────────────────────────────────
+// Usa a taxa retornada pelo BV como proxy para estimar a parcela.
+// Nota: as taxas da BV são "taxas de retorno" — confirmar com BV se são mensais ou anuais.
+export function calcularPMT(
+  valorFinanciado: number,
+  taxaMensalPct: number,
+  prazoMeses: number
+): number {
+  if (taxaMensalPct === 0 || prazoMeses === 0) return valorFinanciado / Math.max(prazoMeses, 1);
+  const i = taxaMensalPct / 100;
+  return (valorFinanciado * i * Math.pow(1 + i, prazoMeses)) / (Math.pow(1 + i, prazoMeses) - 1);
+}
+
+// ─── OAuth ───────────────────────────────────────────────────────────────────
 
 async function getBvToken(
   clientId: string,
   clientSecret: string,
   sandbox: boolean
 ): Promise<string> {
-  const baseUrl = sandbox ? BV_SANDBOX_URL : BV_PROD_URL;
-
   const body = new URLSearchParams({
     grant_type: "client_credentials",
     client_id: clientId,
     client_secret: clientSecret,
   });
 
-  const res = await fetch(`${baseUrl}/oauth/token`, {
+  const res = await fetch(bvOAuthUrl(sandbox), {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: body.toString(),
   });
 
   if (!res.ok) {
-    const err = await res.text();
+    const err = await res.text().catch(() => res.statusText);
     throw new Error(`BV OAuth falhou (${res.status}): ${err}`);
   }
 
   const data = await res.json();
-  if (!data.access_token) {
-    throw new Error("BV OAuth: access_token ausente na resposta");
-  }
-
+  if (!data.access_token) throw new Error("BV OAuth: access_token ausente na resposta");
   return data.access_token as string;
 }
 
-export async function simularFinanciamentoBV(
+// ─── Chamada principal ────────────────────────────────────────────────────────
+
+export async function buscarCondicoesFinanciamentoBV(
   clientId: string,
   clientSecret: string,
   sandbox: boolean,
-  params: BvSimulationParams
-): Promise<BvSimulationResult> {
-  const baseUrl = sandbox ? BV_SANDBOX_URL : BV_PROD_URL;
+  params: BvFinancingRequest
+): Promise<BvFinancingConditionsResult> {
   const token = await getBvToken(clientId, clientSecret, sandbox);
 
-  // Payload conforme documentação da API BV (https://developers-sandbox.bvopen.com.br/api/70)
-  const payload = {
-    cpf: params.cpf.replace(/\D/g, ""),
-    dataNascimento: params.dataNascimento, // "DD/MM/AAAA"
-    possuiHabilitacao: params.possuiHabilitacao,
-    valorBem: params.valorVeiculo,
-    valorEntrada: params.valorEntrada,
-    quantidadeParcelas: params.prazoMeses,
-  };
-
-  const res = await fetch(`${baseUrl}/v1/financiamento/simulacao`, {
+  const res = await fetch(`${bvApiUrl(sandbox)}/financing-conditions`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(params),
   });
 
   if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`BV simulação falhou (${res.status}): ${err}`);
+    const err = await res.text().catch(() => res.statusText);
+    throw new Error(`BV financing-conditions falhou (${res.status}): ${err}`);
   }
 
   const data = await res.json();
+  const tables: BvFinancingTable[] = data.financingTableParameterList ?? [];
 
-  // Normaliza a resposta — ajuste os campos conforme a resposta real da API BV
-  const valorParcela: number =
-    data.valorParcela ?? data.parcela?.valor ?? data.installmentValue ?? 0;
-  const taxaMensal: number =
-    data.taxaMensal ?? data.taxa?.mensal ?? data.monthlyRate ?? 0;
-  const cet: number =
-    data.cet ?? data.custoEfetivoTotal ?? data.effectiveCost ?? 0;
-  const valorTotal: number =
-    data.valorTotal ?? data.totalFinanciado ?? data.totalAmount ?? 0;
+  const defaultTable = tables.find(t => t.default) ?? tables[0] ?? null;
 
-  return { valorParcela, taxaMensal, cet, valorTotal, raw: data };
+  const defaultRate =
+    defaultTable?.financingReturnRateDataList?.find(r => r.default)?.value
+    ?? defaultTable?.financingReturnRateDataList?.[0]?.value
+    ?? null;
+
+  const availableTerms = (defaultTable?.financingTermDataList ?? [])
+    .map(t => t.financingTerm)
+    .sort((a, b) => a - b);
+
+  const defaultTerm =
+    defaultTable?.financingTermDataList?.find(t => t.default)?.financingTerm
+    ?? availableTerms[Math.floor(availableTerms.length / 2)]
+    ?? null;
+
+  return { tables, defaultTable, defaultRate, availableTerms, defaultTerm, raw: data };
 }

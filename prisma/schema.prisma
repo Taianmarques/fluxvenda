@@ -597,10 +597,11 @@ model AgentConfig {
   installmentInterestRate Float   @default(0) // % de acréscimo por parcela além das sem juros
 
   // Simulação de financiamento veicular — integração com API do Banco BV
-  financingEnabled  Boolean @default(false)
-  bvClientId        String?
-  bvClientSecret    String?
-  bvSandbox         Boolean @default(true)
+  financingEnabled        Boolean @default(false)
+  bvClientId              String?
+  bvClientSecret          String?
+  bvSandbox               Boolean @default(true)
+  bvCommercialPartnerCode String  @default("") // código da loja/parceiro cadastrado no BV
 
   conversations        Conversation[]
   pipelines            Pipeline[]

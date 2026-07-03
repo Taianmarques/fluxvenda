@@ -27,6 +27,7 @@ type Props = {
   isGestor: boolean;
   initialFinancingEnabled: boolean;
   initialBvSandbox: boolean;
+  initialBvCommercialPartnerCode: string;
   initialHasBvCredentials: boolean;
   initialSimulations: Simulation[];
 };
@@ -46,11 +47,13 @@ export function FinancimentosClient({
   isGestor,
   initialFinancingEnabled,
   initialBvSandbox,
+  initialBvCommercialPartnerCode,
   initialHasBvCredentials,
   initialSimulations,
 }: Props) {
   const [financingEnabled, setFinancingEnabled] = useState(initialFinancingEnabled);
   const [bvSandbox, setBvSandbox] = useState(initialBvSandbox);
+  const [bvCommercialPartnerCode, setBvCommercialPartnerCode] = useState(initialBvCommercialPartnerCode);
   const [hasBvCredentials, setHasBvCredentials] = useState(initialHasBvCredentials);
   const [bvClientId, setBvClientId] = useState("");
   const [bvClientSecret, setBvClientSecret] = useState("");
@@ -72,7 +75,7 @@ export function FinancimentosClient({
 
   async function saveConfig() {
     setSavingConfig(true);
-    const body: Record<string, unknown> = { financingEnabled, bvSandbox };
+    const body: Record<string, unknown> = { financingEnabled, bvSandbox, bvCommercialPartnerCode };
     if (bvClientId) body.bvClientId = bvClientId;
     if (bvClientSecret) body.bvClientSecret = bvClientSecret;
 
@@ -84,6 +87,7 @@ export function FinancimentosClient({
     const data = await res.json();
     if (res.ok) {
       setHasBvCredentials(data.hasBvCredentials);
+      setBvCommercialPartnerCode(data.bvCommercialPartnerCode ?? bvCommercialPartnerCode);
       setBvClientId("");
       setBvClientSecret("");
       setShowConfig(false);
@@ -158,6 +162,17 @@ export function FinancimentosClient({
             </div>
 
             <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Código do Parceiro BV</label>
+                <input
+                  type="text"
+                  value={bvCommercialPartnerCode}
+                  onChange={e => setBvCommercialPartnerCode(e.target.value)}
+                  placeholder="Ex: 8659 — código da loja cadastrado no Banco BV"
+                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm placeholder:text-gray-600 focus:outline-none focus:border-blue-500"
+                />
+                <p className="text-xs text-gray-600 mt-1">commercialPartnerCode fornecido pelo Banco BV ao credenciar a loja.</p>
+              </div>
               <div>
                 <label className="block text-xs text-gray-400 mb-1">Client ID (BV Open)</label>
                 <input

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { runAgent, runAgentWithImage, runAgentWithTools, transcribeAudio, classifyLeadQualified, SCHEDULING_TOOLS, COMMERCE_TOOLS, BILLING_TOOLS, PROSPECTING_TOOLS, FINANCING_TOOLS } from "@/lib/agent-engine";
-import { simularFinanciamentoBV } from "@/lib/bv-api";
+import { buscarCondicoesFinanciamentoBV, calcularPMT } from "@/lib/bv-api";
 import { sendWhatsAppTextAsTeam, sendMediaAsTeam, downloadMessageMedia } from "@/lib/whatsapp";
 import { getAvailableSlots, isSlotAvailable, formatSlotsForAgent, type AvailabilityRule } from "@/lib/scheduling";
 import { assignNextAttendant } from "@/lib/assignment";
@@ -533,55 +533,99 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
     }
 
     if (name === "simular_financiamento") {
-      const cpf = String(args?.cpf ?? "").replace(/\D/g, "");
-      const dataNascimento = String(args?.dataNascimento ?? "");
-      const possuiHabilitacao = Boolean(args?.possuiHabilitacao);
+      const vehicleCategoryDescription = String(args?.vehicleCategoryDescription ?? "").toUpperCase();
+      const vehicleModelYear = String(args?.vehicleModelYear ?? "").slice(0, 4);
+      const cylinderQuantity = Math.round(Number(args?.cylinderQuantity ?? 0));
+      const zeroVehicle = Boolean(args?.zeroVehicle);
+      const personType = (args?.personType === "J" ? "J" : "F") as "F" | "J";
       const valorVeiculo = Number(args?.valorVeiculo ?? 0);
-      const valorEntrada = Number(args?.valorEntrada ?? 0);
-      const prazoMeses = Number(args?.prazoMeses ?? 36);
+      const valorEntrada = Math.max(0, Number(args?.valorEntrada ?? 0));
+      const prazoDesejado = args?.prazoMeses ? Number(args.prazoMeses) : null;
+      const vehicleBrandDescription = args?.vehicleBrandDescription ? String(args.vehicleBrandDescription).toUpperCase() : undefined;
+      const fullVehicleModelVersionDescription = args?.fullVehicleModelVersionDescription ? String(args.fullVehicleModelVersionDescription).toUpperCase() : undefined;
 
-      if (!cpf || cpf.length < 11) return "CPF inválido. Solicite o CPF completo do cliente (11 dígitos).";
-      if (!dataNascimento.match(/\d{2}\/\d{2}\/\d{4}/)) return "Data de nascimento inválida. Use o formato DD/MM/AAAA.";
+      if (!vehicleCategoryDescription) return "Categoria do veículo não informada. Pergunte ao cliente (AUTOMOVEL, MOTO, CAMINHAO, etc.).";
+      if (!vehicleModelYear.match(/^\d{4}$/)) return "Ano do modelo inválido. Informe 4 dígitos (ex: 2022).";
+      if (cylinderQuantity <= 0) return "Cilindradas inválidas. Pergunte ao cliente (ex: 1000 para motor 1.0, 160 para moto 160cc).";
       if (valorVeiculo <= 0) return "Valor do veículo inválido.";
-      if (valorEntrada < 0 || valorEntrada >= valorVeiculo) return "Valor de entrada inválido.";
+      if (valorEntrada >= valorVeiculo) return "Valor de entrada não pode ser maior ou igual ao valor do veículo.";
 
       const agentConfig = await prisma.agentConfig.findUnique({ where: { id: agentConfigId } });
       if (!agentConfig?.bvClientId || !agentConfig?.bvClientSecret) {
         return "Financiamento não configurado. O gestor precisa cadastrar as credenciais do Banco BV nas configurações.";
       }
+      if (!agentConfig.bvCommercialPartnerCode) {
+        return "Código do parceiro BV não configurado. O gestor precisa cadastrar o código da loja nas configurações.";
+      }
+
+      const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
 
       try {
-        const result = await simularFinanciamentoBV(
+        const result = await buscarCondicoesFinanciamentoBV(
           agentConfig.bvClientId,
           agentConfig.bvClientSecret,
           agentConfig.bvSandbox,
-          { cpf, dataNascimento, possuiHabilitacao, valorVeiculo, valorEntrada, prazoMeses }
+          {
+            zeroVehicle,
+            personType,
+            vehicleCategoryDescription,
+            commercialPartnerCode: agentConfig.bvCommercialPartnerCode,
+            cylinderQuantity,
+            financingEntryDate: today,
+            vehicleModelYear,
+            vehicleBrandDescription,
+            fullVehicleModelVersionDescription,
+          }
         );
+
+        // Determina o prazo a usar (preferência do cliente ou padrão BV)
+        const prazoMeses = prazoDesejado && result.availableTerms.includes(prazoDesejado)
+          ? prazoDesejado
+          : (result.defaultTerm ?? 48);
+
+        // Calcula parcela estimada usando a taxa da tabela padrão BV + fórmula PMT
+        const valorFinanciado = valorVeiculo - valorEntrada;
+        const taxaMensal = result.defaultRate ?? 0;
+        const valorParcela = taxaMensal > 0
+          ? calcularPMT(valorFinanciado, taxaMensal, prazoMeses)
+          : valorFinanciado / prazoMeses;
+        const valorTotal = valorParcela * prazoMeses + valorEntrada;
 
         await prisma.financingSimulation.create({
           data: {
             agentConfigId,
             contactNumber,
             nomeCliente: contactName ?? "",
-            cpf,
-            dataNascimento,
-            possuiHabilitacao,
             valorVeiculo,
             valorEntrada,
             prazoMeses,
             resultadoJson: JSON.stringify(result.raw),
-            valorParcela: result.valorParcela,
-            taxaMensal: result.taxaMensal,
-            cet: result.cet,
-            valorTotal: result.valorTotal,
+            valorParcela,
+            taxaMensal,
+            valorTotal,
           },
         });
 
         const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-        return `Simulação concluída:\n- Parcela: ${fmt(result.valorParcela)}/mês por ${prazoMeses}x\n- Taxa mensal: ${result.taxaMensal.toFixed(2)}% a.m.\n- CET: ${result.cet.toFixed(2)}% a.a.\n- Total financiado: ${fmt(result.valorTotal)}\n\nApresente esses valores ao cliente e pergunte se ele deseja prosseguir com o financiamento.`;
+
+        // Monta resposta com prazos disponíveis
+        const prazosDisponiveis = result.availableTerms.length > 0
+          ? result.availableTerms.join(", ") + " meses"
+          : "conforme tabela BV";
+
+        let resposta = `Condições de financiamento BV consultadas:\n`;
+        resposta += `- Veículo: ${vehicleBrandDescription ?? vehicleCategoryDescription} ${vehicleModelYear} (${zeroVehicle ? "0km" : "seminovo"})\n`;
+        resposta += `- Valor financiado: ${fmt(valorFinanciado)} (veículo ${fmt(valorVeiculo)} − entrada ${fmt(valorEntrada)})\n`;
+        resposta += `- Prazo escolhido: ${prazoMeses}x → parcela estimada de ${fmt(valorParcela)}/mês\n`;
+        if (taxaMensal > 0) resposta += `- Taxa indicativa: ${taxaMensal.toFixed(2)}% a.m.\n`;
+        resposta += `- Prazos disponíveis: ${prazosDisponiveis}\n`;
+        resposta += `- Tabela: ${result.defaultTable?.commercialDescription ?? "padrão BV"}\n`;
+        resposta += `\nApresente as condições ao cliente e pergunte se quer prosseguir. Informe que os valores são estimativas — a aprovação de crédito define a taxa final.`;
+
+        return resposta;
       } catch (err: any) {
-        console.error("[financing] erro na simulação BV:", err);
-        return `Não foi possível realizar a simulação no momento. Erro: ${err?.message ?? "tente novamente"}. Peça ao cliente para aguardar ou entre em contato com o time de financiamento.`;
+        console.error("[financing] erro na consulta BV:", err);
+        return `Não foi possível consultar as condições de financiamento no momento. Erro: ${err?.message ?? "tente novamente"}. Peça ao cliente para aguardar ou entre em contato com o time de financiamento.`;
       }
     }
 

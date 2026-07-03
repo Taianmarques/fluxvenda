@@ -9,6 +9,7 @@ const schema = z.object({
   bvClientId: z.string().optional(),
   bvClientSecret: z.string().optional(),
   bvSandbox: z.boolean().optional(),
+  bvCommercialPartnerCode: z.string().optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {
@@ -30,6 +31,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
   return NextResponse.json({
     financingEnabled: updated.financingEnabled,
     bvSandbox: updated.bvSandbox,
+    bvCommercialPartnerCode: updated.bvCommercialPartnerCode,
     hasBvCredentials: !!(updated.bvClientId && updated.bvClientSecret),
   });
 }

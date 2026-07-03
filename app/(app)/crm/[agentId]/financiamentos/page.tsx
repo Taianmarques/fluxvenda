@@ -43,6 +43,7 @@ export default async function FinancimentosPage({ params }: { params: Promise<{ 
       isGestor={isGestor}
       initialFinancingEnabled={config.financingEnabled}
       initialBvSandbox={config.bvSandbox}
+      initialBvCommercialPartnerCode={config.bvCommercialPartnerCode ?? ""}
       initialHasBvCredentials={!!(config.bvClientId && config.bvClientSecret)}
       initialSimulations={simulations.map(s => ({
         id: s.id,
