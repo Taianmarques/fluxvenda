@@ -389,6 +389,42 @@ export const PROSPECTING_TOOLS = [
   },
 ];
 
+export const FINANCING_TOOLS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "simular_financiamento",
+      description: "Executa uma simulação de financiamento veicular no Banco BV com os dados do cliente. Colete todos os dados obrigatórios antes de chamar esta ferramenta.",
+      parameters: {
+        type: "object",
+        properties: {
+          cpf:               { type: "string", description: "CPF do cliente (apenas dígitos, sem pontos ou traço)" },
+          dataNascimento:    { type: "string", description: "Data de nascimento no formato DD/MM/AAAA" },
+          possuiHabilitacao: { type: "boolean", description: "Se o cliente possui CNH (Carteira Nacional de Habilitação)" },
+          valorVeiculo:      { type: "number", description: "Valor do veículo em reais" },
+          valorEntrada:      { type: "number", description: "Valor da entrada em reais" },
+          prazoMeses:        { type: "number", description: "Prazo de financiamento em meses (24, 36, 48 ou 60)" },
+        },
+        required: ["cpf", "dataNascimento", "possuiHabilitacao", "valorVeiculo", "valorEntrada", "prazoMeses"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "registrar_interesse_financiamento",
+      description: "Registra que o cliente demonstrou interesse em prosseguir com o financiamento após ver a simulação. Use quando o cliente confirmar que quer continuar.",
+      parameters: {
+        type: "object",
+        properties: {
+          notas: { type: "string", description: "Observações sobre o interesse do cliente ou próximos passos combinados" },
+        },
+        required: [],
+      },
+    },
+  },
+];
+
 // Roda o agente com acesso a ferramentas (ex: agendamento) — chama o modelo em loop até ele
 // parar de pedir ferramentas e devolver uma resposta final em texto.
 export async function runAgentWithTools(

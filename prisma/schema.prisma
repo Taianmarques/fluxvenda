@@ -596,17 +596,24 @@ model AgentConfig {
   interestFreeInstallments Int    @default(1) // até quantas parcelas não tem acréscimo
   installmentInterestRate Float   @default(0) // % de acréscimo por parcela além das sem juros
 
-  conversations Conversation[]
-  pipelines      Pipeline[]
-  leadStatuses   LeadStatus[]
-  appointments   Appointment[]
-  professionals  Professional[]
-  services       Service[]
-  quickReplies   QuickReply[]
-  products       Product[]
-  orders         Order[]
-  cobrancas      Cobranca[]
-  prospects      Prospect[]
+  // Simulação de financiamento veicular — integração com API do Banco BV
+  financingEnabled  Boolean @default(false)
+  bvClientId        String?
+  bvClientSecret    String?
+  bvSandbox         Boolean @default(true)
+
+  conversations        Conversation[]
+  pipelines            Pipeline[]
+  leadStatuses         LeadStatus[]
+  appointments         Appointment[]
+  professionals        Professional[]
+  services             Service[]
+  quickReplies         QuickReply[]
+  products             Product[]
+  orders               Order[]
+  cobrancas            Cobranca[]
+  prospects            Prospect[]
+  financingSimulations FinancingSimulation[]
 
   @@index([teamId])
 }
@@ -992,4 +999,45 @@ model Message {
 
   senderId String?  // qual atendente mandou (role "human"), pra CRM multiusuário
   sender   Profile? @relation(fields: [senderId], references: [id], onDelete: SetNull)
+}
+
+// ─── Agente de Financiamento Veicular (Banco BV) ─────────────────────────────
+
+enum FinancingStatus {
+  SIMULADO    // simulação concluída, cliente ainda não se posicionou
+  INTERESSE   // cliente demonstrou interesse em prosseguir
+  ENCAMINHADO // encaminhado para atendente humano fechar o negócio
+  DESCARTADO  // cliente não quis prosseguir
+}
+
+model FinancingSimulation {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  agentConfigId String
+  agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id], onDelete: Cascade)
+
+  // Dados coletados pelo agente no WhatsApp
+  contactNumber     String  // número do WhatsApp do cliente
+  nomeCliente       String  @default("")
+  cpf               String  @default("")
+  dataNascimento    String  @default("") // "DD/MM/AAAA"
+  possuiHabilitacao Boolean @default(false)
+
+  // Parâmetros da simulação
+  valorVeiculo Float
+  valorEntrada Float
+  prazoMeses   Int   // ex: 24, 36, 48, 60
+
+  // Resultado retornado pela API do Banco BV
+  resultadoJson String  @db.Text // JSON completo da resposta BV para auditoria
+  valorParcela  Float?
+  taxaMensal    Float?  // % ao mês
+  cet           Float?  // Custo Efetivo Total % ao ano
+  valorTotal    Float?
+
+  status FinancingStatus @default(SIMULADO)
+  notas  String          @default("")
+
+  @@index([agentConfigId, contactNumber])
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { runAgent, runAgentWithImage, runAgentWithTools, transcribeAudio, classifyLeadQualified, SCHEDULING_TOOLS, COMMERCE_TOOLS, BILLING_TOOLS, PROSPECTING_TOOLS } from "@/lib/agent-engine";
+import { runAgent, runAgentWithImage, runAgentWithTools, transcribeAudio, classifyLeadQualified, SCHEDULING_TOOLS, COMMERCE_TOOLS, BILLING_TOOLS, PROSPECTING_TOOLS, FINANCING_TOOLS } from "@/lib/agent-engine";
+import { simularFinanciamentoBV } from "@/lib/bv-api";
 import { sendWhatsAppTextAsTeam, sendMediaAsTeam, downloadMessageMedia } from "@/lib/whatsapp";
 import { getAvailableSlots, isSlotAvailable, formatSlotsForAgent, type AvailabilityRule } from "@/lib/scheduling";
 import { assignNextAttendant } from "@/lib/assignment";
@@ -125,6 +126,27 @@ Seu objetivo é qualificar esse prospect usando o método BANT:
 Conduza a conversa de forma natural — não pareça um questionário. Quando tiver informação suficiente para avaliar, use registrar_qualificacao. Se ele estiver qualificado e quiser avançar, use encaminhar_para_atendente. Se demonstrar interesse em reunião/demo, use registrar_interesse_reuniao.
 
 Notas anteriores: ${prospect.notas || "nenhuma"}.`;
+}
+
+async function buildFinancingContext(agentConfigId: string, contactNumber: string): Promise<string> {
+  const simulations = await prisma.financingSimulation.findMany({
+    where: { agentConfigId, contactNumber },
+    orderBy: { createdAt: "desc" },
+    take: 3,
+  });
+
+  let ctx = "\n\nFERRAMENTAS DE FINANCIAMENTO VEICULAR:\nVocê é um especialista em financiamento de veículos integrado ao Banco BV. Seu papel é coletar os dados necessários do cliente e executar uma simulação real.";
+  ctx += "\n\nDados obrigatórios para a simulação:\n- CPF do cliente (apenas números)\n- Data de nascimento (DD/MM/AAAA)\n- Se possui CNH (habilitação)\n- Valor do veículo\n- Valor da entrada\n- Prazo em meses (24, 36, 48 ou 60)";
+  ctx += "\n\nColete os dados de forma natural, um de cada vez. Quando tiver todos, use simular_financiamento. Ao apresentar o resultado, mostre o valor da parcela, prazo, taxa mensal e CET de forma clara. Pergunte se o cliente quer prosseguir e, se sim, use registrar_interesse_financiamento.";
+
+  if (simulations.length > 0) {
+    ctx += "\n\nSimulações anteriores nesta conversa:";
+    for (const s of simulations) {
+      ctx += `\n- ${new Date(s.createdAt).toLocaleDateString("pt-BR")}: veículo R$ ${s.valorVeiculo.toLocaleString("pt-BR")}, entrada R$ ${s.valorEntrada.toLocaleString("pt-BR")}, ${s.prazoMeses}x — parcela R$ ${s.valorParcela?.toLocaleString("pt-BR") ?? "n/a"} — status: ${s.status}`;
+    }
+  }
+
+  return ctx;
 }
 
 function makeExecuteTool(agentConfigId: string, conversationId: string, contactName: string | undefined, contactNumber: string) {
@@ -510,6 +532,68 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       return "Interesse em reunião registrado.";
     }
 
+    if (name === "simular_financiamento") {
+      const cpf = String(args?.cpf ?? "").replace(/\D/g, "");
+      const dataNascimento = String(args?.dataNascimento ?? "");
+      const possuiHabilitacao = Boolean(args?.possuiHabilitacao);
+      const valorVeiculo = Number(args?.valorVeiculo ?? 0);
+      const valorEntrada = Number(args?.valorEntrada ?? 0);
+      const prazoMeses = Number(args?.prazoMeses ?? 36);
+
+      if (!cpf || cpf.length < 11) return "CPF inválido. Solicite o CPF completo do cliente (11 dígitos).";
+      if (!dataNascimento.match(/\d{2}\/\d{2}\/\d{4}/)) return "Data de nascimento inválida. Use o formato DD/MM/AAAA.";
+      if (valorVeiculo <= 0) return "Valor do veículo inválido.";
+      if (valorEntrada < 0 || valorEntrada >= valorVeiculo) return "Valor de entrada inválido.";
+
+      const agentConfig = await prisma.agentConfig.findUnique({ where: { id: agentConfigId } });
+      if (!agentConfig?.bvClientId || !agentConfig?.bvClientSecret) {
+        return "Financiamento não configurado. O gestor precisa cadastrar as credenciais do Banco BV nas configurações.";
+      }
+
+      try {
+        const result = await simularFinanciamentoBV(
+          agentConfig.bvClientId,
+          agentConfig.bvClientSecret,
+          agentConfig.bvSandbox,
+          { cpf, dataNascimento, possuiHabilitacao, valorVeiculo, valorEntrada, prazoMeses }
+        );
+
+        await prisma.financingSimulation.create({
+          data: {
+            agentConfigId,
+            contactNumber,
+            nomeCliente: contactName ?? "",
+            cpf,
+            dataNascimento,
+            possuiHabilitacao,
+            valorVeiculo,
+            valorEntrada,
+            prazoMeses,
+            resultadoJson: JSON.stringify(result.raw),
+            valorParcela: result.valorParcela,
+            taxaMensal: result.taxaMensal,
+            cet: result.cet,
+            valorTotal: result.valorTotal,
+          },
+        });
+
+        const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+        return `Simulação concluída:\n- Parcela: ${fmt(result.valorParcela)}/mês por ${prazoMeses}x\n- Taxa mensal: ${result.taxaMensal.toFixed(2)}% a.m.\n- CET: ${result.cet.toFixed(2)}% a.a.\n- Total financiado: ${fmt(result.valorTotal)}\n\nApresente esses valores ao cliente e pergunte se ele deseja prosseguir com o financiamento.`;
+      } catch (err: any) {
+        console.error("[financing] erro na simulação BV:", err);
+        return `Não foi possível realizar a simulação no momento. Erro: ${err?.message ?? "tente novamente"}. Peça ao cliente para aguardar ou entre em contato com o time de financiamento.`;
+      }
+    }
+
+    if (name === "registrar_interesse_financiamento") {
+      const notas = typeof args?.notas === "string" ? args.notas : "";
+      await prisma.financingSimulation.updateMany({
+        where: { agentConfigId, contactNumber, status: "SIMULADO" },
+        data: { status: "INTERESSE", ...(notas ? { notas } : {}) },
+      });
+      return "Interesse no financiamento registrado. Um especialista entrará em contato para dar continuidade ao processo.";
+    }
+
     return "Ferramenta desconhecida.";
   };
 }
@@ -634,6 +718,7 @@ export async function POST(req: NextRequest) {
     ...commerceTools,
     ...(config.cobrancaEnabled ? BILLING_TOOLS : []),
     ...(isProspect ? PROSPECTING_TOOLS : []),
+    ...(config.financingEnabled ? FINANCING_TOOLS : []),
   ];
 
   // Instrução de emoji injetada em tempo de execução — não exige regenerar o systemPrompt
@@ -649,7 +734,8 @@ export async function POST(req: NextRequest) {
     const extraContext = (config.schedulingEnabled ? await buildSchedulingContext(config.id, config.requisitosAgendamento || undefined, config.restricoesAgendamento || undefined, { enabled: config.atendimentoEspecialEnabled, descricao: config.atendimentoEspecialDescricao }) : "")
       + (config.commerceEnabled ? await buildCommerceContext(config.id, config) : "")
       + (config.cobrancaEnabled ? await buildBillingContext(config.id, contactNumber) : "")
-      + (isProspect ? (await buildProspeccaoContext(config.id, contactNumber) ?? "") : "");
+      + (isProspect ? (await buildProspeccaoContext(config.id, contactNumber) ?? "") : "")
+      + (config.financingEnabled ? await buildFinancingContext(config.id, contactNumber) : "");
     reply = await runAgentWithTools(
       activeSystemPrompt + extraContext,
       historyForAgent,
