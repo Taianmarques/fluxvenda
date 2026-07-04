@@ -37,7 +37,8 @@ export async function getInstagramLongLivedToken(shortToken: string): Promise<{ 
 }
 
 export async function getInstagramUserInfo(accessToken: string): Promise<{ igUserId: string; username: string }> {
-  const res = await fetch(`${IG_GRAPH}/me?fields=id,username&access_token=${accessToken}`);
+  // New Instagram Platform uses /me without version prefix
+  const res = await fetch(`https://graph.instagram.com/me?fields=id,username&access_token=${accessToken}`);
   const data = await res.json();
   if (!res.ok || data.error) throw new Error(data.error?.message ?? "Falha ao obter dados do usuário");
   return { igUserId: String(data.id), username: data.username ?? "" };
