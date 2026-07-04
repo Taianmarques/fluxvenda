@@ -37,11 +37,19 @@ export async function getInstagramLongLivedToken(shortToken: string): Promise<{ 
 }
 
 export async function getInstagramUserInfo(accessToken: string, userId: string): Promise<{ igUserId: string; username: string }> {
-  // Fetch username by user ID — avoids /me endpoint issues with new Instagram Platform
+  // Try /me first (no version) — returns the canonical Business Account ID used by webhooks
+  const meRes = await fetch(`https://graph.instagram.com/me?fields=id,username&access_token=${accessToken}`);
+  const meData = await meRes.json();
+  if (meRes.ok && !meData.error && meData.id) {
+    console.log("[instagram] /me returned id:", meData.id, "username:", meData.username);
+    return { igUserId: String(meData.id), username: meData.username ?? "" };
+  }
+  console.warn("[instagram] /me failed:", meData.error?.message, "— falling back to userId");
+  // Fallback: use /{userId} with version
   const res = await fetch(`${IG_GRAPH}/${userId}?fields=id,username&access_token=${accessToken}`);
   const data = await res.json();
   if (!res.ok || data.error) {
-    console.warn("[instagram] getInstagramUserInfo error:", data.error?.message);
+    console.warn("[instagram] /{userId} also failed:", data.error?.message);
     return { igUserId: userId, username: "" };
   }
   return { igUserId: String(data.id ?? userId), username: data.username ?? "" };
