@@ -424,10 +424,12 @@ export function CanaisClient({
     } finally { setLoadingId(null); }
   }
 
-  async function handleCreate() {
+  async function handleCreate(connect: "whatsapp" | "instagram" | "none") {
     if (!newName.trim()) return;
     setLoadingId("new");
     setError("");
+    // Popup precisa abrir de forma síncrona no clique, senão o navegador bloqueia
+    const igPopup = connect === "instagram" ? openInstagramPopup() : null;
     try {
       const res = await fetch("/api/agentes", {
         method: "POST",
@@ -441,21 +443,29 @@ export function CanaisClient({
       setCreating(false);
       setNewName("");
       setNewSegmento("");
-      await startConnect(data.config.id);
+      if (connect === "whatsapp") await startConnect(data.config.id);
+      if (connect === "instagram" && igPopup) {
+        igPopup.location.href = `/api/instagram/auth?agentId=${data.config.id}`;
+      }
     } catch {
+      igPopup?.close();
       setError("Erro ao criar canal. Tente novamente.");
     } finally { setLoadingId(null); }
   }
 
-  function openInstagramOAuth(agentId: string) {
+  function openInstagramPopup(url = "") {
     const w = 600, h = 700;
     const left = window.screenX + (window.outerWidth - w) / 2;
     const top = window.screenY + (window.outerHeight - h) / 2;
-    window.open(
-      `/api/instagram/auth?agentId=${agentId}`,
+    return window.open(
+      url,
       "instagram-oauth",
       `width=${w},height=${h},left=${left},top=${top},scrollbars=yes,resizable=yes`
     );
+  }
+
+  function openInstagramOAuth(agentId: string) {
+    openInstagramPopup(`/api/instagram/auth?agentId=${agentId}`);
   }
 
   async function handleDeleteChannel(agentId: string) {
@@ -544,20 +554,39 @@ export function CanaisClient({
                 />
               </div>
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={handleCreate}
-                disabled={!newName.trim() || loadingId === "new"}
-                className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm rounded-xl px-4 py-2 transition-colors"
-              >
-                {loadingId === "new" ? "Criando..." : "Criar e conectar WhatsApp"}
-              </button>
-              <button
-                onClick={() => { setCreating(false); setNewName(""); setNewSegmento(""); }}
-                className="text-sm text-gray-400 hover:text-gray-200 px-4 py-2 transition-colors"
-              >
-                Cancelar
-              </button>
+            <div className="space-y-2">
+              <p className="text-xs text-gray-500">Escolha o canal para conectar agora (dá para conectar os outros depois):</p>
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  onClick={() => handleCreate("whatsapp")}
+                  disabled={!newName.trim() || loadingId === "new"}
+                  className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm rounded-xl px-4 py-2 transition-colors"
+                >
+                  <Smartphone size={14} />
+                  {loadingId === "new" ? "Criando..." : "Criar e conectar WhatsApp"}
+                </button>
+                <button
+                  onClick={() => handleCreate("instagram")}
+                  disabled={!newName.trim() || loadingId === "new"}
+                  className="flex items-center gap-1.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm rounded-xl px-4 py-2 transition-colors"
+                >
+                  <Instagram size={14} />
+                  {loadingId === "new" ? "Criando..." : "Criar e conectar Instagram"}
+                </button>
+                <button
+                  onClick={() => handleCreate("none")}
+                  disabled={!newName.trim() || loadingId === "new"}
+                  className="text-sm text-gray-400 hover:text-gray-200 border border-gray-700 hover:border-gray-500 rounded-xl px-4 py-2 transition-colors disabled:opacity-50"
+                >
+                  Criar sem conectar
+                </button>
+                <button
+                  onClick={() => { setCreating(false); setNewName(""); setNewSegmento(""); }}
+                  className="text-sm text-gray-500 hover:text-gray-300 px-3 py-2 transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
             </div>
           </div>
         )}

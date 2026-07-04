@@ -85,6 +85,12 @@ export async function GET(req: NextRequest) {
     // 5. Ativa recebimento de DMs (best-effort)
     await subscribeInstagramWebhook(igUserId, token).catch(() => {});
 
+    // 6. Instagram conectado é canal suficiente — ativa o agente (paridade com o fluxo WhatsApp)
+    await prisma.agentConfig.update({
+      where: { id: oauthState.agentConfigId },
+      data: { active: true },
+    }).catch(() => {});
+
     return closePage(appOrigin, {
       type: "INSTAGRAM_CONNECTED",
       agentId: oauthState.agentConfigId,
