@@ -109,8 +109,9 @@ export async function connectInstance(token: string): Promise<UazapiInstanceStat
 // Consulta o status atual da conexão (usado para polling após exibir o QR code)
 export async function getInstanceStatus(token: string): Promise<UazapiInstanceStatus> {
   const res = await fetch(`${UAZAPI_URL}/instance/status`, {
-    method: "GET",
-    headers: { token },
+    method: "POST",
+    headers: { "Content-Type": "application/json", token },
+    body: JSON.stringify({}),
   });
   if (!res.ok) throw new Error(`Erro ao consultar status da instância: ${res.status}`);
   return parseInstanceStatus(await res.json());
