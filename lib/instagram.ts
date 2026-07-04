@@ -43,7 +43,7 @@ export async function getInstagramUserInfo(accessToken: string): Promise<{ igUse
 export async function subscribeInstagramWebhook(igUserId: string, accessToken: string): Promise<void> {
   const res = await fetch(`${IG_GRAPH}/${igUserId}/subscribed_apps`, {
     method: "POST",
-    body: new URLSearchParams({ subscribed_fields: "messages", access_token: accessToken }),
+    body: new URLSearchParams({ subscribed_fields: "messages,comments", access_token: accessToken }),
   });
   const data = await res.json();
   if (!res.ok && data.error) console.warn("[instagram] webhook subscribe:", data.error?.message);
