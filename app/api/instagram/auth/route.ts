@@ -31,6 +31,8 @@ export async function GET(req: NextRequest) {
     scope: "instagram_business_basic,instagram_business_manage_messages",
     response_type: "code",
     state,
+    // Força a tela de consentimento — evita reutilizar autorização antiga com permissões faltando
+    force_reauth: "true",
   });
 
   return NextResponse.redirect(`https://www.instagram.com/oauth/authorize?${params}`);

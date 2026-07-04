@@ -14,6 +14,7 @@ export async function exchangeInstagramCode(code: string, redirectUri: string): 
   const res = await fetch(`${IG_AUTH}/oauth/access_token`, { method: "POST", body });
   const data = await res.json();
   if (!res.ok || data.error_message || data.error) throw new Error(data.error_message ?? data.error?.message ?? "Falha na troca do código OAuth");
+  console.log("[instagram] permissions granted:", JSON.stringify(data.permissions ?? data.scope ?? "n/a"));
   return { accessToken: data.access_token as string, userId: String(data.user_id) };
 }
 
@@ -45,8 +46,11 @@ export async function getInstagramUserInfo(accessToken: string, userId: string):
     console.log("[instagram] /me returned user_id:", meData.user_id, "id:", meData.id, "username:", meData.username);
     return { igUserId: String(meData.user_id ?? meData.id), username: meData.username ?? "" };
   }
-  console.warn("[instagram] /me failed:", meData.error?.message, "— falling back to userId");
-  return { igUserId: userId, username: "" };
+  // Token sem acesso à API — conexão seria inútil (não recebe webhook nem envia DM)
+  console.warn("[instagram] /me failed:", meData.error?.message);
+  throw new Error(
+    "O Instagram não liberou acesso à conta. Verifique se a conta é Profissional (Empresa ou Criador) e aceite TODAS as permissões na tela de autorização, depois tente conectar novamente."
+  );
 }
 
 // ─── Webhook ──────────────────────────────────────────────────────────────────
