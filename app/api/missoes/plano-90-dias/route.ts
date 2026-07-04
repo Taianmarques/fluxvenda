@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { openai, MODEL } from "@/lib/openai";
+import { logTokenUsage, getTeamIdForUser } from "@/lib/token-usage";
 import { levelFromXP } from "@/lib/utils";
 import { getAreaScore } from "@/lib/diagnostic-score";
 
@@ -88,12 +89,16 @@ Regras para "actions":
 
 Seja direto e específico para o segmento "${segment}". Não inclua texto fora do JSON.`;
 
-  const completion = await openai.chat.completions.create({
-    model: MODEL,
-    max_tokens: 2400,
-    response_format: { type: "json_object" },
-    messages: [{ role: "user", content: prompt }],
-  });
+  const [completion, teamId] = await Promise.all([
+    openai.chat.completions.create({
+      model: MODEL,
+      max_tokens: 2400,
+      response_format: { type: "json_object" },
+      messages: [{ role: "user", content: prompt }],
+    }),
+    getTeamIdForUser(userId),
+  ]);
+  if (teamId) logTokenUsage({ teamId, provider: "openai", model: MODEL, feature: "plano", inputTokens: completion.usage?.prompt_tokens ?? 0, outputTokens: completion.usage?.completion_tokens ?? 0 });
 
   const raw = completion.choices[0]?.message?.content ?? "{}";
   let parsed: { narrative?: string; actions?: RawAction[] } = {};

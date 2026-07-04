@@ -477,10 +477,13 @@ model Team {
   size          String  @default("1-10")
   invite        String  @unique @default(cuid()) // código de convite
 
-  members       TeamMember[]
-  goals         Goal[]
-  announcements Announcement[]
-  agentConfigs  AgentConfig[]
+  monthlyTokenLimit Int?
+
+  members        TeamMember[]
+  goals          Goal[]
+  announcements  Announcement[]
+  agentConfigs   AgentConfig[]
+  tokenUsageLogs TokenUsageLog[]
 }
 
 model TeamMember {
@@ -596,12 +599,9 @@ model AgentConfig {
   interestFreeInstallments Int    @default(1) // até quantas parcelas não tem acréscimo
   installmentInterestRate Float   @default(0) // % de acréscimo por parcela além das sem juros
 
-  // Simulação de financiamento veicular — integração com API do Banco BV
-  financingEnabled        Boolean @default(false)
-  bvClientId              String?
-  bvClientSecret          String?
-  bvSandbox               Boolean @default(true)
-  bvCommercialPartnerCode String  @default("") // código da loja/parceiro cadastrado no BV
+  // Resposta automática a comentários do Instagram via DM
+  igCommentAutoDm    Boolean @default(false)
+  igCommentDmMessage String? // fallback quando nenhum fluxo bate — null = IA responde
 
   conversations        Conversation[]
   pipelines            Pipeline[]
@@ -614,7 +614,9 @@ model AgentConfig {
   orders               Order[]
   cobrancas            Cobranca[]
   prospects            Prospect[]
-  financingSimulations FinancingSimulation[]
+  instagramConnection  InstagramConnection?
+  igCommentFlows       InstagramCommentFlow[]
+  igFunnels            InstagramFunnel[]
 
   @@index([teamId])
 }
@@ -1002,43 +1004,140 @@ model Message {
   sender   Profile? @relation(fields: [senderId], references: [id], onDelete: SetNull)
 }
 
-// ─── Agente de Financiamento Veicular (Banco BV) ─────────────────────────────
+// ─── Controle de consumo de tokens de IA ─────────────────────────────────────
 
-enum FinancingStatus {
-  SIMULADO    // simulação concluída, cliente ainda não se posicionou
-  INTERESSE   // cliente demonstrou interesse em prosseguir
-  ENCAMINHADO // encaminhado para atendente humano fechar o negócio
-  DESCARTADO  // cliente não quis prosseguir
+model TokenUsageLog {
+  id           String   @id @default(cuid())
+  createdAt    DateTime @default(now())
+  teamId       String
+  team         Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  provider     String   // "openai" | "anthropic"
+  model        String   // "gpt-4o-mini" | "claude-sonnet-4-6"
+  feature      String   // "whatsapp_agent" | "followup" | "plano" | "missao" | "script" | "objecao" | "scanner" | "simulacao"
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  costUsd      Float    @default(0)
+
+  @@index([teamId, createdAt])
 }
 
-model FinancingSimulation {
-  id            String   @id @default(cuid())
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+// ─── Instagram DM ─────────────────────────────────────────────────────────────
+
+model InstagramConnection {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agentConfigId String      @unique
+  agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id], onDelete: Cascade)
+
+  pageId                     String
+  pageAccessToken            String
+  instagramBusinessAccountId String   @unique
+  instagramUsername          String   @default("")
+  tokenExpiresAt             DateTime?
+  webhookSubscribed          Boolean  @default(false)
+}
+
+// ─── Fluxos condicionais de comentários → DM ─────────────────────────────────
+
+model InstagramCommentFlow {
+  id            String      @id @default(cuid())
+  createdAt     DateTime    @default(now())
   agentConfigId String
   agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id], onDelete: Cascade)
 
-  // Dados coletados pelo agente no WhatsApp
-  contactNumber     String  // número do WhatsApp do cliente
-  nomeCliente       String  @default("")
-  cpf               String  @default("")
-  dataNascimento    String  @default("") // "DD/MM/AAAA"
-  possuiHabilitacao Boolean @default(false)
+  name         String   // label amigável, ex: "Promoção Verão"
+  keywords     String[] @default([]) // vazio = aceita qualquer comentário (catch-all)
+  replyMessage String   @default("") // mensagem direta (usado quando funnelId é null)
+  order        Int      @default(0)
+  active       Boolean  @default(true)
 
-  // Parâmetros da simulação
-  valorVeiculo Float
-  valorEntrada Float
-  prazoMeses   Int   // ex: 24, 36, 48, 60
+  // Quando definido, dispara o funil em vez de enviar replyMessage
+  funnelId String?
+  funnel   InstagramFunnel? @relation(fields: [funnelId], references: [id], onDelete: SetNull)
 
-  // Resultado retornado pela API do Banco BV
-  resultadoJson String  @db.Text // JSON completo da resposta BV para auditoria
-  valorParcela  Float?
-  taxaMensal    Float?  // % ao mês
-  cet           Float?  // Custo Efetivo Total % ao ano
-  valorTotal    Float?
+  @@index([agentConfigId, order])
+}
 
-  status FinancingStatus @default(SIMULADO)
-  notas  String          @default("")
+// ─── Funis de automação estilo Manychat ──────────────────────────────────────
 
-  @@index([agentConfigId, contactNumber])
+model InstagramFunnel {
+  id            String      @id @default(cuid())
+  createdAt     DateTime    @default(now())
+  agentConfigId String
+  agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id], onDelete: Cascade)
+
+  name   String
+  active Boolean @default(true)
+
+  // Gatilho por DM direto (independente de comentário)
+  dmTriggerEnabled  Boolean  @default(false)
+  dmTriggerKeywords String[] @default([]) // vazio = qualquer DM; preenchido = só se o texto contiver a palavra
+
+  blocks     InstagramFunnelBlock[]
+  executions InstagramFunnelExecution[]
+  triggers   InstagramCommentFlow[]
+
+  @@index([agentConfigId])
+}
+
+model InstagramFunnelBlock {
+  id       String          @id @default(cuid())
+  funnelId String
+  funnel   InstagramFunnel @relation(fields: [funnelId], references: [id], onDelete: Cascade)
+
+  type  FunnelBlockType
+  order Int             @default(0)
+
+  // MESSAGE: content = texto enviado no DM
+  // DELAY:   delayMinutes = tempo de espera
+  // CONDITION: content = texto da pergunta; branches = JSON [{keywords:string[], label:string, funnelId:string|null}]
+  content      String?
+  delayMinutes Int?
+  branches     Json?   // [{keywords: string[], label: string, funnelId: string | null}]
+
+  @@index([funnelId, order])
+}
+
+enum FunnelBlockType {
+  MESSAGE    // envia DM e avança imediatamente
+  DELAY      // aguarda X minutos antes do próximo bloco
+  CONDITION  // envia pergunta, aguarda resposta e ramifica por palavra-chave
+}
+
+model InstagramFunnelExecution {
+  id            String           @id @default(cuid())
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  funnelId      String
+  funnel        InstagramFunnel  @relation(fields: [funnelId], references: [id], onDelete: Cascade)
+  agentConfigId String
+  contactIgsid  String           // IGSID do contato no Instagram
+  igBusinessAccountId String
+  pageAccessToken     String     // token da conexão no momento da execução
+  blockIndex    Int              @default(0)
+  status        FunnelExecStatus @default(RUNNING)
+  resumeAt      DateTime?        // preenchido quando WAITING_DELAY
+
+  @@index([agentConfigId, contactIgsid, status])
+  @@index([status, resumeAt])
+}
+
+enum FunnelExecStatus {
+  RUNNING
+  WAITING_DELAY
+  WAITING_INPUT
+  COMPLETED
+}
+
+// Estado anti-CSRF para o fluxo OAuth do Instagram — expira em 5 minutos
+model OAuthState {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+  state         String   @unique
+  agentConfigId String
+  userId        String
+  expiresAt     DateTime
+  used          Boolean  @default(false)
 }

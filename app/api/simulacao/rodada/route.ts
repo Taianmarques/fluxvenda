@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { openai } from "@/lib/openai";
+import { logTokenUsage, getTeamIdForUser } from "@/lib/token-usage";
 
 type DecisionOption = { id: string; label: string; hint: string };
 type Category = { key: string; label: string; icon: string; options: DecisionOption[] };
@@ -12,10 +13,13 @@ export async function GET(req: NextRequest) {
     const { userId } = await auth();
     if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const profile = await prisma.profile.findUnique({
-      where: { id: userId },
-      select: { role: true, segment: true, name: true },
-    });
+    const [profile, teamId] = await Promise.all([
+      prisma.profile.findUnique({
+        where: { id: userId },
+        select: { role: true, segment: true, name: true },
+      }),
+      getTeamIdForUser(userId),
+    ]);
 
     const isVendedor = profile?.role === "VENDEDOR";
 
@@ -61,6 +65,8 @@ export async function GET(req: NextRequest) {
           history,
         });
 
+    if (teamId && (scenario as any)._usage) logTokenUsage({ teamId, provider: "openai", model: "gpt-4o-mini", feature: "simulacao", inputTokens: (scenario as any)._usage.input, outputTokens: (scenario as any)._usage.output });
+
     return NextResponse.json({
       company: {
         name: company.name,
@@ -82,10 +88,13 @@ export async function POST(req: NextRequest) {
     const { userId } = await auth();
     if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const profile = await prisma.profile.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
+    const [profile, teamId] = await Promise.all([
+      prisma.profile.findUnique({
+        where: { id: userId },
+        select: { role: true },
+      }),
+      getTeamIdForUser(userId),
+    ]);
 
     const isVendedor = profile?.role === "VENDEDOR";
 
@@ -105,6 +114,8 @@ export async function POST(req: NextRequest) {
     const result = isVendedor
       ? await evaluateVendedorDecisions({ segment: company.segment, currentMonth: company.currentMonth, scenario, decisions })
       : await evaluateGestorDecisions({ name: company.name, segment: company.segment, currentMRR: company.currentMRR, currentMonth: company.currentMonth, scenario, decisions });
+
+    if (teamId && (result as any)._usage) logTokenUsage({ teamId, provider: "openai", model: "gpt-4o-mini", feature: "simulacao", inputTokens: (result as any)._usage.input, outputTokens: (result as any)._usage.output });
 
     const newMRR = Math.max(0, company.currentMRR * (1 + result.mrrChangePercent / 100));
     const xpGained = Math.max(50, Math.round(100 + result.mrrChangePercent * 3));
@@ -234,7 +245,7 @@ Regras: as opções devem refletir diferentes níveis de habilidade (uma fraca/e
       response_format: { type: "json_object" },
       messages: [{ role: "user", content: prompt }],
     });
-    return JSON.parse(completion.choices[0]?.message?.content ?? "{}");
+    return { ...JSON.parse(completion.choices[0]?.message?.content ?? "{}"), _usage: { input: completion.usage?.prompt_tokens ?? 0, output: completion.usage?.completion_tokens ?? 0 } };
   } catch {
     return fallbackVendedorScenario(round, segment);
   }
@@ -289,7 +300,7 @@ Seja didático: explique o que foi certo ou errado em cada decisão. Impacto rea
       response_format: { type: "json_object" },
       messages: [{ role: "user", content: prompt }],
     });
-    return JSON.parse(completion.choices[0]?.message?.content ?? "{}");
+    return { ...JSON.parse(completion.choices[0]?.message?.content ?? "{}"), _usage: { input: completion.usage?.prompt_tokens ?? 0, output: completion.usage?.completion_tokens ?? 0 } };
   } catch {
     return {
       mrrChangePercent: 5,
@@ -378,7 +389,7 @@ Regras: opções devem ser específicas para ${segment}, variadas em risco/retor
       response_format: { type: "json_object" },
       messages: [{ role: "user", content: prompt }],
     });
-    return JSON.parse(completion.choices[0]?.message?.content ?? "{}");
+    return { ...JSON.parse(completion.choices[0]?.message?.content ?? "{}"), _usage: { input: completion.usage?.prompt_tokens ?? 0, output: completion.usage?.completion_tokens ?? 0 } };
   } catch {
     return fallbackGestorScenario(currentMonth, segment);
   }
@@ -434,7 +445,7 @@ Retorne APENAS este JSON:
       response_format: { type: "json_object" },
       messages: [{ role: "user", content: prompt }],
     });
-    return JSON.parse(completion.choices[0]?.message?.content ?? "{}");
+    return { ...JSON.parse(completion.choices[0]?.message?.content ?? "{}"), _usage: { input: completion.usage?.prompt_tokens ?? 0, output: completion.usage?.completion_tokens ?? 0 } };
   } catch {
     return {
       mrrChangePercent: 5,

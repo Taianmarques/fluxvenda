@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { userBelongsToAgentConfig } from "@/lib/team";
 import { sendWhatsAppTextAsTeam, sendMediaAsTeam, downloadMessageMedia } from "@/lib/whatsapp";
+import { sendInstagramDM } from "@/lib/instagram";
 import { z } from "zod";
 
 const schema = z.object({
@@ -27,47 +28,57 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const config = await prisma.agentConfig.findUnique({ where: { id: conversation.agentConfigId } });
-  if (!config?.uazapiToken) return NextResponse.json({ error: "Agente não encontrado" }, { status: 404 });
+  if (!config) return NextResponse.json({ error: "Agente não encontrado" }, { status: 404 });
 
   const body = schema.safeParse(await req.json());
   if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
 
+  const isInstagram = conversation.contactNumber.startsWith("ig_");
   let mediaUrl: string | null = null;
   let mediaType: string | null = null;
   let content = body.data.content ?? "";
 
-  // Assinatura sai só no texto enviado pro cliente pelo WhatsApp — o chat interno já mostra
-  // o nome de quem mandou via senderId, então o content salvo no banco fica sem assinatura.
-  let signaturePrefix = "";
-  if (config.signatureEnabled) {
-    const sender = await prisma.profile.findUnique({ where: { id: userId }, select: { name: true } });
-    if (sender?.name) signaturePrefix = `*${sender.name}:*\n`;
-  }
-
-  if (body.data.media) {
-    const { base64, type, fileName } = body.data.media;
-    let sent;
-    try {
-      sent = await sendMediaAsTeam(config.uazapiToken, conversation.contactNumber, type, base64, {
-        caption: body.data.content ? `${signaturePrefix}${body.data.content}` : (signaturePrefix || undefined),
-        fileName,
-      });
-    } catch (err) {
-      console.error("[mensagem] erro ao enviar mídia:", err);
-      return NextResponse.json({ error: "Não foi possível enviar a mídia" }, { status: 502 });
-    }
-
-    try {
-      const media = await downloadMessageMedia(config.uazapiToken, sent.messageid);
-      mediaUrl = media.fileURL;
-      mediaType = type;
-    } catch (err) {
-      console.error("[mensagem] erro ao obter url da mídia enviada:", err);
-    }
-
-    if (!content) content = fileName ? `[${type}] ${fileName}` : `[${type}]`;
+  if (isInstagram) {
+    if (!content) return NextResponse.json({ error: "Instagram DM só suporta texto" }, { status: 400 });
+    const igConn = await prisma.instagramConnection.findUnique({ where: { agentConfigId: conversation.agentConfigId } });
+    if (!igConn) return NextResponse.json({ error: "Conexão Instagram não encontrada" }, { status: 404 });
+    const senderIgsid = conversation.contactNumber.replace("ig_", "");
+    await sendInstagramDM(igConn.instagramBusinessAccountId, igConn.pageAccessToken, senderIgsid, content);
   } else {
-    await sendWhatsAppTextAsTeam(config.uazapiToken, conversation.contactNumber, `${signaturePrefix}${content}`);
+    if (!config.uazapiToken) return NextResponse.json({ error: "Agente não encontrado" }, { status: 404 });
+
+    // Assinatura sai só no texto enviado pro cliente pelo WhatsApp
+    let signaturePrefix = "";
+    if (config.signatureEnabled) {
+      const sender = await prisma.profile.findUnique({ where: { id: userId }, select: { name: true } });
+      if (sender?.name) signaturePrefix = `*${sender.name}:*\n`;
+    }
+
+    if (body.data.media) {
+      const { base64, type, fileName } = body.data.media;
+      let sent;
+      try {
+        sent = await sendMediaAsTeam(config.uazapiToken, conversation.contactNumber, type, base64, {
+          caption: body.data.content ? `${signaturePrefix}${body.data.content}` : (signaturePrefix || undefined),
+          fileName,
+        });
+      } catch (err) {
+        console.error("[mensagem] erro ao enviar mídia:", err);
+        return NextResponse.json({ error: "Não foi possível enviar a mídia" }, { status: 502 });
+      }
+
+      try {
+        const media = await downloadMessageMedia(config.uazapiToken, sent.messageid);
+        mediaUrl = media.fileURL;
+        mediaType = type;
+      } catch (err) {
+        console.error("[mensagem] erro ao obter url da mídia enviada:", err);
+      }
+
+      if (!content) content = fileName ? `[${type}] ${fileName}` : `[${type}]`;
+    } else {
+      await sendWhatsAppTextAsTeam(config.uazapiToken, conversation.contactNumber, `${signaturePrefix}${content}`);
+    }
   }
 
   const message = await prisma.message.create({

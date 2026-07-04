@@ -3,6 +3,7 @@ import { UserButton } from "@clerk/nextjs";
 import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { BarChart3, Building2, Search, Cpu, type LucideIcon } from "lucide-react";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await currentUser();
@@ -14,10 +15,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   });
   if (profile?.role !== "ADMIN") redirect("/dashboard");
 
-  const NAV = [
-    { href: "/admin",               label: "Dashboard",    icon: "📈" },
-    { href: "/admin/empresas",      label: "Empresas",     icon: "🏢" },
-    { href: "/admin/diagnosticos",  label: "Diagnósticos", icon: "🔍" },
+  const NAV: { href: string; label: string; icon: LucideIcon }[] = [
+    { href: "/admin",              label: "Dashboard",    icon: BarChart3 },
+    { href: "/admin/empresas",     label: "Empresas",     icon: Building2 },
+    { href: "/admin/diagnosticos", label: "Diagnósticos", icon: Search    },
+    { href: "/admin/tokens",       label: "Tokens",       icon: Cpu       },
   ];
 
   return (
@@ -35,7 +37,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               href={item.href}
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
             >
-              <span className="text-base">{item.icon}</span>
+              <item.icon size={16} className="flex-shrink-0" />
               {item.label}
             </Link>
           ))}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { openai, MODEL } from "@/lib/openai";
+import { logTokenUsage, getTeamIdForUser } from "@/lib/token-usage";
 import { levelFromXP } from "@/lib/utils";
 import { AREA_QUESTIONS } from "@/lib/missao-questions";
 
@@ -35,11 +36,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const prompt = areaConfig.solutionPrompt(answers, segment);
 
-  const completion = await openai.chat.completions.create({
-    model: MODEL,
-    max_tokens: 1000,
-    messages: [{ role: "user", content: prompt }],
-  });
+  const [completion, teamId] = await Promise.all([
+    openai.chat.completions.create({
+      model: MODEL,
+      max_tokens: 1000,
+      messages: [{ role: "user", content: prompt }],
+    }),
+    getTeamIdForUser(userId),
+  ]);
+  if (teamId) logTokenUsage({ teamId, provider: "openai", model: MODEL, feature: "missao", inputTokens: completion.usage?.prompt_tokens ?? 0, outputTokens: completion.usage?.completion_tokens ?? 0 });
 
   const solution = completion.choices[0]?.message?.content ?? "";
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { openai, MODEL } from "@/lib/openai";
+import { logTokenUsage, getTeamIdForUser } from "@/lib/token-usage";
 import { z } from "zod";
 import { generateMissionsFromDiagnostic } from "@/lib/missoes";
 import { levelFromXP } from "@/lib/utils";
@@ -89,7 +90,11 @@ export async function POST(req: NextRequest) {
 
     const scores = { scoreLeads, scoreProcess, scoreTeam, scoreKpis, scoreTools, scoreValue, scoreRetention, scoreMoney, scoreTotal };
     const areaLabels = diagnosticType === "VENDEDOR" ? AREA_LABELS_VENDEDOR : AREA_LABELS_EMPRESA;
-    const aiResult = await generateAnalysis({ companyName, businessModel: businessModel ?? "B2B", segment, subsegment: subsegment ?? "", teamSize, scores, diagnosticType, areaLabels });
+    const [aiResult, teamId] = await Promise.all([
+      generateAnalysis({ companyName, businessModel: businessModel ?? "B2B", segment, subsegment: subsegment ?? "", teamSize, scores, diagnosticType, areaLabels }),
+      getTeamIdForUser(userId),
+    ]);
+    if (teamId && (aiResult as any)._usage) logTokenUsage({ teamId, provider: "openai", model: MODEL, feature: "scanner", inputTokens: (aiResult as any)._usage.input, outputTokens: (aiResult as any)._usage.output });
 
     await prisma.diagnosticResult.create({
       data: {
@@ -248,7 +253,7 @@ Classificação: CRITICO = score < 40, ATENCAO = score 40-69, FORTE = score >= 7
       response_format: { type: "json_object" },
       messages: [{ role: "user", content: prompt }],
     });
-    return JSON.parse(completion.choices[0]?.message?.content ?? "{}");
+    return { ...JSON.parse(completion.choices[0]?.message?.content ?? "{}"), _usage: { input: completion.usage?.prompt_tokens ?? 0, output: completion.usage?.completion_tokens ?? 0 } };
   } catch {
     return {
       summary: "Diagnóstico gerado com base nas suas respostas.",

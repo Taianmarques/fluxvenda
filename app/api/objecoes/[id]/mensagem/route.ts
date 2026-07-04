@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { anthropic, MODEL } from "@/lib/anthropic";
+import { logTokenUsage, getTeamIdForUser } from "@/lib/token-usage";
 import { z } from "zod";
 
 const schema = z.object({ content: z.string().min(1) });
@@ -38,12 +39,16 @@ Seja realista, resistente mas receptivo a bons argumentos. Máximo 3 frases.`;
     { role: "user" as const, content: body.data.content },
   ];
 
-  const response = await anthropic.messages.create({
-    model: MODEL,
-    max_tokens: 300,
-    system: systemPrompt,
-    messages,
-  });
+  const [response, teamId] = await Promise.all([
+    anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 300,
+      system: systemPrompt,
+      messages,
+    }),
+    getTeamIdForUser(userId),
+  ]);
+  if (teamId) logTokenUsage({ teamId, provider: "anthropic", model: MODEL, feature: "objecao", inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens });
 
   const replyText = response.content[0].type === "text" ? response.content[0].text : "Entendo.";
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { openai, MODEL } from "@/lib/openai";
+import { logTokenUsage, getTeamIdForUser } from "@/lib/token-usage";
 import { levelFromXP } from "@/lib/utils";
 
 const AREA_LABELS: Record<string, string> = {
@@ -98,14 +99,18 @@ CONCLUSÃO:
 Quando o exercício estiver verdadeiramente completo, adicione ao FINAL da resposta (fora do texto normal, sem markdown):
 {"completed":true,"summary":"entregável criado em 1 frase","feedback":"feedback motivacional + próximo passo"}`;
 
-  const completion = await openai.chat.completions.create({
-    model: MODEL,
-    max_tokens: 500,
-    messages: [
-      { role: "system", content: systemPrompt },
-      ...messages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
-    ],
-  });
+  const [completion, teamId] = await Promise.all([
+    openai.chat.completions.create({
+      model: MODEL,
+      max_tokens: 500,
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...messages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+      ],
+    }),
+    getTeamIdForUser(userId),
+  ]);
+  if (teamId) logTokenUsage({ teamId, provider: "openai", model: MODEL, feature: "missao", inputTokens: completion.usage?.prompt_tokens ?? 0, outputTokens: completion.usage?.completion_tokens ?? 0 });
 
   const raw = completion.choices[0]?.message?.content ?? "";
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { anthropic, MODEL } from "@/lib/anthropic";
+import { logTokenUsage, getTeamIdForUser } from "@/lib/token-usage";
 import { z } from "zod";
 
 const schema = z.object({
@@ -24,17 +25,16 @@ Sua principal objeção é: "${objection}".
 Seja realista e resistente, mas aberto a bons argumentos. Faça perguntas desafiadoras.
 Responda de forma natural como um comprador real. Seja direto e objetivo (máximo 3 frases por resposta).`;
 
-  const openingMessage = await anthropic.messages.create({
-    model: MODEL,
-    max_tokens: 300,
-    system: systemPrompt,
-    messages: [
-      {
-        role: "user",
-        content: "Olá! Gostaria de apresentar nossa solução para você.",
-      },
-    ],
-  });
+  const [openingMessage, teamId] = await Promise.all([
+    anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 300,
+      system: systemPrompt,
+      messages: [{ role: "user", content: "Olá! Gostaria de apresentar nossa solução para você." }],
+    }),
+    getTeamIdForUser(userId),
+  ]);
+  if (teamId) logTokenUsage({ teamId, provider: "anthropic", model: MODEL, feature: "objecao", inputTokens: openingMessage.usage.input_tokens, outputTokens: openingMessage.usage.output_tokens });
 
   const openingText = openingMessage.content[0].type === "text"
     ? openingMessage.content[0].text

@@ -129,11 +129,13 @@ Responda APENAS em JSON, no formato exato:
   };
 }
 
+export type AgentUsage = { inputTokens: number; outputTokens: number };
+
 export async function runAgent(
   systemPrompt: string,
   history: { role: "user" | "assistant"; content: string }[],
   newMessage: string
-): Promise<string> {
+): Promise<{ reply: string; usage: AgentUsage }> {
   const completion = await openai.chat.completions.create({
     model: MODEL,
     max_tokens: 400,
@@ -144,7 +146,10 @@ export async function runAgent(
     ],
   });
 
-  return completion.choices[0]?.message?.content?.trim() ?? "Desculpe, não consegui processar sua mensagem.";
+  return {
+    reply: completion.choices[0]?.message?.content?.trim() ?? "Desculpe, não consegui processar sua mensagem.",
+    usage: { inputTokens: completion.usage?.prompt_tokens ?? 0, outputTokens: completion.usage?.completion_tokens ?? 0 },
+  };
 }
 
 // Responde com base numa imagem enviada pelo cliente (foto de produto, comprovante, etc.),
@@ -154,7 +159,7 @@ export async function runAgentWithImage(
   history: { role: "user" | "assistant"; content: string }[],
   imageUrl: string,
   caption: string
-): Promise<string> {
+): Promise<{ reply: string; usage: AgentUsage }> {
   const completion = await openai.chat.completions.create({
     model: MODEL,
     max_tokens: 400,
@@ -171,7 +176,10 @@ export async function runAgentWithImage(
     ],
   });
 
-  return completion.choices[0]?.message?.content?.trim() ?? "Desculpe, não consegui processar a imagem.";
+  return {
+    reply: completion.choices[0]?.message?.content?.trim() ?? "Desculpe, não consegui processar a imagem.",
+    usage: { inputTokens: completion.usage?.prompt_tokens ?? 0, outputTokens: completion.usage?.completion_tokens ?? 0 },
+  };
 }
 
 export const SCHEDULING_TOOLS = [
@@ -389,77 +397,6 @@ export const PROSPECTING_TOOLS = [
   },
 ];
 
-export const FINANCING_TOOLS = [
-  {
-    type: "function" as const,
-    function: {
-      name: "simular_financiamento",
-      description: "Consulta as condições de financiamento veicular disponíveis no Banco BV e calcula a parcela estimada. Colete todos os dados obrigatórios antes de chamar. Dados obrigatórios: categoria do veículo, ano do modelo, cilindradas, se é 0km, tipo de pessoa (física/jurídica), valor do veículo e valor de entrada.",
-      parameters: {
-        type: "object",
-        properties: {
-          vehicleCategoryDescription: {
-            type: "string",
-            description: "Categoria do veículo: 'AUTOMOVEL', 'MOTO', 'CAMINHAO', 'UTILITARIO', 'ONIBUS', etc."
-          },
-          vehicleModelYear: {
-            type: "string",
-            description: "Ano do modelo do veículo (4 dígitos, ex: '2022')"
-          },
-          cylinderQuantity: {
-            type: "number",
-            description: "Cilindradas do motor (ex: 1000 para 1.0, 1600 para 1.6, 160 para moto 160cc)"
-          },
-          zeroVehicle: {
-            type: "boolean",
-            description: "true = veículo 0km (novo), false = veículo usado/seminovo"
-          },
-          personType: {
-            type: "string",
-            enum: ["F", "J"],
-            description: "Tipo de pessoa: F = Pessoa Física, J = Pessoa Jurídica"
-          },
-          valorVeiculo: {
-            type: "number",
-            description: "Valor total do veículo em reais"
-          },
-          valorEntrada: {
-            type: "number",
-            description: "Valor da entrada em reais (pode ser 0)"
-          },
-          prazoMeses: {
-            type: "number",
-            description: "Prazo desejado em meses (ex: 24, 36, 48, 60). Se não informado, usa o prazo padrão disponível."
-          },
-          vehicleBrandDescription: {
-            type: "string",
-            description: "Marca do veículo (ex: 'HONDA', 'TOYOTA', 'VOLKSWAGEN') — opcional"
-          },
-          fullVehicleModelVersionDescription: {
-            type: "string",
-            description: "Descrição completa do modelo (ex: 'CIVIC EXL 2.0 16V CVT') — opcional"
-          },
-        },
-        required: ["vehicleCategoryDescription", "vehicleModelYear", "cylinderQuantity", "zeroVehicle", "personType", "valorVeiculo", "valorEntrada"],
-      },
-    },
-  },
-  {
-    type: "function" as const,
-    function: {
-      name: "registrar_interesse_financiamento",
-      description: "Registra que o cliente demonstrou interesse em prosseguir com o financiamento após ver as condições. Use quando o cliente confirmar que quer continuar.",
-      parameters: {
-        type: "object",
-        properties: {
-          notas: { type: "string", description: "Observações sobre o interesse do cliente ou próximos passos combinados" },
-        },
-        required: [],
-      },
-    },
-  },
-];
-
 // Roda o agente com acesso a ferramentas (ex: agendamento) — chama o modelo em loop até ele
 // parar de pedir ferramentas e devolver uma resposta final em texto.
 export async function runAgentWithTools(
@@ -468,12 +405,15 @@ export async function runAgentWithTools(
   newMessage: string,
   tools: any[],
   executeTool: (name: string, args: any) => Promise<string>
-): Promise<string> {
+): Promise<{ reply: string; usage: AgentUsage }> {
   const messages: any[] = [
     { role: "system", content: systemPrompt },
     ...history.map(m => ({ role: m.role, content: m.content })),
     { role: "user", content: newMessage },
   ];
+
+  let totalInput = 0;
+  let totalOutput = 0;
 
   // 6 rounds (não 3): fluxos de comércio costumam encadear vários tool calls num só turno
   // (consultar produto, montar pedido, gerar cobrança) e ainda precisam de uma rodada extra
@@ -485,11 +425,17 @@ export async function runAgentWithTools(
       messages,
       tools,
     });
+    totalInput  += completion.usage?.prompt_tokens     ?? 0;
+    totalOutput += completion.usage?.completion_tokens ?? 0;
+
     const msg = completion.choices[0]?.message;
     if (!msg) break;
 
     if (!msg.tool_calls || msg.tool_calls.length === 0) {
-      return msg.content?.trim() ?? "Desculpe, não consegui processar sua mensagem.";
+      return {
+        reply: msg.content?.trim() ?? "Desculpe, não consegui processar sua mensagem.",
+        usage: { inputTokens: totalInput, outputTokens: totalOutput },
+      };
     }
 
     messages.push(msg);
@@ -502,14 +448,14 @@ export async function runAgentWithTools(
     }
   }
 
-  return "Desculpe, não consegui processar sua mensagem.";
+  return { reply: "Desculpe, não consegui processar sua mensagem.", usage: { inputTokens: totalInput, outputTokens: totalOutput } };
 }
 
 export async function generateFollowupMessage(
   systemPrompt: string,
   history: { role: "user" | "assistant"; content: string }[],
   attemptNumber: number
-): Promise<string> {
+): Promise<{ reply: string; usage: AgentUsage }> {
   const instruction = attemptNumber >= 2
     ? "O cliente já não respondeu a um follow-up anterior. Mande uma última mensagem curta e educada, sem ser insistente, dando a entender que essa é a última tentativa de contato."
     : "O cliente não responde há um tempo. Mande uma mensagem curta e natural retomando a conversa, sem ser insistente, baseada no que foi discutido.";
@@ -524,20 +470,23 @@ export async function generateFollowupMessage(
     ],
   });
 
-  return completion.choices[0]?.message?.content?.trim() ?? "";
+  return {
+    reply: completion.choices[0]?.message?.content?.trim() ?? "",
+    usage: { inputTokens: completion.usage?.prompt_tokens ?? 0, outputTokens: completion.usage?.completion_tokens ?? 0 },
+  };
 }
 
 // Avalia se o cliente já demonstrou interesse real de compra (lead qualificado) — usado
 // pelo modo de distribuição "IA_QUALIFICACAO" pra decidir quando atribuir a um atendente.
 export async function classifyLeadQualified(
   history: { role: "user" | "assistant"; content: string }[]
-): Promise<boolean> {
+): Promise<{ qualified: boolean; usage: AgentUsage }> {
   const transcript = history
     .slice(-12)
     .map(m => `${m.role === "user" ? "Cliente" : "Atendimento"}: ${m.content}`)
     .join("\n");
 
-  if (!transcript.trim()) return false;
+  if (!transcript.trim()) return { qualified: false, usage: { inputTokens: 0, outputTokens: 0 } };
 
   const completion = await openai.chat.completions.create({
     model: MODEL,
@@ -554,5 +503,8 @@ export async function classifyLeadQualified(
   });
 
   const answer = completion.choices[0]?.message?.content?.trim().toLowerCase() ?? "";
-  return answer.startsWith("sim");
+  return {
+    qualified: answer.startsWith("sim"),
+    usage: { inputTokens: completion.usage?.prompt_tokens ?? 0, outputTokens: completion.usage?.completion_tokens ?? 0 },
+  };
 }

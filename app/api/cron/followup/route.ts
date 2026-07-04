@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateFollowupMessage } from "@/lib/agent-engine";
 import { sendWhatsAppTextAsTeam } from "@/lib/whatsapp";
+import { logTokenUsage } from "@/lib/token-usage";
 
 function hoursFromNow(n: number) {
   const d = new Date();
@@ -58,8 +59,9 @@ export async function POST(req: NextRequest) {
         .reverse()
         .map(m => ({ role: m.role === "user" ? ("user" as const) : ("assistant" as const), content: m.content }));
 
-      const followup = await generateFollowupMessage(config.systemPrompt, history, conversation.followupCount + 1);
+      const { reply: followup, usage } = await generateFollowupMessage(config.systemPrompt, history, conversation.followupCount + 1);
       if (!followup) continue;
+      logTokenUsage({ teamId: config.teamId, provider: "openai", model: "gpt-4o-mini", feature: "followup", ...usage });
 
       await prisma.message.create({ data: { conversationId: conversation.id, role: "assistant", content: followup } });
       await prisma.conversation.update({

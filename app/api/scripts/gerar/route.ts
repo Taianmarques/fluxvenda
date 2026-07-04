@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { anthropic, MODEL } from "@/lib/anthropic";
+import { logTokenUsage, getTeamIdForUser } from "@/lib/token-usage";
 import { z } from "zod";
 
 const schema = z.object({
@@ -34,11 +35,15 @@ Retorne um JSON com:
 
 Responda APENAS com o JSON, sem markdown.`;
 
-  const message = await anthropic.messages.create({
-    model: MODEL,
-    max_tokens: 2000,
-    messages: [{ role: "user", content: prompt }],
-  });
+  const [message, teamId] = await Promise.all([
+    anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 2000,
+      messages: [{ role: "user", content: prompt }],
+    }),
+    getTeamIdForUser(userId),
+  ]);
+  if (teamId) logTokenUsage({ teamId, provider: "anthropic", model: MODEL, feature: "script", inputTokens: message.usage.input_tokens, outputTokens: message.usage.output_tokens });
 
   const text = message.content[0].type === "text" ? message.content[0].text : "{}";
   const parsed = JSON.parse(text);

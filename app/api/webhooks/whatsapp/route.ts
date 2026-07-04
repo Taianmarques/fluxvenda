@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { runAgent, runAgentWithImage, runAgentWithTools, transcribeAudio, classifyLeadQualified, SCHEDULING_TOOLS, COMMERCE_TOOLS, BILLING_TOOLS, PROSPECTING_TOOLS, FINANCING_TOOLS } from "@/lib/agent-engine";
-import { buscarCondicoesFinanciamentoBV, calcularPMT } from "@/lib/bv-api";
+import { runAgent, runAgentWithImage, runAgentWithTools, transcribeAudio, classifyLeadQualified, SCHEDULING_TOOLS, COMMERCE_TOOLS, BILLING_TOOLS, PROSPECTING_TOOLS } from "@/lib/agent-engine";
 import { sendWhatsAppTextAsTeam, sendMediaAsTeam, downloadMessageMedia } from "@/lib/whatsapp";
+import { logTokenUsage, isOverQuota } from "@/lib/token-usage";
 import { getAvailableSlots, isSlotAvailable, formatSlotsForAgent, type AvailabilityRule } from "@/lib/scheduling";
 import { assignNextAttendant } from "@/lib/assignment";
 import { createAsaasCustomer, createAsaasCharge, cancelAsaasCharge, getAsaasPixQrCode } from "@/lib/asaas";
@@ -126,27 +126,6 @@ Seu objetivo é qualificar esse prospect usando o método BANT:
 Conduza a conversa de forma natural — não pareça um questionário. Quando tiver informação suficiente para avaliar, use registrar_qualificacao. Se ele estiver qualificado e quiser avançar, use encaminhar_para_atendente. Se demonstrar interesse em reunião/demo, use registrar_interesse_reuniao.
 
 Notas anteriores: ${prospect.notas || "nenhuma"}.`;
-}
-
-async function buildFinancingContext(agentConfigId: string, contactNumber: string): Promise<string> {
-  const simulations = await prisma.financingSimulation.findMany({
-    where: { agentConfigId, contactNumber },
-    orderBy: { createdAt: "desc" },
-    take: 3,
-  });
-
-  let ctx = "\n\nFERRAMENTAS DE FINANCIAMENTO VEICULAR:\nVocê é um especialista em financiamento de veículos integrado ao Banco BV. Seu papel é coletar os dados necessários do cliente e executar uma simulação real.";
-  ctx += "\n\nDados obrigatórios para a simulação:\n- CPF do cliente (apenas números)\n- Data de nascimento (DD/MM/AAAA)\n- Se possui CNH (habilitação)\n- Valor do veículo\n- Valor da entrada\n- Prazo em meses (24, 36, 48 ou 60)";
-  ctx += "\n\nColete os dados de forma natural, um de cada vez. Quando tiver todos, use simular_financiamento. Ao apresentar o resultado, mostre o valor da parcela, prazo, taxa mensal e CET de forma clara. Pergunte se o cliente quer prosseguir e, se sim, use registrar_interesse_financiamento.";
-
-  if (simulations.length > 0) {
-    ctx += "\n\nSimulações anteriores nesta conversa:";
-    for (const s of simulations) {
-      ctx += `\n- ${new Date(s.createdAt).toLocaleDateString("pt-BR")}: veículo R$ ${s.valorVeiculo.toLocaleString("pt-BR")}, entrada R$ ${s.valorEntrada.toLocaleString("pt-BR")}, ${s.prazoMeses}x — parcela R$ ${s.valorParcela?.toLocaleString("pt-BR") ?? "n/a"} — status: ${s.status}`;
-    }
-  }
-
-  return ctx;
 }
 
 function makeExecuteTool(agentConfigId: string, conversationId: string, contactName: string | undefined, contactNumber: string) {
@@ -532,112 +511,6 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       return "Interesse em reunião registrado.";
     }
 
-    if (name === "simular_financiamento") {
-      const vehicleCategoryDescription = String(args?.vehicleCategoryDescription ?? "").toUpperCase();
-      const vehicleModelYear = String(args?.vehicleModelYear ?? "").slice(0, 4);
-      const cylinderQuantity = Math.round(Number(args?.cylinderQuantity ?? 0));
-      const zeroVehicle = Boolean(args?.zeroVehicle);
-      const personType = (args?.personType === "J" ? "J" : "F") as "F" | "J";
-      const valorVeiculo = Number(args?.valorVeiculo ?? 0);
-      const valorEntrada = Math.max(0, Number(args?.valorEntrada ?? 0));
-      const prazoDesejado = args?.prazoMeses ? Number(args.prazoMeses) : null;
-      const vehicleBrandDescription = args?.vehicleBrandDescription ? String(args.vehicleBrandDescription).toUpperCase() : undefined;
-      const fullVehicleModelVersionDescription = args?.fullVehicleModelVersionDescription ? String(args.fullVehicleModelVersionDescription).toUpperCase() : undefined;
-
-      if (!vehicleCategoryDescription) return "Categoria do veículo não informada. Pergunte ao cliente (AUTOMOVEL, MOTO, CAMINHAO, etc.).";
-      if (!vehicleModelYear.match(/^\d{4}$/)) return "Ano do modelo inválido. Informe 4 dígitos (ex: 2022).";
-      if (cylinderQuantity <= 0) return "Cilindradas inválidas. Pergunte ao cliente (ex: 1000 para motor 1.0, 160 para moto 160cc).";
-      if (valorVeiculo <= 0) return "Valor do veículo inválido.";
-      if (valorEntrada >= valorVeiculo) return "Valor de entrada não pode ser maior ou igual ao valor do veículo.";
-
-      const agentConfig = await prisma.agentConfig.findUnique({ where: { id: agentConfigId } });
-      if (!agentConfig?.bvClientId || !agentConfig?.bvClientSecret) {
-        return "Financiamento não configurado. O gestor precisa cadastrar as credenciais do Banco BV nas configurações.";
-      }
-      if (!agentConfig.bvCommercialPartnerCode) {
-        return "Código do parceiro BV não configurado. O gestor precisa cadastrar o código da loja nas configurações.";
-      }
-
-      const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
-
-      try {
-        const result = await buscarCondicoesFinanciamentoBV(
-          agentConfig.bvClientId,
-          agentConfig.bvClientSecret,
-          agentConfig.bvSandbox,
-          {
-            zeroVehicle,
-            personType,
-            vehicleCategoryDescription,
-            commercialPartnerCode: agentConfig.bvCommercialPartnerCode,
-            cylinderQuantity,
-            financingEntryDate: today,
-            vehicleModelYear,
-            vehicleBrandDescription,
-            fullVehicleModelVersionDescription,
-          }
-        );
-
-        // Determina o prazo a usar (preferência do cliente ou padrão BV)
-        const prazoMeses = prazoDesejado && result.availableTerms.includes(prazoDesejado)
-          ? prazoDesejado
-          : (result.defaultTerm ?? 48);
-
-        // Calcula parcela estimada usando a taxa da tabela padrão BV + fórmula PMT
-        const valorFinanciado = valorVeiculo - valorEntrada;
-        const taxaMensal = result.defaultRate ?? 0;
-        const valorParcela = taxaMensal > 0
-          ? calcularPMT(valorFinanciado, taxaMensal, prazoMeses)
-          : valorFinanciado / prazoMeses;
-        const valorTotal = valorParcela * prazoMeses + valorEntrada;
-
-        await prisma.financingSimulation.create({
-          data: {
-            agentConfigId,
-            contactNumber,
-            nomeCliente: contactName ?? "",
-            valorVeiculo,
-            valorEntrada,
-            prazoMeses,
-            resultadoJson: JSON.stringify(result.raw),
-            valorParcela,
-            taxaMensal,
-            valorTotal,
-          },
-        });
-
-        const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-
-        // Monta resposta com prazos disponíveis
-        const prazosDisponiveis = result.availableTerms.length > 0
-          ? result.availableTerms.join(", ") + " meses"
-          : "conforme tabela BV";
-
-        let resposta = `Condições de financiamento BV consultadas:\n`;
-        resposta += `- Veículo: ${vehicleBrandDescription ?? vehicleCategoryDescription} ${vehicleModelYear} (${zeroVehicle ? "0km" : "seminovo"})\n`;
-        resposta += `- Valor financiado: ${fmt(valorFinanciado)} (veículo ${fmt(valorVeiculo)} − entrada ${fmt(valorEntrada)})\n`;
-        resposta += `- Prazo escolhido: ${prazoMeses}x → parcela estimada de ${fmt(valorParcela)}/mês\n`;
-        if (taxaMensal > 0) resposta += `- Taxa indicativa: ${taxaMensal.toFixed(2)}% a.m.\n`;
-        resposta += `- Prazos disponíveis: ${prazosDisponiveis}\n`;
-        resposta += `- Tabela: ${result.defaultTable?.commercialDescription ?? "padrão BV"}\n`;
-        resposta += `\nApresente as condições ao cliente e pergunte se quer prosseguir. Informe que os valores são estimativas — a aprovação de crédito define a taxa final.`;
-
-        return resposta;
-      } catch (err: any) {
-        console.error("[financing] erro na consulta BV:", err);
-        return `Não foi possível consultar as condições de financiamento no momento. Erro: ${err?.message ?? "tente novamente"}. Peça ao cliente para aguardar ou entre em contato com o time de financiamento.`;
-      }
-    }
-
-    if (name === "registrar_interesse_financiamento") {
-      const notas = typeof args?.notas === "string" ? args.notas : "";
-      await prisma.financingSimulation.updateMany({
-        where: { agentConfigId, contactNumber, status: "SIMULADO" },
-        data: { status: "INTERESSE", ...(notas ? { notas } : {}) },
-      });
-      return "Interesse no financiamento registrado. Um especialista entrará em contato para dar continuidade ao processo.";
-    }
-
     return "Ferramenta desconhecida.";
   };
 }
@@ -746,6 +619,33 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Proteção contra loop IA-com-IA: se o agente respondeu 5+ vezes nos últimos 60s para este
+  // contato, o remetente é quase certamente automatizado. Desativa o agente nesta conversa.
+  const recentAIReplies = await prisma.message.count({
+    where: {
+      conversationId: conversation.id,
+      role: "assistant",
+      createdAt: { gte: new Date(Date.now() - 60_000) },
+    },
+  });
+  if (recentAIReplies >= 5) {
+    await prisma.conversation.update({
+      where: { id: conversation.id },
+      data: {
+        humanTakeover: true,
+        status: "ATIVO",
+      },
+    });
+    await prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        role: "note",
+        content: "Agente pausado automaticamente: possível contato automatizado detectado (≥5 respostas em 60s).",
+      },
+    });
+    return NextResponse.json({ ok: true });
+  }
+
   // Mensagens do atendente humano entram como "assistant" para o agente manter o contexto
   // de tudo que já foi dito pela empresa, mesmo no período em que esteve em atendimento manual.
   const historyForAgent = history.map(m => ({ role: m.role === "user" ? "user" as const : "assistant" as const, content: m.content }));
@@ -762,7 +662,6 @@ export async function POST(req: NextRequest) {
     ...commerceTools,
     ...(config.cobrancaEnabled ? BILLING_TOOLS : []),
     ...(isProspect ? PROSPECTING_TOOLS : []),
-    ...(config.financingEnabled ? FINANCING_TOOLS : []),
   ];
 
   // Instrução de emoji injetada em tempo de execução — não exige regenerar o systemPrompt
@@ -771,24 +670,34 @@ export async function POST(req: NextRequest) {
     : "\n\nEmojis: NUNCA use emojis nas respostas. Mantenha o texto limpo, sem símbolos especiais.";
   const activeSystemPrompt = config.systemPrompt + emojiInstruction;
 
+  if (await isOverQuota(config.teamId)) {
+    await sendWhatsAppTextAsTeam(config.uazapiToken, contactNumber, "Serviço de IA temporariamente indisponível. Por favor, aguarde ou entre em contato com nossa equipe.");
+    return NextResponse.json({ ok: true });
+  }
+
   let reply: string;
   if (imageUrl) {
-    reply = await runAgentWithImage(activeSystemPrompt, historyForAgent, imageUrl, caption);
+    const result = await runAgentWithImage(activeSystemPrompt, historyForAgent, imageUrl, caption);
+    reply = result.reply;
+    logTokenUsage({ teamId: config.teamId, provider: "openai", model: "gpt-4o-mini", feature: "whatsapp_agent", ...result.usage });
   } else if (tools.length > 0) {
     const extraContext = (config.schedulingEnabled ? await buildSchedulingContext(config.id, config.requisitosAgendamento || undefined, config.restricoesAgendamento || undefined, { enabled: config.atendimentoEspecialEnabled, descricao: config.atendimentoEspecialDescricao }) : "")
       + (config.commerceEnabled ? await buildCommerceContext(config.id, config) : "")
       + (config.cobrancaEnabled ? await buildBillingContext(config.id, contactNumber) : "")
-      + (isProspect ? (await buildProspeccaoContext(config.id, contactNumber) ?? "") : "")
-      + (config.financingEnabled ? await buildFinancingContext(config.id, contactNumber) : "");
-    reply = await runAgentWithTools(
+      + (isProspect ? (await buildProspeccaoContext(config.id, contactNumber) ?? "") : "");
+    const result = await runAgentWithTools(
       activeSystemPrompt + extraContext,
       historyForAgent,
       text,
       tools,
       makeExecuteTool(config.id, conversation.id, contactName, contactNumber)
     );
+    reply = result.reply;
+    logTokenUsage({ teamId: config.teamId, provider: "openai", model: "gpt-4o-mini", feature: "whatsapp_agent", ...result.usage });
   } else {
-    reply = await runAgent(activeSystemPrompt, historyForAgent, text);
+    const result = await runAgent(activeSystemPrompt, historyForAgent, text);
+    reply = result.reply;
+    logTokenUsage({ teamId: config.teamId, provider: "openai", model: "gpt-4o-mini", feature: "whatsapp_agent", ...result.usage });
   }
 
   await prisma.message.create({ data: { conversationId: conversation.id, role: "assistant", content: reply } });
@@ -796,7 +705,7 @@ export async function POST(req: NextRequest) {
   // IA decide quando o lead está qualificado e atribui a um atendente (rodízio), se ainda não tiver dono
   if (config.leadDistributionMode === "IA_QUALIFICACAO" && !conversation.assignedToId) {
     try {
-      const qualified = await classifyLeadQualified([...historyForAgent, { role: "user", content: text }, { role: "assistant", content: reply }]);
+      const { qualified } = await classifyLeadQualified([...historyForAgent, { role: "user", content: text }, { role: "assistant", content: reply }]);
       if (qualified) await assignNextAttendant(config.id, config.teamId, conversation.id);
     } catch (err) {
       console.error("[whatsapp-webhook] erro ao classificar qualificação do lead:", err);
