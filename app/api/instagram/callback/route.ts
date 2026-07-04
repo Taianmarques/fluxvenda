@@ -45,19 +45,19 @@ export async function GET(req: NextRequest) {
   const redirectUri = `${appOrigin}/api/instagram/callback`;
 
   try {
-    // 1. Troca code por short-lived token
+    // 1. Troca code por short-lived token + obtém userId
     console.log("[ig-cb] step1: exchanging code");
-    const shortToken = await exchangeInstagramCode(code, redirectUri);
-    console.log("[ig-cb] step1 ok, token length:", shortToken?.length);
+    const { accessToken: shortToken, userId: shortUserId } = await exchangeInstagramCode(code, redirectUri);
+    console.log("[ig-cb] step1 ok, userId:", shortUserId);
 
     // 2. Troca por long-lived token (~60 dias)
     console.log("[ig-cb] step2: getting long-lived token");
     const { token, expiresAt } = await getInstagramLongLivedToken(shortToken);
     console.log("[ig-cb] step2 ok");
 
-    // 3. Dados da conta Instagram Business
-    console.log("[ig-cb] step3: getting user info");
-    const { igUserId, username } = await getInstagramUserInfo(token);
+    // 3. Dados da conta Instagram Business (username via userId)
+    console.log("[ig-cb] step3: getting user info for", shortUserId);
+    const { igUserId, username } = await getInstagramUserInfo(token, shortUserId);
     console.log("[ig-cb] step3 ok, igUserId:", igUserId, "username:", username);
 
     // 4. Salva (ou atualiza) a conexão — pageId reutilizado para armazenar o IG user ID

@@ -3,7 +3,7 @@ const IG_GRAPH = "https://graph.instagram.com/v21.0";
 
 // ─── OAuth: Instagram Business Login ─────────────────────────────────────────
 
-export async function exchangeInstagramCode(code: string, redirectUri: string): Promise<string> {
+export async function exchangeInstagramCode(code: string, redirectUri: string): Promise<{ accessToken: string; userId: string }> {
   const body = new URLSearchParams({
     client_id: process.env.INSTAGRAM_APP_ID!,
     client_secret: process.env.INSTAGRAM_APP_SECRET!,
@@ -13,8 +13,8 @@ export async function exchangeInstagramCode(code: string, redirectUri: string): 
   });
   const res = await fetch(`${IG_AUTH}/oauth/access_token`, { method: "POST", body });
   const data = await res.json();
-  if (!res.ok || data.error_message) throw new Error(data.error_message ?? "Falha na troca do código OAuth");
-  return data.access_token as string;
+  if (!res.ok || data.error_message || data.error) throw new Error(data.error_message ?? data.error?.message ?? "Falha na troca do código OAuth");
+  return { accessToken: data.access_token as string, userId: String(data.user_id) };
 }
 
 export async function getInstagramLongLivedToken(shortToken: string): Promise<{ token: string; expiresAt: Date }> {
@@ -36,12 +36,15 @@ export async function getInstagramLongLivedToken(shortToken: string): Promise<{ 
   return { token: data.access_token, expiresAt };
 }
 
-export async function getInstagramUserInfo(accessToken: string): Promise<{ igUserId: string; username: string }> {
-  // New Instagram Platform uses /me without version prefix
-  const res = await fetch(`https://graph.instagram.com/me?fields=id,username&access_token=${accessToken}`);
+export async function getInstagramUserInfo(accessToken: string, userId: string): Promise<{ igUserId: string; username: string }> {
+  // Fetch username by user ID — avoids /me endpoint issues with new Instagram Platform
+  const res = await fetch(`${IG_GRAPH}/${userId}?fields=id,username&access_token=${accessToken}`);
   const data = await res.json();
-  if (!res.ok || data.error) throw new Error(data.error?.message ?? "Falha ao obter dados do usuário");
-  return { igUserId: String(data.id), username: data.username ?? "" };
+  if (!res.ok || data.error) {
+    console.warn("[instagram] getInstagramUserInfo error:", data.error?.message);
+    return { igUserId: userId, username: "" };
+  }
+  return { igUserId: String(data.id ?? userId), username: data.username ?? "" };
 }
 
 // ─── Webhook ──────────────────────────────────────────────────────────────────
