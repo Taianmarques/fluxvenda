@@ -30,8 +30,8 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
         <div className="max-w-3xl mx-auto space-y-6">
           <div>
             <Link href="/ferramentas" className="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1 w-fit"><ArrowLeft size={12} /> Ferramentas</Link>
-            <h1 className="text-3xl font-bold mt-2 flex items-center gap-2"><Bot size={28} className="text-blue-400" /> Agente de Atendimento — WhatsApp</h1>
-            <p className="text-gray-400 mt-1">Configure seu agente de IA antes de conectar o WhatsApp da sua empresa — a conexão é o último passo.</p>
+            <h1 className="text-3xl font-bold mt-2 flex items-center gap-2"><Bot size={28} className="text-blue-400" /> Agente de Atendimento</h1>
+            <p className="text-gray-400 mt-1">Configure seu agente de IA antes de conectar os canais (WhatsApp ou Instagram) — a conexão é o último passo.</p>
           </div>
           <WhatsappAgentClient
             agentId={config.id}
@@ -48,20 +48,30 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
     );
   }
 
-  const instanceStatus = config.uazapiToken
-    ? await getInstanceStatus(config.uazapiToken).catch(() => ({ connected: false }))
-    : { connected: false };
+  const [instanceStatus, igConnection] = await Promise.all([
+    config.uazapiToken
+      ? getInstanceStatus(config.uazapiToken).catch(() => ({ connected: false }))
+      : Promise.resolve({ connected: false }),
+    prisma.instagramConnection.findUnique({ where: { agentConfigId: config.id } }),
+  ]);
 
-  if (!instanceStatus.connected) {
+  // Só bloqueia na tela de conexão se NENHUM canal estiver conectado
+  if (!instanceStatus.connected && !igConnection) {
     return (
       <div className="min-h-screen bg-gray-950 text-white p-6">
         <div className="max-w-md mx-auto space-y-6">
           <div>
             <Link href="/ferramentas" className="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1 w-fit"><ArrowLeft size={12} /> Ferramentas</Link>
-            <h1 className="text-2xl font-bold mt-2 flex items-center gap-2"><Smartphone size={24} className="text-blue-400" /> Último passo: conecte o WhatsApp</h1>
-            <p className="text-gray-400 mt-1">{config.nome} já está configurado. Escaneie o QR code com o WhatsApp do número <span className="text-gray-300">{config.uazapiInstance}</span> para ativar o agente.</p>
+            <h1 className="text-2xl font-bold mt-2 flex items-center gap-2"><Smartphone size={24} className="text-blue-400" /> Conecte um canal</h1>
+            <p className="text-gray-400 mt-1">{config.nome} já está configurado. Escaneie o QR code com o WhatsApp do número <span className="text-gray-300">{config.uazapiInstance}</span> — ou conecte o Instagram se preferir.</p>
           </div>
           <QrConnect agentId={config.id} />
+          <Link
+            href="/crm/canais"
+            className="block text-center text-sm text-purple-400 hover:text-purple-300 border border-purple-800/50 hover:border-purple-600/50 rounded-xl px-4 py-2.5 transition-colors"
+          >
+            Prefiro conectar o Instagram — ir para Canais
+          </Link>
         </div>
       </div>
     );
@@ -80,7 +90,12 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
           <div>
             <Link href="/ferramentas" className="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1 w-fit"><ArrowLeft size={12} /> Ferramentas</Link>
             <h1 className="text-3xl font-bold mt-2 flex items-center gap-2"><Bot size={28} className="text-blue-400" /> {config.nome}</h1>
-            <p className="text-gray-400 mt-1">Agente de atendimento conectado ao WhatsApp da sua empresa.</p>
+            <p className="text-gray-400 mt-1">
+              Agente de atendimento conectado {[
+                instanceStatus.connected && "ao WhatsApp",
+                igConnection && "ao Instagram",
+              ].filter(Boolean).join(" e ")} da sua empresa.
+            </p>
           </div>
           <div className="flex items-center gap-3">
             <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border flex items-center gap-1.5 ${

@@ -481,7 +481,7 @@ export function WhatsappAgentClient({
             <FollowupDelaysEditor followupDelays={followupDelays} onAdd={addFollowupAttempt} onRemove={removeFollowupAttempt} onUpdate={updateFollowupAttempt} />
           )}
 
-          <p className="text-xs text-gray-500">Ao salvar, criamos automaticamente a conexão do WhatsApp e mostramos um QR code para você escanear — sem precisar de nenhum painel externo.</p>
+          <p className="text-xs text-gray-500">Ao salvar, você escolhe qual canal conectar: WhatsApp (via QR code) ou Instagram — e pode conectar os dois depois, na página de Canais.</p>
         </div>
       )}
 
@@ -500,7 +500,7 @@ export function WhatsappAgentClient({
           </button>
         ) : (
           <button onClick={handleSubmit} disabled={saving} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl px-5 py-2 text-sm font-medium">
-            {saving ? "Criando conexão..." : "Salvar e conectar WhatsApp"}
+            {saving ? "Salvando..." : "Salvar agente"}
           </button>
         )}
       </div>
