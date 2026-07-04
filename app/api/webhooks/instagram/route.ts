@@ -32,6 +32,8 @@ export async function POST(req: NextRequest) {
   let body: any;
   try { body = JSON.parse(rawBody); } catch { return NextResponse.json({ ok: true }); }
 
+  console.log("[ig-webhook] received object:", body.object, "entries:", body.entry?.length ?? 0, "raw:", rawBody.slice(0, 300));
+
   if (body.object !== "instagram") return NextResponse.json({ ok: true });
 
   for (const entry of body.entry ?? []) {
