@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { sendInstagramDM } from "@/lib/instagram";
+import { sendInstagramDM, sendInstagramPrivateReply } from "@/lib/instagram";
 
 type Branch = { keywords: string[]; label: string; funnelId: string | null };
 
@@ -11,12 +11,15 @@ export async function startFunnelExecution({
   contactIgsid,
   igBusinessAccountId,
   pageAccessToken,
+  commentId,
 }: {
   funnelId: string;
   agentConfigId: string;
   contactIgsid: string;
   igBusinessAccountId: string;
   pageAccessToken: string;
+  // Quando o funil é disparado por comentário, a primeira mensagem precisa ser private reply
+  commentId?: string;
 }) {
   const funnel = await prisma.instagramFunnel.findUnique({
     where: { id: funnelId },
@@ -46,12 +49,13 @@ export async function startFunnelExecution({
     },
   });
 
-  await runExecution(execution.id, funnel.blocks);
+  await runExecution(execution.id, funnel.blocks, commentId);
 }
 
 // Avança a execução a partir do bloco atual, processando MESSAGE e DELAY em sequência.
 // Para quando encontra DELAY (agenda) ou CONDITION (aguarda input).
-export async function runExecution(executionId: string, preloadedBlocks?: any[]) {
+// `privateReplyCommentId`: usado só no primeiro envio (funil disparado por comentário).
+export async function runExecution(executionId: string, preloadedBlocks?: any[], privateReplyCommentId?: string) {
   const execution = await prisma.instagramFunnelExecution.findUnique({
     where: { id: executionId },
   });
@@ -69,12 +73,17 @@ export async function runExecution(executionId: string, preloadedBlocks?: any[])
 
     if (block.type === "MESSAGE") {
       if (block.content) {
-        await sendInstagramDM(
-          execution.igBusinessAccountId,
-          execution.pageAccessToken,
-          execution.contactIgsid,
-          block.content
-        );
+        if (privateReplyCommentId) {
+          await sendInstagramPrivateReply(execution.pageAccessToken, privateReplyCommentId, block.content);
+          privateReplyCommentId = undefined; // só a primeira mensagem pode ser private reply
+        } else {
+          await sendInstagramDM(
+            execution.igBusinessAccountId,
+            execution.pageAccessToken,
+            execution.contactIgsid,
+            block.content
+          );
+        }
       }
       idx++;
       await prisma.instagramFunnelExecution.update({
@@ -101,12 +110,17 @@ export async function runExecution(executionId: string, preloadedBlocks?: any[])
     if (block.type === "CONDITION") {
       // Envia a pergunta e aguarda resposta do usuário
       if (block.content) {
-        await sendInstagramDM(
-          execution.igBusinessAccountId,
-          execution.pageAccessToken,
-          execution.contactIgsid,
-          block.content
-        );
+        if (privateReplyCommentId) {
+          await sendInstagramPrivateReply(execution.pageAccessToken, privateReplyCommentId, block.content);
+          privateReplyCommentId = undefined;
+        } else {
+          await sendInstagramDM(
+            execution.igBusinessAccountId,
+            execution.pageAccessToken,
+            execution.contactIgsid,
+            block.content
+          );
+        }
       }
       await prisma.instagramFunnelExecution.update({
         where: { id: executionId },

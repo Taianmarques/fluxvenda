@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createHmac } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { runAgent } from "@/lib/agent-engine";
-import { sendInstagramDM } from "@/lib/instagram";
+import { sendInstagramDM, sendInstagramPrivateReply } from "@/lib/instagram";
 import { logTokenUsage, isOverQuota } from "@/lib/token-usage";
 import { startFunnelExecution, handleFunnelReply } from "@/lib/instagram-funnel";
 
@@ -246,9 +246,10 @@ async function processComment(igBusinessAccountId: string, comment: {
 }) {
   const commenterId = comment.from?.id;
   const text = comment.text;
+  console.log("[ig-comment] igBizId:", igBusinessAccountId, "commenter:", commenterId, "commentId:", comment.id, "text:", text?.slice(0, 50));
 
-  if (!commenterId || !text) return;
-  if (commenterId === igBusinessAccountId) return;
+  if (!commenterId || !text || !comment.id) return;
+  if (commenterId === igBusinessAccountId) { console.log("[ig-comment] own comment, skipping"); return; }
 
   let connection = await prisma.instagramConnection.findUnique({
     where: { instagramBusinessAccountId: igBusinessAccountId },
@@ -270,7 +271,10 @@ async function processComment(igBusinessAccountId: string, comment: {
       },
     },
   });
-  if (!config || !config.active || !config.igCommentAutoDm) return;
+  if (!config || !config.active || !config.igCommentAutoDm) {
+    console.log("[ig-comment] dropping — config:", !!config, "active:", config?.active, "autoDm:", config?.igCommentAutoDm);
+    return;
+  }
 
   // Procura o primeiro fluxo ativo cujas keywords batem com o comentário
   const lowerText = text.toLowerCase();
@@ -287,6 +291,7 @@ async function processComment(igBusinessAccountId: string, comment: {
       contactIgsid: commenterId,
       igBusinessAccountId,
       pageAccessToken: connection.pageAccessToken,
+      commentId: comment.id,
     });
     return;
   }
@@ -318,5 +323,7 @@ async function processComment(igBusinessAccountId: string, comment: {
     });
   }
 
-  await sendInstagramDM(igBusinessAccountId, connection.pageAccessToken, commenterId, dmMessage);
+  // Private reply: única forma permitida de DM para quem apenas comentou (sem janela aberta)
+  await sendInstagramPrivateReply(connection.pageAccessToken, comment.id, dmMessage);
+  console.log("[ig-comment] private reply sent for comment", comment.id);
 }

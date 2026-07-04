@@ -92,3 +92,22 @@ export async function sendInstagramDM(
   const data = await res.json();
   if (!res.ok || data.error) throw new Error(data.error?.message ?? "Falha ao enviar DM");
 }
+
+// Responde um comentário no privado (Private Reply). Obrigatório para o primeiro contato
+// com quem comentou: DM comum é rejeitada pela Meta sem janela de conversa aberta.
+export async function sendInstagramPrivateReply(
+  accessToken: string,
+  commentId: string,
+  text: string
+): Promise<void> {
+  const res = await fetch(`${IG_GRAPH}/me/messages`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({
+      recipient: { comment_id: commentId },
+      message: { text },
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok || data.error) throw new Error(data.error?.message ?? "Falha ao enviar private reply");
+}
