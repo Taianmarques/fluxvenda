@@ -109,12 +109,13 @@ export async function connectInstance(token: string): Promise<UazapiInstanceStat
 // Consulta o status atual da conexão (usado para polling após exibir o QR code)
 export async function getInstanceStatus(token: string): Promise<UazapiInstanceStatus> {
   const res = await fetch(`${UAZAPI_URL}/instance/status`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", token },
-    body: JSON.stringify({}),
+    method: "GET",
+    headers: { token },
   });
-  if (!res.ok) throw new Error(`Erro ao consultar status da instância: ${res.status}`);
-  return parseInstanceStatus(await res.json());
+  if (!res.ok) return { connected: false, qrcode: null, paircode: null, profileName: null, ownerNumber: null };
+  const data = await res.json().catch(() => ({}));
+  if (data?.error) return { connected: false, qrcode: null, paircode: null, profileName: null, ownerNumber: null };
+  return parseInstanceStatus(data);
 }
 
 // Baixa uma mídia (áudio, imagem, etc.) de uma mensagem recebida — a UazAPI já entrega
