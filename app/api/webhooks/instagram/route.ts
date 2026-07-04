@@ -72,9 +72,11 @@ export async function POST(req: NextRequest) {
 }
 
 async function processMessage(igBusinessAccountId: string, senderIgsid: string, text: string) {
+  console.log("[ig-msg] processing igBizId:", igBusinessAccountId, "sender:", senderIgsid, "text:", text.slice(0, 50));
   let connection = await prisma.instagramConnection.findUnique({
     where: { instagramBusinessAccountId: igBusinessAccountId },
   });
+  console.log("[ig-msg] connection found:", !!connection);
 
   // Auto-heal: GET /me pode retornar um ID app-scoped diferente do ID que o webhook envia.
   // Se não encontrar, testa o token de cada conexão contra o ID do webhook e corrige o banco.
@@ -96,10 +98,11 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
     }
   }
 
-  if (!connection) return;
+  if (!connection) { console.log("[ig-msg] no connection found, dropping"); return; }
 
   const config = await prisma.agentConfig.findUnique({ where: { id: connection.agentConfigId } });
-  if (!config || !config.active) return;
+  console.log("[ig-msg] config found:", !!config, "active:", config?.active);
+  if (!config || !config.active) { console.log("[ig-msg] config missing or inactive, dropping"); return; }
 
   // Se o contato está em um funil aguardando resposta, o funil assume o controle
   const handledByFunnel = await handleFunnelReply({
@@ -143,7 +146,7 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
     }
   }
 
-  if (!config.systemPrompt) return;
+  if (!config.systemPrompt) { console.log("[ig-msg] no systemPrompt, dropping"); return; }
 
   // Usa "ig_" como prefixo para distinguir de números de WhatsApp no campo contactNumber
   const contactNumber = `ig_${senderIgsid}`;
