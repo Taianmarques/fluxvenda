@@ -72,9 +72,15 @@ async function buildCommerceContext(agentConfigId: string, config: {
 - Use gerar_cobranca só depois que o cliente confirmar o pedido, a forma de pagamento, o CPF/CNPJ e (se cartão) as parcelas. Se for Pix, explique que ele pode pagar com o código copia-e-cola retornado. Se for cartão, mande o link de checkout retornado e explique que ele deve abrir o link pra digitar os dados do cartão — NUNCA peça número de cartão direto no WhatsApp.
 - IMPORTANTE: quando o cliente já confirmou tudo que falta (itens, forma de pagamento, CPF/CNPJ e parcelas se for cartão), chame a ferramenta JÁ NESSA MESMA RESPOSTA — nunca diga "vou gerar" ou "um momento" sem ter chamado a ferramenta antes de responder.`;
 
+  const catalogUrl = `${process.env.NEXT_PUBLIC_APP_URL}/loja/${agentConfigId}`;
+
   return `\n\nFERRAMENTAS DE COMÉRCIO:
 Catálogo de produtos (use consultar_produtos pra confirmar — esse resumo pode estar desatualizado):
 ${catalogo}
+
+Catálogo online da loja (link público): ${catalogUrl}
+- Se o cliente pedir o catálogo, cardápio, lista de produtos, "o que vocês vendem" ou algo parecido, envie o link do catálogo online acima e explique que lá ele vê fotos e preços, monta o carrinho e finaliza o pedido aqui mesmo no WhatsApp.
+- Envie o link puro, sem colchetes nem parênteses em volta, pra ficar clicável.
 
 Quando o cliente quiser comprar algo:
 - Use consultar_produtos pra confirmar nome exato, preço e estoque antes de montar o pedido — nunca invente produto, preço ou estoque fora dessa lista.
