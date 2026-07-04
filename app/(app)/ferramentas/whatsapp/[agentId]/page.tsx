@@ -59,19 +59,35 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
   if (!instanceStatus.connected && !igConnection) {
     return (
       <div className="min-h-screen bg-gray-950 text-white p-6">
-        <div className="max-w-md mx-auto space-y-6">
+        <div className="max-w-2xl mx-auto space-y-6">
           <div>
             <Link href="/ferramentas" className="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1 w-fit"><ArrowLeft size={12} /> Ferramentas</Link>
             <h1 className="text-2xl font-bold mt-2 flex items-center gap-2"><Smartphone size={24} className="text-blue-400" /> Conecte um canal</h1>
             <p className="text-gray-400 mt-1">{config.nome} já está configurado. Escaneie o QR code com o WhatsApp do número <span className="text-gray-300">{config.uazapiInstance}</span> — ou conecte o Instagram se preferir.</p>
           </div>
-          <QrConnect agentId={config.id} />
-          <Link
-            href="/crm/canais"
-            className="block text-center text-sm text-purple-400 hover:text-purple-300 border border-purple-800/50 hover:border-purple-600/50 rounded-xl px-4 py-2.5 transition-colors"
-          >
-            Prefiro conectar o Instagram — ir para Canais
-          </Link>
+          <div className="max-w-md space-y-4">
+            <QrConnect agentId={config.id} />
+            <Link
+              href="/crm/canais"
+              className="block text-center text-sm text-purple-400 hover:text-purple-300 border border-purple-800/50 hover:border-purple-600/50 rounded-xl px-4 py-2.5 transition-colors"
+            >
+              Prefiro conectar o Instagram — ir para Canais
+            </Link>
+          </div>
+
+          <div>
+            <h2 className="text-xl font-bold mb-4">Configurações do agente</h2>
+            <WhatsappAgentClient
+              agentId={config.id}
+              segmento={{ segmento: config.segmento, subsegmento: config.subsegmento }}
+              initialConfig={{
+                nome: config.nome, tom: config.tom, servicos: config.servicos, objecoes: config.objecoes,
+                horario: config.horario, uazapiInstance: config.uazapiInstance, isConfigured: Boolean(config.systemPrompt),
+                descricaoEmpresa: config.descricaoEmpresa, precos: config.precos, enderecoContato: config.enderecoContato,
+                followupEnabled: config.followupEnabled, followupDelaysMinutes: config.followupDelaysMinutes as unknown as number[], emojiEnabled: config.emojiEnabled,
+              }}
+            />
+          </div>
         </div>
       </div>
     );
