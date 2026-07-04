@@ -37,38 +37,33 @@ export async function getInstagramLongLivedToken(shortToken: string): Promise<{ 
 }
 
 export async function getInstagramUserInfo(accessToken: string, userId: string): Promise<{ igUserId: string; username: string }> {
-  // Try /me first (no version) — returns the canonical Business Account ID used by webhooks
-  const meRes = await fetch(`https://graph.instagram.com/me?fields=id,username&access_token=${accessToken}`);
+  // Instagram Business Login: /me retorna `id` (app-scoped) e `user_id` (ID profissional
+  // 17841... — o mesmo que chega em entry.id nos webhooks). Salvamos o user_id.
+  const meRes = await fetch(`https://graph.instagram.com/me?fields=user_id,username,id&access_token=${accessToken}`);
   const meData = await meRes.json();
-  if (meRes.ok && !meData.error && meData.id) {
-    console.log("[instagram] /me returned id:", meData.id, "username:", meData.username);
-    return { igUserId: String(meData.id), username: meData.username ?? "" };
+  if (meRes.ok && !meData.error && (meData.user_id || meData.id)) {
+    console.log("[instagram] /me returned user_id:", meData.user_id, "id:", meData.id, "username:", meData.username);
+    return { igUserId: String(meData.user_id ?? meData.id), username: meData.username ?? "" };
   }
   console.warn("[instagram] /me failed:", meData.error?.message, "— falling back to userId");
-  // Fallback: use /{userId} with version
-  const res = await fetch(`${IG_GRAPH}/${userId}?fields=id,username&access_token=${accessToken}`);
-  const data = await res.json();
-  if (!res.ok || data.error) {
-    console.warn("[instagram] /{userId} also failed:", data.error?.message);
-    return { igUserId: userId, username: "" };
-  }
-  return { igUserId: String(data.id ?? userId), username: data.username ?? "" };
+  return { igUserId: userId, username: "" };
 }
 
 // ─── Webhook ──────────────────────────────────────────────────────────────────
 
 export async function subscribeInstagramWebhook(igUserId: string, accessToken: string): Promise<void> {
-  const res = await fetch(`${IG_GRAPH}/${igUserId}/subscribed_apps`, {
+  // /me/subscribed_apps — o token de Business Login identifica a conta, não usar ID na URL
+  const res = await fetch(`${IG_GRAPH}/me/subscribed_apps?subscribed_fields=messages,comments&access_token=${accessToken}`, {
     method: "POST",
-    body: new URLSearchParams({ subscribed_fields: "messages,comments", access_token: accessToken }),
   });
   const data = await res.json();
-  if (!res.ok && data.error) console.warn("[instagram] webhook subscribe:", data.error?.message);
+  if (!res.ok || data.error) console.warn("[instagram] webhook subscribe:", data.error?.message ?? res.status);
+  else console.log("[instagram] webhook subscribed ok");
 }
 
 export async function unsubscribeInstagramWebhook(igUserId: string, accessToken: string): Promise<void> {
   await fetch(
-    `${IG_GRAPH}/${igUserId}/subscribed_apps?subscribed_fields=messages&access_token=${accessToken}`,
+    `${IG_GRAPH}/me/subscribed_apps?subscribed_fields=messages&access_token=${accessToken}`,
     { method: "DELETE" }
   ).catch(() => {});
 }
@@ -81,14 +76,13 @@ export async function sendInstagramDM(
   recipientIgsid: string,
   text: string
 ): Promise<void> {
-  const res = await fetch(`${IG_GRAPH}/${igUserId}/messages`, {
+  // /me/messages — o token de Business Login identifica a conta remetente
+  const res = await fetch(`${IG_GRAPH}/me/messages`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
     body: JSON.stringify({
       recipient: { id: recipientIgsid },
       message: { text },
-      messaging_type: "RESPONSE",
-      access_token: accessToken,
     }),
   });
   const data = await res.json();

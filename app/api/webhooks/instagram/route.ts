@@ -71,6 +71,31 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ ok: true });
 }
 
+// Procura a conexão dona do ID que chegou no webhook: consulta /me com o token de cada
+// conexão cujo ID salvo não bate e corrige o banco quando o user_id retornado é o do webhook.
+async function healConnection(igBusinessAccountId: string) {
+  const candidates = await prisma.instagramConnection.findMany({
+    where: { instagramBusinessAccountId: { not: igBusinessAccountId } },
+    take: 20,
+  });
+  for (const c of candidates) {
+    try {
+      const res = await fetch(`https://graph.instagram.com/me?fields=user_id,id&access_token=${c.pageAccessToken}`);
+      const data = await res.json();
+      if (!res.ok || data.error) continue;
+      const ownIds = [data.user_id, data.id].filter(Boolean).map(String);
+      if (!ownIds.includes(igBusinessAccountId)) continue;
+      await prisma.instagramConnection.update({
+        where: { id: c.id },
+        data: { instagramBusinessAccountId: igBusinessAccountId, pageId: igBusinessAccountId },
+      });
+      console.log("[ig-heal] connection", c.id, "atualizada para igBizId", igBusinessAccountId);
+      return { ...c, instagramBusinessAccountId: igBusinessAccountId, pageId: igBusinessAccountId };
+    } catch {}
+  }
+  return null;
+}
+
 async function processMessage(igBusinessAccountId: string, senderIgsid: string, text: string) {
   console.log("[ig-msg] processing igBizId:", igBusinessAccountId, "sender:", senderIgsid, "text:", text.slice(0, 50));
   let connection = await prisma.instagramConnection.findUnique({
@@ -78,24 +103,10 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
   });
   console.log("[ig-msg] connection found:", !!connection);
 
-  // Auto-heal: GET /me pode retornar um ID app-scoped diferente do ID que o webhook envia.
-  // Se não encontrar, testa o token de cada conexão contra o ID do webhook e corrige o banco.
+  // Auto-heal: conexões antigas salvaram o ID app-scoped em vez do ID profissional (17841...)
+  // que o webhook envia. Consulta /me de cada conexão e corrige quando o user_id bate.
   if (!connection) {
-    const all = await prisma.instagramConnection.findMany({ take: 20 });
-    for (const c of all) {
-      try {
-        const res = await fetch(`https://graph.instagram.com/v21.0/${igBusinessAccountId}?fields=id&access_token=${c.pageAccessToken}`);
-        const data = await res.json();
-        if (!data.error && String(data.id) === igBusinessAccountId) {
-          await prisma.instagramConnection.update({
-            where: { id: c.id },
-            data: { instagramBusinessAccountId: igBusinessAccountId, pageId: igBusinessAccountId },
-          });
-          connection = { ...c, instagramBusinessAccountId: igBusinessAccountId, pageId: igBusinessAccountId };
-          break;
-        }
-      } catch {}
-    }
+    connection = await healConnection(igBusinessAccountId);
   }
 
   if (!connection) { console.log("[ig-msg] no connection found, dropping"); return; }
@@ -244,21 +255,7 @@ async function processComment(igBusinessAccountId: string, comment: {
   });
 
   if (!connection) {
-    const all = await prisma.instagramConnection.findMany({ take: 20 });
-    for (const c of all) {
-      try {
-        const res = await fetch(`https://graph.instagram.com/v21.0/${igBusinessAccountId}?fields=id&access_token=${c.pageAccessToken}`);
-        const data = await res.json();
-        if (!data.error && String(data.id) === igBusinessAccountId) {
-          await prisma.instagramConnection.update({
-            where: { id: c.id },
-            data: { instagramBusinessAccountId: igBusinessAccountId, pageId: igBusinessAccountId },
-          });
-          connection = { ...c, instagramBusinessAccountId: igBusinessAccountId, pageId: igBusinessAccountId };
-          break;
-        }
-      } catch {}
-    }
+    connection = await healConnection(igBusinessAccountId);
   }
 
   if (!connection) return;
