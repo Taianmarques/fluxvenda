@@ -199,6 +199,8 @@ export function CanaisClient({
   const [newSegmento, setNewSegmento] = useState("");
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [disconnectingIg, setDisconnectingIg] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -456,6 +458,24 @@ export function CanaisClient({
     );
   }
 
+  async function handleDeleteChannel(agentId: string) {
+    setDeletingId(agentId);
+    setError("");
+    try {
+      const res = await fetch(`/api/agentes/${agentId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Erro ao excluir o canal.");
+      }
+      setChannels((prev) => prev.filter((c) => c.id !== agentId));
+      setConfirmDeleteId(null);
+    } catch (e: any) {
+      setError(e.message ?? "Erro ao excluir o canal.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   async function handleDisconnectInstagram(agentId: string) {
     setDisconnectingIg(agentId);
     try {
@@ -563,12 +583,23 @@ export function CanaisClient({
             return (
               <div key={ch.id} className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
                 {/* Nome do agente */}
-                <div className="px-5 pt-4 pb-3 border-b border-gray-800/60">
-                  <p className="font-semibold">{ch.nome}</p>
-                  {(ch.segmento || ch.subsegmento) && (
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {[ch.segmento, ch.subsegmento].filter(Boolean).join(" › ")}
-                    </p>
+                <div className="px-5 pt-4 pb-3 border-b border-gray-800/60 flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold">{ch.nome}</p>
+                    {(ch.segmento || ch.subsegmento) && (
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {[ch.segmento, ch.subsegmento].filter(Boolean).join(" › ")}
+                      </p>
+                    )}
+                  </div>
+                  {isManager && (
+                    <button
+                      onClick={() => setConfirmDeleteId(ch.id)}
+                      className="flex-shrink-0 text-gray-600 hover:text-red-400 transition-colors p-1"
+                      title="Excluir canal"
+                    >
+                      <Trash2 size={15} />
+                    </button>
                   )}
                 </div>
 
@@ -769,6 +800,47 @@ export function CanaisClient({
           })}
         </div>
       </div>
+
+      {/* Modal de confirmação de exclusão */}
+      {confirmDeleteId && (() => {
+        const ch = channels.find((c) => c.id === confirmDeleteId);
+        if (!ch) return null;
+        return (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-gray-900 border border-red-900/50 rounded-2xl p-6 w-full max-w-sm space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-900/30 border border-red-800/50 flex items-center justify-center">
+                  <Trash2 size={17} className="text-red-400" />
+                </div>
+                <div>
+                  <p className="font-semibold">Excluir canal</p>
+                  <p className="text-sm text-gray-400 mt-1">
+                    Excluir <span className="font-medium text-gray-200">{ch.nome}</span> remove
+                    definitivamente o WhatsApp, o Instagram, todas as conversas, funis e condições deste agente.
+                  </p>
+                  <p className="text-xs text-red-400 mt-2">Essa ação não pode ser desfeita.</p>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  onClick={() => setConfirmDeleteId(null)}
+                  disabled={deletingId === ch.id}
+                  className="text-sm text-gray-400 hover:text-gray-200 px-4 py-2 transition-colors disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => handleDeleteChannel(ch.id)}
+                  disabled={deletingId === ch.id}
+                  className="text-sm bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white rounded-xl px-4 py-2 transition-colors"
+                >
+                  {deletingId === ch.id ? "Excluindo..." : "Excluir definitivamente"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Modal QR WhatsApp */}
       {connectingId && (

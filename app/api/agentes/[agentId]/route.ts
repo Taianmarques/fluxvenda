@@ -3,6 +3,8 @@ import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { generateSystemPrompt } from "@/lib/agent-engine";
 import { getAgentConfigAsManager } from "@/lib/team";
+import { deleteInstance } from "@/lib/whatsapp";
+import { unsubscribeInstagramWebhook } from "@/lib/instagram";
 import { z } from "zod";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {
@@ -70,4 +72,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
   });
 
   return NextResponse.json({ config });
+}
+
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { agentId } = await params;
+  const existing = await getAgentConfigAsManager(userId, agentId);
+  if (!existing) return NextResponse.json({ error: "Agente não encontrado" }, { status: 404 });
+
+  // Limpezas externas best-effort — a exclusão no banco acontece mesmo se falharem
+  if (existing.uazapiToken) {
+    await deleteInstance(existing.uazapiToken).catch(() => {});
+  }
+  const igConnection = await prisma.instagramConnection.findUnique({ where: { agentConfigId: agentId } });
+  if (igConnection) {
+    await unsubscribeInstagramWebhook(igConnection.instagramBusinessAccountId, igConnection.pageAccessToken).catch(() => {});
+  }
+
+  // Cascade remove conversas, mensagens, conexão Instagram, funis, execuções, etc.
+  await prisma.agentConfig.delete({ where: { id: agentId } });
+
+  return NextResponse.json({ ok: true });
 }
