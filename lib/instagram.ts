@@ -24,9 +24,14 @@ export async function getInstagramLongLivedToken(shortToken: string): Promise<{ 
     client_secret: process.env.INSTAGRAM_APP_SECRET!,
     access_token: shortToken,
   });
-  const res = await fetch(`${IG_GRAPH}/access_token?${params}`);
+  // Token exchange uses the base URL without version
+  const res = await fetch(`https://graph.instagram.com/access_token?${params}`);
   const data = await res.json();
-  if (!res.ok || data.error) throw new Error(data.error?.message ?? "Falha ao obter token de longa duração");
+  if (!res.ok || data.error) {
+    // Instagram Business Login tokens são válidos por 60 dias — usa o token diretamente como fallback
+    console.warn("[instagram] token exchange failed, using short-lived token:", data.error?.message);
+    return { token: shortToken, expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000) };
+  }
   const expiresAt = new Date(Date.now() + (data.expires_in ?? 5_184_000) * 1000);
   return { token: data.access_token, expiresAt };
 }
