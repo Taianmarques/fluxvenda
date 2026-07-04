@@ -205,9 +205,13 @@ export async function processDelayedExecutions() {
       where: { id: exec.id },
       data: { status: "RUNNING", updatedAt: new Date() },
     });
-    await runExecution(exec.id).catch((err) =>
-      console.error("[funnel-runner] processDelayedExecutions:", err)
-    );
+    await runExecution(exec.id).catch(async (err) => {
+      console.error("[funnel-runner] processDelayedExecutions:", err);
+      await prisma.instagramFunnelExecution.update({
+        where: { id: exec.id },
+        data: { status: "COMPLETED", updatedAt: new Date() },
+      }).catch(() => {});
+    });
   }
 
   return due.length;

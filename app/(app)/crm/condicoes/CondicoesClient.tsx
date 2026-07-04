@@ -600,7 +600,7 @@ export function CondicoesClient({ agentId, igConnected, igUsername, igCommentAut
       const res = await fetch(`/api/instagram/funnels/${agentId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ funnels: funnels.map((f) => ({ id: f.id.startsWith("new_") ? undefined : f.id, name: f.name, active: f.active, dmTriggerEnabled: f.dmTriggerEnabled, dmTriggerKeywords: f.dmTriggerKeywords, blocks: f.blocks })) }),
+        body: JSON.stringify({ funnels: funnels.map((f) => ({ id: f.id.startsWith("new_") ? undefined : f.id, tempId: f.id, name: f.name, active: f.active, dmTriggerEnabled: f.dmTriggerEnabled, dmTriggerKeywords: f.dmTriggerKeywords, blocks: f.blocks })) }),
       });
       if (!res.ok) throw new Error();
       const data = await res.json();

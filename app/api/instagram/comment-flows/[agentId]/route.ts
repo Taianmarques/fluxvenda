@@ -21,6 +21,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ agen
       name: string;
       keywords: string[];
       replyMessage: string;
+      funnelId: string | null;
       order: number;
       active: boolean;
     }>;
@@ -38,6 +39,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ agen
             name: f.name || `Condição ${i + 1}`,
             keywords: Array.isArray(f.keywords) ? f.keywords.map(String) : [],
             replyMessage: f.replyMessage ?? "",
+            funnelId: f.funnelId ?? null,
             order: f.order ?? i,
             active: f.active !== false,
           })),

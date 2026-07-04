@@ -35,6 +35,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ agen
   const { funnels } = await req.json() as {
     funnels: Array<{
       id?: string;
+      tempId?: string;
       name: string;
       active: boolean;
       dmTriggerEnabled: boolean;
@@ -66,28 +67,30 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ agen
   const upsertedFunnels: { tempId?: string; realId: string }[] = [];
 
   for (const f of funnels) {
+    const blockData = f.blocks.map((b, i) => ({
+      type: b.type,
+      order: i,
+      content: b.content ?? null,
+      delayMinutes: b.delayMinutes ?? null,
+      branches: b.branches != null ? (b.branches as Prisma.InputJsonValue) : Prisma.JsonNull,
+    }));
+
     if (f.id && existingIds.has(f.id)) {
-      // Atualiza
-      await prisma.instagramFunnelBlock.deleteMany({ where: { funnelId: f.id } });
-      await prisma.instagramFunnel.update({
-        where: { id: f.id },
-        data: {
-          name: f.name,
-          active: f.active,
-          dmTriggerEnabled: Boolean(f.dmTriggerEnabled),
-          dmTriggerKeywords: Array.isArray(f.dmTriggerKeywords) ? f.dmTriggerKeywords : [],
-          blocks: {
-            create: f.blocks.map((b, i) => ({
-              type: b.type,
-              order: i,
-              content: b.content ?? null,
-              delayMinutes: b.delayMinutes ?? null,
-              branches: b.branches != null ? (b.branches as Prisma.InputJsonValue) : Prisma.JsonNull,
-            })),
+      // Atualiza atomicamente (delete blocks + update em transação)
+      await prisma.$transaction([
+        prisma.instagramFunnelBlock.deleteMany({ where: { funnelId: f.id } }),
+        prisma.instagramFunnel.update({
+          where: { id: f.id },
+          data: {
+            name: f.name,
+            active: f.active,
+            dmTriggerEnabled: Boolean(f.dmTriggerEnabled),
+            dmTriggerKeywords: Array.isArray(f.dmTriggerKeywords) ? f.dmTriggerKeywords : [],
+            blocks: { create: blockData },
           },
-        },
-      });
-      upsertedFunnels.push({ tempId: f.id, realId: f.id });
+        }),
+      ]);
+      upsertedFunnels.push({ tempId: f.tempId ?? f.id, realId: f.id });
     } else {
       // Cria novo
       const created = await prisma.instagramFunnel.create({
@@ -97,18 +100,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ agen
           active: f.active,
           dmTriggerEnabled: Boolean(f.dmTriggerEnabled),
           dmTriggerKeywords: Array.isArray(f.dmTriggerKeywords) ? f.dmTriggerKeywords : [],
-          blocks: {
-            create: f.blocks.map((b, i) => ({
-              type: b.type,
-              order: i,
-              content: b.content ?? null,
-              delayMinutes: b.delayMinutes ?? null,
-              branches: b.branches != null ? (b.branches as Prisma.InputJsonValue) : Prisma.JsonNull,
-            })),
-          },
+          blocks: { create: blockData },
         },
       });
-      upsertedFunnels.push({ tempId: f.id, realId: created.id });
+      upsertedFunnels.push({ tempId: f.tempId ?? f.id, realId: created.id });
     }
   }
 
