@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ShoppingCart, Settings, Copy, Image as ImageIcon } from "lucide-react";
+import { ShoppingCart, Settings, Copy, Image as ImageIcon, ExternalLink, Check } from "lucide-react";
 
 const MAX_PHOTO_MB = 2;
 
@@ -213,6 +213,15 @@ export function ComercioClient({
   }
 
   const webhookUrl = typeof window !== "undefined" ? `${window.location.origin}/api/webhooks/asaas/${agentId}` : `/api/webhooks/asaas/${agentId}`;
+  const catalogUrl = typeof window !== "undefined" ? `${window.location.origin}/loja/${agentId}` : `/loja/${agentId}`;
+  const [catalogCopied, setCatalogCopied] = useState(false);
+
+  function copyCatalogLink() {
+    navigator.clipboard.writeText(catalogUrl).then(() => {
+      setCatalogCopied(true);
+      setTimeout(() => setCatalogCopied(false), 2000);
+    }).catch(() => {});
+  }
 
   return (
     <div className="h-full overflow-y-auto bg-gray-950 text-white p-6">
@@ -231,6 +240,37 @@ export function ComercioClient({
             </button>
           </div>
         </div>
+
+        {/* Link do catálogo público */}
+        {commerceEnabled && (
+          <div className="bg-gray-900 border border-green-800/40 rounded-2xl p-4 flex items-center justify-between gap-3 flex-wrap">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-green-300">Catálogo online da loja</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Compartilhe este link — o cliente monta o carrinho e finaliza o pedido no WhatsApp.
+              </p>
+              <p className="text-xs text-gray-400 font-mono mt-1 truncate">{catalogUrl}</p>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                onClick={copyCatalogLink}
+                className="flex items-center gap-1.5 text-xs text-gray-300 hover:text-white border border-gray-700 hover:border-gray-500 rounded-lg px-3 py-1.5 transition-colors"
+              >
+                {catalogCopied ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
+                {catalogCopied ? "Copiado!" : "Copiar link"}
+              </button>
+              <a
+                href={catalogUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-xs text-green-400 hover:text-green-300 border border-green-800/50 hover:border-green-600/50 rounded-lg px-3 py-1.5 transition-colors"
+              >
+                <ExternalLink size={12} />
+                Abrir
+              </a>
+            </div>
+          </div>
+        )}
 
         {showNewProduct && (
           <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
