@@ -59,6 +59,13 @@ export default async function ComercioPage({ params }: { params: Promise<{ agent
       storeSlug={storeSlug}
       initialOrderWebhookUrl={config.orderWebhookUrl}
       initialHasOrderWebhookSecret={Boolean(config.orderWebhookSecret)}
+      initialDelivery={{
+        deliveryEnabled: config.deliveryEnabled,
+        pickupEnabled: config.pickupEnabled,
+        deliveryFee: config.deliveryFee,
+        deliveryFreeAbove: config.deliveryFreeAbove,
+        deliveryArea: config.deliveryArea,
+      }}
       initialStoreLogo={config.storeLogoBase64 ? `data:${config.storeLogoMimeType ?? "image/png"};base64,${config.storeLogoBase64}` : null}
       initialBanners={banners.map(b => ({
         id: b.id, dataUri: `data:${b.imagemMimeType};base64,${b.imagemBase64}`, active: b.active,

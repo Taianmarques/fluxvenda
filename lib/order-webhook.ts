@@ -25,7 +25,11 @@ export async function notifyOrderWebhook(agentConfigId: string, orderId: string,
       order: {
         id: order.id,
         status: order.status,
-        total: order.total,
+        total: order.total, // subtotal dos itens
+        deliveryType: order.deliveryType,       // "ENTREGA" | "RETIRADA" | null
+        deliveryFee: order.deliveryFee,
+        deliveryAddress: order.deliveryAddress,
+        grandTotal: order.total + order.deliveryFee,
         contactName: order.contactName,
         contactNumber: order.contactNumber,
         paymentUrl: order.asaasInvoiceUrl,

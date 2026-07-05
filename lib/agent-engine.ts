@@ -274,6 +274,21 @@ export const COMMERCE_TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "definir_entrega",
+      description: "Registra no pedido em andamento se será entrega ou retirada no local. Para entrega, informe também o endereço completo do cliente. Chame antes de gerar a cobrança quando a empresa oferece entrega — a taxa é calculada automaticamente conforme a configuração da loja.",
+      parameters: {
+        type: "object",
+        properties: {
+          tipo: { type: "string", enum: ["ENTREGA", "RETIRADA"], description: "Como o cliente quer receber o pedido" },
+          endereco: { type: "string", description: "Endereço completo de entrega (rua, número, bairro, complemento). Obrigatório quando tipo = ENTREGA." },
+        },
+        required: ["tipo"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "gerar_cobranca",
       description: "Gera a cobrança do pedido atual em andamento dessa conversa, depois que o cliente confirmou os itens, escolheu a forma de pagamento (Pix ou cartão), informou o CPF/CNPJ (exigido pra qualquer cobrança) e — se for cartão e a empresa permitir parcelamento — escolheu em quantas vezes quer pagar. Se for Pix, retorna o código copia-e-cola pra enviar direto no chat. Se for cartão, retorna um link de checkout seguro pro cliente abrir e digitar os dados do cartão lá — NUNCA peça número de cartão pelo WhatsApp.",
       parameters: {

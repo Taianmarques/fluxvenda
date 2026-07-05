@@ -60,6 +60,7 @@ function buildInstallmentNote(config: {
 
 async function buildCommerceContext(agentConfigId: string, config: {
   catalogOnly: boolean; installmentsEnabled: boolean; maxInstallments: number; interestFreeInstallments: number; installmentInterestRate: number;
+  deliveryEnabled: boolean; pickupEnabled: boolean; deliveryFee: number; deliveryFreeAbove: number | null; deliveryArea: string;
 }): Promise<string> {
   const products = await prisma.product.findMany({ where: { agentConfigId, active: true }, select: { name: true, price: true } });
   const catalogo = products.length > 0
@@ -88,8 +89,24 @@ Quando o cliente quiser comprar algo:
 - Use consultar_produtos pra confirmar nome exato, preço e estoque antes de montar o pedido — nunca invente produto, preço ou estoque fora dessa lista.
 - Use montar_pedido sempre que o cliente definir ou mudar os itens — passe a lista COMPLETA de itens desejados (substitui o pedido anterior, não é incremental).
 ${pagamentoBlock}
+${buildDeliveryBlock(config)}
 - Se o cliente perguntar sobre um pedido já feito, use consultar_status_pedido.
 - Se o cliente pedir pra ver o produto ou perguntar se tem foto, use enviar_foto_produto.`;
+}
+
+function buildDeliveryBlock(config: {
+  deliveryEnabled: boolean; pickupEnabled: boolean; deliveryFee: number; deliveryFreeAbove: number | null; deliveryArea: string;
+}): string {
+  if (!config.deliveryEnabled) {
+    return `- Entrega: essa loja NÃO faz entrega — o pedido é retirado no local. Depois de montar o pedido, registre com definir_entrega (tipo RETIRADA).`;
+  }
+  const opcoes = config.pickupEnabled ? "ENTREGA ou RETIRADA no local" : "somente ENTREGA (não há retirada)";
+  const taxa = config.deliveryFee > 0
+    ? `A taxa de entrega é R$ ${config.deliveryFee.toFixed(2)}${config.deliveryFreeAbove != null ? `, com frete GRÁTIS para pedidos a partir de R$ ${config.deliveryFreeAbove.toFixed(2)}` : ""}.`
+    : "A entrega é gratuita.";
+  const area = config.deliveryArea ? `\n- Área e prazo de entrega: ${config.deliveryArea}` : "";
+  return `- Entrega: essa loja oferece ${opcoes}. ${taxa}
+- Depois de montar o pedido, pergunte como o cliente quer receber. Se for entrega, peça o endereço completo (rua, número, bairro) e registre com definir_entrega — a taxa é calculada e somada automaticamente. É OBRIGATÓRIO registrar a entrega antes de gerar a cobrança.${area}`;
 }
 
 async function buildBillingContext(agentConfigId: string, contactNumber: string): Promise<string> {
@@ -297,6 +314,35 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       return `Pedido atualizado:\n${resumo}\nTotal: R$ ${total.toFixed(2)}`;
     }
 
+    if (name === "definir_entrega") {
+      const tipo = args?.tipo === "ENTREGA" ? "ENTREGA" : args?.tipo === "RETIRADA" ? "RETIRADA" : null;
+      if (!tipo) return "Erro: pergunte ao cliente se ele quer ENTREGA ou RETIRADA.";
+      if (tipo === "ENTREGA" && !config.deliveryEnabled) return "Essa loja não oferece entrega — apenas retirada no local.";
+      if (tipo === "RETIRADA" && !config.pickupEnabled) return "Essa loja não oferece retirada — apenas entrega.";
+
+      const endereco = typeof args?.endereco === "string" ? args.endereco.trim() : "";
+      if (tipo === "ENTREGA" && !endereco) return "Erro: peça o endereço completo de entrega (rua, número, bairro) antes de definir a entrega.";
+
+      const order = await prisma.order.findFirst({ where: { agentConfigId, conversationId, status: "ABERTO" } });
+      if (!order) return "Ainda não há pedido montado nessa conversa. Monte o pedido primeiro com montar_pedido.";
+
+      // Taxa: frete grátis quando o subtotal atinge o mínimo configurado
+      const fee = tipo === "RETIRADA"
+        ? 0
+        : (config.deliveryFreeAbove != null && order.total >= config.deliveryFreeAbove ? 0 : config.deliveryFee);
+
+      await prisma.order.update({
+        where: { id: order.id },
+        data: { deliveryType: tipo, deliveryFee: fee, deliveryAddress: endereco },
+      });
+      notifyOrderWebhook(agentConfigId, order.id, "order.updated");
+
+      if (tipo === "RETIRADA") return `Retirada no local registrada. Total do pedido: R$ ${order.total.toFixed(2)}.`;
+      return fee > 0
+        ? `Entrega registrada para "${endereco}". Taxa de entrega: R$ ${fee.toFixed(2)}. Total com entrega: R$ ${(order.total + fee).toFixed(2)}.`
+        : `Entrega registrada para "${endereco}" — frete grátis! Total: R$ ${order.total.toFixed(2)}.`;
+    }
+
     if (name === "gerar_cobranca") {
       if (!config.asaasApiKey) return "Erro interno: pagamento não está configurado pra essa empresa.";
 
@@ -309,14 +355,22 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       const order = await prisma.order.findFirst({ where: { agentConfigId, conversationId, status: "ABERTO" }, include: { items: true } });
       if (!order || order.items.length === 0) return "Ainda não há nenhum pedido montado pra gerar a cobrança. Monte o pedido primeiro.";
 
+      // Exige a definição de entrega quando a loja oferece entrega
+      if (config.deliveryEnabled && !order.deliveryType) {
+        return "Erro: antes de cobrar, pergunte se o cliente quer ENTREGA ou RETIRADA e registre com definir_entrega.";
+      }
+
+      // Valor cobrado = itens + taxa de entrega (order.total guarda só o subtotal dos itens)
+      const baseTotal = order.total + order.deliveryFee;
+
       // Parcelamento só se aplica a cartão, e só dentro do limite configurado pra esse agente
       let parcelas = 1;
-      let totalComJuros = order.total;
+      let totalComJuros = baseTotal;
       if (formaPagamento === "CARTAO" && config.installmentsEnabled && config.maxInstallments > 1) {
         const pedido = Math.round(Number(args?.parcelas) || 1);
         parcelas = Math.min(Math.max(1, pedido), config.maxInstallments);
         const parcelasComJuros = Math.max(0, parcelas - config.interestFreeInstallments);
-        totalComJuros = order.total * (1 + (config.installmentInterestRate / 100) * parcelasComJuros);
+        totalComJuros = baseTotal * (1 + (config.installmentInterestRate / 100) * parcelasComJuros);
       }
 
       try {
@@ -336,7 +390,7 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
         if (formaPagamento === "CARTAO") {
           await prisma.order.update({
             where: { id: order.id },
-            data: { status: "AGUARDANDO_PAGAMENTO", total: totalComJuros, asaasPaymentId: payment.id, asaasInvoiceUrl: payment.invoiceUrl, asaasInstallmentId: payment.installment ?? null },
+            data: { status: "AGUARDANDO_PAGAMENTO", asaasPaymentId: payment.id, asaasInvoiceUrl: payment.invoiceUrl, asaasInstallmentId: payment.installment ?? null },
           });
           notifyOrderWebhook(agentConfigId, order.id, "order.updated");
           const parcelaInfo = parcelas > 1 ? ` em ${parcelas}x de R$ ${(totalComJuros / parcelas).toFixed(2)}` : "";
@@ -356,7 +410,7 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
           await sendWhatsAppTextAsTeam(config.uazapiToken, contactNumber, qr.payload).catch(() => {});
         }
 
-        return `[SISTEMA] Pix gerado com sucesso (R$ ${order.total.toFixed(2)}). O código Pix copia-e-cola foi enviado automaticamente como mensagem separada. Na SUA RESPOSTA ao cliente, apenas confirme que o Pix foi gerado e que o código está na mensagem acima — NÃO inclua o código, NÃO escreva "[código gerado]" nem qualquer placeholder.`;
+        return `[SISTEMA] Pix gerado com sucesso (R$ ${baseTotal.toFixed(2)}). O código Pix copia-e-cola foi enviado automaticamente como mensagem separada. Na SUA RESPOSTA ao cliente, apenas confirme que o Pix foi gerado e que o código está na mensagem acima — NÃO inclua o código, NÃO escreva "[código gerado]" nem qualquer placeholder.`;
       } catch (err) {
         console.error("[whatsapp-webhook] erro ao gerar cobrança:", err);
         return "Não foi possível gerar a cobrança agora. Avise que vai encaminhar pra um atendente confirmar o pagamento.";

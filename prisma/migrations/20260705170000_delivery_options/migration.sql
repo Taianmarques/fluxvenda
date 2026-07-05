@@ -1,0 +1,11 @@
+-- AlterTable AgentConfig
+ALTER TABLE "AgentConfig" ADD COLUMN "deliveryEnabled" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "AgentConfig" ADD COLUMN "pickupEnabled" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "AgentConfig" ADD COLUMN "deliveryFee" DOUBLE PRECISION NOT NULL DEFAULT 0;
+ALTER TABLE "AgentConfig" ADD COLUMN "deliveryFreeAbove" DOUBLE PRECISION;
+ALTER TABLE "AgentConfig" ADD COLUMN "deliveryArea" TEXT NOT NULL DEFAULT '';
+
+-- AlterTable Order
+ALTER TABLE "Order" ADD COLUMN "deliveryType" TEXT;
+ALTER TABLE "Order" ADD COLUMN "deliveryFee" DOUBLE PRECISION NOT NULL DEFAULT 0;
+ALTER TABLE "Order" ADD COLUMN "deliveryAddress" TEXT NOT NULL DEFAULT '';

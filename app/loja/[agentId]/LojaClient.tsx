@@ -20,12 +20,21 @@ function effectivePrice(p: StoreProduct) {
   return p.precoPromocional ?? p.price;
 }
 
+type DeliveryConfig = {
+  deliveryEnabled: boolean;
+  pickupEnabled: boolean;
+  deliveryFee: number;
+  deliveryFreeAbove: number | null;
+  deliveryArea: string;
+};
+
 export function LojaClient({
   agentId,
   storeName,
   whatsappNumber,
   logo,
   banners,
+  delivery,
   products,
 }: {
   agentId: string;
@@ -33,6 +42,7 @@ export function LojaClient({
   whatsappNumber: string | null;
   logo: string | null;
   banners: string[];
+  delivery: DeliveryConfig;
   products: StoreProduct[];
 }) {
   const cartKey = `loja_cart_${agentId}`;
@@ -144,18 +154,45 @@ export function LojaClient({
   );
 
   const totalQty = cartItems.reduce((s, i) => s + i.qty, 0);
-  const total = cartItems.reduce((s, i) => s + effectivePrice(i.product) * i.qty, 0);
+  const subtotal = cartItems.reduce((s, i) => s + effectivePrice(i.product) * i.qty, 0);
+
+  // Entrega: escolha do cliente no carrinho
+  const deliveryChoices = [
+    ...(delivery.deliveryEnabled ? ["ENTREGA" as const] : []),
+    ...(delivery.pickupEnabled ? ["RETIRADA" as const] : []),
+  ];
+  const [deliveryType, setDeliveryType] = useState<"ENTREGA" | "RETIRADA" | null>(
+    deliveryChoices.length === 1 ? deliveryChoices[0] : null
+  );
+  const [deliveryAddress, setDeliveryAddress] = useState("");
+
+  const fee =
+    deliveryType === "ENTREGA"
+      ? (delivery.deliveryFreeAbove != null && subtotal >= delivery.deliveryFreeAbove ? 0 : delivery.deliveryFee)
+      : 0;
+  const total = subtotal + fee;
+  const needsDeliveryChoice = deliveryChoices.length > 1 && deliveryType === null;
 
   function checkout() {
-    if (!whatsappNumber || cartItems.length === 0) return;
+    if (!whatsappNumber || cartItems.length === 0 || needsDeliveryChoice) return;
     const lines = cartItems.map(
       (i) => `- ${i.qty}x ${i.product.name} — ${brl.format(effectivePrice(i.product) * i.qty)}`
     );
+    const deliveryLines =
+      deliveryType === "ENTREGA"
+        ? [
+            `Entrega: ${fee > 0 ? brl.format(fee) : "grátis"}`,
+            ...(deliveryAddress.trim() ? [`Endereço: ${deliveryAddress.trim()}`] : []),
+          ]
+        : deliveryType === "RETIRADA"
+          ? ["Retirada no local"]
+          : [];
     const message = [
       `Olá! Montei um pedido pelo catálogo de ${storeName}:`,
       "",
       ...lines,
       "",
+      ...deliveryLines,
       `Total: ${brl.format(total)}`,
       "",
       "Pode confirmar meu pedido?",
@@ -371,7 +408,7 @@ export function LojaClient({
               <p className="font-bold">{brl.format(total)}</p>
             </button>
             <button
-              onClick={checkout}
+              onClick={() => (needsDeliveryChoice || deliveryType === "ENTREGA" ? setCartOpen(true) : checkout())}
               disabled={!whatsappNumber}
               className="flex-1 bg-green-600 hover:bg-green-500 active:bg-green-700 disabled:bg-gray-300 text-white font-semibold rounded-xl py-3 flex items-center justify-center gap-2 transition-colors"
             >
@@ -438,13 +475,73 @@ export function LojaClient({
 
             {cartItems.length > 0 && (
               <div className="px-5 py-4 border-t border-gray-100 space-y-3 pb-[max(16px,env(safe-area-inset-bottom))]">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-gray-500">Total</p>
-                  <p className="text-xl font-bold">{brl.format(total)}</p>
+                {/* Escolha de entrega */}
+                {deliveryChoices.length > 1 && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setDeliveryType("ENTREGA")}
+                      className={`text-sm font-medium rounded-xl py-2 border transition-colors ${
+                        deliveryType === "ENTREGA" ? "bg-blue-600 border-blue-600 text-white" : "bg-white border-gray-200 text-gray-600"
+                      }`}
+                    >
+                      Entrega
+                    </button>
+                    <button
+                      onClick={() => setDeliveryType("RETIRADA")}
+                      className={`text-sm font-medium rounded-xl py-2 border transition-colors ${
+                        deliveryType === "RETIRADA" ? "bg-blue-600 border-blue-600 text-white" : "bg-white border-gray-200 text-gray-600"
+                      }`}
+                    >
+                      Retirar na loja
+                    </button>
+                  </div>
+                )}
+
+                {deliveryType === "ENTREGA" && (
+                  <div className="space-y-1.5">
+                    <textarea
+                      value={deliveryAddress}
+                      onChange={(e) => setDeliveryAddress(e.target.value)}
+                      rows={2}
+                      placeholder="Endereço de entrega (rua, número, bairro) — opcional, dá pra combinar no WhatsApp"
+                      className="w-full bg-gray-100 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500 focus:bg-white resize-none"
+                    />
+                    {delivery.deliveryArea && (
+                      <p className="text-xs text-gray-400">{delivery.deliveryArea}</p>
+                    )}
+                  </div>
+                )}
+
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-sm text-gray-500">
+                    <p>Subtotal</p>
+                    <p>{brl.format(subtotal)}</p>
+                  </div>
+                  {deliveryType === "ENTREGA" && (
+                    <div className="flex items-center justify-between text-sm text-gray-500">
+                      <p>Entrega</p>
+                      <p className={fee === 0 ? "text-green-600 font-medium" : ""}>
+                        {fee === 0 ? "Grátis" : brl.format(fee)}
+                      </p>
+                    </div>
+                  )}
+                  {deliveryType === "ENTREGA" && fee > 0 && delivery.deliveryFreeAbove != null && subtotal < delivery.deliveryFreeAbove && (
+                    <p className="text-xs text-green-600">
+                      Frete grátis a partir de {brl.format(delivery.deliveryFreeAbove)} — faltam {brl.format(delivery.deliveryFreeAbove - subtotal)}
+                    </p>
+                  )}
+                  <div className="flex items-center justify-between pt-1">
+                    <p className="text-sm text-gray-500">Total</p>
+                    <p className="text-xl font-bold">{brl.format(total)}</p>
+                  </div>
                 </div>
+
+                {needsDeliveryChoice && (
+                  <p className="text-xs text-center text-amber-600">Escolha entrega ou retirada para continuar.</p>
+                )}
                 <button
                   onClick={checkout}
-                  disabled={!whatsappNumber}
+                  disabled={!whatsappNumber || needsDeliveryChoice}
                   className="w-full bg-green-600 hover:bg-green-500 active:bg-green-700 disabled:bg-gray-300 text-white font-semibold rounded-xl py-3 flex items-center justify-center gap-2 transition-colors"
                 >
                   <MessageCircle size={18} />

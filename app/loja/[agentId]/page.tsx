@@ -19,6 +19,11 @@ async function findStore(idOrSlug: string) {
       storeLogoBase64: true,
       storeLogoMimeType: true,
       storeSlug: true,
+      deliveryEnabled: true,
+      pickupEnabled: true,
+      deliveryFee: true,
+      deliveryFreeAbove: true,
+      deliveryArea: true,
       team: { select: { name: true } },
     },
   });
@@ -91,6 +96,13 @@ export default async function LojaPage({ params }: { params: Promise<{ agentId: 
       whatsappNumber={whatsappNumber}
       logo={config.storeLogoBase64 ? `data:${config.storeLogoMimeType ?? "image/png"};base64,${config.storeLogoBase64}` : null}
       banners={banners.map((b) => `data:${b.imagemMimeType};base64,${b.imagemBase64}`)}
+      delivery={{
+        deliveryEnabled: config.deliveryEnabled,
+        pickupEnabled: config.pickupEnabled,
+        deliveryFee: config.deliveryFee,
+        deliveryFreeAbove: config.deliveryFreeAbove,
+        deliveryArea: config.deliveryArea,
+      }}
       products={products.map((p) => ({
         id: p.id,
         name: p.name,

@@ -26,6 +26,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ age
     installmentInterestRate: config.installmentInterestRate,
     orderWebhookUrl: config.orderWebhookUrl,
     hasOrderWebhookSecret: Boolean(config.orderWebhookSecret),
+    deliveryEnabled: config.deliveryEnabled,
+    pickupEnabled: config.pickupEnabled,
+    deliveryFee: config.deliveryFee,
+    deliveryFreeAbove: config.deliveryFreeAbove,
+    deliveryArea: config.deliveryArea,
   });
 }
 
@@ -45,6 +50,12 @@ const schema = z.object({
   // Integração com o sistema do cliente — null desativa
   orderWebhookUrl: z.string().url().max(500).nullable().optional(),
   orderWebhookSecret: z.string().max(200).nullable().optional(),
+  // Entrega
+  deliveryEnabled: z.boolean().optional(),
+  pickupEnabled: z.boolean().optional(),
+  deliveryFee: z.number().min(0).max(100000).optional(),
+  deliveryFreeAbove: z.number().min(0).max(1000000).nullable().optional(),
+  deliveryArea: z.string().max(1000).optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {

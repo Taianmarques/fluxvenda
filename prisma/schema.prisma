@@ -613,6 +613,13 @@ model AgentConfig {
   orderWebhookUrl    String?
   orderWebhookSecret String?
 
+  // Opções de entrega do comércio
+  deliveryEnabled   Boolean @default(false) // oferece entrega
+  pickupEnabled     Boolean @default(true)  // oferece retirada no local
+  deliveryFee       Float   @default(0)     // taxa fixa de entrega
+  deliveryFreeAbove Float?                  // frete grátis a partir desse subtotal (null = nunca)
+  deliveryArea      String  @default("")    // área atendida, prazos, observações
+
   conversations        Conversation[]
   pipelines            Pipeline[]
   leadStatuses         LeadStatus[]
@@ -811,7 +818,11 @@ model Order {
   contactName   String
   contactNumber String
   status        OrderStatus @default(ABERTO)
-  total         Float       @default(0)
+  total         Float       @default(0) // subtotal dos itens (sem taxa de entrega)
+
+  deliveryType    String? // "ENTREGA" | "RETIRADA" — null = ainda não definido
+  deliveryFee     Float   @default(0)
+  deliveryAddress String  @default("")
 
   asaasPaymentId  String?
   asaasPixPayload String? // código Pix copia-e-cola

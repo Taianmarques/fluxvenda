@@ -93,7 +93,7 @@ export function ComercioClient({
   agentId, initialCommerceEnabled, initialCatalogOnly, initialAsaasSandbox, initialHasAsaasApiKey, initialAsaasWebhookToken,
   initialInstallmentsEnabled, initialMaxInstallments, initialInterestFreeInstallments, initialInstallmentInterestRate,
   initialProducts, initialOrders, initialStoreLogo, initialBanners, storeSlug,
-  initialOrderWebhookUrl, initialHasOrderWebhookSecret,
+  initialOrderWebhookUrl, initialHasOrderWebhookSecret, initialDelivery,
 }: {
   agentId: string;
   initialCommerceEnabled: boolean;
@@ -112,6 +112,13 @@ export function ComercioClient({
   storeSlug?: string | null; // URL amigável do catálogo
   initialOrderWebhookUrl?: string | null;
   initialHasOrderWebhookSecret?: boolean;
+  initialDelivery?: {
+    deliveryEnabled: boolean;
+    pickupEnabled: boolean;
+    deliveryFee: number;
+    deliveryFreeAbove: number | null;
+    deliveryArea: string;
+  };
 }) {
   const [showSettings, setShowSettings] = useState(false);
   const [commerceEnabled, setCommerceEnabled] = useState(initialCommerceEnabled);
@@ -133,6 +140,15 @@ export function ComercioClient({
   const importInputRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
   const [importMessage, setImportMessage] = useState("");
+
+  // Entrega
+  const [deliveryEnabled, setDeliveryEnabled] = useState(initialDelivery?.deliveryEnabled ?? false);
+  const [pickupEnabled, setPickupEnabled] = useState(initialDelivery?.pickupEnabled ?? true);
+  const [deliveryFee, setDeliveryFee] = useState(initialDelivery?.deliveryFee ?? 0);
+  const [deliveryFreeAbove, setDeliveryFreeAbove] = useState<string>(
+    initialDelivery?.deliveryFreeAbove != null ? String(initialDelivery.deliveryFreeAbove) : ""
+  );
+  const [deliveryArea, setDeliveryArea] = useState(initialDelivery?.deliveryArea ?? "");
 
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [orders] = useState<Order[]>(initialOrders);
@@ -177,6 +193,9 @@ export function ComercioClient({
           commerceEnabled, catalogOnly, asaasSandbox,
           installmentsEnabled, maxInstallments, interestFreeInstallments, installmentInterestRate,
           ...(asaasApiKeyInput.trim() ? { asaasApiKey: asaasApiKeyInput.trim() } : {}),
+          deliveryEnabled, pickupEnabled, deliveryFee,
+          deliveryFreeAbove: deliveryFreeAbove.trim() ? Number(deliveryFreeAbove.replace(",", ".")) : null,
+          deliveryArea: deliveryArea.trim(),
           // URL vazia desativa a integração (e limpa o secret junto)
           orderWebhookUrl: orderWebhookUrl.trim() || null,
           ...(orderWebhookSecretInput.trim()
@@ -687,6 +706,52 @@ export function ComercioClient({
                       className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
                     />
                     <p className="text-xs text-gray-500 mt-1">O acréscimo é calculado por nós e embutido no valor cobrado — não depende de configuração da sua conta Asaas.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-gray-800 pt-4 space-y-3">
+              <p className="text-sm font-medium">Entrega</p>
+              <div className="flex gap-5 flex-wrap">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={deliveryEnabled} onChange={e => setDeliveryEnabled(e.target.checked)} className="w-4 h-4" />
+                  <span className="text-sm">Fazemos entrega</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={pickupEnabled} onChange={e => setPickupEnabled(e.target.checked)} className="w-4 h-4" />
+                  <span className="text-sm">Retirada no local</span>
+                </label>
+              </div>
+              {deliveryEnabled && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Taxa de entrega (R$)</label>
+                    <input
+                      type="number" min={0} step={0.5} value={deliveryFee}
+                      onChange={e => setDeliveryFee(Math.max(0, Number(e.target.value)))}
+                      className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Frete grátis a partir de (R$)</label>
+                    <input
+                      value={deliveryFreeAbove}
+                      onChange={e => setDeliveryFreeAbove(e.target.value)}
+                      placeholder="Vazio = nunca"
+                      className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-xs text-gray-400 block mb-1">Área e prazo de entrega</label>
+                    <textarea
+                      value={deliveryArea}
+                      onChange={e => setDeliveryArea(e.target.value)}
+                      rows={2}
+                      placeholder="Ex: Entregamos no centro e bairros vizinhos, em até 90 minutos. Fora dessa área, combinar com atendente."
+                      className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm resize-none"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">O agente usa essa descrição pra responder onde e quando a loja entrega.</p>
                   </div>
                 </div>
               )}
