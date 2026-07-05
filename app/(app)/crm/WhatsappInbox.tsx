@@ -758,7 +758,7 @@ export function WhatsappInbox({
                       {showTransferMenu && (
                         <>
                           <div className="fixed inset-0 z-10" onClick={() => setShowTransferMenu(false)} />
-                          <div className={`absolute z-20 top-full max-md:left-0 md:right-0 mt-1 w-48 max-w-[calc(100vw-2rem)] rounded-xl border shadow-xl p-1.5 space-y-0.5 ${theme === "dark" ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}`}>
+                          <div className={`absolute z-20 top-full right-0 mt-1 w-48 max-w-[calc(100vw-2rem)] rounded-xl border shadow-xl p-1.5 space-y-0.5 ${theme === "dark" ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}`}>
                             <button
                               onClick={() => { handleAssign(null); setShowTransferMenu(false); }}
                               className={`w-full text-left text-xs px-2 py-1.5 rounded-lg ${!detail.assignedToId ? "font-semibold" : ""} ${theme === "dark" ? "text-gray-300 hover:bg-gray-800" : "text-gray-600 hover:bg-gray-100"}`}

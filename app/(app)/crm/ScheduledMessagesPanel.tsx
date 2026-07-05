@@ -61,7 +61,7 @@ export function ScheduledMessagesPanel({
   return (
     <div
       ref={ref}
-      className={`absolute top-full max-md:left-0 md:right-0 mt-1 rounded-xl border shadow-xl z-20 w-80 max-w-[calc(100vw-2rem)] max-h-96 flex flex-col ${dark ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}`}
+      className={`max-md:fixed max-md:inset-x-3 max-md:top-28 md:absolute md:top-full md:right-0 md:mt-1 md:w-80 rounded-xl border shadow-xl z-30 max-h-96 flex flex-col ${dark ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}`}
     >
       <div className={`px-3 py-2 border-b text-xs font-semibold ${dark ? "border-gray-800 text-gray-300" : "border-gray-200 text-gray-600"}`}>
         Agendar envio
