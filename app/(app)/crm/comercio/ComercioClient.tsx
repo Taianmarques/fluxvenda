@@ -39,7 +39,7 @@ function formatBRL(value: number): string {
 export function ComercioClient({
   agentId, initialCommerceEnabled, initialCatalogOnly, initialAsaasSandbox, initialHasAsaasApiKey, initialAsaasWebhookToken,
   initialInstallmentsEnabled, initialMaxInstallments, initialInterestFreeInstallments, initialInstallmentInterestRate,
-  initialProducts, initialOrders, initialStoreLogo, initialBanners,
+  initialProducts, initialOrders, initialStoreLogo, initialBanners, storeSlug,
 }: {
   agentId: string;
   initialCommerceEnabled: boolean;
@@ -55,6 +55,7 @@ export function ComercioClient({
   initialOrders: Order[];
   initialStoreLogo?: string | null; // data URI
   initialBanners?: { id: string; dataUri: string; active: boolean }[];
+  storeSlug?: string | null; // URL amigável do catálogo
 }) {
   const [showSettings, setShowSettings] = useState(false);
   const [commerceEnabled, setCommerceEnabled] = useState(initialCommerceEnabled);
@@ -323,7 +324,8 @@ export function ComercioClient({
   }
 
   const webhookUrl = typeof window !== "undefined" ? `${window.location.origin}/api/webhooks/asaas/${agentId}` : `/api/webhooks/asaas/${agentId}`;
-  const catalogUrl = typeof window !== "undefined" ? `${window.location.origin}/loja/${agentId}` : `/loja/${agentId}`;
+  const catalogPath = `/loja/${storeSlug ?? agentId}`;
+  const catalogUrl = typeof window !== "undefined" ? `${window.location.origin}${catalogPath}` : catalogPath;
   const [catalogCopied, setCatalogCopied] = useState(false);
 
   function copyCatalogLink() {

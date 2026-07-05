@@ -7,12 +7,26 @@ import { ShoppingBag } from "lucide-react";
 // Catálogo público — sem sessão; revalida a cada 60s para refletir estoque/preços
 export const revalidate = 60;
 
+// O segmento aceita o slug amigável (/loja/nome-da-loja) ou o id do agente (links antigos)
+async function findStore(idOrSlug: string) {
+  return prisma.agentConfig.findFirst({
+    where: { OR: [{ storeSlug: idOrSlug }, { id: idOrSlug }] },
+    select: {
+      id: true,
+      active: true,
+      commerceEnabled: true,
+      uazapiToken: true,
+      storeLogoBase64: true,
+      storeLogoMimeType: true,
+      storeSlug: true,
+      team: { select: { name: true } },
+    },
+  });
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ agentId: string }> }): Promise<Metadata> {
   const { agentId } = await params;
-  const config = await prisma.agentConfig.findUnique({
-    where: { id: agentId },
-    select: { commerceEnabled: true, storeLogoBase64: true, team: { select: { name: true } } },
-  });
+  const config = await findStore(agentId);
   const storeName = config?.commerceEnabled ? (config.team?.name || "Catálogo") : "Catálogo";
   const hasLogo = Boolean(config?.commerceEnabled && config.storeLogoBase64);
   return {
@@ -45,18 +59,7 @@ function Indisponivel() {
 export default async function LojaPage({ params }: { params: Promise<{ agentId: string }> }) {
   const { agentId } = await params;
 
-  const config = await prisma.agentConfig.findUnique({
-    where: { id: agentId },
-    select: {
-      id: true,
-      active: true,
-      commerceEnabled: true,
-      uazapiToken: true,
-      storeLogoBase64: true,
-      storeLogoMimeType: true,
-      team: { select: { name: true } },
-    },
-  });
+  const config = await findStore(agentId);
 
   if (!config || !config.commerceEnabled) return <Indisponivel />;
 

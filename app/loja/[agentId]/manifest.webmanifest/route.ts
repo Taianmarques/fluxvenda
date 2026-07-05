@@ -4,8 +4,8 @@ import { prisma } from "@/lib/prisma";
 export async function GET(_req: Request, { params }: { params: Promise<{ agentId: string }> }) {
   const { agentId } = await params;
 
-  const config = await prisma.agentConfig.findUnique({
-    where: { id: agentId },
+  const config = await prisma.agentConfig.findFirst({
+    where: { OR: [{ storeSlug: agentId }, { id: agentId }] },
     select: { commerceEnabled: true, storeLogoBase64: true, storeLogoMimeType: true, team: { select: { name: true } } },
   });
 

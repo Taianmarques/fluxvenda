@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ShoppingCart } from "lucide-react";
 import { getAgentConfigWithRole } from "@/lib/team";
+import { ensureStoreSlug } from "@/lib/store-slug";
 import { ComercioClient } from "../../comercio/ComercioClient";
 
 export default async function ComercioPage({ params }: { params: Promise<{ agentId: string }> }) {
@@ -40,6 +41,9 @@ export default async function ComercioPage({ params }: { params: Promise<{ agent
     prisma.storeBanner.findMany({ where: { agentConfigId: config.id }, orderBy: { order: "asc" } }),
   ]);
 
+  // Slug amigável do catálogo (/loja/nome-da-loja) — gerado na primeira visita
+  const storeSlug = await ensureStoreSlug(config.id);
+
   return (
     <ComercioClient
       agentId={config.id}
@@ -52,6 +56,7 @@ export default async function ComercioPage({ params }: { params: Promise<{ agent
       initialMaxInstallments={config.maxInstallments}
       initialInterestFreeInstallments={config.interestFreeInstallments}
       initialInstallmentInterestRate={config.installmentInterestRate}
+      storeSlug={storeSlug}
       initialStoreLogo={config.storeLogoBase64 ? `data:${config.storeLogoMimeType ?? "image/png"};base64,${config.storeLogoBase64}` : null}
       initialBanners={banners.map(b => ({
         id: b.id, dataUri: `data:${b.imagemMimeType};base64,${b.imagemBase64}`, active: b.active,

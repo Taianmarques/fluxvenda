@@ -606,6 +606,7 @@ model AgentConfig {
   // Identidade visual do catálogo público (/loja) — logo base64 como as fotos de produto
   storeLogoBase64   String? @db.Text
   storeLogoMimeType String?
+  storeSlug         String? @unique // URL amigável do catálogo (/loja/nome-da-loja), gerada do nome da empresa
 
   conversations        Conversation[]
   pipelines            Pipeline[]

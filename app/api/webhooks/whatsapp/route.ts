@@ -6,6 +6,7 @@ import { logTokenUsage, isOverQuota } from "@/lib/token-usage";
 import { getAvailableSlots, isSlotAvailable, formatSlotsForAgent, type AvailabilityRule } from "@/lib/scheduling";
 import { assignNextAttendant } from "@/lib/assignment";
 import { createAsaasCustomer, createAsaasCharge, cancelAsaasCharge, getAsaasPixQrCode } from "@/lib/asaas";
+import { ensureStoreSlug } from "@/lib/store-slug";
 
 function mediaMimetype(message: any): string | null {
   return typeof message?.content === "object" && typeof message.content?.mimetype === "string"
@@ -72,7 +73,7 @@ async function buildCommerceContext(agentConfigId: string, config: {
 - Use gerar_cobranca só depois que o cliente confirmar o pedido, a forma de pagamento, o CPF/CNPJ e (se cartão) as parcelas. Se for Pix, explique que ele pode pagar com o código copia-e-cola retornado. Se for cartão, mande o link de checkout retornado e explique que ele deve abrir o link pra digitar os dados do cartão — NUNCA peça número de cartão direto no WhatsApp.
 - IMPORTANTE: quando o cliente já confirmou tudo que falta (itens, forma de pagamento, CPF/CNPJ e parcelas se for cartão), chame a ferramenta JÁ NESSA MESMA RESPOSTA — nunca diga "vou gerar" ou "um momento" sem ter chamado a ferramenta antes de responder.`;
 
-  const catalogUrl = `${process.env.NEXT_PUBLIC_APP_URL}/loja/${agentConfigId}`;
+  const catalogUrl = `${process.env.NEXT_PUBLIC_APP_URL}/loja/${await ensureStoreSlug(agentConfigId)}`;
 
   return `\n\nFERRAMENTAS DE COMÉRCIO:
 Catálogo de produtos (use consultar_produtos pra confirmar — esse resumo pode estar desatualizado):
