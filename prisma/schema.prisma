@@ -686,6 +686,8 @@ model Professional {
   agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id], onDelete: Cascade)
 
   name         String
+  phone        String  @default("") // WhatsApp do profissional — notificado a cada agendamento
+  accessToken  String? @unique      // token do link da agenda PWA do profissional (/agenda/[token])
   availability Json    @default("[]") // [{ dayOfWeek: 0-6, start: "09:00", end: "18:00" }]
   active       Boolean @default(true)
 

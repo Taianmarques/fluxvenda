@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { userBelongsToAgentConfig } from "@/lib/team";
+import { randomUUID } from "crypto";
 import { z } from "zod";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {
@@ -16,6 +17,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ age
     orderBy: { createdAt: "asc" },
   });
 
+  // Backfill: profissionais criados antes do link da agenda ganham token na primeira listagem
+  for (const p of professionals) {
+    if (!p.accessToken) {
+      p.accessToken = randomUUID();
+      await prisma.professional.update({ where: { id: p.id }, data: { accessToken: p.accessToken } });
+    }
+  }
+
   return NextResponse.json({ professionals });
 }
 
@@ -27,6 +36,7 @@ const ruleSchema = z.object({
 
 const schema = z.object({
   name: z.string().min(1),
+  phone: z.string().max(20).default(""),
   availability: z.array(ruleSchema).optional(),
 });
 
@@ -41,7 +51,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
   if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
 
   const professional = await prisma.professional.create({
-    data: { agentConfigId: agentId, name: body.data.name, availability: body.data.availability ?? [] },
+    data: {
+      agentConfigId: agentId,
+      name: body.data.name,
+      phone: body.data.phone.replace(/\D/g, ""),
+      availability: body.data.availability ?? [],
+      accessToken: randomUUID(),
+    },
   });
 
   return NextResponse.json({ professional });

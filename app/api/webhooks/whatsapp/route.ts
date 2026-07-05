@@ -8,6 +8,7 @@ import { assignNextAttendant } from "@/lib/assignment";
 import { createAsaasCustomer, createAsaasCharge, cancelAsaasCharge, getAsaasPixQrCode } from "@/lib/asaas";
 import { ensureStoreSlug } from "@/lib/store-slug";
 import { notifyOrderWebhook } from "@/lib/order-webhook";
+import { notifyProfessionalOfAppointment } from "@/lib/appointment-notify";
 
 function mediaMimetype(message: any): string | null {
   return typeof message?.content === "object" && typeof message.content?.mimetype === "string"
@@ -235,7 +236,7 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       const available = isSlotAvailable(availability, slotDuration, busy, scheduledAt);
       if (!available) return "Esse horário não está mais disponível. Consulte os horários disponíveis novamente e ofereça outra opção ao cliente.";
 
-      await prisma.appointment.create({
+      const appointment = await prisma.appointment.create({
         data: {
           agentConfigId, conversationId, contactName, contactNumber,
           scheduledAt, durationMinutes: slotDuration, notes: notes ?? "",
@@ -243,6 +244,9 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
         },
       });
       await prisma.conversation.update({ where: { id: conversationId }, data: { pendingProfessionalId: null, pendingServiceId: null } });
+
+      // Avisa o profissional no WhatsApp (fire-and-forget)
+      notifyProfessionalOfAppointment(appointment.id, "novo");
 
       return `Agendamento confirmado para ${date} às ${time}.`;
     }
@@ -255,6 +259,7 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       if (!next) return "Não encontrei nenhum agendamento confirmado para cancelar.";
 
       await prisma.appointment.update({ where: { id: next.id }, data: { status: "CANCELADO" } });
+      notifyProfessionalOfAppointment(next.id, "cancelado");
       return "Agendamento cancelado com sucesso.";
     }
 

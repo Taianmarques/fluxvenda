@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { getAgentConfigWithRole } from "@/lib/team";
 import { isSlotAvailable, type AvailabilityRule } from "@/lib/scheduling";
+import { notifyProfessionalOfAppointment } from "@/lib/appointment-notify";
 import { z } from "zod";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {
@@ -84,6 +85,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
       serviceId: service?.id,
     },
   });
+
+  // Avisa o profissional no WhatsApp (fire-and-forget)
+  notifyProfessionalOfAppointment(appointment.id, "novo");
 
   return NextResponse.json({ appointment });
 }

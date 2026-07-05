@@ -15,7 +15,7 @@ type Appointment = {
   professional?: { id: string; name: string } | null;
   service?: { id: string; name: string } | null;
 };
-type Professional = { id: string; name: string; availability: AvailabilityRule[]; active: boolean };
+type Professional = { id: string; name: string; phone?: string; accessToken?: string | null; availability: AvailabilityRule[]; active: boolean };
 type Service = { id: string; name: string; durationMinutes: number; active: boolean };
 
 function rulesFromAvailability(availability: AvailabilityRule[]): Record<number, { enabled: boolean; start: string; end: string }> {
@@ -64,7 +64,9 @@ function rulesToAvailability(rules: Record<number, { enabled: boolean; start: st
 function ProfessionalRow({ professional, onUpdated, onDeleted }: { professional: Professional; onUpdated: () => void; onDeleted: () => void }) {
   const [editing, setEditing] = useState(false);
   const [rules, setRules] = useState(() => rulesFromAvailability(professional.availability));
+  const [phone, setPhone] = useState(professional.phone ?? "");
   const [saving, setSaving] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   async function save() {
     setSaving(true);
@@ -72,13 +74,21 @@ function ProfessionalRow({ professional, onUpdated, onDeleted }: { professional:
       await fetch(`/api/ferramentas/whatsapp/profissionais/${professional.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ availability: rulesToAvailability(rules) }),
+        body: JSON.stringify({ availability: rulesToAvailability(rules), phone: phone.trim() }),
       });
       setEditing(false);
       onUpdated();
     } finally {
       setSaving(false);
     }
+  }
+
+  function copyAgendaLink() {
+    if (!professional.accessToken) return;
+    navigator.clipboard.writeText(`${window.location.origin}/agenda/${professional.accessToken}`).then(() => {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    }).catch(() => {});
   }
 
   async function toggleActive() {
@@ -98,19 +108,36 @@ function ProfessionalRow({ professional, onUpdated, onDeleted }: { professional:
 
   return (
     <div className="bg-gray-950 border border-gray-800 rounded-xl p-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className={`text-sm font-medium ${!professional.active ? "text-gray-500 line-through" : ""}`}>{professional.name}</p>
-        <div className="flex gap-2 text-xs">
-          <button onClick={() => setEditing(s => !s)} className="text-blue-400 hover:text-blue-300">Horários</button>
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="min-w-0">
+          <p className={`text-sm font-medium ${!professional.active ? "text-gray-500 line-through" : ""}`}>{professional.name}</p>
+          {professional.phone && <p className="text-xs text-gray-500 font-mono">+{professional.phone}</p>}
+        </div>
+        <div className="flex gap-2 text-xs flex-wrap">
+          {professional.accessToken && (
+            <button onClick={copyAgendaLink} className="text-purple-400 hover:text-purple-300">
+              {linkCopied ? "Copiado!" : "Link da agenda"}
+            </button>
+          )}
+          <button onClick={() => setEditing(s => !s)} className="text-blue-400 hover:text-blue-300">Editar</button>
           <button onClick={toggleActive} className="text-gray-400 hover:text-white">{professional.active ? "Desativar" : "Ativar"}</button>
           <button onClick={remove} className="text-red-400 hover:text-red-300">Remover</button>
         </div>
       </div>
       {editing && (
         <div className="mt-3 space-y-3">
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">WhatsApp do profissional (recebe aviso de cada agendamento)</label>
+            <input
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+              placeholder="Ex: 5584999990000 (vazio = não notifica)"
+              className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+            />
+          </div>
           <AvailabilityEditor rules={rules} onChange={setRules} />
           <button onClick={save} disabled={saving} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium">
-            {saving ? "Salvando..." : "Salvar horários"}
+            {saving ? "Salvando..." : "Salvar"}
           </button>
         </div>
       )}
@@ -166,6 +193,7 @@ export function AgendaClient({
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [newProfessionalName, setNewProfessionalName] = useState("");
+  const [newProfessionalPhone, setNewProfessionalPhone] = useState("");
   const [newServiceName, setNewServiceName] = useState("");
   const [newServiceDuration, setNewServiceDuration] = useState(30);
 
@@ -216,9 +244,10 @@ export function AgendaClient({
     await fetch(`/api/agentes/${agentId}/profissionais`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newProfessionalName.trim() }),
+      body: JSON.stringify({ name: newProfessionalName.trim(), phone: newProfessionalPhone.trim() }),
     });
     setNewProfessionalName("");
+    setNewProfessionalPhone("");
     loadProfessionals();
   }
 
@@ -369,10 +398,12 @@ export function AgendaClient({
                   <ProfessionalRow key={p.id} professional={p} onUpdated={loadProfessionals} onDeleted={loadProfessionals} />
                 ))}
               </div>
-              <div className="flex gap-2">
-                <input placeholder="Nome do profissional" value={newProfessionalName} onChange={e => setNewProfessionalName(e.target.value)} className="flex-1 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
+              <div className="flex gap-2 flex-wrap">
+                <input placeholder="Nome do profissional" value={newProfessionalName} onChange={e => setNewProfessionalName(e.target.value)} className="flex-1 min-w-[140px] bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
+                <input placeholder="WhatsApp (opcional)" value={newProfessionalPhone} onChange={e => setNewProfessionalPhone(e.target.value)} className="w-40 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
                 <button onClick={handleAddProfessional} className="bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-2 text-sm font-medium">Adicionar</button>
               </div>
+              <p className="text-xs text-gray-600">Com o WhatsApp preenchido, o profissional recebe aviso de cada novo agendamento. O botão "Link da agenda" gera a página que ele pode adicionar à tela inicial do celular.</p>
             </div>
 
             <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">

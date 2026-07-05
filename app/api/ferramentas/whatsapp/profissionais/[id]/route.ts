@@ -12,6 +12,7 @@ const ruleSchema = z.object({
 
 const patchSchema = z.object({
   name: z.string().min(1).optional(),
+  phone: z.string().max(20).transform(v => v.replace(/\D/g, "")).optional(),
   availability: z.array(ruleSchema).optional(),
   active: z.boolean().optional(),
 });

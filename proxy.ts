@@ -13,6 +13,7 @@ const isPublicRoute = createRouteMatcher([
   "/api/cron(.*)",          // protegido por CRON_SECRET, não por sessão de usuário
   "/api/instagram/callback", // callback do OAuth — valida via OAuthState, sem sessão Clerk
   "/loja(.*)",              // catálogo público (PWA) — clientes finais, sem login
+  "/agenda(.*)",            // agenda do profissional (PWA) — acesso por token secreto, sem login
 ]);
 
 const isGestorRoute = createRouteMatcher(["/gestor(.*)", "/ferramentas(.*)"]);
