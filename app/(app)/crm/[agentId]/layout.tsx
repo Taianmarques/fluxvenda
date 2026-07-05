@@ -17,7 +17,7 @@ export default async function CrmAgentLayout({
   if (!result || !result.configs.some(c => c.id === agentId)) redirect("/crm");
 
   return (
-    <div className="h-full flex bg-gray-950">
+    <div className="h-full flex flex-col md:flex-row bg-gray-950">
       <CrmSidebar agentId={agentId} agents={result.configs.map(c => ({ id: c.id, nome: c.nome }))} />
       <div className="flex-1 overflow-hidden">{children}</div>
     </div>

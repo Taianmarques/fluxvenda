@@ -31,7 +31,41 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
   }
 
   return (
-    <aside className="w-56 flex-shrink-0 border-r border-gray-800 bg-black flex flex-col">
+    <>
+    {/* Barra horizontal — mobile */}
+    <div className="md:hidden flex-shrink-0 border-b border-gray-800 bg-black">
+      {agents.length > 1 && (
+        <div className="px-3 pt-2">
+          <select
+            value={agentId}
+            onChange={e => switchAgent(e.target.value)}
+            className="w-full bg-gray-900 border border-gray-800 rounded-lg px-2 py-1.5 text-xs"
+          >
+            {agents.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
+          </select>
+        </div>
+      )}
+      <nav className="flex overflow-x-auto px-2 py-2 gap-1" style={{ scrollbarWidth: "none" }}>
+        {CRM_NAV.map(item => {
+          const active = item.href === `/crm/${agentId}` ? pathname === item.href : pathname.startsWith(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-[10px] font-medium flex-shrink-0 transition-colors ${
+                active ? "text-blue-400 bg-blue-500/10" : "text-gray-400"
+              }`}
+            >
+              <item.icon size={17} />
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+    </div>
+
+    {/* Sidebar vertical — desktop */}
+    <aside className="hidden md:flex w-56 flex-shrink-0 border-r border-gray-800 bg-black flex-col">
       <div className="px-5 py-5 border-b border-gray-800">
         <p className="font-bold text-lg">
           <span className="text-blue-400">CRM</span>
@@ -94,5 +128,6 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
         </Link>
       </div>
     </aside>
+    </>
   );
 }

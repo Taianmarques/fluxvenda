@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   MessageCircle, Search, X, Trophy, Lock, Unlock, Bot, User,
-  FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap, StickyNote, ArrowRightLeft, HandCoins, CalendarClock, ListFilter, Instagram,
+  FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap, StickyNote, ArrowRightLeft, HandCoins, CalendarClock, ListFilter, Instagram, ArrowLeft,
 } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { EmojiPicker } from "./EmojiPicker";
@@ -174,6 +174,8 @@ export function WhatsappInbox({
   const [leadStatuses, setLeadStatuses] = useState(initialLeadStatuses);
   const [attendants, setAttendants] = useState<Attendant[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId ?? initialConversations[0]?.id ?? null);
+  // Mobile: alterna entre lista e conversa (no desktop as duas aparecem lado a lado)
+  const [mobileChatOpen, setMobileChatOpen] = useState<boolean>(Boolean(initialSelectedId));
   const [detail, setDetail] = useState<ConversationDetail | null>(null);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -557,8 +559,8 @@ export function WhatsappInbox({
       </div>
 
       <div className="flex-1 flex overflow-hidden">
-          {/* Lista de conversas */}
-          <aside className={`w-80 flex-shrink-0 border-r ${t.sidebar} flex flex-col`}>
+          {/* Lista de conversas — no mobile, some quando uma conversa está aberta */}
+          <aside className={`${mobileChatOpen ? "hidden md:flex" : "flex"} w-full md:w-80 flex-shrink-0 md:border-r ${t.sidebar} flex-col`}>
             <div className={`px-3 py-2.5 border-b ${t.sidebar} flex-shrink-0 space-y-2`}>
               <div className="flex items-center gap-1.5">
                 {([
@@ -622,8 +624,8 @@ export function WhatsappInbox({
                     key={c.id}
                     role="button"
                     tabIndex={0}
-                    onClick={() => setSelectedId(c.id)}
-                    onKeyDown={e => (e.key === "Enter" || e.key === " ") && setSelectedId(c.id)}
+                    onClick={() => { setSelectedId(c.id); setMobileChatOpen(true); }}
+                    onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { setSelectedId(c.id); setMobileChatOpen(true); } }}
                     className={`w-full text-left px-4 py-3 border-b transition-colors cursor-pointer ${t.listItemBorder} ${selectedId === c.id ? t.listItemSelected : ""}`}
                   >
                     <div className="flex items-center justify-between gap-2">
@@ -664,16 +666,24 @@ export function WhatsappInbox({
             </div>
           </aside>
 
-          {/* Conversa selecionada */}
-          <main className="flex-1 flex flex-col">
+          {/* Conversa selecionada — no mobile só aparece quando aberta */}
+          <main className={`${mobileChatOpen ? "flex" : "hidden md:flex"} flex-1 flex-col min-w-0`}>
             {!detail ? (
               <div className={`flex-1 flex items-center justify-center ${t.listSecondary}`}>
                 Selecione uma conversa
               </div>
             ) : (
               <>
-                <div className={`px-5 py-4 border-b ${t.chatHeaderBorder} flex items-center justify-between flex-wrap gap-2`}>
-                  <div>
+                <div className={`px-3 md:px-5 py-4 border-b ${t.chatHeaderBorder} flex items-center justify-between flex-wrap gap-2`}>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <button
+                      onClick={() => setMobileChatOpen(false)}
+                      className={`md:hidden p-1.5 -ml-1 rounded-lg flex-shrink-0 ${t.toggleBar} ${t.toggleInactive}`}
+                      aria-label="Voltar para a lista"
+                    >
+                      <ArrowLeft size={17} />
+                    </button>
+                  <div className="min-w-0">
                     <p className="font-semibold flex items-center gap-1.5">
                       {isIgContact(detail.contactNumber)
                         ? <Instagram size={14} className="text-pink-400 flex-shrink-0" />
@@ -690,6 +700,7 @@ export function WhatsappInbox({
                         {detail.opportunities.length > 1 && ` (${detail.opportunities.length})`}
                       </p>
                     )}
+                  </div>
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap justify-end">
                     <div className="relative">

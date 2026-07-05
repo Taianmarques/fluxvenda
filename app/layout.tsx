@@ -6,6 +6,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Plataforma B2B",
   description: "Plataforma educacional de vendas B2B",
+  appleWebApp: { capable: true, title: "FluxVenda", statusBarStyle: "black-translucent" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
