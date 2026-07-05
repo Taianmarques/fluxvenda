@@ -36,10 +36,64 @@ function formatBRL(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+// ─── Importação CSV ───────────────────────────────────────────────────────────
+
+const CSV_TEMPLATE = "nome;descricao;categoria;preco;preco_promocional;estoque\nCamiseta Basica;100% algodao, varias cores;Vestuario;49,90;39,90;25\nBone Trucker;Ajustavel;Acessorios;35,00;;\n";
+
+function normalizeHeader(h: string): string {
+  return h.normalize("NFD").replace(/[^a-zA-Z_ ]/g, "").toLowerCase().trim().replace(/\s+/g, "_");
+}
+
+// Aceita ; ou , como separador (Excel brasileiro usa ;) e campos entre aspas
+function parseCsv(text: string): Record<string, string>[] {
+  const firstLine = text.split(/\r?\n/, 1)[0] ?? "";
+  const delim = (firstLine.match(/;/g)?.length ?? 0) >= (firstLine.match(/,/g)?.length ?? 0) ? ";" : ",";
+
+  const rows: string[][] = [];
+  let cur = "";
+  let row: string[] = [];
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') { cur += '"'; i++; } else inQuotes = false;
+      } else cur += ch;
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === delim) {
+      row.push(cur); cur = "";
+    } else if (ch === "\n") {
+      row.push(cur.replace(/\r$/, "")); rows.push(row); row = []; cur = "";
+    } else {
+      cur += ch;
+    }
+  }
+  if (cur !== "" || row.length > 0) { row.push(cur.replace(/\r$/, "")); rows.push(row); }
+
+  const headerRow = rows.shift();
+  if (!headerRow) return [];
+  const headers = headerRow.map(normalizeHeader);
+
+  return rows
+    .filter((r) => r.some((c) => c.trim() !== ""))
+    .map((r) => Object.fromEntries(headers.map((h, i) => [h, (r[i] ?? "").trim()])));
+}
+
+// "R$ 1.234,56" → 1234.56 | "49.90" → 49.9
+function parsePrice(v: string): number | null {
+  const clean = v.replace(/[R$\s]/g, "");
+  if (!clean) return null;
+  const normalized = clean.includes(",") ? clean.replace(/\./g, "").replace(",", ".") : clean;
+  const n = Number(normalized);
+  return Number.isFinite(n) ? n : null;
+}
+
 export function ComercioClient({
   agentId, initialCommerceEnabled, initialCatalogOnly, initialAsaasSandbox, initialHasAsaasApiKey, initialAsaasWebhookToken,
   initialInstallmentsEnabled, initialMaxInstallments, initialInterestFreeInstallments, initialInstallmentInterestRate,
   initialProducts, initialOrders, initialStoreLogo, initialBanners, storeSlug,
+  initialOrderWebhookUrl, initialHasOrderWebhookSecret,
 }: {
   agentId: string;
   initialCommerceEnabled: boolean;
@@ -56,6 +110,8 @@ export function ComercioClient({
   initialStoreLogo?: string | null; // data URI
   initialBanners?: { id: string; dataUri: string; active: boolean }[];
   storeSlug?: string | null; // URL amigável do catálogo
+  initialOrderWebhookUrl?: string | null;
+  initialHasOrderWebhookSecret?: boolean;
 }) {
   const [showSettings, setShowSettings] = useState(false);
   const [commerceEnabled, setCommerceEnabled] = useState(initialCommerceEnabled);
@@ -69,6 +125,14 @@ export function ComercioClient({
   const [interestFreeInstallments, setInterestFreeInstallments] = useState(initialInterestFreeInstallments);
   const [installmentInterestRate, setInstallmentInterestRate] = useState(initialInstallmentInterestRate);
   const [savingSettings, setSavingSettings] = useState(false);
+
+  // Integração com o sistema da loja do cliente (webhook de pedidos + importação de produtos)
+  const [orderWebhookUrl, setOrderWebhookUrl] = useState(initialOrderWebhookUrl ?? "");
+  const [orderWebhookSecretInput, setOrderWebhookSecretInput] = useState("");
+  const [hasOrderWebhookSecret, setHasOrderWebhookSecret] = useState(initialHasOrderWebhookSecret ?? false);
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+  const [importMessage, setImportMessage] = useState("");
 
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [orders] = useState<Order[]>(initialOrders);
@@ -113,12 +177,20 @@ export function ComercioClient({
           commerceEnabled, catalogOnly, asaasSandbox,
           installmentsEnabled, maxInstallments, interestFreeInstallments, installmentInterestRate,
           ...(asaasApiKeyInput.trim() ? { asaasApiKey: asaasApiKeyInput.trim() } : {}),
+          // URL vazia desativa a integração (e limpa o secret junto)
+          orderWebhookUrl: orderWebhookUrl.trim() || null,
+          ...(orderWebhookSecretInput.trim()
+            ? { orderWebhookSecret: orderWebhookSecretInput.trim() }
+            : (!orderWebhookUrl.trim() ? { orderWebhookSecret: null } : {})),
         }),
       });
       const data = await res.json();
       setHasAsaasApiKey(data.hasAsaasApiKey);
       setAsaasWebhookToken(data.asaasWebhookToken);
       setAsaasApiKeyInput("");
+      if (orderWebhookSecretInput.trim()) setHasOrderWebhookSecret(true);
+      if (!orderWebhookUrl.trim()) setHasOrderWebhookSecret(false);
+      setOrderWebhookSecretInput("");
     } finally {
       setSavingSettings(false);
     }
@@ -180,6 +252,69 @@ export function ComercioClient({
     });
     setNewName(""); setNewDescription(""); setNewCategory(""); setNewPrice(""); setNewStock(""); setNewPrecoPromo(""); setNewImage(null); setShowNewProduct(false);
     loadProducts();
+  }
+
+  async function handleImportCsv(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setImporting(true);
+    setImportMessage("");
+    try {
+      const text = await file.text();
+      const rows = parseCsv(text);
+      const parsed = rows.map((r) => {
+        const name = r.nome || r.name || r.produto || "";
+        const price = parsePrice(r.preco || r.price || r.valor || "");
+        if (!name || price === null) return null;
+        const promo = parsePrice(r.preco_promocional || r.promocao || "");
+        const stockRaw = (r.estoque || r.stock || "").replace(/\D/g, "");
+        return {
+          name,
+          description: r.descricao || r.description || "",
+          category: r.categoria || r.category || "",
+          price,
+          precoPromocional: promo,
+          stock: stockRaw ? Number(stockRaw) : null,
+        };
+      }).filter(Boolean);
+
+      if (parsed.length === 0) {
+        setImportMessage("Nenhuma linha válida encontrada. Confira se a planilha tem as colunas nome e preco (baixe o modelo).");
+        return;
+      }
+      if (parsed.length > 500) {
+        setImportMessage("Máximo de 500 produtos por importação — divida a planilha.");
+        return;
+      }
+
+      const res = await fetch(`/api/agentes/${agentId}/produtos/importar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ products: parsed }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Erro na importação.");
+      }
+      const { created, updated } = await res.json();
+      setImportMessage(`Importação concluída: ${created} produto(s) criado(s), ${updated} atualizado(s).`);
+      loadProducts();
+    } catch (err: any) {
+      setImportMessage(err?.message ?? "Erro ao ler a planilha.");
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  function downloadCsvTemplate() {
+    const blob = new Blob(["﻿" + CSV_TEMPLATE], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "modelo-produtos.csv";
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   async function handleSelectLogo(e: React.ChangeEvent<HTMLInputElement>) {
@@ -557,6 +692,40 @@ export function ComercioClient({
               )}
             </div>
 
+            <div className="border-t border-gray-800 pt-4 space-y-3">
+              <div>
+                <p className="text-sm font-medium">Integração com o sistema da loja</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Enviamos cada pedido (criado, atualizado e pago) por POST em JSON para a URL abaixo — para cair no seu ERP, PDV ou e-commerce.
+                </p>
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">URL do webhook de pedidos</label>
+                <input
+                  type="url"
+                  value={orderWebhookUrl}
+                  onChange={e => setOrderWebhookUrl(e.target.value)}
+                  placeholder="https://sistema-da-loja.com.br/webhooks/fluxvenda (vazio = desativado)"
+                  className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">
+                  Chave secreta (opcional) {hasOrderWebhookSecret && <span className="text-green-400">(configurada)</span>}
+                </label>
+                <input
+                  type="password"
+                  value={orderWebhookSecretInput}
+                  onChange={e => setOrderWebhookSecretInput(e.target.value)}
+                  placeholder={hasOrderWebhookSecret ? "Digitar uma nova pra substituir" : "Usada pra assinar os envios (HMAC-SHA256)"}
+                  className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Com a chave definida, cada envio leva o header <code className="text-gray-400">X-FluxVenda-Signature: sha256=...</code> pro seu sistema validar a origem.
+                </p>
+              </div>
+            </div>
+
             {asaasWebhookToken && (
               <div className="bg-gray-950 border border-gray-800 rounded-xl p-3 space-y-2 text-xs">
                 <p className="text-gray-400">Cadastre no painel do Asaas (Webhooks) pra confirmar pagamentos automaticamente:</p>
@@ -579,7 +748,25 @@ export function ComercioClient({
         )}
 
         <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-          <p className="font-semibold p-5 pb-3">Produtos</p>
+          <div className="flex items-center justify-between gap-3 flex-wrap p-5 pb-3">
+            <p className="font-semibold">Produtos</p>
+            <div className="flex items-center gap-3 text-xs">
+              <button
+                onClick={() => importInputRef.current?.click()}
+                disabled={importing}
+                className="text-blue-400 hover:text-blue-300 disabled:opacity-50"
+              >
+                {importing ? "Importando..." : "Importar planilha (CSV)"}
+              </button>
+              <button onClick={downloadCsvTemplate} className="text-gray-500 hover:text-gray-300">
+                Baixar modelo
+              </button>
+            </div>
+          </div>
+          <input ref={importInputRef} type="file" accept=".csv,text/csv" onChange={handleImportCsv} className="hidden" />
+          {importMessage && (
+            <p className="text-xs text-gray-400 px-5 pb-3 -mt-1">{importMessage}</p>
+          )}
           {products.length === 0 ? (
             <p className="text-sm text-gray-500 px-5 pb-5">Nenhum produto cadastrado ainda.</p>
           ) : (

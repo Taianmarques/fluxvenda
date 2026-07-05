@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppTextAsTeam } from "@/lib/whatsapp";
+import { notifyOrderWebhook } from "@/lib/order-webhook";
 
 // Webhook de confirmação de pagamento do Asaas, um por agente (a URL já escopa o tenant).
 // Autenticidade validada pelo token estático que o gestor configura no painel do Asaas
@@ -28,6 +29,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
     });
     if (order && order.status !== "PAGO") {
       await prisma.order.update({ where: { id: order.id }, data: { status: "PAGO", paidAt: new Date() } });
+      notifyOrderWebhook(agentId, order.id, "order.paid");
       if (config.uazapiToken) {
         await sendWhatsAppTextAsTeam(
           config.uazapiToken,

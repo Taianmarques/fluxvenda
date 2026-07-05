@@ -24,6 +24,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ age
     maxInstallments: config.maxInstallments,
     interestFreeInstallments: config.interestFreeInstallments,
     installmentInterestRate: config.installmentInterestRate,
+    orderWebhookUrl: config.orderWebhookUrl,
+    hasOrderWebhookSecret: Boolean(config.orderWebhookSecret),
   });
 }
 
@@ -40,6 +42,9 @@ const schema = z.object({
   // Logo do catálogo público — null remove a logo
   storeLogoBase64: z.string().max(3_000_000).nullable().optional(),
   storeLogoMimeType: z.string().nullable().optional(),
+  // Integração com o sistema do cliente — null desativa
+  orderWebhookUrl: z.string().url().max(500).nullable().optional(),
+  orderWebhookSecret: z.string().max(200).nullable().optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {

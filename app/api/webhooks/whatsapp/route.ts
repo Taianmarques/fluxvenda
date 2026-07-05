@@ -7,6 +7,7 @@ import { getAvailableSlots, isSlotAvailable, formatSlotsForAgent, type Availabil
 import { assignNextAttendant } from "@/lib/assignment";
 import { createAsaasCustomer, createAsaasCharge, cancelAsaasCharge, getAsaasPixQrCode } from "@/lib/asaas";
 import { ensureStoreSlug } from "@/lib/store-slug";
+import { notifyOrderWebhook } from "@/lib/order-webhook";
 
 function mediaMimetype(message: any): string | null {
   return typeof message?.content === "object" && typeof message.content?.mimetype === "string"
@@ -272,6 +273,7 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       const total = resolved.reduce((sum, r) => sum + getPreco(r.product!) * r.quantidade, 0);
 
       let order = await prisma.order.findFirst({ where: { agentConfigId, conversationId, status: "ABERTO" } });
+      const isNewOrder = !order;
       if (!order) {
         order = await prisma.order.create({ data: { agentConfigId, conversationId, contactName: contactName ?? "", contactNumber, status: "ABERTO", total } });
       } else {
@@ -282,6 +284,9 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       await prisma.orderItem.createMany({
         data: resolved.map(r => ({ orderId: order!.id, productId: r.product!.id, name: r.product!.name, unitPrice: getPreco(r.product!), quantity: r.quantidade })),
       });
+
+      // Integração com o sistema do cliente (fire-and-forget)
+      notifyOrderWebhook(agentConfigId, order.id, isNewOrder ? "order.created" : "order.updated");
 
       const resumo = resolved.map(r => {
         const p = r.product!;
@@ -333,6 +338,7 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
             where: { id: order.id },
             data: { status: "AGUARDANDO_PAGAMENTO", total: totalComJuros, asaasPaymentId: payment.id, asaasInvoiceUrl: payment.invoiceUrl, asaasInstallmentId: payment.installment ?? null },
           });
+          notifyOrderWebhook(agentConfigId, order.id, "order.updated");
           const parcelaInfo = parcelas > 1 ? ` em ${parcelas}x de R$ ${(totalComJuros / parcelas).toFixed(2)}` : "";
           return `Cobrança gerada, total R$ ${totalComJuros.toFixed(2)}${parcelaInfo}. Link seguro pra pagar com cartão:\n${payment.invoiceUrl}`;
         }
@@ -342,6 +348,8 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
           where: { id: order.id },
           data: { status: "AGUARDANDO_PAGAMENTO", asaasPaymentId: payment.id, asaasPixPayload: qr.payload, asaasInvoiceUrl: payment.invoiceUrl },
         });
+
+        notifyOrderWebhook(agentConfigId, order.id, "order.updated");
 
         // Envia o código Pix como mensagem separada pra o cliente conseguir copiar facilmente
         if (config.uazapiToken) {

@@ -608,6 +608,11 @@ model AgentConfig {
   storeLogoMimeType String?
   storeSlug         String? @unique // URL amigável do catálogo (/loja/nome-da-loja), gerada do nome da empresa
 
+  // Integração com o sistema do cliente: pedidos (criado/atualizado/pago) são enviados
+  // por POST para essa URL, assinados com HMAC-SHA256 quando o secret está definido
+  orderWebhookUrl    String?
+  orderWebhookSecret String?
+
   conversations        Conversation[]
   pipelines            Pipeline[]
   leadStatuses         LeadStatus[]
