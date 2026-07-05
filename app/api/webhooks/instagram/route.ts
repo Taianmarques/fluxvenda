@@ -192,21 +192,22 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
     if (latest?.id !== savedMsg.id) return;
   }
 
-  // Proteção contra loop IA-com-IA
-  const recentAIReplies = await prisma.message.count({
-    where: {
-      conversationId: conversation.id,
-      role: "assistant",
-      createdAt: { gte: new Date(Date.now() - 60_000) },
-    },
-  });
-  if (recentAIReplies >= 5) {
+  // Proteção contra loop IA-com-IA em duas camadas: rajada (5+/60s) e sustentado (12+/10min)
+  const [burstReplies, sustainedReplies] = await Promise.all([
+    prisma.message.count({
+      where: { conversationId: conversation.id, role: "assistant", createdAt: { gte: new Date(Date.now() - 60_000) } },
+    }),
+    prisma.message.count({
+      where: { conversationId: conversation.id, role: "assistant", createdAt: { gte: new Date(Date.now() - 10 * 60_000) } },
+    }),
+  ]);
+  if (burstReplies >= 5 || sustainedReplies >= 12) {
     await prisma.conversation.update({ where: { id: conversation.id }, data: { humanTakeover: true, status: "ATIVO" } });
     await prisma.message.create({
       data: {
         conversationId: conversation.id,
         role: "note",
-        content: "Agente pausado automaticamente: possível contato automatizado detectado (≥5 respostas em 60s).",
+        content: `Agente pausado automaticamente: possível contato automatizado detectado (${burstReplies >= 5 ? `${burstReplies} respostas em 60s` : `${sustainedReplies} respostas em 10min`}).`,
       },
     });
     return;

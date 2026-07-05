@@ -774,16 +774,20 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Proteção contra loop IA-com-IA: se o agente respondeu 5+ vezes nos últimos 60s para este
-  // contato, o remetente é quase certamente automatizado. Desativa o agente nesta conversa.
-  const recentAIReplies = await prisma.message.count({
-    where: {
-      conversationId: conversation.id,
-      role: "assistant",
-      createdAt: { gte: new Date(Date.now() - 60_000) },
-    },
-  });
-  if (recentAIReplies >= 5) {
+  // Proteção contra loop IA-com-IA em duas camadas:
+  // - rajada: 5+ respostas do agente em 60s (bot rápido, sem debounce)
+  // - sustentado: 12+ respostas em 10 minutos (com debounce de 8s cada troca leva 15-30s,
+  //   então duas IAs nunca passam de ~4/min — mas mantêm o ritmo SEM PARAR, coisa que
+  //   humano não faz; 12 em 10min só acontece em ping-pong automatizado)
+  const [burstReplies, sustainedReplies] = await Promise.all([
+    prisma.message.count({
+      where: { conversationId: conversation.id, role: "assistant", createdAt: { gte: new Date(Date.now() - 60_000) } },
+    }),
+    prisma.message.count({
+      where: { conversationId: conversation.id, role: "assistant", createdAt: { gte: new Date(Date.now() - 10 * 60_000) } },
+    }),
+  ]);
+  if (burstReplies >= 5 || sustainedReplies >= 12) {
     await prisma.conversation.update({
       where: { id: conversation.id },
       data: {
@@ -795,7 +799,7 @@ export async function POST(req: NextRequest) {
       data: {
         conversationId: conversation.id,
         role: "note",
-        content: "Agente pausado automaticamente: possível contato automatizado detectado (≥5 respostas em 60s).",
+        content: `Agente pausado automaticamente: possível contato automatizado detectado (${burstReplies >= 5 ? `${burstReplies} respostas em 60s` : `${sustainedReplies} respostas em 10min`}).`,
       },
     });
     return NextResponse.json({ ok: true });
