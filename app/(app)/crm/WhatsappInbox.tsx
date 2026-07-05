@@ -176,6 +176,12 @@ export function WhatsappInbox({
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId ?? initialConversations[0]?.id ?? null);
   // Mobile: alterna entre lista e conversa (no desktop as duas aparecem lado a lado)
   const [mobileChatOpen, setMobileChatOpen] = useState<boolean>(Boolean(initialSelectedId));
+
+  // Sinaliza para o layout (CrmSidebar) esconder a barra de navegação mobile com o chat aberto
+  useEffect(() => {
+    document.documentElement.dataset.mobileChat = mobileChatOpen ? "1" : "0";
+    return () => { delete document.documentElement.dataset.mobileChat; };
+  }, [mobileChatOpen]);
   const [detail, setDetail] = useState<ConversationDetail | null>(null);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -674,14 +680,14 @@ export function WhatsappInbox({
               </div>
             ) : (
               <>
-                <div className={`px-3 md:px-5 py-2.5 md:py-4 border-b ${t.chatHeaderBorder} flex flex-col md:flex-row md:items-center md:justify-between gap-2`}>
-                  <div className="flex items-center gap-1.5 min-w-0">
+                <div className={`px-2 md:px-5 py-2 md:py-4 border-b ${t.chatHeaderBorder} flex items-center justify-between gap-1.5`}>
+                  <div className="flex items-center gap-1 min-w-0 flex-1">
                     <button
                       onClick={() => setMobileChatOpen(false)}
-                      className={`md:hidden p-1.5 -ml-1 rounded-lg flex-shrink-0 ${t.toggleBar} ${t.toggleInactive}`}
+                      className={`md:hidden p-1.5 rounded-lg flex-shrink-0 ${t.toggleInactive}`}
                       aria-label="Voltar para a lista"
                     >
-                      <ArrowLeft size={17} />
+                      <ArrowLeft size={18} />
                     </button>
                   <div className="min-w-0">
                     <p className="font-semibold flex items-center gap-1.5">
@@ -702,7 +708,7 @@ export function WhatsappInbox({
                     )}
                   </div>
                   </div>
-                  <div className="flex items-center gap-1.5 flex-wrap justify-start md:justify-end">
+                  <div className="flex items-center gap-0.5 md:gap-1.5 flex-nowrap flex-shrink-0">
                     <div className="relative">
                       <button
                         onClick={() => setShowOpportunities(s => !s)}
@@ -793,7 +799,7 @@ export function WhatsappInbox({
                   </div>
                 </div>
 
-                <div className={`flex-1 overflow-y-auto p-3 md:p-5 space-y-2 ${t.chatBg}`}>
+                <div className={`flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-5 space-y-2 ${t.chatBg}`}>
                   {detail.messages.map(m => {
                     if (m.role === "note") {
                       return (

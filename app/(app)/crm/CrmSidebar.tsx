@@ -32,8 +32,8 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
 
   return (
     <>
-    {/* Barra horizontal — mobile */}
-    <div className="md:hidden flex-shrink-0 border-b border-gray-800 bg-black">
+    {/* Barra horizontal — mobile (some quando uma conversa está aberta) */}
+    <div className='md:hidden flex-shrink-0 border-b border-gray-800 bg-black [[data-mobile-chat="1"]_&]:hidden'>
       {agents.length > 1 && (
         <div className="px-3 pt-2">
           <select
