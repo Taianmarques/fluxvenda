@@ -11,6 +11,7 @@ export type AgendaAppointment = {
   contactName: string | null;
   contactNumber: string;
   serviceName: string | null;
+  professionalName?: string | null; // preenchido só na agenda geral da empresa
   notes: string;
   status: string; // CONFIRMADO | CANCELADO
 };
@@ -131,8 +132,10 @@ export function AgendaClient({
                       <User size={13} className="text-gray-400 flex-shrink-0" />
                       {a.contactName || "Cliente"}
                     </p>
-                    {a.serviceName && (
-                      <p className="text-xs text-gray-500">{a.serviceName}</p>
+                    {(a.serviceName || a.professionalName) && (
+                      <p className="text-xs text-gray-500">
+                        {[a.serviceName, a.professionalName && `com ${a.professionalName}`].filter(Boolean).join(" · ")}
+                      </p>
                     )}
                     <a
                       href={`https://wa.me/${a.contactNumber.replace(/\D/g, "")}`}

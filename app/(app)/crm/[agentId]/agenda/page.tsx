@@ -2,6 +2,8 @@ import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Calendar } from "lucide-react";
+import { randomUUID } from "crypto";
+import { prisma } from "@/lib/prisma";
 import { getAgentConfigWithRole } from "@/lib/team";
 import { AgendaClient } from "../../agenda/AgendaClient";
 
@@ -28,6 +30,13 @@ export default async function AgendaPage({ params }: { params: Promise<{ agentId
     );
   }
 
+  // Garante o token do link da agenda geral (gerado na primeira visita)
+  let agendaAccessToken = config.agendaAccessToken;
+  if (!agendaAccessToken) {
+    agendaAccessToken = randomUUID();
+    await prisma.agentConfig.update({ where: { id: config.id }, data: { agendaAccessToken } });
+  }
+
   return (
     <AgendaClient
       agentId={config.id}
@@ -39,6 +48,8 @@ export default async function AgendaPage({ params }: { params: Promise<{ agentId
       initialRestricoesAgendamento={config.restricoesAgendamento}
       initialAtendimentoEspecialEnabled={config.atendimentoEspecialEnabled}
       initialAtendimentoEspecialDescricao={config.atendimentoEspecialDescricao}
+      initialAskProfessionalEnabled={config.askProfessionalEnabled}
+      agendaAccessToken={agendaAccessToken}
     />
   );
 }

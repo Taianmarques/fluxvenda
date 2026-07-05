@@ -167,6 +167,7 @@ function fmtDate(d: Date): string {
 
 export function AgendaClient({
   agentId, initialSchedulingEnabled, initialSlotDurationMinutes, initialAvailability, initialAppointmentReminderHours, initialRequisitosAgendamento, initialRestricoesAgendamento, initialAtendimentoEspecialEnabled, initialAtendimentoEspecialDescricao,
+  initialAskProfessionalEnabled, agendaAccessToken,
 }: {
   agentId: string;
   initialSchedulingEnabled: boolean;
@@ -177,6 +178,8 @@ export function AgendaClient({
   initialRestricoesAgendamento: string;
   initialAtendimentoEspecialEnabled: boolean;
   initialAtendimentoEspecialDescricao: string;
+  initialAskProfessionalEnabled?: boolean;
+  agendaAccessToken?: string | null;
 }) {
   const [showSettings, setShowSettings] = useState(false);
   const [showTeam, setShowTeam] = useState(false);
@@ -187,8 +190,18 @@ export function AgendaClient({
   const [restricoesAgendamento, setRestricoesAgendamento] = useState(initialRestricoesAgendamento);
   const [atendimentoEspecialEnabled, setAtendimentoEspecialEnabled] = useState(initialAtendimentoEspecialEnabled);
   const [atendimentoEspecialDescricao, setAtendimentoEspecialDescricao] = useState(initialAtendimentoEspecialDescricao);
+  const [askProfessionalEnabled, setAskProfessionalEnabled] = useState(initialAskProfessionalEnabled ?? true);
   const [rules, setRules] = useState(() => rulesFromAvailability(initialAvailability));
   const [savingSettings, setSavingSettings] = useState(false);
+  const [agendaLinkCopied, setAgendaLinkCopied] = useState(false);
+
+  function copyClinicAgendaLink() {
+    if (!agendaAccessToken) return;
+    navigator.clipboard.writeText(`${window.location.origin}/agenda/${agendaAccessToken}`).then(() => {
+      setAgendaLinkCopied(true);
+      setTimeout(() => setAgendaLinkCopied(false), 2000);
+    }).catch(() => {});
+  }
 
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [services, setServices] = useState<Service[]>([]);
@@ -285,7 +298,7 @@ export function AgendaClient({
       await fetch(`/api/agentes/${agentId}/agenda`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ schedulingEnabled, slotDurationMinutes, availability, appointmentReminderHours, requisitosAgendamento, restricoesAgendamento, atendimentoEspecialEnabled, atendimentoEspecialDescricao }),
+        body: JSON.stringify({ schedulingEnabled, slotDurationMinutes, availability, appointmentReminderHours, requisitosAgendamento, restricoesAgendamento, atendimentoEspecialEnabled, atendimentoEspecialDescricao, askProfessionalEnabled }),
       });
     } finally {
       setSavingSettings(false);
@@ -354,6 +367,15 @@ export function AgendaClient({
             <button onClick={() => setShowSettings(s => !s)} className="bg-gray-800 hover:bg-gray-700 rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-1.5">
               <Settings size={15} /> Configurar disponibilidade
             </button>
+            {agendaAccessToken && (
+              <button
+                onClick={copyClinicAgendaLink}
+                className="bg-gray-800 hover:bg-gray-700 rounded-xl px-4 py-2.5 text-sm font-medium text-purple-300"
+                title="Página PWA com todos os agendamentos, para acompanhar no celular"
+              >
+                {agendaLinkCopied ? "Copiado!" : "Link da agenda geral"}
+              </button>
+            )}
           </div>
         </div>
 
@@ -513,6 +535,23 @@ export function AgendaClient({
                   />
                 </div>
               )}
+            </div>
+
+            <div className="border border-gray-800 rounded-xl p-4">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={askProfessionalEnabled}
+                  onChange={e => setAskProfessionalEnabled(e.target.checked)}
+                  className="w-4 h-4"
+                />
+                <div>
+                  <p className="text-sm font-medium">Perguntar com qual profissional o cliente quer agendar</p>
+                  <p className="text-xs text-gray-500">
+                    Vale quando há mais de um profissional. Desligado: o agente oferece os horários de toda a equipe e o sistema atribui automaticamente a um profissional livre.
+                  </p>
+                </div>
+              </label>
             </div>
 
             <div>

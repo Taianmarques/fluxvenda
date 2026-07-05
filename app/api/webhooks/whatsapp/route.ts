@@ -193,12 +193,32 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       const service = await resolveService(args?.service);
 
       // Com profissionais cadastrados, todo agendamento precisa pertencer a um deles:
-      // 1 ativo = atribui direto; vários = o agente precisa perguntar ao cliente.
+      // 1 ativo = atribui direto; vários = pergunta (configurável) ou une os horários de todos.
       if (!professional) {
         const activePros = await prisma.professional.findMany({ where: { agentConfigId, active: true } });
         if (activePros.length === 1) professional = activePros[0];
         else if (activePros.length > 1) {
-          return `Erro: pergunte com qual profissional o cliente quer agendar antes de consultar horários. Profissionais disponíveis: ${activePros.map(p => p.name).join(", ")}.`;
+          if (config.askProfessionalEnabled) {
+            return `Erro: pergunte com qual profissional o cliente quer agendar antes de consultar horários. Profissionais disponíveis: ${activePros.map(p => p.name).join(", ")}.`;
+          }
+          // Não pergunta: horário disponível = algum profissional livre nele
+          const slotDurationAll = service?.durationMinutes ?? config.slotDurationMinutes;
+          const merged = new Map<string, { date: string; weekday: string; slots: Set<string> }>();
+          for (const pro of activePros) {
+            const proBusy = await prisma.appointment.findMany({
+              where: { agentConfigId, status: "CONFIRMADO", professionalId: pro.id },
+              select: { scheduledAt: true, durationMinutes: true },
+            });
+            const proSlots = getAvailableSlots(pro.availability as unknown as AvailabilityRule[], slotDurationAll, proBusy);
+            for (const day of proSlots) {
+              if (!merged.has(day.date)) merged.set(day.date, { date: day.date, weekday: day.weekday, slots: new Set() });
+              day.slots.forEach((s) => merged.get(day.date)!.slots.add(s));
+            }
+          }
+          const combined = Array.from(merged.values())
+            .sort((a, b) => a.date.localeCompare(b.date))
+            .map((d) => ({ date: d.date, weekday: d.weekday, slots: Array.from(d.slots).sort() }));
+          return formatSlotsForAgent(combined);
         }
       }
 
@@ -240,7 +260,22 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
         const activePros = await prisma.professional.findMany({ where: { agentConfigId, active: true } });
         if (activePros.length === 1) professional = activePros[0];
         else if (activePros.length > 1) {
-          return `Erro: pergunte com qual profissional o cliente quer agendar. Profissionais disponíveis: ${activePros.map(p => p.name).join(", ")}. Depois chame agendar_horario informando o campo professional.`;
+          if (config.askProfessionalEnabled) {
+            return `Erro: pergunte com qual profissional o cliente quer agendar. Profissionais disponíveis: ${activePros.map(p => p.name).join(", ")}. Depois chame agendar_horario informando o campo professional.`;
+          }
+          // Não pergunta: atribui ao primeiro profissional livre nesse horário
+          const slotDurationPick = service?.durationMinutes ?? config.slotDurationMinutes;
+          for (const pro of activePros) {
+            const proBusy = await prisma.appointment.findMany({
+              where: { agentConfigId, status: "CONFIRMADO", professionalId: pro.id },
+              select: { scheduledAt: true, durationMinutes: true },
+            });
+            if (isSlotAvailable(pro.availability as unknown as AvailabilityRule[], slotDurationPick, proBusy, scheduledAt)) {
+              professional = pro;
+              break;
+            }
+          }
+          if (!professional) return "Esse horário não está mais disponível com nenhum profissional. Consulte os horários disponíveis novamente e ofereça outra opção ao cliente.";
         }
       }
 

@@ -8,8 +8,16 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
     where: { accessToken: token },
     select: { name: true },
   });
+  let ownerName = professional?.name;
+  if (!ownerName) {
+    const clinic = await prisma.agentConfig.findUnique({
+      where: { agendaAccessToken: token },
+      select: { team: { select: { name: true } } },
+    });
+    ownerName = clinic?.team?.name;
+  }
 
-  const name = professional ? `Agenda — ${professional.name}` : "Agenda";
+  const name = ownerName ? `Agenda — ${ownerName}` : "Agenda";
 
   return Response.json(
     {

@@ -12,9 +12,16 @@ export async function generateMetadata({ params }: { params: Promise<{ token: st
     where: { accessToken: token },
     select: { name: true },
   });
-  const title = professional ? `Agenda — ${professional.name}` : "Agenda";
+  let name = professional?.name;
+  if (!name) {
+    const clinic = await prisma.agentConfig.findUnique({
+      where: { agendaAccessToken: token },
+      select: { team: { select: { name: true } } },
+    });
+    name = clinic?.team?.name;
+  }
   return {
-    title,
+    title: name ? `Agenda — ${name}` : "Agenda",
     description: "Acompanhe seus agendamentos em tempo real.",
     manifest: `/agenda/${token}/manifest.webmanifest`,
     robots: { index: false, follow: false },
@@ -36,7 +43,15 @@ export default async function AgendaPage({ params }: { params: Promise<{ token: 
     include: { agentConfig: { select: { team: { select: { name: true } } } } },
   });
 
-  if (!professional) {
+  // Token pode ser de um profissional OU da agenda geral da empresa
+  const clinic = professional
+    ? null
+    : await prisma.agentConfig.findUnique({
+        where: { agendaAccessToken: token },
+        select: { id: true, team: { select: { name: true } } },
+      });
+
+  if (!professional && !clinic) {
     return (
       <div className="min-h-screen bg-white text-gray-900 flex items-center justify-center p-6">
         <div className="text-center space-y-3 max-w-sm">
@@ -53,10 +68,13 @@ export default async function AgendaPage({ params }: { params: Promise<{ token: 
 
   const appointments = await prisma.appointment.findMany({
     where: {
-      professionalId: professional.id,
+      ...(professional ? { professionalId: professional.id } : { agentConfigId: clinic!.id }),
       scheduledAt: { gte: startOfToday },
     },
-    include: { service: { select: { name: true } } },
+    include: {
+      service: { select: { name: true } },
+      professional: { select: { name: true } },
+    },
     orderBy: { scheduledAt: "asc" },
     take: 200,
   });
@@ -68,14 +86,15 @@ export default async function AgendaPage({ params }: { params: Promise<{ token: 
     contactName: a.contactName,
     contactNumber: a.contactNumber,
     serviceName: a.service?.name ?? null,
+    professionalName: professional ? null : (a.professional?.name ?? null),
     notes: a.notes,
     status: a.status,
   }));
 
   return (
     <AgendaClient
-      professionalName={professional.name}
-      storeName={professional.agentConfig.team?.name ?? ""}
+      professionalName={professional ? professional.name : (clinic!.team?.name || "Agenda geral")}
+      storeName={professional ? (professional.agentConfig.team?.name ?? "") : "Agenda geral"}
       appointments={items}
     />
   );
