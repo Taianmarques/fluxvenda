@@ -12,11 +12,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const conversation = await prisma.conversation.findUnique({
     where: { id },
     include: {
-      messages: { orderBy: { createdAt: "asc" }, include: { sender: { select: { name: true } } } },
+      // Últimas 100 mensagens (desc + take + reverse) — o polling de 3s do chat não pode
+      // carregar o histórico inteiro de conversas longas a cada tick
+      messages: { orderBy: { createdAt: "desc" }, take: 100, include: { sender: { select: { name: true } } } },
       opportunities: { orderBy: { createdAt: "asc" } },
     },
   });
   if (!conversation) return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
+  conversation.messages.reverse(); // devolve em ordem cronológica
 
   const result = await getAgentConfigWithRole(userId, conversation.agentConfigId);
   if (!result) return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
@@ -25,8 +28,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
   }
 
-  // Abrir a conversa marca como lida pra todo mundo (não é por usuário) — usado no filtro "não lidas"
-  await prisma.conversation.update({ where: { id }, data: { lastReadAt: new Date() } });
+  // Abrir a conversa marca como lida pra todo mundo (não é por usuário) — usado no filtro
+  // "não lidas". Throttle de 30s: o polling de 3s não precisa escrever no banco toda vez.
+  if (!conversation.lastReadAt || conversation.lastReadAt < new Date(Date.now() - 30_000)) {
+    await prisma.conversation.update({ where: { id }, data: { lastReadAt: new Date() } });
+  }
 
   return NextResponse.json({ conversation });
 }

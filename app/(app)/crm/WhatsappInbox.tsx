@@ -206,6 +206,17 @@ export function WhatsappInbox({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Estabilidade do polling: evita corrida ao trocar de conversa, requisições acumuladas
+  // em rede lenta e re-render quando nada mudou (fingerprint)
+  const selectedIdRef = useRef<string | null>(selectedId);
+  const detailInFlightRef = useRef(false);
+  const listInFlightRef = useRef(false);
+  const detailFingerprintRef = useRef("");
+  const listFingerprintRef = useRef("");
+  // Scroll estilo WhatsApp: só acompanha mensagens novas se o usuário já está no fim
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+  const nearBottomRef = useRef(true);
+  const lastScrolledConversationRef = useRef<string | null>(null);
   const t = THEMES[theme];
 
   useEffect(() => {
@@ -227,12 +238,15 @@ export function WhatsappInbox({
     localStorage.setItem(THEME_STORAGE_KEY, next);
   }
 
-  async function refreshList() {
+  async function refreshList(isPoll = false) {
+    if (isPoll && listInFlightRef.current) return; // rede lenta: não acumula requisições
+    listInFlightRef.current = true;
     try {
       const res = await fetch(`/api/agentes/${agentId}/conversas`);
+      if (!res.ok) return;
       const data = await res.json();
       if (data.conversations) {
-        setConversations(data.conversations.map((c: any) => ({
+        const next = data.conversations.map((c: any) => ({
           id: c.id, contactName: c.contactName, contactNumber: c.contactNumber,
           status: c.status, humanTakeover: c.humanTakeover, leadStatusId: c.leadStatusId,
           opportunities: c.opportunities, assignedToId: c.assignedToId, updatedAt: c.updatedAt,
@@ -240,9 +254,17 @@ export function WhatsappInbox({
           lastMessage: c.messages[0]?.content ?? null,
           lastMessageRole: c.messages[0]?.role ?? null,
           lastMessageAt: c.messages[0]?.createdAt ?? null,
-        })));
+        }));
+        // Só re-renderiza a lista se algo realmente mudou
+        const fp = JSON.stringify(next.map((c: any) => [c.id, c.updatedAt, c.lastMessageAt, c.status, c.humanTakeover, c.leadStatusId, c.assignedToId, c.lastReadAt]));
+        if (fp !== listFingerprintRef.current) {
+          listFingerprintRef.current = fp;
+          setConversations(next);
+        }
       }
-    } catch {}
+    } catch {} finally {
+      listInFlightRef.current = false;
+    }
   }
 
   async function refreshLeadStatuses() {
@@ -270,13 +292,30 @@ export function WhatsappInbox({
     });
   }
 
-  async function refreshDetail(id: string) {
+  async function refreshDetail(id: string, isPoll = false) {
+    if (isPoll && detailInFlightRef.current) return; // rede lenta: não acumula requisições
+    detailInFlightRef.current = true;
     try {
       const res = await fetch(`/api/ferramentas/whatsapp/conversas/${id}`);
       if (!res.ok) return;
       const data = await res.json();
-      setDetail(data.conversation);
-    } catch {}
+      // Guarda de corrida: o usuário pode ter trocado de conversa enquanto o fetch corria
+      if (selectedIdRef.current !== id || !data.conversation) return;
+      const c = data.conversation;
+      // Só re-renderiza o chat se algo realmente mudou (evita jank a cada tick de 3s)
+      const lastMsg = c.messages[c.messages.length - 1];
+      const fp = JSON.stringify([
+        c.id, c.messages.length, lastMsg?.id, c.humanTakeover, c.status,
+        c.assignedToId, c.leadStatusId, c.opportunities?.length,
+        c.opportunities?.map((o: any) => [o.id, o.wonAt, o.dealValue]),
+      ]);
+      if (fp !== detailFingerprintRef.current) {
+        detailFingerprintRef.current = fp;
+        setDetail(c);
+      }
+    } catch {} finally {
+      detailInFlightRef.current = false;
+    }
   }
 
   async function refreshScheduled(id: string) {
@@ -289,21 +328,55 @@ export function WhatsappInbox({
   }
 
   useEffect(() => {
-    const interval = setInterval(refreshList, 5000);
-    return () => clearInterval(interval);
+    // Polling pausa com a aba/app em segundo plano e atualiza na hora ao voltar
+    const interval = setInterval(() => { if (!document.hidden) refreshList(true); }, 5000);
+    const onVisible = () => {
+      if (document.hidden) return;
+      refreshList();
+      if (selectedIdRef.current) refreshDetail(selectedIdRef.current);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { clearInterval(interval); document.removeEventListener("visibilitychange", onVisible); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
+    selectedIdRef.current = selectedId;
+    detailFingerprintRef.current = ""; // nova conversa sempre renderiza a primeira carga
+    nearBottomRef.current = true;
     if (!selectedId) { setDetail(null); setScheduledMessages([]); return; }
     refreshDetail(selectedId);
     refreshScheduled(selectedId);
-    const interval = setInterval(() => { refreshDetail(selectedId); refreshScheduled(selectedId); }, 3000);
+    const interval = setInterval(() => {
+      if (document.hidden) return;
+      refreshDetail(selectedId, true);
+      refreshScheduled(selectedId);
+    }, 3000);
     return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
+  // Scroll estilo WhatsApp: ao abrir a conversa vai direto pro fim; depois, só acompanha
+  // mensagens novas se o usuário já estava perto do fim (não puxa quem lê o histórico)
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [detail?.messages.length]);
+    if (!detail) return;
+    const isFirstRender = lastScrolledConversationRef.current !== detail.id;
+    lastScrolledConversationRef.current = detail.id;
+    if (isFirstRender) {
+      bottomRef.current?.scrollIntoView({ behavior: "auto" });
+      nearBottomRef.current = true;
+      return;
+    }
+    if (nearBottomRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [detail?.id, detail?.messages.length]);
+
+  function handleChatScroll() {
+    const el = chatScrollRef.current;
+    if (!el) return;
+    nearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+  }
 
   useEffect(() => {
     return () => {
@@ -799,7 +872,7 @@ export function WhatsappInbox({
                   </div>
                 </div>
 
-                <div className={`flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-5 space-y-2 ${t.chatBg}`}>
+                <div ref={chatScrollRef} onScroll={handleChatScroll} className={`flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-5 space-y-2 ${t.chatBg}`}>
                   {detail.messages.map(m => {
                     if (m.role === "note") {
                       return (
