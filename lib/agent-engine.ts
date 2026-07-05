@@ -275,12 +275,13 @@ export const COMMERCE_TOOLS = [
     type: "function" as const,
     function: {
       name: "definir_entrega",
-      description: "Registra no pedido em andamento se será entrega ou retirada no local. Para entrega, informe também o endereço completo do cliente. Chame antes de gerar a cobrança quando a empresa oferece entrega — a taxa é calculada automaticamente conforme a configuração da loja.",
+      description: "Registra no pedido em andamento se será entrega ou retirada no local. Para entrega, informe também o endereço completo do cliente e, quando a loja tiver zonas de entrega listadas no contexto, a zona correspondente ao bairro do cliente. Chame antes de gerar a cobrança quando a empresa oferece entrega — a taxa é calculada automaticamente conforme a configuração da loja.",
       parameters: {
         type: "object",
         properties: {
           tipo: { type: "string", enum: ["ENTREGA", "RETIRADA"], description: "Como o cliente quer receber o pedido" },
           endereco: { type: "string", description: "Endereço completo de entrega (rua, número, bairro, complemento). Obrigatório quando tipo = ENTREGA." },
+          area: { type: "string", description: "Nome da zona de entrega (igual à lista do contexto). Obrigatório quando a loja tem zonas de entrega." },
         },
         required: ["tipo"],
       },

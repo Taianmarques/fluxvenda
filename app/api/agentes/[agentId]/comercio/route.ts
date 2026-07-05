@@ -31,6 +31,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ age
     deliveryFee: config.deliveryFee,
     deliveryFreeAbove: config.deliveryFreeAbove,
     deliveryArea: config.deliveryArea,
+    deliveryZones: await prisma.deliveryZone.findMany({
+      where: { agentConfigId: config.id },
+      orderBy: { order: "asc" },
+      select: { name: true, fee: true },
+    }),
   });
 }
 
@@ -56,6 +61,11 @@ const schema = z.object({
   deliveryFee: z.number().min(0).max(100000).optional(),
   deliveryFreeAbove: z.number().min(0).max(1000000).nullable().optional(),
   deliveryArea: z.string().max(1000).optional(),
+  // Zonas com taxa própria — substitui a lista inteira quando presente
+  deliveryZones: z.array(z.object({
+    name: z.string().min(1).max(100),
+    fee: z.number().min(0).max(100000),
+  })).max(50).optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {
@@ -72,10 +82,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
   // Gera o token de validação do webhook na primeira vez que o comércio é ativado
   const needsWebhookToken = body.data.commerceEnabled && !config.asaasWebhookToken;
 
+  const { deliveryZones, ...configData } = body.data;
+
   const updated = await prisma.agentConfig.update({
     where: { id: config.id },
-    data: { ...body.data, ...(needsWebhookToken ? { asaasWebhookToken: randomUUID() } : {}) },
+    data: { ...configData, ...(needsWebhookToken ? { asaasWebhookToken: randomUUID() } : {}) },
   });
+
+  if (deliveryZones) {
+    await prisma.$transaction([
+      prisma.deliveryZone.deleteMany({ where: { agentConfigId: config.id } }),
+      prisma.deliveryZone.createMany({
+        data: deliveryZones.map((z, i) => ({ agentConfigId: config.id, name: z.name.trim(), fee: z.fee, order: i })),
+      }),
+    ]);
+  }
 
   return NextResponse.json({
     commerceEnabled: updated.commerceEnabled,

@@ -26,6 +26,7 @@ type DeliveryConfig = {
   deliveryFee: number;
   deliveryFreeAbove: number | null;
   deliveryArea: string;
+  deliveryZones: { name: string; fee: number }[];
 };
 
 export function LojaClient({
@@ -165,23 +166,29 @@ export function LojaClient({
     deliveryChoices.length === 1 ? deliveryChoices[0] : null
   );
   const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [zoneName, setZoneName] = useState("");
+
+  const hasZones = delivery.deliveryZones.length > 0;
+  const selectedZone = hasZones ? delivery.deliveryZones.find((z) => z.name === zoneName) ?? null : null;
+  const baseFee = hasZones ? (selectedZone?.fee ?? 0) : delivery.deliveryFee;
 
   const fee =
     deliveryType === "ENTREGA"
-      ? (delivery.deliveryFreeAbove != null && subtotal >= delivery.deliveryFreeAbove ? 0 : delivery.deliveryFee)
+      ? (delivery.deliveryFreeAbove != null && subtotal >= delivery.deliveryFreeAbove ? 0 : baseFee)
       : 0;
   const total = subtotal + fee;
   const needsDeliveryChoice = deliveryChoices.length > 1 && deliveryType === null;
+  const needsZoneChoice = deliveryType === "ENTREGA" && hasZones && !selectedZone;
 
   function checkout() {
-    if (!whatsappNumber || cartItems.length === 0 || needsDeliveryChoice) return;
+    if (!whatsappNumber || cartItems.length === 0 || needsDeliveryChoice || needsZoneChoice) return;
     const lines = cartItems.map(
       (i) => `- ${i.qty}x ${i.product.name} — ${brl.format(effectivePrice(i.product) * i.qty)}`
     );
     const deliveryLines =
       deliveryType === "ENTREGA"
         ? [
-            `Entrega: ${fee > 0 ? brl.format(fee) : "grátis"}`,
+            `Entrega${selectedZone ? ` (${selectedZone.name})` : ""}: ${fee > 0 ? brl.format(fee) : "grátis"}`,
             ...(deliveryAddress.trim() ? [`Endereço: ${deliveryAddress.trim()}`] : []),
           ]
         : deliveryType === "RETIRADA"
@@ -499,6 +506,20 @@ export function LojaClient({
 
                 {deliveryType === "ENTREGA" && (
                   <div className="space-y-1.5">
+                    {hasZones && (
+                      <select
+                        value={zoneName}
+                        onChange={(e) => setZoneName(e.target.value)}
+                        className="w-full bg-gray-100 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500 focus:bg-white"
+                      >
+                        <option value="">Selecione sua região...</option>
+                        {delivery.deliveryZones.map((z) => (
+                          <option key={z.name} value={z.name}>
+                            {z.name} — {z.fee > 0 ? brl.format(z.fee) : "grátis"}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                     <textarea
                       value={deliveryAddress}
                       onChange={(e) => setDeliveryAddress(e.target.value)}
@@ -539,9 +560,12 @@ export function LojaClient({
                 {needsDeliveryChoice && (
                   <p className="text-xs text-center text-amber-600">Escolha entrega ou retirada para continuar.</p>
                 )}
+                {needsZoneChoice && (
+                  <p className="text-xs text-center text-amber-600">Selecione sua região de entrega para continuar.</p>
+                )}
                 <button
                   onClick={checkout}
-                  disabled={!whatsappNumber || needsDeliveryChoice}
+                  disabled={!whatsappNumber || needsDeliveryChoice || needsZoneChoice}
                   className="w-full bg-green-600 hover:bg-green-500 active:bg-green-700 disabled:bg-gray-300 text-white font-semibold rounded-xl py-3 flex items-center justify-center gap-2 transition-colors"
                 >
                   <MessageCircle size={18} />

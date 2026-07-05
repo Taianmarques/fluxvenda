@@ -68,7 +68,7 @@ export default async function LojaPage({ params }: { params: Promise<{ agentId: 
 
   if (!config || !config.commerceEnabled) return <Indisponivel />;
 
-  const [products, banners, instanceStatus] = await Promise.all([
+  const [products, banners, deliveryZones, instanceStatus] = await Promise.all([
     prisma.product.findMany({
       where: { agentConfigId: config.id, active: true },
       orderBy: { createdAt: "asc" },
@@ -81,6 +81,11 @@ export default async function LojaPage({ params }: { params: Promise<{ agentId: 
       where: { agentConfigId: config.id, active: true },
       orderBy: { order: "asc" },
       select: { id: true, imagemBase64: true, imagemMimeType: true },
+    }),
+    prisma.deliveryZone.findMany({
+      where: { agentConfigId: config.id },
+      orderBy: { order: "asc" },
+      select: { name: true, fee: true },
     }),
     config.uazapiToken
       ? getInstanceStatus(config.uazapiToken).catch(() => null)
@@ -102,6 +107,7 @@ export default async function LojaPage({ params }: { params: Promise<{ agentId: 
         deliveryFee: config.deliveryFee,
         deliveryFreeAbove: config.deliveryFreeAbove,
         deliveryArea: config.deliveryArea,
+        deliveryZones,
       }}
       products={products.map((p) => ({
         id: p.id,

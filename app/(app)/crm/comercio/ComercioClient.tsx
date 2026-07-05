@@ -118,6 +118,7 @@ export function ComercioClient({
     deliveryFee: number;
     deliveryFreeAbove: number | null;
     deliveryArea: string;
+    deliveryZones: { name: string; fee: number }[];
   };
 }) {
   const [showSettings, setShowSettings] = useState(false);
@@ -149,6 +150,13 @@ export function ComercioClient({
     initialDelivery?.deliveryFreeAbove != null ? String(initialDelivery.deliveryFreeAbove) : ""
   );
   const [deliveryArea, setDeliveryArea] = useState(initialDelivery?.deliveryArea ?? "");
+  const [deliveryZones, setDeliveryZones] = useState<{ name: string; fee: string }[]>(
+    (initialDelivery?.deliveryZones ?? []).map(z => ({ name: z.name, fee: String(z.fee) }))
+  );
+
+  function updateZone(i: number, patch: Partial<{ name: string; fee: string }>) {
+    setDeliveryZones(prev => prev.map((z, zi) => zi === i ? { ...z, ...patch } : z));
+  }
 
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [orders] = useState<Order[]>(initialOrders);
@@ -196,6 +204,9 @@ export function ComercioClient({
           deliveryEnabled, pickupEnabled, deliveryFee,
           deliveryFreeAbove: deliveryFreeAbove.trim() ? Number(deliveryFreeAbove.replace(",", ".")) : null,
           deliveryArea: deliveryArea.trim(),
+          deliveryZones: deliveryZones
+            .filter(z => z.name.trim())
+            .map(z => ({ name: z.name.trim(), fee: Math.max(0, Number(z.fee.replace(",", ".")) || 0) })),
           // URL vazia desativa a integração (e limpa o secret junto)
           orderWebhookUrl: orderWebhookUrl.trim() || null,
           ...(orderWebhookSecretInput.trim()
@@ -726,7 +737,9 @@ export function ComercioClient({
               {deliveryEnabled && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs text-gray-400 block mb-1">Taxa de entrega (R$)</label>
+                    <label className="text-xs text-gray-400 block mb-1">
+                      Taxa de entrega padrão (R$) {deliveryZones.length > 0 && <span className="text-gray-600">— ignorada quando há zonas</span>}
+                    </label>
                     <input
                       type="number" min={0} step={0.5} value={deliveryFee}
                       onChange={e => setDeliveryFee(Math.max(0, Number(e.target.value)))}
@@ -742,6 +755,45 @@ export function ComercioClient({
                       className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
                     />
                   </div>
+
+                  {/* Zonas de entrega */}
+                  <div className="col-span-2 space-y-2">
+                    <label className="text-xs text-gray-400 block">
+                      Zonas de entrega com taxa própria
+                      <span className="text-gray-600 ml-1">(opcional — ex: Centro R$ 5, Zona Norte R$ 12)</span>
+                    </label>
+                    {deliveryZones.map((z, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <input
+                          value={z.name}
+                          onChange={e => updateZone(i, { name: e.target.value })}
+                          placeholder="Nome da zona (bairro/região)"
+                          className="flex-1 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+                        />
+                        <input
+                          value={z.fee}
+                          onChange={e => updateZone(i, { fee: e.target.value })}
+                          placeholder="Taxa (R$)"
+                          className="w-24 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+                        />
+                        <button
+                          onClick={() => setDeliveryZones(prev => prev.filter((_, zi) => zi !== i))}
+                          className="text-xs text-red-400 hover:text-red-300 flex-shrink-0"
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    ))}
+                    {deliveryZones.length < 50 && (
+                      <button
+                        onClick={() => setDeliveryZones(prev => [...prev, { name: "", fee: "" }])}
+                        className="text-xs text-blue-400 hover:text-blue-300"
+                      >
+                        + Adicionar zona
+                      </button>
+                    )}
+                  </div>
+
                   <div className="col-span-2">
                     <label className="text-xs text-gray-400 block mb-1">Área e prazo de entrega</label>
                     <textarea

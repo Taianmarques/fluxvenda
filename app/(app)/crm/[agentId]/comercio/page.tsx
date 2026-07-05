@@ -41,6 +41,12 @@ export default async function ComercioPage({ params }: { params: Promise<{ agent
     prisma.storeBanner.findMany({ where: { agentConfigId: config.id }, orderBy: { order: "asc" } }),
   ]);
 
+  const deliveryZones = await prisma.deliveryZone.findMany({
+    where: { agentConfigId: config.id },
+    orderBy: { order: "asc" },
+    select: { name: true, fee: true },
+  });
+
   // Slug amigável do catálogo (/loja/nome-da-loja) — gerado na primeira visita
   const storeSlug = await ensureStoreSlug(config.id);
 
@@ -65,6 +71,7 @@ export default async function ComercioPage({ params }: { params: Promise<{ agent
         deliveryFee: config.deliveryFee,
         deliveryFreeAbove: config.deliveryFreeAbove,
         deliveryArea: config.deliveryArea,
+        deliveryZones,
       }}
       initialStoreLogo={config.storeLogoBase64 ? `data:${config.storeLogoMimeType ?? "image/png"};base64,${config.storeLogoBase64}` : null}
       initialBanners={banners.map(b => ({

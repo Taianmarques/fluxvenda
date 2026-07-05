@@ -89,21 +89,30 @@ Quando o cliente quiser comprar algo:
 - Use consultar_produtos pra confirmar nome exato, preço e estoque antes de montar o pedido — nunca invente produto, preço ou estoque fora dessa lista.
 - Use montar_pedido sempre que o cliente definir ou mudar os itens — passe a lista COMPLETA de itens desejados (substitui o pedido anterior, não é incremental).
 ${pagamentoBlock}
-${buildDeliveryBlock(config)}
+${await buildDeliveryBlock(agentConfigId, config)}
 - Se o cliente perguntar sobre um pedido já feito, use consultar_status_pedido.
 - Se o cliente pedir pra ver o produto ou perguntar se tem foto, use enviar_foto_produto.`;
 }
 
-function buildDeliveryBlock(config: {
+async function buildDeliveryBlock(agentConfigId: string, config: {
   deliveryEnabled: boolean; pickupEnabled: boolean; deliveryFee: number; deliveryFreeAbove: number | null; deliveryArea: string;
-}): string {
+}): Promise<string> {
   if (!config.deliveryEnabled) {
     return `- Entrega: essa loja NÃO faz entrega — o pedido é retirado no local. Depois de montar o pedido, registre com definir_entrega (tipo RETIRADA).`;
   }
+  const zones = await prisma.deliveryZone.findMany({ where: { agentConfigId }, orderBy: { order: "asc" } });
   const opcoes = config.pickupEnabled ? "ENTREGA ou RETIRADA no local" : "somente ENTREGA (não há retirada)";
-  const taxa = config.deliveryFee > 0
-    ? `A taxa de entrega é R$ ${config.deliveryFee.toFixed(2)}${config.deliveryFreeAbove != null ? `, com frete GRÁTIS para pedidos a partir de R$ ${config.deliveryFreeAbove.toFixed(2)}` : ""}.`
-    : "A entrega é gratuita.";
+
+  const gratis = config.deliveryFreeAbove != null
+    ? ` Frete GRÁTIS para pedidos a partir de R$ ${config.deliveryFreeAbove.toFixed(2)}.`
+    : "";
+
+  const taxa = zones.length > 0
+    ? `As zonas de entrega e taxas são:\n${zones.map(z => `  - ${z.name}: R$ ${z.fee.toFixed(2)}`).join("\n")}\n  Pergunte o bairro do cliente, identifique a zona correspondente e passe o nome EXATO dela no campo "area" de definir_entrega. Se o bairro não estiver em nenhuma zona, avise que não entregamos lá e ofereça retirada.${gratis}`
+    : (config.deliveryFee > 0
+        ? `A taxa de entrega é R$ ${config.deliveryFee.toFixed(2)}.${gratis}`
+        : "A entrega é gratuita.");
+
   const area = config.deliveryArea ? `\n- Área e prazo de entrega: ${config.deliveryArea}` : "";
   return `- Entrega: essa loja oferece ${opcoes}. ${taxa}
 - Depois de montar o pedido, pergunte como o cliente quer receber. Se for entrega, peça o endereço completo (rua, número, bairro) e registre com definir_entrega — a taxa é calculada e somada automaticamente. É OBRIGATÓRIO registrar a entrega antes de gerar a cobrança.${area}`;
@@ -326,21 +335,39 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       const order = await prisma.order.findFirst({ where: { agentConfigId, conversationId, status: "ABERTO" } });
       if (!order) return "Ainda não há pedido montado nessa conversa. Monte o pedido primeiro com montar_pedido.";
 
-      // Taxa: frete grátis quando o subtotal atinge o mínimo configurado
+      // Taxa base: da zona (quando a loja usa zonas) ou a taxa padrão
+      let baseFee = config.deliveryFee;
+      let zoneName = "";
+      if (tipo === "ENTREGA") {
+        const zones = await prisma.deliveryZone.findMany({ where: { agentConfigId } });
+        if (zones.length > 0) {
+          const areaArg = typeof args?.area === "string" ? args.area.trim().toLowerCase() : "";
+          const zone = zones.find(z => z.name.toLowerCase() === areaArg)
+            ?? zones.find(z => areaArg && (z.name.toLowerCase().includes(areaArg) || areaArg.includes(z.name.toLowerCase())));
+          if (!zone) {
+            return `Erro: informe a zona de entrega no campo "area". Zonas disponíveis: ${zones.map(z => `${z.name} (R$ ${z.fee.toFixed(2)})`).join(", ")}. Se o bairro do cliente não está em nenhuma zona, avise que não entregamos lá e ofereça retirada.`;
+          }
+          baseFee = zone.fee;
+          zoneName = zone.name;
+        }
+      }
+
+      // Frete grátis quando o subtotal atinge o mínimo configurado
       const fee = tipo === "RETIRADA"
         ? 0
-        : (config.deliveryFreeAbove != null && order.total >= config.deliveryFreeAbove ? 0 : config.deliveryFee);
+        : (config.deliveryFreeAbove != null && order.total >= config.deliveryFreeAbove ? 0 : baseFee);
 
       await prisma.order.update({
         where: { id: order.id },
-        data: { deliveryType: tipo, deliveryFee: fee, deliveryAddress: endereco },
+        data: { deliveryType: tipo, deliveryFee: fee, deliveryAddress: endereco, deliveryZone: zoneName },
       });
       notifyOrderWebhook(agentConfigId, order.id, "order.updated");
 
       if (tipo === "RETIRADA") return `Retirada no local registrada. Total do pedido: R$ ${order.total.toFixed(2)}.`;
+      const zonaInfo = zoneName ? ` (zona: ${zoneName})` : "";
       return fee > 0
-        ? `Entrega registrada para "${endereco}". Taxa de entrega: R$ ${fee.toFixed(2)}. Total com entrega: R$ ${(order.total + fee).toFixed(2)}.`
-        : `Entrega registrada para "${endereco}" — frete grátis! Total: R$ ${order.total.toFixed(2)}.`;
+        ? `Entrega registrada para "${endereco}"${zonaInfo}. Taxa de entrega: R$ ${fee.toFixed(2)}. Total com entrega: R$ ${(order.total + fee).toFixed(2)}.`
+        : `Entrega registrada para "${endereco}"${zonaInfo} — frete grátis! Total: R$ ${order.total.toFixed(2)}.`;
     }
 
     if (name === "gerar_cobranca") {

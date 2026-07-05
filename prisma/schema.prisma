@@ -616,9 +616,10 @@ model AgentConfig {
   // Opções de entrega do comércio
   deliveryEnabled   Boolean @default(false) // oferece entrega
   pickupEnabled     Boolean @default(true)  // oferece retirada no local
-  deliveryFee       Float   @default(0)     // taxa fixa de entrega
+  deliveryFee       Float   @default(0)     // taxa padrão — usada quando não há zonas cadastradas
   deliveryFreeAbove Float?                  // frete grátis a partir desse subtotal (null = nunca)
   deliveryArea      String  @default("")    // área atendida, prazos, observações
+  deliveryZones     DeliveryZone[]          // zonas com taxa própria (bairro/região)
 
   conversations        Conversation[]
   pipelines            Pipeline[]
@@ -637,6 +638,20 @@ model AgentConfig {
   storeBanners         StoreBanner[]
 
   @@index([teamId])
+}
+
+// Zona de entrega com taxa própria (ex: "Centro" R$ 5, "Zona Norte" R$ 12)
+model DeliveryZone {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+  agentConfigId String
+  agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id], onDelete: Cascade)
+
+  name  String
+  fee   Float  @default(0)
+  order Int    @default(0)
+
+  @@index([agentConfigId])
 }
 
 // Banner do carrossel de destaque no topo do catálogo público (/loja)
@@ -823,6 +838,7 @@ model Order {
   deliveryType    String? // "ENTREGA" | "RETIRADA" — null = ainda não definido
   deliveryFee     Float   @default(0)
   deliveryAddress String  @default("")
+  deliveryZone    String  @default("") // nome da zona escolhida, quando a loja usa zonas
 
   asaasPaymentId  String?
   asaasPixPayload String? // código Pix copia-e-cola
