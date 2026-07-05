@@ -52,7 +52,7 @@ export function ConversationFiltersPanel({
   return (
     <div
       ref={ref}
-      className={`absolute top-full left-0 mt-1 rounded-xl border shadow-xl z-20 w-64 p-3 space-y-3 ${dark ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}`}
+      className={`absolute top-full max-md:right-0 md:left-0 mt-1 rounded-xl border shadow-xl z-20 w-64 max-w-[calc(100vw-2rem)] p-3 space-y-3 ${dark ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}`}
     >
       <div>
         <p className={labelClass}>Atendente</p>

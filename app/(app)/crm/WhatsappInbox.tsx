@@ -544,7 +544,7 @@ export function WhatsappInbox({
 
   return (
     <div className={`h-full flex flex-col ${t.root}`}>
-      <div className={`px-4 py-3 border-b ${t.header} flex items-center justify-between flex-shrink-0`}>
+      <div className={`px-4 py-3 border-b ${t.header} ${mobileChatOpen ? "hidden md:flex" : "flex"} items-center justify-between flex-shrink-0`}>
         <div>
           <p className="font-bold text-lg flex items-center gap-2"><MessageCircle size={18} /> WhatsApp</p>
           <p className={`text-xs ${t.subtitle}`}>Agente: {agentName}</p>
@@ -674,7 +674,7 @@ export function WhatsappInbox({
               </div>
             ) : (
               <>
-                <div className={`px-3 md:px-5 py-4 border-b ${t.chatHeaderBorder} flex items-center justify-between flex-wrap gap-2`}>
+                <div className={`px-3 md:px-5 py-2.5 md:py-4 border-b ${t.chatHeaderBorder} flex flex-col md:flex-row md:items-center md:justify-between gap-2`}>
                   <div className="flex items-center gap-1.5 min-w-0">
                     <button
                       onClick={() => setMobileChatOpen(false)}
@@ -702,7 +702,7 @@ export function WhatsappInbox({
                     )}
                   </div>
                   </div>
-                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                  <div className="flex items-center gap-1.5 flex-wrap justify-start md:justify-end">
                     <div className="relative">
                       <button
                         onClick={() => setShowOpportunities(s => !s)}
@@ -752,7 +752,7 @@ export function WhatsappInbox({
                       {showTransferMenu && (
                         <>
                           <div className="fixed inset-0 z-10" onClick={() => setShowTransferMenu(false)} />
-                          <div className={`absolute z-20 top-full right-0 mt-1 w-48 rounded-xl border shadow-xl p-1.5 space-y-0.5 ${theme === "dark" ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}`}>
+                          <div className={`absolute z-20 top-full max-md:left-0 md:right-0 mt-1 w-48 max-w-[calc(100vw-2rem)] rounded-xl border shadow-xl p-1.5 space-y-0.5 ${theme === "dark" ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}`}>
                             <button
                               onClick={() => { handleAssign(null); setShowTransferMenu(false); }}
                               className={`w-full text-left text-xs px-2 py-1.5 rounded-lg ${!detail.assignedToId ? "font-semibold" : ""} ${theme === "dark" ? "text-gray-300 hover:bg-gray-800" : "text-gray-600 hover:bg-gray-100"}`}
@@ -793,7 +793,7 @@ export function WhatsappInbox({
                   </div>
                 </div>
 
-                <div className={`flex-1 overflow-y-auto p-5 space-y-2 ${t.chatBg}`}>
+                <div className={`flex-1 overflow-y-auto p-3 md:p-5 space-y-2 ${t.chatBg}`}>
                   {detail.messages.map(m => {
                     if (m.role === "note") {
                       return (

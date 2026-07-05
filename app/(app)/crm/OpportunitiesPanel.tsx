@@ -65,7 +65,7 @@ export function OpportunitiesPanel({
   return (
     <div
       ref={ref}
-      className={`absolute top-full right-0 mt-1 rounded-xl border shadow-xl z-20 w-72 max-h-96 flex flex-col ${dark ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}`}
+      className={`absolute top-full max-md:left-0 md:right-0 mt-1 rounded-xl border shadow-xl z-20 w-72 max-w-[calc(100vw-2rem)] max-h-96 flex flex-col ${dark ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}`}
     >
       <div className={`px-3 py-2 border-b text-xs font-semibold ${dark ? "border-gray-800 text-gray-300" : "border-gray-200 text-gray-600"}`}>
         Oportunidades

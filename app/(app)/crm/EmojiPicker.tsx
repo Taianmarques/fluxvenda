@@ -87,7 +87,7 @@ export function EmojiPicker({ onSelect, onClose, dark }: { onSelect: (emoji: str
   return (
     <div
       ref={ref}
-      className={`absolute bottom-full left-0 mb-2 rounded-xl border shadow-xl z-10 w-80 flex flex-col ${dark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"}`}
+      className={`absolute bottom-full left-0 mb-2 rounded-xl border shadow-xl z-10 w-80 max-w-[calc(100vw-2rem)] flex flex-col ${dark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"}`}
     >
       <div className={`p-2 border-b ${dark ? "border-gray-800" : "border-gray-200"}`}>
         <input
