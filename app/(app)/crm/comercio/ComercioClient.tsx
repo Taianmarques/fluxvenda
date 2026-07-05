@@ -17,7 +17,8 @@ function readFileAsBase64(file: File): Promise<{ base64: string; mimeType: strin
   });
 }
 
-type Product = { id: string; name: string; description: string; price: number; precoPromocional?: number | null; stock: number | null; active: boolean; imagemBase64?: string | null; imagemMimeType?: string | null };
+type Product = { id: string; name: string; description: string; category?: string; price: number; precoPromocional?: number | null; stock: number | null; active: boolean; imagemBase64?: string | null; imagemMimeType?: string | null };
+type Banner = { id?: string; dataUri: string; base64?: string; mimeType?: string; active: boolean };
 type OrderItem = { id: string; name: string; unitPrice: number; quantity: number };
 type Order = { id: string; contactName: string; contactNumber: string; status: string; total: number; asaasInvoiceUrl: string | null; createdAt: string; items: OrderItem[] };
 
@@ -38,7 +39,7 @@ function formatBRL(value: number): string {
 export function ComercioClient({
   agentId, initialCommerceEnabled, initialCatalogOnly, initialAsaasSandbox, initialHasAsaasApiKey, initialAsaasWebhookToken,
   initialInstallmentsEnabled, initialMaxInstallments, initialInterestFreeInstallments, initialInstallmentInterestRate,
-  initialProducts, initialOrders,
+  initialProducts, initialOrders, initialStoreLogo, initialBanners,
 }: {
   agentId: string;
   initialCommerceEnabled: boolean;
@@ -52,6 +53,8 @@ export function ComercioClient({
   initialInstallmentInterestRate: number;
   initialProducts: Product[];
   initialOrders: Order[];
+  initialStoreLogo?: string | null; // data URI
+  initialBanners?: { id: string; dataUri: string; active: boolean }[];
 }) {
   const [showSettings, setShowSettings] = useState(false);
   const [commerceEnabled, setCommerceEnabled] = useState(initialCommerceEnabled);
@@ -71,6 +74,7 @@ export function ComercioClient({
   const [showNewProduct, setShowNewProduct] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
+  const [newCategory, setNewCategory] = useState("");
   const [newPrice, setNewPrice] = useState("");
   const [newStock, setNewStock] = useState("");
   const [newPrecoPromo, setNewPrecoPromo] = useState("");
@@ -79,7 +83,18 @@ export function ComercioClient({
   const editPhotoInputRef = useRef<HTMLInputElement>(null);
   const [editingPhotoId, setEditingPhotoId] = useState<string | null>(null);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
-  const [editFields, setEditFields] = useState<{ name: string; description: string; price: string; precoPromo: string; stock: string }>({ name: "", description: "", price: "", precoPromo: "", stock: "" });
+  const [editFields, setEditFields] = useState<{ name: string; description: string; category: string; price: string; precoPromo: string; stock: string }>({ name: "", description: "", category: "", price: "", precoPromo: "", stock: "" });
+
+  // Personalização da loja (logo + banners do catálogo público)
+  const [showAppearance, setShowAppearance] = useState(false);
+  const [storeLogo, setStoreLogo] = useState<string | null>(initialStoreLogo ?? null);
+  const [banners, setBanners] = useState<Banner[]>(
+    (initialBanners ?? []).map((b) => ({ id: b.id, dataUri: b.dataUri, active: b.active }))
+  );
+  const [savingAppearance, setSavingAppearance] = useState(false);
+  const [appearanceError, setAppearanceError] = useState("");
+
+  const categorias = Array.from(new Set(products.map((p) => p.category).filter(Boolean))) as string[];
 
   async function loadProducts() {
     const res = await fetch(`/api/agentes/${agentId}/produtos`);
@@ -156,14 +171,107 @@ export function ComercioClient({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: newName.trim(), description: newDescription.trim(), price,
+        name: newName.trim(), description: newDescription.trim(), category: newCategory.trim(), price,
         precoPromocional: promo != null && promo >= 0 ? promo : null,
         stock: newStock.trim() ? Math.max(0, Number(newStock)) : null,
         imagemBase64: newImage?.base64 ?? null, imagemMimeType: newImage?.mimeType ?? null,
       }),
     });
-    setNewName(""); setNewDescription(""); setNewPrice(""); setNewStock(""); setNewPrecoPromo(""); setNewImage(null); setShowNewProduct(false);
+    setNewName(""); setNewDescription(""); setNewCategory(""); setNewPrice(""); setNewStock(""); setNewPrecoPromo(""); setNewImage(null); setShowNewProduct(false);
     loadProducts();
+  }
+
+  async function handleSelectLogo(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setAppearanceError("");
+    if (file.size > MAX_PHOTO_MB * 1024 * 1024) {
+      setAppearanceError(`Imagem muito grande (máx. ${MAX_PHOTO_MB}MB).`);
+      return;
+    }
+    try {
+      const { base64, mimeType } = await readFileAsBase64(file);
+      setStoreLogo(`data:${mimeType};base64,${base64}`);
+    } catch {
+      setAppearanceError("Não foi possível ler a imagem.");
+    }
+  }
+
+  async function handleAddBanner(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setAppearanceError("");
+    if (file.size > MAX_PHOTO_MB * 1024 * 1024) {
+      setAppearanceError(`Imagem muito grande (máx. ${MAX_PHOTO_MB}MB).`);
+      return;
+    }
+    if (banners.length >= 10) {
+      setAppearanceError("Máximo de 10 banners.");
+      return;
+    }
+    try {
+      const { base64, mimeType } = await readFileAsBase64(file);
+      setBanners((prev) => [...prev, { dataUri: `data:${mimeType};base64,${base64}`, base64, mimeType, active: true }]);
+    } catch {
+      setAppearanceError("Não foi possível ler a imagem.");
+    }
+  }
+
+  function moveBanner(index: number, dir: -1 | 1) {
+    setBanners((prev) => {
+      const next = [...prev];
+      const target = index + dir;
+      if (target < 0 || target >= next.length) return prev;
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }
+
+  async function handleSaveAppearance() {
+    setSavingAppearance(true);
+    setAppearanceError("");
+    try {
+      // Logo: extrai base64/mime do data URI (null remove)
+      let logoPayload: { storeLogoBase64: string | null; storeLogoMimeType: string | null };
+      if (storeLogo) {
+        const [meta, base64] = storeLogo.split(",");
+        const mimeType = meta.match(/data:(.*?);/)?.[1] ?? "image/png";
+        logoPayload = { storeLogoBase64: base64, storeLogoMimeType: mimeType };
+      } else {
+        logoPayload = { storeLogoBase64: null, storeLogoMimeType: null };
+      }
+
+      const [logoRes, bannersRes] = await Promise.all([
+        fetch(`/api/agentes/${agentId}/comercio`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(logoPayload),
+        }),
+        fetch(`/api/agentes/${agentId}/banners`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            banners: banners.map((b) => b.id
+              ? { id: b.id, active: b.active }
+              : { imagemBase64: b.base64, imagemMimeType: b.mimeType, active: b.active }
+            ),
+          }),
+        }),
+      ]);
+      if (!logoRes.ok || !bannersRes.ok) throw new Error();
+      const data = await bannersRes.json();
+      setBanners((data.banners ?? []).map((b: any) => ({
+        id: b.id,
+        dataUri: `data:${b.imagemMimeType};base64,${b.imagemBase64}`,
+        active: b.active,
+      })));
+    } catch {
+      setAppearanceError("Erro ao salvar a personalização. Tente novamente.");
+    } finally {
+      setSavingAppearance(false);
+    }
   }
 
   function startEdit(p: Product) {
@@ -171,6 +279,7 @@ export function ComercioClient({
     setEditFields({
       name: p.name,
       description: p.description,
+      category: p.category ?? "",
       price: String(p.price),
       precoPromo: p.precoPromocional != null ? String(p.precoPromocional) : "",
       stock: p.stock != null ? String(p.stock) : "",
@@ -188,6 +297,7 @@ export function ComercioClient({
       body: JSON.stringify({
         name: editFields.name.trim(),
         description: editFields.description.trim(),
+        category: editFields.category.trim(),
         price,
         precoPromocional: promo != null && promo >= 0 ? promo : null,
         stock: editFields.stock.trim() ? Math.max(0, Number(editFields.stock)) : null,
@@ -231,15 +341,96 @@ export function ComercioClient({
             <p className="text-gray-400 text-sm">Atendimento</p>
             <h1 className="text-3xl font-bold mt-1 flex items-center gap-2"><ShoppingCart size={28} className="text-blue-400" /> Comércio</h1>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <button onClick={() => setShowNewProduct(s => !s)} className="bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-2.5 text-sm font-medium">
               + Novo produto
+            </button>
+            <button onClick={() => setShowAppearance(s => !s)} className="bg-gray-800 hover:bg-gray-700 rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-1.5">
+              <ImageIcon size={15} /> Personalizar loja
             </button>
             <button onClick={() => setShowSettings(s => !s)} className="bg-gray-800 hover:bg-gray-700 rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-1.5">
               <Settings size={15} /> Configurar pagamento
             </button>
           </div>
         </div>
+
+        <datalist id="categorias-loja">
+          {categorias.map(c => <option key={c} value={c} />)}
+        </datalist>
+
+        {showAppearance && (
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-5">
+            <div>
+              <p className="font-semibold">Personalizar loja</p>
+              <p className="text-xs text-gray-500 mt-0.5">Logo e banners aparecem no catálogo online que os clientes acessam.</p>
+            </div>
+
+            {/* Logo */}
+            <div className="space-y-2">
+              <p className="text-sm text-gray-400 font-medium">Logo da loja</p>
+              <div className="flex items-center gap-3">
+                {storeLogo ? (
+                  <img src={storeLogo} alt="Logo" className="w-14 h-14 rounded-xl object-cover border border-gray-800" />
+                ) : (
+                  <span className="w-14 h-14 rounded-xl bg-gray-950 border border-gray-800 flex items-center justify-center text-gray-600"><ImageIcon size={20} /></span>
+                )}
+                <label className="text-sm text-blue-400 hover:text-blue-300 cursor-pointer">
+                  {storeLogo ? "Trocar logo" : "Enviar logo"}
+                  <input type="file" accept="image/*" onChange={handleSelectLogo} className="hidden" />
+                </label>
+                {storeLogo && (
+                  <button onClick={() => setStoreLogo(null)} className="text-sm text-red-400 hover:text-red-300">Remover</button>
+                )}
+              </div>
+              <p className="text-xs text-gray-600">Ideal: imagem quadrada (ex: 512×512). Também vira o ícone quando o cliente adiciona a loja à tela inicial.</p>
+            </div>
+
+            {/* Banners */}
+            <div className="space-y-2 border-t border-gray-800 pt-4">
+              <p className="text-sm text-gray-400 font-medium">Banners de destaque (carrossel no topo do catálogo)</p>
+              <div className="space-y-2">
+                {banners.map((b, i) => (
+                  <div key={b.id ?? `new_${i}`} className={`flex items-center gap-3 ${!b.active ? "opacity-50" : ""}`}>
+                    <img src={b.dataUri} alt={`Banner ${i + 1}`} className="w-28 h-12 rounded-lg object-cover border border-gray-800 flex-shrink-0" />
+                    <div className="flex gap-2 text-xs flex-wrap">
+                      <button onClick={() => moveBanner(i, -1)} disabled={i === 0} className="text-gray-400 hover:text-white disabled:opacity-30">↑</button>
+                      <button onClick={() => moveBanner(i, 1)} disabled={i === banners.length - 1} className="text-gray-400 hover:text-white disabled:opacity-30">↓</button>
+                      <button
+                        onClick={() => setBanners(prev => prev.map((x, xi) => xi === i ? { ...x, active: !x.active } : x))}
+                        className="text-gray-400 hover:text-white"
+                      >
+                        {b.active ? "Ocultar" : "Mostrar"}
+                      </button>
+                      <button
+                        onClick={() => setBanners(prev => prev.filter((_, xi) => xi !== i))}
+                        className="text-red-400 hover:text-red-300"
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {banners.length < 10 && (
+                <label className="inline-block text-sm text-blue-400 hover:text-blue-300 cursor-pointer">
+                  + Adicionar banner
+                  <input type="file" accept="image/*" onChange={handleAddBanner} className="hidden" />
+                </label>
+              )}
+              <p className="text-xs text-gray-600">Ideal: imagem larga (ex: 1200×515). A ordem aqui é a ordem do carrossel.</p>
+            </div>
+
+            {appearanceError && <p className="text-sm text-red-400">{appearanceError}</p>}
+
+            <button
+              onClick={handleSaveAppearance}
+              disabled={savingAppearance}
+              className="bg-green-700 hover:bg-green-600 disabled:opacity-50 rounded-xl px-4 py-2 text-sm font-medium"
+            >
+              {savingAppearance ? "Salvando..." : "Salvar personalização"}
+            </button>
+          </div>
+        )}
 
         {/* Link do catálogo público */}
         {commerceEnabled && (
@@ -279,7 +470,8 @@ export function ComercioClient({
               <input placeholder="Nome do produto" value={newName} onChange={e => setNewName(e.target.value)} className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm md:col-span-2" />
               <input placeholder="Preço (R$)" value={newPrice} onChange={e => setNewPrice(e.target.value)} className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
               <input placeholder="Estoque (opcional)" value={newStock} onChange={e => setNewStock(e.target.value)} className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
-              <input placeholder="Preço promo (opcional)" value={newPrecoPromo} onChange={e => setNewPrecoPromo(e.target.value)} className="bg-gray-950 border border-amber-800/50 rounded-xl px-3 py-2 text-sm md:col-span-2" title="Deixe vazio para sem promoção" />
+              <input placeholder="Preço promo (opcional)" value={newPrecoPromo} onChange={e => setNewPrecoPromo(e.target.value)} className="bg-gray-950 border border-amber-800/50 rounded-xl px-3 py-2 text-sm" title="Deixe vazio para sem promoção" />
+              <input placeholder="Categoria (opcional)" value={newCategory} onChange={e => setNewCategory(e.target.value)} list="categorias-loja" className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
             </div>
             <input placeholder="Descrição (opcional)" value={newDescription} onChange={e => setNewDescription(e.target.value)} className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
             <div className="flex items-center gap-3">
@@ -398,7 +590,8 @@ export function ComercioClient({
                         <input value={editFields.name} onChange={e => setEditFields(f => ({ ...f, name: e.target.value }))} placeholder="Nome" className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm col-span-2" />
                         <input value={editFields.price} onChange={e => setEditFields(f => ({ ...f, price: e.target.value }))} placeholder="Preço (R$)" className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
                         <input value={editFields.stock} onChange={e => setEditFields(f => ({ ...f, stock: e.target.value }))} placeholder="Estoque (opcional)" className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
-                        <input value={editFields.precoPromo} onChange={e => setEditFields(f => ({ ...f, precoPromo: e.target.value }))} placeholder="Preço promo (vazio = sem promo)" className="bg-gray-950 border border-amber-800/50 rounded-xl px-3 py-2 text-sm col-span-2" />
+                        <input value={editFields.precoPromo} onChange={e => setEditFields(f => ({ ...f, precoPromo: e.target.value }))} placeholder="Preço promo (vazio = sem promo)" className="bg-gray-950 border border-amber-800/50 rounded-xl px-3 py-2 text-sm" />
+                        <input value={editFields.category} onChange={e => setEditFields(f => ({ ...f, category: e.target.value }))} placeholder="Categoria (opcional)" list="categorias-loja" className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
                         <input value={editFields.description} onChange={e => setEditFields(f => ({ ...f, description: e.target.value }))} placeholder="Descrição (opcional)" className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm col-span-2" />
                       </div>
                       <div className="flex gap-2">
@@ -420,7 +613,7 @@ export function ComercioClient({
                             {p.precoPromocional != null ? (
                               <><span className="text-amber-400 font-medium">{formatBRL(p.precoPromocional)}</span> <span className="line-through">{formatBRL(p.price)}</span></>
                             ) : formatBRL(p.price)}
-                            {p.stock !== null && ` · estoque: ${p.stock}`}{p.description && ` · ${p.description}`}
+                            {p.category && ` · ${p.category}`}{p.stock !== null && ` · estoque: ${p.stock}`}{p.description && ` · ${p.description}`}
                           </p>
                         </div>
                       </div>

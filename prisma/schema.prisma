@@ -603,6 +603,10 @@ model AgentConfig {
   igCommentAutoDm    Boolean @default(false)
   igCommentDmMessage String? // fallback quando nenhum fluxo bate — null = IA responde
 
+  // Identidade visual do catálogo público (/loja) — logo base64 como as fotos de produto
+  storeLogoBase64   String? @db.Text
+  storeLogoMimeType String?
+
   conversations        Conversation[]
   pipelines            Pipeline[]
   leadStatuses         LeadStatus[]
@@ -617,8 +621,24 @@ model AgentConfig {
   instagramConnection  InstagramConnection?
   igCommentFlows       InstagramCommentFlow[]
   igFunnels            InstagramFunnel[]
+  storeBanners         StoreBanner[]
 
   @@index([teamId])
+}
+
+// Banner do carrossel de destaque no topo do catálogo público (/loja)
+model StoreBanner {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+  agentConfigId String
+  agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id], onDelete: Cascade)
+
+  imagemBase64   String  @db.Text
+  imagemMimeType String
+  order          Int     @default(0)
+  active         Boolean @default(true)
+
+  @@index([agentConfigId])
 }
 
 enum LeadDistributionMode {
@@ -749,6 +769,7 @@ model Product {
 
   name              String
   description       String  @default("")
+  category          String  @default("") // texto livre; "" = sem categoria (aparece por último no catálogo)
   price             Float
   precoPromocional  Float?  // null = sem promoção ativa; quando definido, sobrepõe o preço normal
   stock             Int?    // null = não controla estoque

@@ -29,7 +29,7 @@ export default async function ComercioPage({ params }: { params: Promise<{ agent
     );
   }
 
-  const [products, orders] = await Promise.all([
+  const [products, orders, banners] = await Promise.all([
     prisma.product.findMany({ where: { agentConfigId: config.id }, orderBy: { createdAt: "asc" } }),
     prisma.order.findMany({
       where: { agentConfigId: config.id },
@@ -37,6 +37,7 @@ export default async function ComercioPage({ params }: { params: Promise<{ agent
       take: 50,
       include: { items: true },
     }),
+    prisma.storeBanner.findMany({ where: { agentConfigId: config.id }, orderBy: { order: "asc" } }),
   ]);
 
   return (
@@ -51,8 +52,12 @@ export default async function ComercioPage({ params }: { params: Promise<{ agent
       initialMaxInstallments={config.maxInstallments}
       initialInterestFreeInstallments={config.interestFreeInstallments}
       initialInstallmentInterestRate={config.installmentInterestRate}
+      initialStoreLogo={config.storeLogoBase64 ? `data:${config.storeLogoMimeType ?? "image/png"};base64,${config.storeLogoBase64}` : null}
+      initialBanners={banners.map(b => ({
+        id: b.id, dataUri: `data:${b.imagemMimeType};base64,${b.imagemBase64}`, active: b.active,
+      }))}
       initialProducts={products.map(p => ({
-        id: p.id, name: p.name, description: p.description, price: p.price, precoPromocional: p.precoPromocional,
+        id: p.id, name: p.name, description: p.description, category: p.category, price: p.price, precoPromocional: p.precoPromocional,
         stock: p.stock, active: p.active, imagemBase64: p.imagemBase64, imagemMimeType: p.imagemMimeType,
       }))}
       initialOrders={orders.map(o => ({

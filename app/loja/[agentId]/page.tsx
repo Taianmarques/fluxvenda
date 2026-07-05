@@ -11,13 +11,15 @@ export async function generateMetadata({ params }: { params: Promise<{ agentId: 
   const { agentId } = await params;
   const config = await prisma.agentConfig.findUnique({
     where: { id: agentId },
-    select: { commerceEnabled: true, team: { select: { name: true } } },
+    select: { commerceEnabled: true, storeLogoBase64: true, team: { select: { name: true } } },
   });
   const storeName = config?.commerceEnabled ? (config.team?.name || "Catálogo") : "Catálogo";
+  const hasLogo = Boolean(config?.commerceEnabled && config.storeLogoBase64);
   return {
     title: storeName,
     description: `Catálogo de produtos de ${storeName} — monte seu pedido e finalize pelo WhatsApp.`,
     manifest: `/loja/${agentId}/manifest.webmanifest`,
+    ...(hasLogo ? { icons: { icon: `/loja/${agentId}/logo`, apple: `/loja/${agentId}/logo` } } : {}),
   };
 }
 
@@ -50,20 +52,27 @@ export default async function LojaPage({ params }: { params: Promise<{ agentId: 
       active: true,
       commerceEnabled: true,
       uazapiToken: true,
+      storeLogoBase64: true,
+      storeLogoMimeType: true,
       team: { select: { name: true } },
     },
   });
 
   if (!config || !config.commerceEnabled) return <Indisponivel />;
 
-  const [products, instanceStatus] = await Promise.all([
+  const [products, banners, instanceStatus] = await Promise.all([
     prisma.product.findMany({
       where: { agentConfigId: config.id, active: true },
       orderBy: { createdAt: "asc" },
       select: {
-        id: true, name: true, description: true, price: true, precoPromocional: true,
+        id: true, name: true, description: true, category: true, price: true, precoPromocional: true,
         stock: true, imagemBase64: true, imagemMimeType: true,
       },
+    }),
+    prisma.storeBanner.findMany({
+      where: { agentConfigId: config.id, active: true },
+      orderBy: { order: "asc" },
+      select: { id: true, imagemBase64: true, imagemMimeType: true },
     }),
     config.uazapiToken
       ? getInstanceStatus(config.uazapiToken).catch(() => null)
@@ -77,10 +86,13 @@ export default async function LojaPage({ params }: { params: Promise<{ agentId: 
       agentId={config.id}
       storeName={config.team?.name || "Catálogo"}
       whatsappNumber={whatsappNumber}
+      logo={config.storeLogoBase64 ? `data:${config.storeLogoMimeType ?? "image/png"};base64,${config.storeLogoBase64}` : null}
+      banners={banners.map((b) => `data:${b.imagemMimeType};base64,${b.imagemBase64}`)}
       products={products.map((p) => ({
         id: p.id,
         name: p.name,
         description: p.description,
+        category: p.category,
         price: p.price,
         precoPromocional: p.precoPromocional,
         stock: p.stock,

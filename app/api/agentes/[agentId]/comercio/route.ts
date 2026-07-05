@@ -37,6 +37,9 @@ const schema = z.object({
   maxInstallments: z.number().int().min(1).max(21).optional(),
   interestFreeInstallments: z.number().int().min(0).max(21).optional(),
   installmentInterestRate: z.number().min(0).max(100).optional(),
+  // Logo do catálogo público — null remove a logo
+  storeLogoBase64: z.string().max(3_000_000).nullable().optional(),
+  storeLogoMimeType: z.string().nullable().optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {

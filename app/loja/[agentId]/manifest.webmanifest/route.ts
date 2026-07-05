@@ -6,10 +6,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ agentId
 
   const config = await prisma.agentConfig.findUnique({
     where: { id: agentId },
-    select: { commerceEnabled: true, team: { select: { name: true } } },
+    select: { commerceEnabled: true, storeLogoBase64: true, storeLogoMimeType: true, team: { select: { name: true } } },
   });
 
   const name = config?.commerceEnabled ? (config.team?.name || "Catálogo") : "Catálogo";
+  const hasLogo = Boolean(config?.commerceEnabled && config.storeLogoBase64);
 
   return Response.json(
     {
@@ -20,6 +21,18 @@ export async function GET(_req: Request, { params }: { params: Promise<{ agentId
       display: "standalone",
       background_color: "#f9fafb",
       theme_color: "#ffffff",
+      ...(hasLogo
+        ? {
+            icons: [
+              {
+                src: `/loja/${agentId}/logo`,
+                sizes: "512x512",
+                type: config!.storeLogoMimeType ?? "image/png",
+                purpose: "any",
+              },
+            ],
+          }
+        : {}),
     },
     { headers: { "Content-Type": "application/manifest+json", "Cache-Control": "public, max-age=3600" } }
   );

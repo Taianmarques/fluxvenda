@@ -22,6 +22,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ age
 const schema = z.object({
   name: z.string().min(1),
   description: z.string().default(""),
+  category: z.string().default(""),
   price: z.number().min(0),
   precoPromocional: z.number().min(0).nullable().optional(),
   stock: z.number().int().min(0).nullable().optional(),
@@ -44,6 +45,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
       agentConfigId: agentId,
       name: body.data.name,
       description: body.data.description,
+      category: body.data.category.trim(),
       price: body.data.price,
       stock: body.data.stock ?? null,
       precoPromocional: body.data.precoPromocional ?? null,

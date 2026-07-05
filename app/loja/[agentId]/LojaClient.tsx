@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, ShoppingCart, Plus, Minus, Trash2, X, ShoppingBag, Store, MessageCircle } from "lucide-react";
 
 type StoreProduct = {
   id: string;
   name: string;
   description: string;
+  category: string;
   price: number;
   precoPromocional: number | null;
   stock: number | null;
@@ -23,11 +24,15 @@ export function LojaClient({
   agentId,
   storeName,
   whatsappNumber,
+  logo,
+  banners,
   products,
 }: {
   agentId: string;
   storeName: string;
   whatsappNumber: string | null;
+  logo: string | null;
+  banners: string[];
   products: StoreProduct[];
 }) {
   const cartKey = `loja_cart_${agentId}`;
@@ -35,6 +40,35 @@ export function LojaClient({
   const [cartLoaded, setCartLoaded] = useState(false);
   const [search, setSearch] = useState("");
   const [cartOpen, setCartOpen] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [bannerIndex, setBannerIndex] = useState(0);
+  const bannerRef = useRef<HTMLDivElement>(null);
+
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of products) if (p.category) set.add(p.category);
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [products]);
+
+  // Carrossel: avança sozinho a cada 4s (scroll-snap manual continua funcionando)
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const t = setInterval(() => {
+      setBannerIndex((i) => {
+        const next = (i + 1) % banners.length;
+        const el = bannerRef.current;
+        if (el) el.scrollTo({ left: next * el.clientWidth, behavior: "smooth" });
+        return next;
+      });
+    }, 4000);
+    return () => clearInterval(t);
+  }, [banners.length]);
+
+  function onBannerScroll() {
+    const el = bannerRef.current;
+    if (!el || el.clientWidth === 0) return;
+    setBannerIndex(Math.round(el.scrollLeft / el.clientWidth));
+  }
 
   // Carrinho persistido por loja no localStorage
   useEffect(() => {
@@ -74,11 +108,29 @@ export function LojaClient({
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return products;
-    return products.filter(
-      (p) => p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q)
-    );
-  }, [products, search]);
+    let base = products;
+    if (activeCategory !== null) base = base.filter((p) => p.category === activeCategory);
+    if (q) {
+      base = base.filter(
+        (p) => p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q)
+      );
+    }
+    return base;
+  }, [products, search, activeCategory]);
+
+  // Sem filtro ativo, agrupa por categoria (produtos sem categoria vão para o final)
+  const sections = useMemo((): { title: string | null; items: StoreProduct[] }[] => {
+    if (activeCategory !== null || search.trim() || categories.length === 0) {
+      return [{ title: null, items: filtered }];
+    }
+    const result: { title: string | null; items: StoreProduct[] }[] = categories.map((c) => ({
+      title: c,
+      items: filtered.filter((p) => p.category === c),
+    }));
+    const uncategorized = filtered.filter((p) => !p.category);
+    if (uncategorized.length > 0) result.push({ title: "Outros", items: uncategorized });
+    return result.filter((s) => s.items.length > 0);
+  }, [filtered, categories, activeCategory, search]);
 
   const cartItems = useMemo(
     () =>
@@ -116,9 +168,14 @@ export function LojaClient({
       {/* Header */}
       <header className="sticky top-0 z-30 bg-white border-b border-gray-200">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0">
-            <Store size={18} />
-          </div>
+          {logo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logo} alt={storeName} className="w-9 h-9 rounded-xl object-cover flex-shrink-0 border border-gray-200" />
+          ) : (
+            <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0">
+              <Store size={18} />
+            </div>
+          )}
           <p className="font-bold text-lg flex-1 truncate">{storeName}</p>
           <button
             onClick={() => setCartOpen(true)}
@@ -147,8 +204,70 @@ export function LojaClient({
         </div>
       </header>
 
-      {/* Grid de produtos */}
-      <main className="max-w-2xl mx-auto px-4 py-4">
+      <main className="max-w-2xl mx-auto pb-4">
+        {/* Carrossel de banners */}
+        {banners.length > 0 && (
+          <div className="px-4 pt-4">
+            <div
+              ref={bannerRef}
+              onScroll={onBannerScroll}
+              className="flex overflow-x-auto snap-x snap-mandatory rounded-2xl scrollbar-none"
+              style={{ scrollbarWidth: "none" }}
+            >
+              {banners.map((src, i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={i}
+                  src={src}
+                  alt={`Destaque ${i + 1}`}
+                  className="w-full flex-shrink-0 snap-center object-cover aspect-[21/9] rounded-2xl"
+                />
+              ))}
+            </div>
+            {banners.length > 1 && (
+              <div className="flex justify-center gap-1.5 mt-2">
+                {banners.map((_, i) => (
+                  <span
+                    key={i}
+                    className={`h-1.5 rounded-full transition-all ${i === bannerIndex ? "w-5 bg-blue-600" : "w-1.5 bg-gray-300"}`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Chips de categoria */}
+        {categories.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto px-4 pt-4 pb-1" style={{ scrollbarWidth: "none" }}>
+            <button
+              onClick={() => setActiveCategory(null)}
+              className={`flex-shrink-0 text-sm font-medium rounded-full px-4 py-1.5 border transition-colors ${
+                activeCategory === null
+                  ? "bg-blue-600 border-blue-600 text-white"
+                  : "bg-white border-gray-200 text-gray-600 hover:border-gray-400"
+              }`}
+            >
+              Todos
+            </button>
+            {categories.map((c) => (
+              <button
+                key={c}
+                onClick={() => setActiveCategory(activeCategory === c ? null : c)}
+                className={`flex-shrink-0 text-sm font-medium rounded-full px-4 py-1.5 border transition-colors ${
+                  activeCategory === c
+                    ? "bg-blue-600 border-blue-600 text-white"
+                    : "bg-white border-gray-200 text-gray-600 hover:border-gray-400"
+                }`}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Produtos */}
+        <div className="px-4 pt-3">
         {filtered.length === 0 && (
           <div className="text-center py-16 space-y-2">
             <ShoppingBag size={40} className="mx-auto text-gray-300" />
@@ -158,8 +277,13 @@ export function LojaClient({
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
-          {filtered.map((p) => {
+        {sections.map((section, si) => (
+          <div key={section.title ?? "all"} className={si > 0 ? "mt-6" : ""}>
+            {section.title && (
+              <h2 className="text-base font-bold text-gray-800 mb-2">{section.title}</h2>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+          {section.items.map((p) => {
             const qty = cart[p.id] ?? 0;
             const soldOut = p.stock !== null && p.stock <= 0;
             const hasPromo = p.precoPromocional !== null && p.precoPromocional < p.price;
@@ -229,6 +353,9 @@ export function LojaClient({
               </div>
             );
           })}
+            </div>
+          </div>
+        ))}
         </div>
       </main>
 
