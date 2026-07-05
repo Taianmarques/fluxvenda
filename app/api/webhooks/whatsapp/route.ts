@@ -189,8 +189,18 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
     }
 
     if (name === "consultar_horarios_disponiveis") {
-      const professional = await resolveProfessional(args?.professional);
+      let professional = await resolveProfessional(args?.professional);
       const service = await resolveService(args?.service);
+
+      // Com profissionais cadastrados, todo agendamento precisa pertencer a um deles:
+      // 1 ativo = atribui direto; vários = o agente precisa perguntar ao cliente.
+      if (!professional) {
+        const activePros = await prisma.professional.findMany({ where: { agentConfigId, active: true } });
+        if (activePros.length === 1) professional = activePros[0];
+        else if (activePros.length > 1) {
+          return `Erro: pergunte com qual profissional o cliente quer agendar antes de consultar horários. Profissionais disponíveis: ${activePros.map(p => p.name).join(", ")}.`;
+        }
+      }
 
       // Memoriza a escolha do cliente nessa conversa, pra usar como fallback se o modelo
       // não repetir o parâmetro service/professional na chamada de agendar_horario.
@@ -220,10 +230,19 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       if (isNaN(scheduledAt.getTime())) return "Erro: data ou horário em formato inválido.";
 
       const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
-      const professional = (await resolveProfessional(args?.professional))
+      let professional = (await resolveProfessional(args?.professional))
         ?? (conversation?.pendingProfessionalId ? await prisma.professional.findUnique({ where: { id: conversation.pendingProfessionalId } }) : null);
       const service = (await resolveService(args?.service))
         ?? (conversation?.pendingServiceId ? await prisma.service.findUnique({ where: { id: conversation.pendingServiceId } }) : null);
+
+      // Nunca deixa agendamento órfão quando existem profissionais cadastrados
+      if (!professional) {
+        const activePros = await prisma.professional.findMany({ where: { agentConfigId, active: true } });
+        if (activePros.length === 1) professional = activePros[0];
+        else if (activePros.length > 1) {
+          return `Erro: pergunte com qual profissional o cliente quer agendar. Profissionais disponíveis: ${activePros.map(p => p.name).join(", ")}. Depois chame agendar_horario informando o campo professional.`;
+        }
+      }
 
       const availability = (professional?.availability ?? config.availability) as unknown as AvailabilityRule[];
       const slotDuration = service?.durationMinutes ?? config.slotDurationMinutes;
