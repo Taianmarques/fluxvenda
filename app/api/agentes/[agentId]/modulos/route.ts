@@ -10,6 +10,7 @@ const schema = z.object({
   cobrancaEnabled: z.boolean().optional(),
   prospeccaoEnabled: z.boolean().optional(),
   carteiraEnabled: z.boolean().optional(),
+  posVendaEnabled: z.boolean().optional(),
 });
 
 // Liga/desliga os agentes de IA (módulos) a partir do Hub — só gestor

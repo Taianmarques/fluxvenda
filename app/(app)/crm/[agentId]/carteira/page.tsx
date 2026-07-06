@@ -116,6 +116,8 @@ export default async function CarteiraPage({ params }: { params: Promise<{ agent
         recompraDias: config.recompraDias,
         carteiraInstrucoes: config.carteiraInstrucoes,
         carteiraInativoDias: config.carteiraInativoDias,
+        posVendaPesquisaEnabled: config.posVendaPesquisaEnabled,
+        posVendaReviewLink: config.posVendaReviewLink,
       }}
     />
   );

@@ -607,9 +607,13 @@ model AgentConfig {
 
   // Agente de gestão de carteira: pós-venda e recompra automáticos (via cron /api/cron/carteira)
   carteiraEnabled    Boolean @default(false)
-  posVendaEnabled    Boolean @default(true)  // mensagem após pagamento confirmado
+  // Agente de Pós-venda (independente da carteira): mensagem pós-compra + pesquisa de satisfação
+  posVendaEnabled    Boolean @default(false)
   posVendaDelayHours Int     @default(24)    // horas depois do pagamento
   posVendaMensagem   String  @default("")    // template fixo ({nome} = cliente); vazio = IA gera
+  posVendaPesquisaEnabled Boolean @default(true) // pede nota de 0 a 5 na mensagem de pós-venda
+  posVendaReviewLink      String  @default("")   // link de avaliação (Google) enviado quando a nota é alta
+  posVendaFeedbacks       PosVendaFeedback[]
   recompraEnabled    Boolean @default(true)  // reativação de quem não compra há X dias
   recompraDias       Int     @default(30)
   carteiraInstrucoes String  @default("")    // orientações pra IA (ofertas, tom, cupons)
@@ -651,6 +655,21 @@ model AgentConfig {
   carteiraTouches      CarteiraTouch[]
 
   @@index([teamId])
+}
+
+// Avaliação de satisfação coletada pelo agente de pós-venda
+model PosVendaFeedback {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+  agentConfigId String
+  agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id], onDelete: Cascade)
+
+  contactNumber String
+  contactName   String  @default("")
+  rating        Int     // 0 a 5
+  comment       String  @default("")
+
+  @@index([agentConfigId, createdAt])
 }
 
 // Registro de cada toque automático da gestão de carteira — evita duplicar envios

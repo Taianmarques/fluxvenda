@@ -29,6 +29,8 @@ export type CarteiraConfig = {
   recompraDias: number;
   carteiraInstrucoes: string;
   carteiraInativoDias: number;
+  posVendaPesquisaEnabled: boolean;
+  posVendaReviewLink: string;
 };
 
 export type Nivel = "A" | "B" | "C" | "INATIVO" | "PERDIDO" | "PROSPECTO";
@@ -122,7 +124,7 @@ export function CarteiraClient({ agentId, clientes, initialConfig, isManager, in
   const [cfg, setCfg] = useState<CarteiraConfig>(initialConfig ?? {
     carteiraEnabled: false, posVendaEnabled: true, posVendaDelayHours: 24,
     posVendaMensagem: "", recompraEnabled: true, recompraDias: 30, carteiraInstrucoes: "",
-    carteiraInativoDias: 60,
+    carteiraInativoDias: 60, posVendaPesquisaEnabled: true, posVendaReviewLink: "",
   });
   const [savingCfg, setSavingCfg] = useState(false);
   const [cfgSaved, setCfgSaved] = useState(false);
@@ -373,7 +375,10 @@ export function CarteiraClient({ agentId, clientes, initialConfig, isManager, in
             <div className="border-t border-gray-800 pt-4 space-y-3">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={cfg.posVendaEnabled} onChange={e => setCfg(c => ({ ...c, posVendaEnabled: e.target.checked }))} className="w-4 h-4" />
-                <span className="text-sm font-medium">Pós-venda automático</span>
+                <div>
+                  <span className="text-sm font-medium">Agente de Pós-venda</span>
+                  <p className="text-xs text-gray-500">Agradece após a compra, faz pesquisa de satisfação, escala notas baixas para a equipe e pede avaliação pública nas notas altas. Funciona mesmo com o agente de carteira desligado.</p>
+                </div>
               </label>
               {cfg.posVendaEnabled && (
                 <div className="space-y-3 pl-6">
@@ -397,6 +402,23 @@ export function CarteiraClient({ agentId, clientes, initialConfig, isManager, in
                       maxLength={1000}
                     />
                     <p className="text-xs text-gray-600 mt-0.5">{"{nome}"} vira o primeiro nome do cliente.</p>
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={cfg.posVendaPesquisaEnabled} onChange={e => setCfg(c => ({ ...c, posVendaPesquisaEnabled: e.target.checked }))} className="w-4 h-4" />
+                    <div>
+                      <span className="text-sm">Pesquisa de satisfação (nota de 0 a 5)</span>
+                      <p className="text-xs text-gray-600">Nota ≤ 3 gera alerta interno na conversa para contato humano; nota ≥ 4 dispara o pedido de avaliação pública.</p>
+                    </div>
+                  </label>
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Link de avaliação pública (opcional — ex: Google)</label>
+                    <input
+                      value={cfg.posVendaReviewLink}
+                      onChange={e => setCfg(c => ({ ...c, posVendaReviewLink: e.target.value }))}
+                      placeholder="https://g.page/r/..."
+                      className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+                      maxLength={300}
+                    />
                   </div>
                 </div>
               )}

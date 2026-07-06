@@ -17,8 +17,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Pós-venda é agente próprio; recompra pertence ao agente de carteira
   const configs = await prisma.agentConfig.findMany({
-    where: { active: true, carteiraEnabled: true, uazapiToken: { not: null } },
+    where: {
+      active: true,
+      uazapiToken: { not: null },
+      OR: [{ posVendaEnabled: true }, { carteiraEnabled: true, recompraEnabled: true }],
+    },
   });
 
   let posVendaEnviados = 0;
@@ -59,16 +64,20 @@ export async function POST(req: NextRequest) {
 
         const nome = order.contactName || "cliente";
         const itens = order.items.map(i => `${i.quantity}x ${i.name}`).join(", ");
+        const pedirNota = config.posVendaPesquisaEnabled;
 
         let mensagem: string;
         if (config.posVendaMensagem.trim()) {
           mensagem = config.posVendaMensagem.replaceAll("{nome}", nome.split(" ")[0]);
+          if (pedirNota && !/0 a 5|nota/i.test(mensagem)) {
+            mensagem += "\n\nDe 0 a 5, que nota você dá pra sua experiência com a gente?";
+          }
         } else {
           if (overQuota || !config.systemPrompt) continue;
           const result = await runAgent(
             config.systemPrompt + (config.carteiraInstrucoes ? `\n\nOrientações da gestão de carteira: ${config.carteiraInstrucoes}` : ""),
             [],
-            `[TAREFA DE PÓS-VENDA] O cliente ${nome} comprou e pagou: ${itens}. Escreva UMA mensagem curta de pós-venda no WhatsApp: agradeça a compra, pergunte se está tudo certo com o pedido e se coloque à disposição. Natural e pessoal, sem parecer automática. Responda SÓ com a mensagem.`
+            `[TAREFA DE PÓS-VENDA] O cliente ${nome} comprou e pagou: ${itens}. Escreva UMA mensagem curta de pós-venda no WhatsApp: agradeça a compra, pergunte se está tudo certo com o pedido${pedirNota ? " e peça uma nota de 0 a 5 pra experiência" : ""} e se coloque à disposição. Natural e pessoal, sem parecer automática. Responda SÓ com a mensagem.`
           );
           mensagem = result.reply;
           logTokenUsage({ teamId: config.teamId, provider: "openai", model: "gpt-4o-mini", feature: "carteira_posvenda", ...result.usage });
@@ -88,7 +97,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ─── Recompra: última compra há mais de X dias (e menos de 180) ────────────
-    if (config.recompraEnabled) {
+    if (config.carteiraEnabled && config.recompraEnabled) {
       const cutoff = new Date(Date.now() - config.recompraDias * 86400_000);
       const cutoffAntigo = new Date(Date.now() - 180 * 86400_000);
 

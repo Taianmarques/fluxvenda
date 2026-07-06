@@ -325,6 +325,24 @@ export const COMMERCE_TOOLS = [
   },
 ];
 
+export const POSVENDA_TOOLS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "registrar_avaliacao",
+      description: "Registra a avaliação de satisfação do cliente sobre uma compra/atendimento. Use quando o cliente responder à pesquisa de pós-venda com uma nota (0 a 5) ou der um feedback claro sobre a experiência.",
+      parameters: {
+        type: "object",
+        properties: {
+          nota: { type: "number", description: "Nota de 0 a 5 dada pelo cliente" },
+          comentario: { type: "string", description: "Comentário/feedback do cliente com as próprias palavras dele, se houver" },
+        },
+        required: ["nota"],
+      },
+    },
+  },
+];
+
 export const BILLING_TOOLS = [
   {
     type: "function" as const,

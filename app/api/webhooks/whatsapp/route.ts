@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { runAgent, runAgentWithImage, runAgentWithTools, transcribeAudio, classifyLeadQualified, SCHEDULING_TOOLS, COMMERCE_TOOLS, BILLING_TOOLS, PROSPECTING_TOOLS } from "@/lib/agent-engine";
+import { runAgent, runAgentWithImage, runAgentWithTools, transcribeAudio, classifyLeadQualified, SCHEDULING_TOOLS, COMMERCE_TOOLS, BILLING_TOOLS, PROSPECTING_TOOLS, POSVENDA_TOOLS } from "@/lib/agent-engine";
 import { sendWhatsAppTextAsTeam, sendMediaAsTeam, downloadMessageMedia } from "@/lib/whatsapp";
 import { logTokenUsage, isOverQuota } from "@/lib/token-usage";
 import { getAvailableSlots, isSlotAvailable, formatSlotsForAgent, type AvailabilityRule } from "@/lib/scheduling";
@@ -47,6 +47,13 @@ Quando o cliente quiser agendar algo:
 Você também pode receber, no meio da conversa, um lembrete automático perguntando se o cliente confirma presença num agendamento já marcado:
 - Se o cliente confirmar (ex: "sim", "confirmado", "pode contar comigo"), apenas agradeça brevemente, sem chamar nenhuma ferramenta.
 - Se ele disser que não pode ir ou quer cancelar, use cancelar_agendamento e, na mesma resposta, já ofereça reagendar — pergunte o novo dia/período de preferência (ou, se ele já tiver dito, use consultar_horarios_disponiveis e siga o fluxo normal de agendamento).`;
+}
+
+function buildPosVendaContext(reviewLink: string): string {
+  return `\n\nPÓS-VENDA E SATISFAÇÃO:
+- Após uma compra, o cliente pode receber uma pesquisa de satisfação (nota de 0 a 5). Quando ele responder com uma nota ou der feedback claro sobre a experiência, chame registrar_avaliacao com a nota e o comentário dele.
+- Siga exatamente a orientação que a ferramenta retornar (agradecer, pedir desculpas ou enviar o link de avaliação).
+- Se o cliente relatar problema com o pedido (defeito, atraso, item errado), demonstre empatia, colete os detalhes e registre a avaliação com nota baixa e o problema no comentário — a equipe é avisada automaticamente.${reviewLink ? `\n- Link público de avaliação da empresa: ${reviewLink} — só envie quando a ferramenta orientar (nota alta).` : ""}`;
 }
 
 function buildInstallmentNote(config: {
@@ -384,6 +391,32 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
         return `${r.quantidade}x ${p.name} (R$ ${(preco * r.quantidade).toFixed(2)}${promoTag})`;
       }).join("\n");
       return `Pedido atualizado:\n${resumo}\nTotal: R$ ${total.toFixed(2)}`;
+    }
+
+    if (name === "registrar_avaliacao") {
+      const nota = Math.max(0, Math.min(5, Math.round(Number(args?.nota))));
+      if (!Number.isFinite(nota)) return "Erro: a nota precisa ser um número de 0 a 5.";
+      const comentario = typeof args?.comentario === "string" ? args.comentario.trim() : "";
+
+      await prisma.posVendaFeedback.create({
+        data: { agentConfigId, contactNumber, contactName: contactName ?? "", rating: nota, comment: comentario },
+      });
+
+      if (nota <= 3) {
+        // Nota baixa: registra nota interna pra equipe agir
+        await prisma.message.create({
+          data: {
+            conversationId,
+            role: "note",
+            content: `⚠ Avaliação baixa no pós-venda: nota ${nota}/5${comentario ? ` — "${comentario}"` : ""}. Vale um contato humano.`,
+          },
+        });
+        emitChatEvent(agentConfigId, conversationId);
+        return `Avaliação registrada (nota ${nota}/5). Na SUA RESPOSTA: peça desculpas sinceras pela experiência, agradeça o retorno e diga que um responsável da equipe vai entrar em contato pra resolver. NÃO envie link de avaliação.`;
+      }
+
+      const reviewLink = config.posVendaReviewLink?.trim();
+      return `Avaliação registrada (nota ${nota}/5). Na SUA RESPOSTA: agradeça calorosamente.${reviewLink ? ` Como a nota foi alta, convide o cliente a deixar essa avaliação publicamente e envie o link puro: ${reviewLink}` : ""}`;
     }
 
     if (name === "definir_entrega") {
@@ -825,6 +858,7 @@ export async function POST(req: NextRequest) {
     ...(config.schedulingEnabled ? SCHEDULING_TOOLS : []),
     ...commerceTools,
     ...(config.cobrancaEnabled ? BILLING_TOOLS : []),
+    ...(config.posVendaEnabled ? POSVENDA_TOOLS : []),
     ...(isProspect ? PROSPECTING_TOOLS : []),
   ];
 
@@ -848,6 +882,7 @@ export async function POST(req: NextRequest) {
     const extraContext = (config.schedulingEnabled ? await buildSchedulingContext(config.id, config.requisitosAgendamento || undefined, config.restricoesAgendamento || undefined, { enabled: config.atendimentoEspecialEnabled, descricao: config.atendimentoEspecialDescricao }) : "")
       + (config.commerceEnabled ? await buildCommerceContext(config.id, config) : "")
       + (config.cobrancaEnabled ? await buildBillingContext(config.id, contactNumber) : "")
+      + (config.posVendaEnabled ? buildPosVendaContext(config.posVendaReviewLink) : "")
       + (isProspect ? (await buildProspeccaoContext(config.id, contactNumber) ?? "") : "");
     const result = await runAgentWithTools(
       activeSystemPrompt + extraContext,

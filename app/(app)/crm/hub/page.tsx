@@ -36,7 +36,7 @@ export default async function HubPage() {
   const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
   const amanha = new Date(hoje.getTime() + 86400000);
 
-  const [igConnections, convCounts, orderStats, apptCounts, cobrancaCounts, waStatuses] = await Promise.all([
+  const [igConnections, convCounts, orderStats, apptCounts, cobrancaCounts, feedbackStats, waStatuses] = await Promise.all([
     prisma.instagramConnection.findMany({
       where: { agentConfigId: { in: ids } },
       select: { agentConfigId: true, instagramUsername: true },
@@ -62,6 +62,12 @@ export default async function HubPage() {
       where: { agentConfigId: { in: ids }, status: { in: ["PENDENTE", "BOLETO_GERADO", "VENCIDA"] } },
       _count: { id: true },
     }),
+    prisma.posVendaFeedback.groupBy({
+      by: ["agentConfigId"],
+      where: { agentConfigId: { in: ids }, createdAt: { gte: d30 } },
+      _count: { id: true },
+      _avg: { rating: true },
+    }),
     Promise.all(configs.map(c => c.uazapiToken
       ? getInstanceStatus(c.uazapiToken).catch(() => ({ connected: false }))
       : Promise.resolve({ connected: false })
@@ -73,6 +79,7 @@ export default async function HubPage() {
   const orderByAgent = new Map(orderStats.map(o => [o.agentConfigId, { count: o._count.id, valor: (o._sum.total ?? 0) + (o._sum.deliveryFee ?? 0) }]));
   const apptByAgent = new Map(apptCounts.map(a => [a.agentConfigId, a._count.id]));
   const cobByAgent = new Map(cobrancaCounts.map(c => [c.agentConfigId, c._count.id]));
+  const fbByAgent = new Map(feedbackStats.map(f => [f.agentConfigId, { avg: f._avg.rating, count: f._count.id }]));
 
   const agents: HubAgent[] = configs.map((c, i) => ({
     id: c.id,
@@ -87,12 +94,15 @@ export default async function HubPage() {
     cobrancaEnabled: c.cobrancaEnabled,
     prospeccaoEnabled: c.prospeccaoEnabled,
     carteiraEnabled: c.carteiraEnabled,
+    posVendaEnabled: c.posVendaEnabled,
     metricas: {
       conversas7d: convByAgent.get(c.id) ?? 0,
       vendas30d: orderByAgent.get(c.id)?.valor ?? 0,
       vendas30dCount: orderByAgent.get(c.id)?.count ?? 0,
       agendaHoje: apptByAgent.get(c.id) ?? 0,
       cobrancasAbertas: cobByAgent.get(c.id) ?? 0,
+      avaliacaoMedia: fbByAgent.get(c.id)?.avg ?? null,
+      avaliacoes30d: fbByAgent.get(c.id)?.count ?? 0,
     },
   }));
 

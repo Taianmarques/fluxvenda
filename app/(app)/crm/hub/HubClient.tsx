@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   Headset, Calendar, ShoppingCart, Landmark, Target, Briefcase,
-  MessageCircle, Instagram, Settings, ChevronRight,
+  MessageCircle, Instagram, Settings, ChevronRight, HeartHandshake,
 } from "lucide-react";
 
 export type HubAgent = {
@@ -20,10 +20,11 @@ export type HubAgent = {
   cobrancaEnabled: boolean;
   prospeccaoEnabled: boolean;
   carteiraEnabled: boolean;
-  metricas: { conversas7d: number; vendas30d: number; vendas30dCount: number; agendaHoje: number; cobrancasAbertas: number };
+  posVendaEnabled: boolean;
+  metricas: { conversas7d: number; vendas30d: number; vendas30dCount: number; agendaHoje: number; cobrancasAbertas: number; avaliacaoMedia: number | null; avaliacoes30d: number };
 };
 
-type ModuloKey = "schedulingEnabled" | "commerceEnabled" | "cobrancaEnabled" | "prospeccaoEnabled" | "carteiraEnabled";
+type ModuloKey = "schedulingEnabled" | "commerceEnabled" | "cobrancaEnabled" | "prospeccaoEnabled" | "carteiraEnabled" | "posVendaEnabled";
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -100,9 +101,19 @@ export function HubClient({ agents, isManager }: { agents: HubAgent[]; isManager
       configHref: `/crm/${agent.id}/prospeccao`,
     },
     {
+      key: "posVendaEnabled",
+      nome: "Agente de Pós-venda",
+      desc: "Agradece após cada compra, faz pesquisa de satisfação (0 a 5), escala notas baixas para atendimento humano e pede avaliação no Google nas notas altas.",
+      icon: HeartHandshake,
+      configHref: `/crm/${agent.id}/carteira`,
+      metrica: agent.metricas.avaliacaoMedia !== null
+        ? `nota média ${agent.metricas.avaliacaoMedia.toFixed(1)}/5 (${agent.metricas.avaliacoes30d} avaliação${agent.metricas.avaliacoes30d === 1 ? "" : "ões"} em 30d)`
+        : "sem avaliações ainda",
+    },
+    {
       key: "carteiraEnabled",
       nome: "Agente de Carteira",
-      desc: "Cuida do pós-venda e da recompra: agradece após cada compra, reativa clientes sumidos e classifica a carteira em níveis A/B/C de prioridade.",
+      desc: "Trabalha a recompra: reativa clientes que sumiram citando a última compra e classifica a carteira em níveis A/B/C de prioridade.",
       icon: Briefcase,
       configHref: `/crm/${agent.id}/carteira`,
     },

@@ -13,6 +13,8 @@ const schema = z.object({
   recompraDias: z.number().int().min(3).max(180).optional(),
   carteiraInstrucoes: z.string().max(1000).optional(),
   carteiraInativoDias: z.number().int().refine(v => [15, 30, 60, 90, 120].includes(v)).optional(),
+  posVendaPesquisaEnabled: z.boolean().optional(),
+  posVendaReviewLink: z.string().max(300).optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {
