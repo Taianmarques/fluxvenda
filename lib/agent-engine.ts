@@ -210,7 +210,7 @@ export const SCHEDULING_TOOLS = [
     type: "function" as const,
     function: {
       name: "agendar_horario",
-      description: "Confirma um agendamento numa data e hora específicas, depois que o cliente escolheu um horário dentre os disponíveis retornados por consultar_horarios_disponiveis.",
+      description: "Confirma um agendamento numa data e hora específicas, depois que o cliente escolheu um horário dentre os disponíveis retornados por consultar_horarios_disponiveis. Se o contexto listar informações obrigatórias para confirmar, colete-as ANTES de chamar e passe todas no campo notes.",
       parameters: {
         type: "object",
         properties: {
@@ -218,7 +218,7 @@ export const SCHEDULING_TOOLS = [
           time: { type: "string", description: "Horário no formato HH:mm" },
           service: { type: "string", description: "Nome do serviço escolhido, se aplicável" },
           professional: { type: "string", description: "Nome do profissional escolhido, se aplicável" },
-          notes: { type: "string", description: "Observações sobre o agendamento, se houver" },
+          notes: { type: "string", description: "Observações e informações coletadas do cliente para o agendamento (as obrigatórias do contexto + extras)" },
         },
         required: ["date", "time"],
       },

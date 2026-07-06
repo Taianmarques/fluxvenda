@@ -489,7 +489,7 @@ export function AgendaClient({
                 className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
                 maxLength={500}
               />
-              <p className="text-xs text-gray-500 mt-1">O agente vai pedir essas informações ao cliente antes de confirmar o horário.</p>
+              <p className="text-xs text-gray-500 mt-1">Depois que o cliente escolher a data e o horário, o agente envia uma mensagem pedindo essas informações — e só confirma o agendamento quando o cliente responder.</p>
             </div>
 
             <div>

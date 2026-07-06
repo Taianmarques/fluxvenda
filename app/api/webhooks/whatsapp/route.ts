@@ -35,11 +35,14 @@ async function buildSchedulingContext(agentConfigId: string, requisitosAgendamen
   return `\n\nFERRAMENTAS DE AGENDAMENTO:
 Hoje é ${dateStr} (${weekday}), agora são ${timeStr}. ${selectionNote}
 
-Quando o cliente quiser agendar algo:${requisitosAgendamento ? `\n- Antes de consultar horários, colete as seguintes informações obrigatórias do cliente (se ainda não tiver): ${requisitosAgendamento}` : ""}
+Quando o cliente quiser agendar algo:
 - Pergunte primeiro o dia e período (manhã/tarde/noite) de preferência, se ele não tiver dito.
 - Use a ferramenta consultar_horarios_disponiveis para saber os horários reais — nunca invente ou suponha horários livres.
-- NUNCA liste todos os horários disponíveis de uma vez. Escolha no máximo 2 ou 3 opções relevantes (próximas ao que o cliente pediu) e ofereça de forma curta e natural, como faria pelo WhatsApp.
-- Depois que o cliente escolher um horário, use agendar_horario para confirmar. Só diga que o agendamento foi confirmado depois que essa ferramenta retornar sucesso.${atendimentoEspecial?.enabled ? `\n\nATENDIMENTO ESPECIAL FORA DO HORÁRIO: se o cliente pedir um horário fora da disponibilidade normal e não houver alternativa adequada nos horários disponíveis, informe que é possível verificar um horário especial fora do horário comercial${atendimentoEspecial.descricao ? ` com as seguintes condições: ${atendimentoEspecial.descricao}` : ""}. Deixe claro que esse atendimento especial precisa ser confirmado pela equipe e que você vai registrar o interesse.` : ""}${restricoesAgendamento ? `\n\nRESTRIÇÕES — o que você NÃO deve fazer neste agendamento:\n${restricoesAgendamento}` : ""}
+- NUNCA liste todos os horários disponíveis de uma vez. Escolha no máximo 2 ou 3 opções relevantes (próximas ao que o cliente pediu) e ofereça de forma curta e natural, como faria pelo WhatsApp.${requisitosAgendamento ? `
+- SÓ DEPOIS que o cliente escolher a data e o horário, envie UMA mensagem pedindo as informações necessárias para confirmar o agendamento: ${requisitosAgendamento}. Não pergunte nada disso antes da escolha do horário.
+- Quando o cliente responder com as informações, chame agendar_horario passando tudo no campo "notes". NUNCA confirme o agendamento sem ter coletado essas informações.` : `
+- Depois que o cliente escolher um horário, use agendar_horario para confirmar.`}
+- Só diga que o agendamento foi confirmado depois que a ferramenta agendar_horario retornar sucesso.${atendimentoEspecial?.enabled ? `\n\nATENDIMENTO ESPECIAL FORA DO HORÁRIO: se o cliente pedir um horário fora da disponibilidade normal e não houver alternativa adequada nos horários disponíveis, informe que é possível verificar um horário especial fora do horário comercial${atendimentoEspecial.descricao ? ` com as seguintes condições: ${atendimentoEspecial.descricao}` : ""}. Deixe claro que esse atendimento especial precisa ser confirmado pela equipe e que você vai registrar o interesse.` : ""}${restricoesAgendamento ? `\n\nRESTRIÇÕES — o que você NÃO deve fazer neste agendamento:\n${restricoesAgendamento}` : ""}
 
 Você também pode receber, no meio da conversa, um lembrete automático perguntando se o cliente confirma presença num agendamento já marcado:
 - Se o cliente confirmar (ex: "sim", "confirmado", "pode contar comigo"), apenas agradeça brevemente, sem chamar nenhuma ferramenta.
