@@ -62,7 +62,25 @@ echo "==> 4/8 Parando o app (janela de manutenção)..."
 pm2 stop fluxvenda >/dev/null || true
 
 echo "==> 5/8 Dump do Supabase (pode levar alguns minutos)..."
-pg_dump "$OLD_URL" --schema=public --no-owner --no-privileges -Fc -f "$DUMP_FILE"
+# Senhas com caracteres especiais (@, #, etc.) quebram o parse de URL do pg_dump.
+# Extrai as partes com o parser do Node e conecta via variáveis PG* (sem URL).
+PARSED=$(OLD_URL="$OLD_URL" node -e "
+const u = new URL(process.env.OLD_URL);
+console.log(u.hostname);
+console.log(u.port || '5432');
+console.log(decodeURIComponent(u.username));
+console.log(decodeURIComponent(u.password));
+console.log((u.pathname.split('/')[1] || 'postgres').split('?')[0]);
+")
+PGHOST=$(echo "$PARSED" | sed -n 1p)
+PGPORT=$(echo "$PARSED" | sed -n 2p)
+PGUSER=$(echo "$PARSED" | sed -n 3p)
+PGPASSWORD=$(echo "$PARSED" | sed -n 4p)
+PGDATABASE=$(echo "$PARSED" | sed -n 5p)
+export PGHOST PGPORT PGUSER PGPASSWORD PGDATABASE
+echo "    Conectando em $PGHOST:$PGPORT/$PGDATABASE como $PGUSER..."
+pg_dump --schema=public --no-owner --no-privileges -Fc -f "$DUMP_FILE"
+unset PGHOST PGPORT PGUSER PGPASSWORD PGDATABASE
 echo "    Dump salvo em $DUMP_FILE ($(du -h "$DUMP_FILE" | cut -f1))"
 
 echo "==> 6/8 Restore no banco local..."
