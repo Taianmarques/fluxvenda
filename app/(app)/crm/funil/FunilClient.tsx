@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Filter, Inbox, Megaphone, Trophy, Users, Star, RefreshCw, Heart } from "lucide-react";
+import { Filter, Inbox, Megaphone, Users } from "lucide-react";
 
 export type FunilPipeline = {
   id: string;
@@ -31,27 +31,33 @@ type Origem = "todos" | "inbound" | "outbound";
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-function Barra({ count, max, color, label, sub, icon: Icon, minPct = 10 }: {
-  count: number; max: number; color: string; label: string; sub?: string;
-  icon?: typeof Trophy; minPct?: number;
+const AZUL = "#3b82f6";
+const VERDE = "#22c55e";
+
+type LinhaFunil = { id: string; nome: string; count: number; sub?: string };
+
+// Fatia trapezoidal do funil — as larguras (top/bottom em %) desenham o triângulo
+function Fatia({ wTop, wBot, color, count, label, sub, labelSide }: {
+  wTop: number; wBot: number; color: string; count: number;
+  label: string; sub?: string; labelSide: "left" | "right";
 }) {
-  const largura = Math.max(minPct, (count / Math.max(1, max)) * 100);
+  const clip = `polygon(${(100 - wTop) / 2}% 0, ${(100 + wTop) / 2}% 0, ${(100 + wBot) / 2}% 100%, ${(100 - wBot) / 2}% 100%)`;
+  const labelEl = (
+    <div className={`w-28 md:w-40 flex-shrink-0 ${labelSide === "right" ? "text-left pl-2" : "text-right pr-2"}`}>
+      <p className="text-xs font-semibold leading-tight">{label}</p>
+      {sub && <p className="text-[10px] text-gray-500 leading-tight">{sub}</p>}
+    </div>
+  );
   return (
-    <div className="flex items-center gap-3">
-      <div className="w-32 md:w-44 flex-shrink-0 text-right">
-        <p className="text-xs font-medium truncate flex items-center justify-end gap-1">
-          {Icon && <Icon size={10} style={{ color }} />}{label}
-        </p>
-        {sub && <p className="text-[10px] text-gray-500">{sub}</p>}
-      </div>
-      <div className="flex-1 flex justify-center">
-        <div
-          className="h-8 rounded-lg flex items-center justify-center transition-all"
-          style={{ width: `${largura}%`, backgroundColor: `${color}45`, border: `1px solid ${color}90` }}
-        >
-          <span className="text-xs font-bold">{count}</span>
+    <div className="flex items-center mb-1">
+      {labelSide === "left" ? labelEl : <div className="w-28 md:w-40 flex-shrink-0" />}
+      <div className="flex-1 relative h-10 md:h-11">
+        <div className="absolute inset-0" style={{ clipPath: clip, backgroundColor: color }} />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-sm font-bold text-white drop-shadow">{count}</span>
         </div>
       </div>
+      {labelSide === "right" ? labelEl : <div className="w-28 md:w-40 flex-shrink-0" />}
     </div>
   );
 }
@@ -74,7 +80,6 @@ export function FunilClient({ pipelines, leads, opportunities, compras, feedback
     const conversationIds = new Set(leadsFiltrados.map(l => l.conversationId));
     const contatos = new Set(leadsFiltrados.map(l => l.contactNumber));
 
-    // ── Metade de cima: aquisição ────────────────────────────────────────────
     const oppsFiltradas = opportunities.filter(o => conversationIds.has(o.conversationId));
     const porEtapa = new Map<string, { count: number; valor: number }>();
     let ganhos = 0;
@@ -87,7 +92,6 @@ export function FunilClient({ pipelines, leads, opportunities, compras, feedback
       porEtapa.set(o.stageId, cur);
     }
 
-    // ── Metade de baixo: retenção e expansão ─────────────────────────────────
     const comprasPorContato = new Map<string, { count: number; valor: number }>();
     for (const c of compras) {
       if (!contatos.has(c.contactNumber)) continue;
@@ -120,19 +124,29 @@ export function FunilClient({ pipelines, leads, opportunities, compras, feedback
     };
   }, [leads, opportunities, compras, feedbacks, origem]);
 
-  const topo = useMemo(() => {
+  const linhasTopo: LinhaFunil[] = useMemo(() => {
     if (!pipeline) return [];
     return [
-      { id: "__leads__", nome: "Leads (conversas)", color: "#6b7280", count: dados.totalLeads, valor: null as number | null },
+      { id: "__leads__", nome: "Leads", count: dados.totalLeads },
       ...pipeline.stages.map(s => {
         const d = dados.porEtapa.get(s.id) ?? { count: 0, valor: 0 };
-        return { id: s.id, nome: s.name, color: s.color, count: d.count, valor: d.valor };
+        return { id: s.id, nome: s.name, count: d.count, sub: d.valor > 0 ? brl(d.valor) : undefined };
       }),
     ];
   }, [pipeline, dados]);
 
-  const maxTopo = Math.max(1, ...topo.map(l => l.count), dados.ganhos);
-  const maxBaixo = Math.max(1, dados.compraram, dados.avaliaram, dados.recompraram, dados.fieis);
+  const linhasBaixo: LinhaFunil[] = [
+    { id: "compraram", nome: "Retenção", count: dados.compraram, sub: `compraram${dados.receitaTotal > 0 ? ` · ${brl(dados.receitaTotal)}` : ""}` },
+    { id: "avaliaram", nome: "Satisfação", count: dados.avaliaram, sub: dados.notaMedia !== null ? `nota média ${dados.notaMedia.toFixed(1)}/5` : "avaliaram no pós-venda" },
+    { id: "recompraram", nome: "Lealdade", count: dados.recompraram, sub: "recompraram (2+)" },
+    { id: "fieis", nome: "Indicação", count: dados.fieis, sub: "clientes fiéis (3+)" },
+  ];
+
+  // Larguras do desenho: topo afunila de 100% até 26%; base abre de 26% até 100%
+  const W_MAX = 100, W_MIN = 26;
+  const wTopo = (i: number) => W_MAX - ((W_MAX - W_MIN) * i) / Math.max(1, linhasTopo.length);
+  const wBaixo = (i: number) => W_MIN + ((W_MAX - W_MIN) * i) / Math.max(1, linhasBaixo.length);
+
   const conversaoGeral = dados.totalLeads > 0 ? (dados.compraram / dados.totalLeads) * 100 : 0;
   const taxaRecompra = dados.compraram > 0 ? (dados.recompraram / dados.compraram) * 100 : 0;
 
@@ -142,9 +156,9 @@ export function FunilClient({ pipelines, leads, opportunities, compras, feedback
         <div>
           <p className="text-gray-400 text-sm">Atendimento</p>
           <h1 className="text-2xl md:text-3xl font-bold mt-1 flex items-center gap-2">
-            <Filter size={26} className="text-blue-400" /> Funil ampulheta
+            <Filter size={26} className="text-blue-400" /> Funil
           </h1>
-          <p className="text-sm text-gray-500 mt-1">Aquisição em cima, compra no meio, retenção e expansão embaixo.</p>
+          <p className="text-sm text-gray-500 mt-1">Ampulheta: aquisição em cima, venda no meio, retenção e expansão embaixo.</p>
         </div>
 
         {/* Origem */}
@@ -196,71 +210,54 @@ export function FunilClient({ pipelines, leads, opportunities, compras, feedback
             </Link>
           </div>
         ) : (
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
-            {/* ── Metade de cima: AQUISIÇÃO (afunila) ── */}
-            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-3">Aquisição</p>
-            <div className="space-y-2">
-              {topo.map((linha, i) => {
-                const anterior = i > 0 ? topo[i - 1] : null;
-                const conversao = anterior && anterior.count > 0 ? (linha.count / anterior.count) * 100 : null;
-                return (
-                  <div key={linha.id}>
-                    {conversao !== null && <p className="text-[10px] text-gray-600 text-center mb-1">↓ {conversao.toFixed(0)}%</p>}
-                    <Barra
-                      count={linha.count}
-                      max={maxTopo}
-                      color={linha.color}
-                      label={linha.nome}
-                      sub={linha.valor !== null && linha.valor > 0 ? brl(linha.valor) : undefined}
-                    />
-                  </div>
-                );
-              })}
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 md:p-8">
+            {/* Triângulo invertido — aquisição */}
+            <div>
+              {linhasTopo.map((linha, i) => (
+                <Fatia
+                  key={linha.id}
+                  wTop={wTopo(i)}
+                  wBot={wTopo(i + 1)}
+                  color={AZUL}
+                  count={linha.count}
+                  label={linha.nome}
+                  sub={linha.sub}
+                  labelSide="right"
+                />
+              ))}
             </div>
 
-            {/* ── Gargalo central: COMPRA ── */}
-            <div className="my-4 flex items-center gap-3">
-              <div className="flex-1 border-t border-dashed border-gray-700" />
-              <div className="bg-green-900/40 border border-green-700 rounded-full px-4 py-1.5 flex items-center gap-2">
-                <Trophy size={13} className="text-green-400" />
-                <span className="text-xs font-bold text-green-300">
-                  {dados.ganhos} negócio{dados.ganhos === 1 ? "" : "s"} ganho{dados.ganhos === 1 ? "" : "s"}
-                  {dados.ganhoValor > 0 && ` · ${brl(dados.ganhoValor)}`}
-                </span>
-              </div>
-              <div className="flex-1 border-t border-dashed border-gray-700" />
+            {/* Venda / Conversão */}
+            <div className="my-3 flex items-center gap-3">
+              <div className="flex-1 border-t border-dashed border-gray-600" />
+              <span className="text-xs font-semibold text-gray-300">
+                Venda / Conversão
+                <span className="text-gray-500 font-normal"> — {dados.ganhos} ganho{dados.ganhos === 1 ? "" : "s"}{dados.ganhoValor > 0 ? ` · ${brl(dados.ganhoValor)}` : ""}</span>
+              </span>
+              <div className="flex-1 border-t border-dashed border-gray-600" />
             </div>
 
-            {/* ── Metade de baixo: RETENÇÃO E EXPANSÃO ── */}
-            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-3">Retenção e expansão</p>
-            <div className="space-y-2">
-              <Barra
-                count={dados.compraram} max={maxBaixo} color="#22c55e"
-                label="Clientes que compraram" icon={Users}
-                sub={dados.receitaTotal > 0 ? brl(dados.receitaTotal) : undefined}
-              />
-              <Barra
-                count={dados.avaliaram} max={maxBaixo} color="#a855f7"
-                label="Avaliaram (pós-venda)" icon={Star}
-                sub={dados.notaMedia !== null ? `nota média ${dados.notaMedia.toFixed(1)}/5` : undefined}
-              />
-              <Barra
-                count={dados.recompraram} max={maxBaixo} color="#3b82f6"
-                label="Recompraram (2+)" icon={RefreshCw}
-                sub={dados.compraram > 0 ? `${taxaRecompra.toFixed(0)}% dos clientes` : undefined}
-              />
-              <Barra
-                count={dados.fieis} max={maxBaixo} color="#f59e0b"
-                label="Fiéis (3+ compras)" icon={Heart}
-              />
+            {/* Pirâmide — retenção e expansão */}
+            <div>
+              {linhasBaixo.map((linha, i) => (
+                <Fatia
+                  key={linha.id}
+                  wTop={wBaixo(i)}
+                  wBot={wBaixo(i + 1)}
+                  color={VERDE}
+                  count={linha.count}
+                  label={linha.nome}
+                  sub={linha.sub}
+                  labelSide="left"
+                />
+              ))}
             </div>
           </div>
         )}
 
         <p className="text-xs text-gray-600">
-          A metade de cima mostra a jornada até a compra (etapas do pipeline). A de baixo mostra o que acontece depois:
-          quem comprou, quem avaliou no pós-venda, quem voltou a comprar e quem virou cliente fiel — alimentada pelos
-          agentes de Pós-venda e Recompra. Inbound = chegou pelos canais; Outbound = abordado pela prospecção.
+          Descoberta → decisão nas etapas do seu pipeline; depois da venda, a base verde mostra retenção (compraram),
+          satisfação (pós-venda), lealdade (recompra) e indicação (fiéis). Inbound = chegou pelos canais; Outbound = prospecção ativa.
         </p>
       </div>
     </div>
