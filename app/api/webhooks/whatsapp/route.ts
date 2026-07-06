@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { runAgent, runAgentWithImage, runAgentWithTools, transcribeAudio, classifyLeadQualified, SCHEDULING_TOOLS, COMMERCE_TOOLS, BILLING_TOOLS, PROSPECTING_TOOLS, POSVENDA_TOOLS, PIPELINE_TOOLS } from "@/lib/agent-engine";
+import { runAgent, runAgentWithImage, runAgentWithTools, transcribeAudio, classifyLeadQualified, SCHEDULING_TOOLS, COMMERCE_TOOLS, BILLING_TOOLS, PROSPECTING_TOOLS, POSVENDA_TOOLS, PIPELINE_TOOLS, DEPARTAMENTO_TOOLS } from "@/lib/agent-engine";
 import { sendWhatsAppTextAsTeam, sendMediaAsTeam, downloadMessageMedia } from "@/lib/whatsapp";
 import { logTokenUsage, isOverQuota } from "@/lib/token-usage";
 import { getAvailableSlots, isSlotAvailable, formatSlotsForAgent, type AvailabilityRule } from "@/lib/scheduling";
@@ -47,6 +47,18 @@ Quando o cliente quiser agendar algo:
 Você também pode receber, no meio da conversa, um lembrete automático perguntando se o cliente confirma presença num agendamento já marcado:
 - Se o cliente confirmar (ex: "sim", "confirmado", "pode contar comigo"), apenas agradeça brevemente, sem chamar nenhuma ferramenta.
 - Se ele disser que não pode ir ou quer cancelar, use cancelar_agendamento e, na mesma resposta, já ofereça reagendar — pergunte o novo dia/período de preferência (ou, se ele já tiver dito, use consultar_horarios_disponiveis e siga o fluxo normal de agendamento).`;
+}
+
+// Lista os departamentos humanos e ensina o agente a transferir quando o assunto exigir
+function buildDepartamentosContext(departamentos: { nome: string; descricao: string }[]): string {
+  const lista = departamentos
+    .map(d => `- ${d.nome}${d.descricao ? `: ${d.descricao}` : ""}`)
+    .join("\n");
+  return `\n\nDEPARTAMENTOS HUMANOS (transferência):
+${lista}
+- Se o cliente pedir para falar com um setor/humano, ou o assunto for claramente de um departamento acima e você não conseguir resolver, chame transferir_departamento com o nome exato e um resumo do que ele precisa.
+- Antes de transferir, avise o cliente com naturalidade (ex: "vou te passar para o nosso financeiro, um instante").
+- NÃO transfira por qualquer coisa — só quando o atendimento humano daquele setor for realmente necessário.`;
 }
 
 // Lista as etapas do funil e ensina o agente a mover o lead conforme a conversa evolui.
@@ -418,6 +430,57 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
         return `${r.quantidade}x ${p.name} (R$ ${(preco * r.quantidade).toFixed(2)}${promoTag})`;
       }).join("\n");
       return `Pedido atualizado:\n${resumo}\nTotal: R$ ${total.toFixed(2)}`;
+    }
+
+    if (name === "transferir_departamento") {
+      const depNome = typeof args?.departamento === "string" ? args.departamento.trim() : "";
+      if (!depNome) return "Erro: informe o departamento de destino.";
+      const motivo = typeof args?.motivo === "string" ? args.motivo.trim() : "";
+
+      const departamentos = await prisma.departamento.findMany({
+        where: { teamId: config.teamId },
+        include: { membros: { select: { profileId: true, profile: { select: { name: true } } } } },
+      });
+      const lower = depNome.toLowerCase();
+      const dep = departamentos.find(d => d.nome.toLowerCase() === lower)
+        ?? departamentos.find(d => d.nome.toLowerCase().includes(lower) || lower.includes(d.nome.toLowerCase()));
+      if (!dep) return `Erro: departamento "${depNome}" não existe. Disponíveis: ${departamentos.map(d => d.nome).join(", ")}.`;
+
+      // Atribui ao atendente menos ocupado do departamento (conversas ativas atribuídas)
+      let assignedToId: string | null = null;
+      let assignedName = "";
+      if (dep.membros.length > 0) {
+        const cargas = await Promise.all(dep.membros.map(async m => ({
+          profileId: m.profileId,
+          name: m.profile.name,
+          abertas: await prisma.conversation.count({
+            where: { agentConfigId, assignedToId: m.profileId, status: { not: "FINALIZADO" } },
+          }),
+        })));
+        cargas.sort((a, b) => a.abertas - b.abertas);
+        assignedToId = cargas[0].profileId;
+        assignedName = cargas[0].name;
+      }
+
+      await prisma.conversation.update({
+        where: { id: conversationId },
+        data: {
+          departamentoId: dep.id,
+          humanTakeover: true,
+          status: "ATIVO",
+          ...(assignedToId ? { assignedToId } : {}),
+        },
+      });
+      await prisma.message.create({
+        data: {
+          conversationId,
+          role: "note",
+          content: `Transferida pela IA para o departamento "${dep.nome}"${assignedName ? ` — atribuída a ${assignedName}` : " (sem atendente no setor ainda)"}${motivo ? `. Motivo: ${motivo}` : ""}.`,
+        },
+      });
+      emitChatEvent(agentConfigId, conversationId);
+
+      return `Conversa transferida para "${dep.nome}"${assignedName ? ` (atendente: ${assignedName})` : ""}. Na SUA RESPOSTA, avise o cliente com naturalidade que o setor vai atendê-lo em instantes. Depois desta mensagem você para de responder — o atendimento é humano a partir daqui.`;
     }
 
     if (name === "mover_etapa_funil") {
@@ -926,12 +989,18 @@ export async function POST(req: NextRequest) {
   const isProspect = config.prospeccaoEnabled
     ? await prisma.prospect.findFirst({ where: { agentConfigId: config.id, telefone: contactNumber, status: { in: ["ABORDADO", "RESPONDEU"] } } })
     : null;
+  const departamentos = await prisma.departamento.findMany({
+    where: { teamId: config.teamId },
+    select: { nome: true, descricao: true },
+  });
+
   const tools = [
     ...(config.schedulingEnabled ? SCHEDULING_TOOLS : []),
     ...commerceTools,
     ...(config.cobrancaEnabled ? BILLING_TOOLS : []),
     ...(config.posVendaEnabled ? POSVENDA_TOOLS : []),
     ...(config.pipelineAutoAvancar ? PIPELINE_TOOLS : []),
+    ...(departamentos.length > 0 ? DEPARTAMENTO_TOOLS : []),
     ...(isProspect ? PROSPECTING_TOOLS : []),
   ];
 
@@ -977,6 +1046,7 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
       + (config.cobrancaEnabled ? await buildBillingContext(config.id, contactNumber) : "")
       + (config.posVendaEnabled ? buildPosVendaContext(config.posVendaReviewLink) : "")
       + (config.pipelineAutoAvancar ? await buildPipelineContext(config.id, conversation.id) : "")
+      + (departamentos.length > 0 ? buildDepartamentosContext(departamentos) : "")
       + (isProspect ? (await buildProspeccaoContext(config.id, contactNumber) ?? "") : "");
     const result = await runAgentWithTools(
       activeSystemPrompt + extraContext,

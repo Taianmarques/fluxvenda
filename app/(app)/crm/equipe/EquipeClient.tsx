@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { UserPlus, Copy, Check, Crown, User, Trash2, MessageCircle } from "lucide-react";
+import { UserPlus, Copy, Check, Crown, User, Trash2, MessageCircle, Building2, Plus, X } from "lucide-react";
 
 type Membro = {
   memberId: string;
@@ -10,19 +10,59 @@ type Membro = {
   name: string;
   email: string;
   joinedAt: string;
+  departamentoId: string | null;
 };
 
-export function EquipeClient({ teamName, isManager, inviteLink, manager, members, currentUserId }: {
+type Departamento = { id: string; nome: string; descricao: string };
+
+export function EquipeClient({ teamName, isManager, inviteLink, manager, members, departamentos, currentUserId }: {
   teamName: string;
   isManager: boolean;
   inviteLink: string | null;
   manager: { id: string; name: string; email: string };
   members: Membro[];
+  departamentos: Departamento[];
   currentUserId: string;
 }) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
+
+  // Departamentos
+  const [showNovoDep, setShowNovoDep] = useState(false);
+  const [depNome, setDepNome] = useState("");
+  const [depDescricao, setDepDescricao] = useState("");
+  const [salvandoDep, setSalvandoDep] = useState(false);
+
+  async function handleCriarDepartamento() {
+    if (!depNome.trim()) return;
+    setSalvandoDep(true);
+    try {
+      const res = await fetch(`/api/equipe/departamentos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nome: depNome.trim(), descricao: depDescricao.trim() }),
+      });
+      if (res.ok) { setDepNome(""); setDepDescricao(""); setShowNovoDep(false); router.refresh(); }
+    } finally {
+      setSalvandoDep(false);
+    }
+  }
+
+  async function handleExcluirDepartamento(d: Departamento) {
+    if (!confirm(`Excluir o departamento "${d.nome}"? Membros e conversas dele ficam sem departamento.`)) return;
+    await fetch(`/api/equipe/departamentos/${d.id}`, { method: "DELETE" });
+    router.refresh();
+  }
+
+  async function handleSetDepartamento(memberId: string, departamentoId: string) {
+    await fetch(`/api/equipe/membros/${memberId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ departamentoId: departamentoId || null }),
+    });
+    router.refresh();
+  }
 
   function copyLink() {
     if (!inviteLink) return;
@@ -93,6 +133,75 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
           </div>
         )}
 
+        {/* Departamentos */}
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <p className="font-semibold text-sm flex items-center gap-1.5"><Building2 size={15} className="text-blue-400" /> Departamentos</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                A IA transfere a conversa para o departamento certo com base na descrição do que cada um atende.
+              </p>
+            </div>
+            {isManager && (
+              <button
+                onClick={() => setShowNovoDep(s => !s)}
+                className="flex items-center gap-1 text-xs font-medium text-blue-400 hover:text-blue-300 border border-blue-800/50 hover:border-blue-600/50 rounded-lg px-3 py-1.5 transition-colors"
+              >
+                <Plus size={12} /> Novo departamento
+              </button>
+            )}
+          </div>
+
+          {showNovoDep && isManager && (
+            <div className="bg-gray-950 border border-gray-800 rounded-xl p-3 space-y-2">
+              <input
+                value={depNome}
+                onChange={e => setDepNome(e.target.value)}
+                placeholder="Nome (ex: Financeiro, Suporte, Vendas...)"
+                className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm"
+                maxLength={40}
+              />
+              <input
+                value={depDescricao}
+                onChange={e => setDepDescricao(e.target.value)}
+                placeholder="O que esse setor atende (a IA usa isso pra decidir a transferência)"
+                className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm"
+                maxLength={300}
+              />
+              <div className="flex gap-2">
+                <button onClick={handleCriarDepartamento} disabled={salvandoDep || !depNome.trim()} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium">
+                  {salvandoDep ? "Criando..." : "Criar"}
+                </button>
+                <button onClick={() => setShowNovoDep(false)} className="text-xs text-gray-400 hover:text-gray-200 px-2">Cancelar</button>
+              </div>
+            </div>
+          )}
+
+          {departamentos.length === 0 ? (
+            <p className="text-xs text-gray-600">Nenhum departamento ainda. Sem departamentos, a IA não oferece transferência por setor.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {departamentos.map(d => (
+                <div key={d.id} className="flex items-center gap-3 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2.5">
+                  <Building2 size={14} className="text-gray-500 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{d.nome}</p>
+                    {d.descricao && <p className="text-xs text-gray-500 truncate">{d.descricao}</p>}
+                  </div>
+                  <span className="text-[10px] text-gray-500 flex-shrink-0">
+                    {members.filter(m => m.departamentoId === d.id).length} membro{members.filter(m => m.departamentoId === d.id).length === 1 ? "" : "s"}
+                  </span>
+                  {isManager && (
+                    <button onClick={() => handleExcluirDepartamento(d)} className="text-gray-600 hover:text-red-400 flex-shrink-0">
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Lista de membros */}
         <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
           <p className="font-semibold p-5 pb-3">
@@ -129,9 +238,21 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
                     {m.email} · entrou em {new Date(m.joinedAt).toLocaleDateString("pt-BR")}
                   </p>
                 </div>
-                <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-blue-900/40 text-blue-300 border border-blue-800/50 flex-shrink-0">
-                  Atendente
-                </span>
+                {isManager && departamentos.length > 0 ? (
+                  <select
+                    value={m.departamentoId ?? ""}
+                    onChange={e => handleSetDepartamento(m.memberId, e.target.value)}
+                    className="text-xs bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 flex-shrink-0 max-w-[130px]"
+                    title="Departamento do atendente"
+                  >
+                    <option value="">Sem departamento</option>
+                    {departamentos.map(d => <option key={d.id} value={d.id}>{d.nome}</option>)}
+                  </select>
+                ) : (
+                  <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-blue-900/40 text-blue-300 border border-blue-800/50 flex-shrink-0">
+                    {departamentos.find(d => d.id === m.departamentoId)?.nome ?? "Atendente"}
+                  </span>
+                )}
                 {isManager && (
                   <button
                     onClick={() => handleRemove(m)}

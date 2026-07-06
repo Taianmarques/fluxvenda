@@ -480,6 +480,7 @@ model Team {
   monthlyTokenLimit Int?
 
   members        TeamMember[]
+  departamentos  Departamento[]
   goals          Goal[]
   announcements  Announcement[]
   agentConfigs   AgentConfig[]
@@ -494,7 +495,28 @@ model TeamMember {
   profile   Profile  @relation(fields: [profileId], references: [id])
   joinedAt  DateTime @default(now())
 
+  departamentoId String?
+  departamento   Departamento? @relation(fields: [departamentoId], references: [id], onDelete: SetNull)
+
   @@unique([teamId, profileId])
+}
+
+// Departamento da equipe (Vendas, Suporte, Financeiro...) — a IA transfere conversas
+// para o departamento certo com base na descrição do que cada um atende
+model Departamento {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  teamId String
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  nome      String
+  descricao String @default("") // o que esse departamento atende — a IA usa pra rotear
+
+  membros       TeamMember[]
+  conversations Conversation[]
+
+  @@index([teamId])
 }
 
 model Goal {
@@ -1059,6 +1081,10 @@ model Conversation {
   // Nível manual da carteira ("A"|"B"|"C"|"INATIVO"|"PERDIDO") — null = calculado automaticamente.
   // Usado p.ex. quando o cliente informa que passou a comprar de outro fornecedor (PERDIDO).
   nivelCarteira String?
+
+  // Departamento responsável pela conversa (setado pela IA na transferência ou manualmente)
+  departamentoId String?
+  departamento   Departamento? @relation(fields: [departamentoId], references: [id], onDelete: SetNull)
 
   // Atendente responsável por essa conversa — null = ainda não atribuída (qualquer atendente
   // pode ver e assumir). Quem atribui/quando depende do leadDistributionMode do AgentConfig.

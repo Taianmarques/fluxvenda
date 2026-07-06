@@ -37,6 +37,7 @@ export default async function EquipeCrmPage({ params }: { params: Promise<{ agen
         include: { profile: { select: { id: true, name: true, email: true } } },
         orderBy: { joinedAt: "asc" },
       },
+      departamentos: { orderBy: { createdAt: "asc" }, select: { id: true, nome: true, descricao: true } },
     },
   });
 
@@ -56,7 +57,9 @@ export default async function EquipeCrmPage({ params }: { params: Promise<{ agen
         name: m.profile.name,
         email: m.profile.email,
         joinedAt: m.joinedAt.toISOString(),
+        departamentoId: m.departamentoId,
       }))}
+      departamentos={team.departamentos}
       currentUserId={user.id}
     />
   );

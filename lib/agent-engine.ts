@@ -325,6 +325,24 @@ export const COMMERCE_TOOLS = [
   },
 ];
 
+export const DEPARTAMENTO_TOOLS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "transferir_departamento",
+      description: "Transfere a conversa para um departamento humano da empresa quando o assunto exige (use as descrições dos departamentos no contexto). Após transferir, o agente de IA para de responder e um atendente do setor assume.",
+      parameters: {
+        type: "object",
+        properties: {
+          departamento: { type: "string", description: "Nome EXATO do departamento, igual à lista do contexto" },
+          motivo: { type: "string", description: "Resumo em uma frase do que o cliente precisa (o atendente lê isso)" },
+        },
+        required: ["departamento"],
+      },
+    },
+  },
+];
+
 export const PIPELINE_TOOLS = [
   {
     type: "function" as const,
