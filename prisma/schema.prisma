@@ -613,6 +613,7 @@ model AgentConfig {
   recompraEnabled    Boolean @default(true)  // reativação de quem não compra há X dias
   recompraDias       Int     @default(30)
   carteiraInstrucoes String  @default("")    // orientações pra IA (ofertas, tom, cupons)
+  carteiraInativoDias Int    @default(60)    // dias sem compra para nível INATIVO (15/30/60/90/120)
 
   // Identidade visual do catálogo público (/loja) — logo base64 como as fotos de produto
   storeLogoBase64   String? @db.Text
@@ -996,6 +997,10 @@ model Conversation {
 
   leadStatusId String?
   leadStatus   LeadStatus? @relation(fields: [leadStatusId], references: [id], onDelete: SetNull)
+
+  // Nível manual da carteira ("A"|"B"|"C"|"INATIVO"|"PERDIDO") — null = calculado automaticamente.
+  // Usado p.ex. quando o cliente informa que passou a comprar de outro fornecedor (PERDIDO).
+  nivelCarteira String?
 
   // Atendente responsável por essa conversa — null = ainda não atribuída (qualquer atendente
   // pode ver e assumir). Quem atribui/quando depende do leadDistributionMode do AgentConfig.

@@ -8,6 +8,7 @@ export type CarteiraCliente = {
   contactNumber: string;
   contactName: string | null;
   conversationId: string;
+  nivelManual: string | null; // override manual ("A".."PERDIDO") — null = automático
   lastContactAt: string; // ISO
   assignedToName: string | null;
   leadStatusName: string | null;
@@ -27,11 +28,25 @@ export type CarteiraConfig = {
   recompraEnabled: boolean;
   recompraDias: number;
   carteiraInstrucoes: string;
+  carteiraInativoDias: number;
+};
+
+export type Nivel = "A" | "B" | "C" | "INATIVO" | "PERDIDO" | "PROSPECTO";
+
+export const NIVEL_META: Record<Nivel, { label: string; badge: string; desc: string }> = {
+  A: { label: "A", badge: "bg-emerald-900/50 text-emerald-300 border-emerald-700", desc: "Alto potencial: recorrente + ticket alto. Prioridade máxima" },
+  B: { label: "B", badge: "bg-blue-900/50 text-blue-300 border-blue-700", desc: "Compra média com boa frequência. Pode crescer com ofertas" },
+  C: { label: "C", badge: "bg-gray-800 text-gray-300 border-gray-600", desc: "Baixa frequência ou ticket. Precisa ser ativado/educado" },
+  INATIVO: { label: "Inativo", badge: "bg-amber-900/50 text-amber-300 border-amber-700", desc: "Sem compra há mais tempo que o limite configurado" },
+  PERDIDO: { label: "Perdido", badge: "bg-red-900/50 text-red-300 border-red-700", desc: "Sem compra há +180 dias ou foi para outro fornecedor" },
+  PROSPECTO: { label: "Nunca comprou", badge: "bg-violet-900/50 text-violet-300 border-violet-700", desc: "Está na carteira mas ainda não converteu" },
 };
 
 type Periodo = "hoje" | "7d" | "15d" | "30d" | "60d" | "90d" | "mes_atual" | "mes_anterior" | "custom";
 type Segmento = "todos" | "compraram" | "nao_compraram" | "reduziram" | "aumentaram" | "orcamento" | "sem_contato" | "followup";
-type Ordem = "recentes" | "valor" | "valor_periodo";
+type Ordem = "recentes" | "valor" | "valor_periodo" | "prioridade";
+
+const NIVEL_ORDEM: Record<Nivel, number> = { A: 0, B: 1, C: 2, INATIVO: 3, PROSPECTO: 4, PERDIDO: 5 };
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const isIg = (n: string) => n.startsWith("ig_");
@@ -86,11 +101,12 @@ function sumCompras(c: CarteiraCliente, start: Date, end: Date): number {
   return s;
 }
 
-export function CarteiraClient({ agentId, clientes, initialConfig, isManager }: {
+export function CarteiraClient({ agentId, clientes, initialConfig, isManager, inativoDias }: {
   agentId: string;
   clientes: CarteiraCliente[];
   initialConfig?: CarteiraConfig;
   isManager?: boolean;
+  inativoDias?: number;
 }) {
   const [search, setSearch] = useState("");
   const [periodo, setPeriodo] = useState<Periodo>("30d");
@@ -98,12 +114,15 @@ export function CarteiraClient({ agentId, clientes, initialConfig, isManager }: 
   const [customEnd, setCustomEnd] = useState("");
   const [segmento, setSegmento] = useState<Segmento>("todos");
   const [ordem, setOrdem] = useState<Ordem>("recentes");
+  const [nivelFiltro, setNivelFiltro] = useState<Nivel | "todos">("todos");
+  const [niveisManuais, setNiveisManuais] = useState<Record<string, string | null>>({});
 
   // Configuração do agente de carteira
   const [showConfig, setShowConfig] = useState(false);
   const [cfg, setCfg] = useState<CarteiraConfig>(initialConfig ?? {
     carteiraEnabled: false, posVendaEnabled: true, posVendaDelayHours: 24,
     posVendaMensagem: "", recompraEnabled: true, recompraDias: 30, carteiraInstrucoes: "",
+    carteiraInativoDias: 60,
   });
   const [savingCfg, setSavingCfg] = useState(false);
   const [cfgSaved, setCfgSaved] = useState(false);
@@ -129,22 +148,71 @@ export function CarteiraClient({ agentId, clientes, initialConfig, isManager }: 
     totalComprado: number;
     pedidos: number;
     lastPurchaseAt: string | null;
+    valor180: number;
+    freq180: number;
+    nivel: Nivel;
   };
 
-  const calc: ClienteCalc[] = useMemo(() => clientes.map(c => {
-    const totalComprado = c.compras.reduce((s, x) => s + x.valor, 0);
-    const lastPurchaseAt = c.compras.length > 0
-      ? c.compras.reduce((max, x) => (x.at > max ? x.at : max), c.compras[0].at)
-      : null;
-    return {
-      ...c,
-      valorPeriodo: sumCompras(c, start, end),
-      valorPeriodoAnterior: sumCompras(c, prev.start, prev.end),
-      totalComprado,
-      pedidos: c.compras.length,
-      lastPurchaseAt,
-    };
-  }), [clientes, start, end, prev]);
+  const limiteInativo = cfg.carteiraInativoDias || inativoDias || 60;
+
+  const calc: ClienteCalc[] = useMemo(() => {
+    const now = new Date();
+    const d180 = new Date(now.getTime() - 180 * 86400000);
+
+    const base = clientes.map(c => {
+      const totalComprado = c.compras.reduce((s, x) => s + x.valor, 0);
+      const lastPurchaseAt = c.compras.length > 0
+        ? c.compras.reduce((max, x) => (x.at > max ? x.at : max), c.compras[0].at)
+        : null;
+      const compras180 = c.compras.filter(x => new Date(x.at) >= d180);
+      return {
+        ...c,
+        valorPeriodo: sumCompras(c, start, end),
+        valorPeriodoAnterior: sumCompras(c, prev.start, prev.end),
+        totalComprado,
+        pedidos: c.compras.length,
+        lastPurchaseAt,
+        valor180: compras180.reduce((s, x) => s + x.valor, 0),
+        freq180: compras180.length,
+        nivel: "C" as Nivel, // preenchido abaixo
+      };
+    });
+
+    // Percentis de valor (180d) entre os compradores ativos — a régua se adapta à carteira
+    const ativos = base.filter(c => {
+      if (!c.lastPurchaseAt) return false;
+      const dias = (now.getTime() - new Date(c.lastPurchaseAt).getTime()) / 86400000;
+      return dias <= limiteInativo;
+    });
+    const valores = ativos.map(c => c.valor180).sort((a, b) => a - b);
+    const pct = (p: number) => valores.length > 0 ? valores[Math.min(valores.length - 1, Math.floor(valores.length * p))] : 0;
+    const p75 = pct(0.75);
+    const mediana = pct(0.5);
+
+    for (const c of base) {
+      const manual = niveisManuais[c.conversationId] !== undefined ? niveisManuais[c.conversationId] : c.nivelManual;
+      if (manual) { c.nivel = manual as Nivel; continue; }
+      if (!c.lastPurchaseAt) { c.nivel = "PROSPECTO"; continue; }
+      const dias = (now.getTime() - new Date(c.lastPurchaseAt).getTime()) / 86400000;
+      if (dias > 180) { c.nivel = "PERDIDO"; continue; }
+      if (dias > limiteInativo) { c.nivel = "INATIVO"; continue; }
+      // Ativo: A = recorrente (3+) e ticket alto (top 25%); B = 2+ compras ou acima da mediana; C = resto
+      if (c.freq180 >= 3 && c.valor180 >= p75 && p75 > 0) c.nivel = "A";
+      else if (c.freq180 >= 2 || (c.valor180 >= mediana && mediana > 0)) c.nivel = "B";
+      else c.nivel = "C";
+    }
+    return base;
+  }, [clientes, start, end, prev, limiteInativo, niveisManuais]);
+
+  async function handleSetNivel(conversationId: string, nivel: string) {
+    const value = nivel === "" ? null : nivel;
+    setNiveisManuais(prevMap => ({ ...prevMap, [conversationId]: value }));
+    await fetch(`/api/agentes/${agentId}/carteira/nivel`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ conversationId, nivel: value }),
+    }).catch(() => {});
+  }
 
   function inSegment(c: ClienteCalc, seg: Segmento): boolean {
     switch (seg) {
@@ -174,17 +242,28 @@ export function CarteiraClient({ agentId, clientes, initialConfig, isManager }: 
 
   const receitaPeriodo = useMemo(() => calc.reduce((s, c) => s + c.valorPeriodo, 0), [calc]);
 
+  const nivelCounts = useMemo(() => {
+    const counts: Record<Nivel, number> = { A: 0, B: 0, C: 0, INATIVO: 0, PERDIDO: 0, PROSPECTO: 0 };
+    for (const c of calc) counts[c.nivel]++;
+    return counts;
+  }, [calc]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     let base = calc.filter(c => inSegment(c, segmento));
+    if (nivelFiltro !== "todos") base = base.filter(c => c.nivel === nivelFiltro);
     if (q) base = base.filter(c => (c.contactName ?? "").toLowerCase().includes(q) || c.contactNumber.includes(q));
     return [...base].sort((a, b) => {
       if (ordem === "valor") return b.totalComprado - a.totalComprado;
       if (ordem === "valor_periodo") return b.valorPeriodo - a.valorPeriodo;
+      if (ordem === "prioridade") {
+        const diff = NIVEL_ORDEM[a.nivel] - NIVEL_ORDEM[b.nivel];
+        return diff !== 0 ? diff : b.totalComprado - a.totalComprado;
+      }
       return b.lastContactAt.localeCompare(a.lastContactAt);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [calc, search, segmento, ordem]);
+  }, [calc, search, segmento, ordem, nivelFiltro]);
 
   async function handleSaveConfig() {
     setSavingCfg(true);
@@ -346,6 +425,21 @@ export function CarteiraClient({ agentId, clientes, initialConfig, isManager }: 
               )}
             </div>
 
+            <div className="border-t border-gray-800 pt-4 space-y-2">
+              <div className="flex items-center gap-2 text-sm text-gray-400 flex-wrap">
+                Considerar cliente <span className="text-amber-400 font-medium">Inativo</span> após
+                <select
+                  value={cfg.carteiraInativoDias}
+                  onChange={e => setCfg(c => ({ ...c, carteiraInativoDias: Number(e.target.value) }))}
+                  className="bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 text-sm text-white"
+                >
+                  {[15, 30, 60, 90, 120].map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+                dias sem compra
+              </div>
+              <p className="text-xs text-gray-600">Acima de 180 dias sem compra o cliente vira Perdido automaticamente.</p>
+            </div>
+
             <div className="border-t border-gray-800 pt-4">
               <label className="text-xs text-gray-400 block mb-1">Orientações para a IA (opcional)</label>
               <textarea
@@ -417,6 +511,33 @@ export function CarteiraClient({ agentId, clientes, initialConfig, isManager }: 
           ))}
         </div>
 
+        {/* Nível da carteira */}
+        <div className="space-y-1.5">
+          <p className="text-xs text-gray-500 font-medium">Nível da carteira <span className="text-gray-600 font-normal">(classificação automática por recorrência, ticket e recência — ajustável por cliente)</span></p>
+          <div className="flex gap-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+            <button
+              onClick={() => setNivelFiltro("todos")}
+              className={`flex-shrink-0 text-xs font-medium rounded-full px-3 py-1.5 border transition-colors ${
+                nivelFiltro === "todos" ? "bg-blue-600 border-blue-600 text-white" : "border-gray-800 text-gray-400 hover:border-gray-600"
+              }`}
+            >
+              Todos
+            </button>
+            {(Object.keys(NIVEL_META) as Nivel[]).map(n => (
+              <button
+                key={n}
+                onClick={() => setNivelFiltro(nivelFiltro === n ? "todos" : n)}
+                title={NIVEL_META[n].desc}
+                className={`flex-shrink-0 text-xs font-medium rounded-full px-3 py-1.5 border transition-colors ${
+                  nivelFiltro === n ? NIVEL_META[n].badge : "border-gray-800 text-gray-400 hover:border-gray-600"
+                }`}
+              >
+                {NIVEL_META[n].label} <span className="opacity-70">{nivelCounts[n]}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Busca + ordenação */}
         <div className="flex gap-2 flex-wrap">
           <div className="flex-1 min-w-[200px] flex items-center gap-2 bg-gray-900 border border-gray-800 rounded-xl px-3 py-2">
@@ -434,6 +555,7 @@ export function CarteiraClient({ agentId, clientes, initialConfig, isManager }: 
             onChange={e => setOrdem(e.target.value as Ordem)}
             className="bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-sm"
           >
+            <option value="prioridade">Prioridade (nível)</option>
             <option value="recentes">Último contato</option>
             <option value="valor_periodo">Maior valor no período</option>
             <option value="valor">Maior valor total</option>
@@ -461,6 +583,20 @@ export function CarteiraClient({ agentId, clientes, initialConfig, isManager }: 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-medium truncate">{c.contactName || c.contactNumber.replace("ig_", "ID ")}</p>
+                      <select
+                        value={(niveisManuais[c.conversationId] !== undefined ? niveisManuais[c.conversationId] : c.nivelManual) ?? ""}
+                        onClick={e => { e.preventDefault(); e.stopPropagation(); }}
+                        onChange={e => { e.preventDefault(); e.stopPropagation(); handleSetNivel(c.conversationId, e.target.value); }}
+                        title={NIVEL_META[c.nivel].desc + ((niveisManuais[c.conversationId] ?? c.nivelManual) ? " (definido manualmente)" : " (automático)")}
+                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border cursor-pointer appearance-none text-center ${NIVEL_META[c.nivel].badge}`}
+                      >
+                        <option value="">{(niveisManuais[c.conversationId] ?? c.nivelManual) ? "Automático" : `${NIVEL_META[c.nivel].label} (auto)`}</option>
+                        <option value="A">A</option>
+                        <option value="B">B</option>
+                        <option value="C">C</option>
+                        <option value="INATIVO">Inativo</option>
+                        <option value="PERDIDO">Perdido</option>
+                      </select>
                       {c.leadStatusName && (
                         <span
                           className="text-[10px] px-1.5 py-0.5 rounded-full border flex-shrink-0"

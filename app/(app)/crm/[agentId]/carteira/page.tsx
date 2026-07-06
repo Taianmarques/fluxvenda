@@ -70,6 +70,7 @@ export default async function CarteiraPage({ params }: { params: Promise<{ agent
       contactNumber: c.contactNumber,
       contactName: c.contactName,
       conversationId: c.id,
+      nivelManual: c.nivelCarteira,
       lastContactAt: c.updatedAt.toISOString(),
       assignedToName: c.assignedTo?.name ?? null,
       leadStatusName: c.leadStatus?.name ?? null,
@@ -105,6 +106,7 @@ export default async function CarteiraPage({ params }: { params: Promise<{ agent
       agentId={config.id}
       clientes={Array.from(byContact.values())}
       isManager={isManager}
+      inativoDias={config.carteiraInativoDias}
       initialConfig={{
         carteiraEnabled: config.carteiraEnabled,
         posVendaEnabled: config.posVendaEnabled,
@@ -113,6 +115,7 @@ export default async function CarteiraPage({ params }: { params: Promise<{ agent
         recompraEnabled: config.recompraEnabled,
         recompraDias: config.recompraDias,
         carteiraInstrucoes: config.carteiraInstrucoes,
+        carteiraInativoDias: config.carteiraInativoDias,
       }}
     />
   );
