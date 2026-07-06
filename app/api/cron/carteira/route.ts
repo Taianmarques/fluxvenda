@@ -17,12 +17,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Pós-venda é agente próprio; recompra pertence ao agente de carteira
+  // Pós-venda e Recompra são agentes independentes
   const configs = await prisma.agentConfig.findMany({
     where: {
       active: true,
       uazapiToken: { not: null },
-      OR: [{ posVendaEnabled: true }, { carteiraEnabled: true, recompraEnabled: true }],
+      OR: [{ posVendaEnabled: true }, { recompraEnabled: true }],
     },
   });
 
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ─── Recompra: última compra há mais de X dias (e menos de 180) ────────────
-    if (config.carteiraEnabled && config.recompraEnabled) {
+    if (config.recompraEnabled) {
       const cutoff = new Date(Date.now() - config.recompraDias * 86400_000);
       const cutoffAntigo = new Date(Date.now() - 180 * 86400_000);
 

@@ -93,8 +93,8 @@ export default async function HubPage() {
     commerceEnabled: c.commerceEnabled,
     cobrancaEnabled: c.cobrancaEnabled,
     prospeccaoEnabled: c.prospeccaoEnabled,
-    carteiraEnabled: c.carteiraEnabled,
     posVendaEnabled: c.posVendaEnabled,
+    recompraEnabled: c.recompraEnabled,
     metricas: {
       conversas7d: convByAgent.get(c.id) ?? 0,
       vendas30d: orderByAgent.get(c.id)?.valor ?? 0,

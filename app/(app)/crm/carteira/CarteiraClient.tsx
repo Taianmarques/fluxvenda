@@ -334,11 +334,11 @@ export function CarteiraClient({ agentId, clientes, initialConfig, isManager, in
               <button
                 onClick={() => setShowConfig(s => !s)}
                 className={`flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
-                  cfg.carteiraEnabled ? "bg-green-700 hover:bg-green-600" : "bg-gray-800 hover:bg-gray-700"
+                  cfg.posVendaEnabled || cfg.recompraEnabled ? "bg-green-700 hover:bg-green-600" : "bg-gray-800 hover:bg-gray-700"
                 }`}
               >
                 <Bot size={15} />
-                {cfg.carteiraEnabled ? "Agente ativo" : "Configurar agente"}
+                {cfg.posVendaEnabled || cfg.recompraEnabled ? "Agentes ativos" : "Configurar agentes"}
               </button>
             </div>
           )}
@@ -361,18 +361,13 @@ export function CarteiraClient({ agentId, clientes, initialConfig, isManager, in
         {showConfig && isManager && (
           <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-5">
             <div>
-              <p className="font-semibold">Agente de gestão de carteira</p>
+              <p className="font-semibold">Agentes da carteira</p>
               <p className="text-xs text-gray-500 mt-0.5">
-                Trabalha a carteira sozinho pelo WhatsApp: agradece após a compra (pós-venda) e reativa quem sumiu (recompra).
+                Dois agentes independentes que trabalham a carteira sozinhos pelo WhatsApp — também podem ser ligados/desligados pelo Hub de agentes.
               </p>
             </div>
 
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={cfg.carteiraEnabled} onChange={e => setCfg(c => ({ ...c, carteiraEnabled: e.target.checked }))} className="w-4 h-4" />
-              <span className="text-sm font-medium">Ativar agente de carteira</span>
-            </label>
-
-            <div className="border-t border-gray-800 pt-4 space-y-3">
+            <div className="space-y-3">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={cfg.posVendaEnabled} onChange={e => setCfg(c => ({ ...c, posVendaEnabled: e.target.checked }))} className="w-4 h-4" />
                 <div>
@@ -427,7 +422,10 @@ export function CarteiraClient({ agentId, clientes, initialConfig, isManager, in
             <div className="border-t border-gray-800 pt-4 space-y-3">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={cfg.recompraEnabled} onChange={e => setCfg(c => ({ ...c, recompraEnabled: e.target.checked }))} className="w-4 h-4" />
-                <span className="text-sm font-medium">Recompra automática (reativação)</span>
+                <div>
+                  <span className="text-sm font-medium">Agente de Recompra</span>
+                  <p className="text-xs text-gray-500">Reativa quem parou de comprar com uma mensagem pessoal citando a última compra.</p>
+                </div>
               </label>
               {cfg.recompraEnabled && (
                 <div className="space-y-2 pl-6">

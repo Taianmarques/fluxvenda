@@ -3,8 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  Headset, Calendar, ShoppingCart, Landmark, Target, Briefcase,
-  MessageCircle, Instagram, Settings, ChevronRight, HeartHandshake,
+  Headset, Calendar, ShoppingCart, Landmark, Target,
+  MessageCircle, Instagram, Settings, ChevronRight, HeartHandshake, RefreshCw,
 } from "lucide-react";
 
 export type HubAgent = {
@@ -19,12 +19,12 @@ export type HubAgent = {
   commerceEnabled: boolean;
   cobrancaEnabled: boolean;
   prospeccaoEnabled: boolean;
-  carteiraEnabled: boolean;
   posVendaEnabled: boolean;
+  recompraEnabled: boolean;
   metricas: { conversas7d: number; vendas30d: number; vendas30dCount: number; agendaHoje: number; cobrancasAbertas: number; avaliacaoMedia: number | null; avaliacoes30d: number };
 };
 
-type ModuloKey = "schedulingEnabled" | "commerceEnabled" | "cobrancaEnabled" | "prospeccaoEnabled" | "carteiraEnabled" | "posVendaEnabled";
+type ModuloKey = "schedulingEnabled" | "commerceEnabled" | "cobrancaEnabled" | "prospeccaoEnabled" | "posVendaEnabled" | "recompraEnabled";
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -111,10 +111,10 @@ export function HubClient({ agents, isManager }: { agents: HubAgent[]; isManager
         : "sem avaliações ainda",
     },
     {
-      key: "carteiraEnabled",
-      nome: "Agente de Carteira",
-      desc: "Trabalha a recompra: reativa clientes que sumiram citando a última compra e classifica a carteira em níveis A/B/C de prioridade.",
-      icon: Briefcase,
+      key: "recompraEnabled",
+      nome: "Agente de Recompra",
+      desc: "Reativa clientes que pararam de comprar: identifica quem sumiu, escreve uma mensagem pessoal citando a última compra e traz de volta — um toque por ciclo, sem spam.",
+      icon: RefreshCw,
       configHref: `/crm/${agent.id}/carteira`,
     },
   ];

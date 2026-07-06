@@ -614,7 +614,8 @@ model AgentConfig {
   posVendaPesquisaEnabled Boolean @default(true) // pede nota de 0 a 5 na mensagem de pós-venda
   posVendaReviewLink      String  @default("")   // link de avaliação (Google) enviado quando a nota é alta
   posVendaFeedbacks       PosVendaFeedback[]
-  recompraEnabled    Boolean @default(true)  // reativação de quem não compra há X dias
+  // Agente de Recompra (independente): reativação de quem não compra há X dias
+  recompraEnabled    Boolean @default(false)
   recompraDias       Int     @default(30)
   carteiraInstrucoes String  @default("")    // orientações pra IA (ofertas, tom, cupons)
   carteiraInativoDias Int    @default(60)    // dias sem compra para nível INATIVO (15/30/60/90/120)
