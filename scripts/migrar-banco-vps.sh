@@ -32,16 +32,24 @@ case "$OLD_URL" in
   *localhost*|*127.0.0.1*) echo "ERRO: DATABASE_URL já aponta para banco local — nada a migrar."; exit 1;;
 esac
 
-echo "==> 2/8 Instalando PostgreSQL 17 (se necessário)..."
-if ! command -v pg_dump >/dev/null 2>&1 || ! pg_dump --version | grep -qE ' 1[5-9]| 2[0-9]'; then
+echo "==> 2/8 Instalando PostgreSQL (se necessário)..."
+# Servidor local: qualquer versão recente serve para o app
+if ! sudo -u postgres psql -c 'SELECT 1' >/dev/null 2>&1; then
   apt-get update -qq
+  apt-get install -y -qq postgresql >/dev/null
+  systemctl enable --now postgresql >/dev/null 2>&1 || true
+  sleep 2
+fi
+# Cliente 17: o pg_dump precisa ser >= versão do servidor Supabase (17)
+PGBIN=/usr/lib/postgresql/17/bin
+if [ ! -x "$PGBIN/pg_dump" ]; then
+  echo "    Instalando postgresql-client-17 (repositório oficial PGDG)..."
   apt-get install -y -qq postgresql-common >/dev/null
   YES=yes /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y >/dev/null 2>&1 || true
   apt-get update -qq
-  apt-get install -y -qq postgresql-17 >/dev/null
+  apt-get install -y -qq postgresql-client-17 >/dev/null
 fi
-systemctl enable --now postgresql >/dev/null 2>&1 || true
-sleep 2
+if [ ! -x "$PGBIN/pg_dump" ]; then echo "ERRO: não consegui instalar o cliente PostgreSQL 17."; exit 1; fi
 
 echo "==> 3/8 Criando banco e usuário locais..."
 DB_PASS=$(openssl rand -hex 24)
@@ -77,14 +85,20 @@ PGPORT=$(echo "$PARSED" | sed -n 2p)
 PGUSER=$(echo "$PARSED" | sed -n 3p)
 PGPASSWORD=$(echo "$PARSED" | sed -n 4p)
 PGDATABASE=$(echo "$PARSED" | sed -n 5p)
+# Porta 6543 é o transaction pooler do Supabase — não suporta pg_dump.
+# A 5432 (session pooler) aceita as mesmas credenciais.
+if [ "$PGPORT" = "6543" ]; then
+  echo "    Porta 6543 (transaction pooler) detectada — usando 5432 (session) para o dump."
+  PGPORT=5432
+fi
 export PGHOST PGPORT PGUSER PGPASSWORD PGDATABASE
 echo "    Conectando em $PGHOST:$PGPORT/$PGDATABASE como $PGUSER..."
-pg_dump --schema=public --no-owner --no-privileges -Fc -f "$DUMP_FILE"
+"$PGBIN/pg_dump" --schema=public --no-owner --no-privileges -Fc -f "$DUMP_FILE"
 unset PGHOST PGPORT PGUSER PGPASSWORD PGDATABASE
 echo "    Dump salvo em $DUMP_FILE ($(du -h "$DUMP_FILE" | cut -f1))"
 
 echo "==> 6/8 Restore no banco local..."
-pg_restore --no-owner --no-privileges --clean --if-exists -d "$NEW_URL" "$DUMP_FILE"
+"$PGBIN/pg_restore" --no-owner --no-privileges --clean --if-exists -d "$NEW_URL" "$DUMP_FILE"
 
 echo "    Verificando dados..."
 AGENTES=$(psql "$NEW_URL" -tAc 'SELECT count(*) FROM "AgentConfig";')
