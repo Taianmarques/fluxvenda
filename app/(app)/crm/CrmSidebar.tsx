@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { MessageCircle, KanbanSquare, Calendar, Wallet, ShoppingCart, Landmark, Target, ArrowLeft, ChevronDown, Wifi, GitBranch, Briefcase } from "lucide-react";
+import { MessageCircle, KanbanSquare, Calendar, Wallet, ShoppingCart, Landmark, Target, ArrowLeft, ChevronDown, Wifi, GitBranch, Briefcase, LayoutGrid } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id: string; nome: string }[] }) {
@@ -65,6 +65,13 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
         </div>
       )}
       <nav className="flex overflow-x-auto px-2 py-2 gap-1" style={{ scrollbarWidth: "none" }}>
+        <Link
+          href="/crm/hub"
+          className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-[10px] font-medium flex-shrink-0 text-gray-400"
+        >
+          <LayoutGrid size={17} />
+          Hub
+        </Link>
         {CRM_NAV.map(item => {
           const active = isActive(item.href);
           return (
@@ -121,6 +128,14 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
       )}
 
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">
+        <Link
+          href="/crm/hub"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium border-l-2 border-transparent text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+        >
+          <LayoutGrid size={17} />
+          Hub de agentes
+        </Link>
+        <div className="border-t border-gray-800 my-2" />
         {CRM_NAV.map(item => {
           const active = isActive(item.href);
           return (
