@@ -325,6 +325,24 @@ export const COMMERCE_TOOLS = [
   },
 ];
 
+export const PIPELINE_TOOLS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "mover_etapa_funil",
+      description: "Move o lead desta conversa para uma etapa do funil de vendas quando a conversa mostrar que ele evoluiu (ou regrediu). Use os nomes de etapa listados no contexto FUNIL DE VENDAS. Se o lead ainda não está no funil, a oportunidade é criada automaticamente.",
+      parameters: {
+        type: "object",
+        properties: {
+          etapa: { type: "string", description: "Nome EXATO da etapa de destino, igual à lista do contexto" },
+          motivo: { type: "string", description: "Uma frase explicando o sinal da conversa que justificou a mudança" },
+        },
+        required: ["etapa"],
+      },
+    },
+  },
+];
+
 export const POSVENDA_TOOLS = [
   {
     type: "function" as const,

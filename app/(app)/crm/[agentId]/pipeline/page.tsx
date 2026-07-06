@@ -59,6 +59,7 @@ export default async function PipelinePage({ params }: { params: Promise<{ agent
   return (
     <PipelineBoard
       agentId={config.id}
+      initialAutoAvancar={config.pipelineAutoAvancar}
       initialPipelines={pipelines.map(p => ({
         id: p.id,
         name: p.name,

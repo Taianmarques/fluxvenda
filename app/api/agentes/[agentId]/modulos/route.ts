@@ -12,6 +12,7 @@ const schema = z.object({
   carteiraEnabled: z.boolean().optional(),
   posVendaEnabled: z.boolean().optional(),
   recompraEnabled: z.boolean().optional(),
+  pipelineAutoAvancar: z.boolean().optional(),
 });
 
 // Liga/desliga os agentes de IA (módulos) a partir do Hub — só gestor

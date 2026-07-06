@@ -601,6 +601,9 @@ model AgentConfig {
   interestFreeInstallments Int    @default(1) // até quantas parcelas não tem acréscimo
   installmentInterestRate Float   @default(0) // % de acréscimo por parcela além das sem juros
 
+  // O agente de IA move leads pelas etapas do pipeline conforme a conversa evolui
+  pipelineAutoAvancar Boolean @default(false)
+
   // Resposta automática a comentários do Instagram via DM
   igCommentAutoDm    Boolean @default(false)
   igCommentDmMessage String? // fallback quando nenhum fluxo bate — null = IA responde

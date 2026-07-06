@@ -12,12 +12,13 @@ type ChatTheme = "dark" | "light";
 const THEME_STORAGE_KEY = "whatsapp-chat-theme";
 
 export function PipelineBoard({
-  agentId, initialPipelines, initialLeadStatuses, initialOpportunities,
+  agentId, initialPipelines, initialLeadStatuses, initialOpportunities, initialAutoAvancar,
 }: {
   agentId: string;
   initialPipelines: PipelineSummary[];
   initialLeadStatuses: LeadStatus[];
   initialOpportunities: PipelineOpportunity[];
+  initialAutoAvancar?: boolean;
 }) {
   const router = useRouter();
   const [theme, setTheme] = useState<ChatTheme>("dark");
@@ -29,6 +30,27 @@ export function PipelineBoard({
   const [showNewPipeline, setShowNewPipeline] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+
+  // Avanço automático: a IA move o lead pelas etapas conforme a conversa evolui
+  const [autoAvancar, setAutoAvancar] = useState(initialAutoAvancar ?? false);
+  const [salvandoAuto, setSalvandoAuto] = useState(false);
+
+  async function toggleAutoAvancar() {
+    const next = !autoAvancar;
+    setAutoAvancar(next);
+    setSalvandoAuto(true);
+    try {
+      await fetch(`/api/agentes/${agentId}/modulos`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pipelineAutoAvancar: next }),
+      });
+    } catch {
+      setAutoAvancar(!next);
+    } finally {
+      setSalvandoAuto(false);
+    }
+  }
 
   // Agente responsável pelo pipeline (instruções que valem em todas as etapas dele)
   const [showAgente, setShowAgente] = useState(false);
@@ -172,6 +194,20 @@ export function PipelineBoard({
         </div>
 
         {active && (
+          <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={toggleAutoAvancar}
+            disabled={salvandoAuto}
+            title="Com o avanço automático, a IA move o lead pelas etapas conforme a conversa evolui (registrando o motivo numa nota interna)"
+            className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-50 ${
+              autoAvancar
+                ? "text-green-400 border-green-800/60 hover:border-green-600"
+                : theme === "dark" ? "text-gray-500 border-gray-800 hover:text-gray-300" : "text-gray-500 border-gray-300 hover:text-gray-700"
+            }`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${autoAvancar ? "bg-green-400" : "bg-gray-600"}`} />
+            Avanço automático {autoAvancar ? "ligado" : "desligado"}
+          </button>
           <button
             onClick={() => { setAgenteInstrucoes(active.agenteInstrucoes ?? ""); setShowAgente(s => !s); }}
             title={`Agente responsável pelo pipeline "${active.name}"`}
@@ -184,6 +220,7 @@ export function PipelineBoard({
             <Bot size={13} />
             {(active.agenteInstrucoes ?? "").trim() ? "Agente do pipeline" : "Definir agente do pipeline"}
           </button>
+          </div>
         )}
       </div>
 

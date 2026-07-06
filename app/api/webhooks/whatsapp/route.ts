@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { runAgent, runAgentWithImage, runAgentWithTools, transcribeAudio, classifyLeadQualified, SCHEDULING_TOOLS, COMMERCE_TOOLS, BILLING_TOOLS, PROSPECTING_TOOLS, POSVENDA_TOOLS } from "@/lib/agent-engine";
+import { runAgent, runAgentWithImage, runAgentWithTools, transcribeAudio, classifyLeadQualified, SCHEDULING_TOOLS, COMMERCE_TOOLS, BILLING_TOOLS, PROSPECTING_TOOLS, POSVENDA_TOOLS, PIPELINE_TOOLS } from "@/lib/agent-engine";
 import { sendWhatsAppTextAsTeam, sendMediaAsTeam, downloadMessageMedia } from "@/lib/whatsapp";
 import { logTokenUsage, isOverQuota } from "@/lib/token-usage";
 import { getAvailableSlots, isSlotAvailable, formatSlotsForAgent, type AvailabilityRule } from "@/lib/scheduling";
@@ -47,6 +47,33 @@ Quando o cliente quiser agendar algo:
 Você também pode receber, no meio da conversa, um lembrete automático perguntando se o cliente confirma presença num agendamento já marcado:
 - Se o cliente confirmar (ex: "sim", "confirmado", "pode contar comigo"), apenas agradeça brevemente, sem chamar nenhuma ferramenta.
 - Se ele disser que não pode ir ou quer cancelar, use cancelar_agendamento e, na mesma resposta, já ofereça reagendar — pergunte o novo dia/período de preferência (ou, se ele já tiver dito, use consultar_horarios_disponiveis e siga o fluxo normal de agendamento).`;
+}
+
+// Lista as etapas do funil e ensina o agente a mover o lead conforme a conversa evolui.
+// Usa o pipeline da oportunidade aberta do lead — ou o pipeline padrão (primeiro) se ele
+// ainda não está no funil.
+async function buildPipelineContext(agentConfigId: string, conversationId: string): Promise<string> {
+  const currentOpp = await prisma.opportunity.findFirst({
+    where: { conversationId, wonAt: null },
+    orderBy: { createdAt: "desc" },
+    include: { stage: { select: { name: true, pipelineId: true } } },
+  });
+
+  const pipeline = currentOpp?.stage
+    ? await prisma.pipeline.findUnique({ where: { id: currentOpp.stage.pipelineId }, include: { stages: { orderBy: { order: "asc" } } } })
+    : await prisma.pipeline.findFirst({ where: { agentConfigId }, orderBy: { order: "asc" }, include: { stages: { orderBy: { order: "asc" } } } });
+
+  if (!pipeline || pipeline.stages.length === 0) return "";
+
+  const etapas = pipeline.stages.map(s => s.name).join(" → ");
+  const atual = currentOpp?.stage?.name ?? "(ainda fora do funil)";
+
+  return `\n\nFUNIL DE VENDAS (avanço automático ativado):
+Funil "${pipeline.name}", etapas em ordem: ${etapas}
+Etapa atual deste lead: ${atual}
+- Acompanhe a conversa e, quando o lead der um sinal CLARO de evolução (demonstrou interesse real, pediu preço/orçamento, agendou, confirmou compra...), chame mover_etapa_funil com o nome exato da etapa adequada e o motivo.
+- Avance no máximo UMA etapa por vez, e só com sinal claro — na dúvida, não mova.
+- Se o lead desistir explicitamente ou esfriar, pode voltar etapa. Nunca anuncie ao cliente que ele "mudou de etapa" — isso é controle interno.`;
 }
 
 function buildPosVendaContext(reviewLink: string): string {
@@ -391,6 +418,51 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
         return `${r.quantidade}x ${p.name} (R$ ${(preco * r.quantidade).toFixed(2)}${promoTag})`;
       }).join("\n");
       return `Pedido atualizado:\n${resumo}\nTotal: R$ ${total.toFixed(2)}`;
+    }
+
+    if (name === "mover_etapa_funil") {
+      const etapaNome = typeof args?.etapa === "string" ? args.etapa.trim() : "";
+      if (!etapaNome) return "Erro: informe o nome da etapa de destino.";
+      const motivo = typeof args?.motivo === "string" ? args.motivo.trim() : "";
+
+      // Pipeline da oportunidade atual, ou o padrão (primeiro)
+      const opp = await prisma.opportunity.findFirst({
+        where: { conversationId, wonAt: null },
+        orderBy: { createdAt: "desc" },
+        include: { stage: { select: { pipelineId: true, name: true } } },
+      });
+      const pipeline = opp?.stage
+        ? await prisma.pipeline.findUnique({ where: { id: opp.stage.pipelineId }, include: { stages: { orderBy: { order: "asc" } } } })
+        : await prisma.pipeline.findFirst({ where: { agentConfigId }, orderBy: { order: "asc" }, include: { stages: { orderBy: { order: "asc" } } } });
+      if (!pipeline || pipeline.stages.length === 0) return "Erro: não há funil configurado.";
+
+      const lower = etapaNome.toLowerCase();
+      const stage = pipeline.stages.find(s => s.name.toLowerCase() === lower)
+        ?? pipeline.stages.find(s => s.name.toLowerCase().includes(lower) || lower.includes(s.name.toLowerCase()));
+      if (!stage) return `Erro: etapa "${etapaNome}" não existe. Etapas disponíveis: ${pipeline.stages.map(s => s.name).join(", ")}.`;
+
+      if (opp) {
+        if (opp.stageId === stage.id) return `O lead já está na etapa "${stage.name}".`;
+        await prisma.opportunity.update({
+          where: { id: opp.id },
+          data: { stageId: stage.id, stageEnteredAt: new Date() },
+        });
+      } else {
+        await prisma.opportunity.create({
+          data: { conversationId, stageId: stage.id, stageEnteredAt: new Date(), dealValue: 0 },
+        });
+      }
+
+      await prisma.message.create({
+        data: {
+          conversationId,
+          role: "note",
+          content: `Lead movido pela IA para a etapa "${stage.name}"${opp?.stage ? ` (antes: "${opp.stage.name}")` : " (entrou no funil)"}${motivo ? ` — ${motivo}` : ""}.`,
+        },
+      });
+      emitChatEvent(agentConfigId, conversationId);
+
+      return `Lead movido para a etapa "${stage.name}". Continue a conversa normalmente, sem mencionar a mudança de etapa ao cliente.`;
     }
 
     if (name === "registrar_avaliacao") {
@@ -859,6 +931,7 @@ export async function POST(req: NextRequest) {
     ...commerceTools,
     ...(config.cobrancaEnabled ? BILLING_TOOLS : []),
     ...(config.posVendaEnabled ? POSVENDA_TOOLS : []),
+    ...(config.pipelineAutoAvancar ? PIPELINE_TOOLS : []),
     ...(isProspect ? PROSPECTING_TOOLS : []),
   ];
 
@@ -903,6 +976,7 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
       + (config.commerceEnabled ? await buildCommerceContext(config.id, config) : "")
       + (config.cobrancaEnabled ? await buildBillingContext(config.id, contactNumber) : "")
       + (config.posVendaEnabled ? buildPosVendaContext(config.posVendaReviewLink) : "")
+      + (config.pipelineAutoAvancar ? await buildPipelineContext(config.id, conversation.id) : "")
       + (isProspect ? (await buildProspeccaoContext(config.id, contactNumber) ?? "") : "");
     const result = await runAgentWithTools(
       activeSystemPrompt + extraContext,
