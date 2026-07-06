@@ -1086,6 +1086,10 @@ model Conversation {
   departamentoId String?
   departamento   Departamento? @relation(fields: [departamentoId], references: [id], onDelete: SetNull)
 
+  // Encerramento: motivo escolhido pelo atendente + quando — base do relatório de motivos
+  motivoEncerramento String?
+  encerradaEm        DateTime?
+
   // Atendente responsável por essa conversa — null = ainda não atribuída (qualquer atendente
   // pode ver e assumir). Quem atribui/quando depende do leadDistributionMode do AgentConfig.
   assignedToId String?

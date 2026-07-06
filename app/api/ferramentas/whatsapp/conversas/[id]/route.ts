@@ -41,6 +41,7 @@ const patchSchema = z.object({
   leadStatusId: z.string().nullable().optional(),
   assignedToId: z.string().nullable().optional(),
   status: z.enum(["ATIVO", "AGUARDANDO", "FINALIZADO"]).optional(),
+  motivoEncerramento: z.string().max(200).optional(), // enviado junto com status FINALIZADO
 });
 
 // Muda o status do lead, o status da conversa e/ou o atendente responsável.
@@ -79,14 +80,26 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
   }
 
+  const encerrando = body.data.status === "FINALIZADO";
+  const reabrindo = body.data.status !== undefined && body.data.status !== "FINALIZADO" && conversation.status === "FINALIZADO";
+
   const updated = await prisma.conversation.update({
     where: { id },
     data: {
       ...(body.data.leadStatusId !== undefined && { leadStatusId: body.data.leadStatusId }),
       ...(body.data.assignedToId !== undefined && { assignedToId: body.data.assignedToId }),
       ...(body.data.status !== undefined && { status: body.data.status }),
+      ...(encerrando && { motivoEncerramento: body.data.motivoEncerramento ?? null, encerradaEm: new Date() }),
+      ...(reabrindo && { motivoEncerramento: null, encerradaEm: null }),
     },
   });
+
+  // Registra o motivo no histórico da conversa (auditoria)
+  if (encerrando && body.data.motivoEncerramento) {
+    await prisma.message.create({
+      data: { conversationId: id, role: "note", content: `Atendimento encerrado — motivo: ${body.data.motivoEncerramento}.` },
+    });
+  }
 
   return NextResponse.json({ conversation: updated });
 }

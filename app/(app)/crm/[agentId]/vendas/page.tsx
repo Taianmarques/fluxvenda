@@ -48,6 +48,22 @@ export default async function VendasPage({ params }: { params: Promise<{ agentId
     include: { stage: true },
   });
 
+  // Motivos de encerramento das conversas finalizadas (o texto pode ter "— observação")
+  const encerradas = await prisma.conversation.findMany({
+    where: { agentConfigId: config.id, status: "FINALIZADO", motivoEncerramento: { not: null } },
+    select: { motivoEncerramento: true },
+  });
+  const motivosMap = new Map<string, number>();
+  for (const c of encerradas) {
+    const base = (c.motivoEncerramento ?? "").split(" — ")[0].replace(/^Outro:.*/, "Outro").trim();
+    if (!base) continue;
+    motivosMap.set(base, (motivosMap.get(base) ?? 0) + 1);
+  }
+  const motivos = Array.from(motivosMap.entries())
+    .map(([motivo, quantidade]) => ({ motivo, quantidade }))
+    .sort((a, b) => b.quantidade - a.quantidade);
+  const totalEncerradas = motivos.reduce((s, m) => s + m.quantidade, 0);
+
   const totalAberto = openDeals.reduce((sum, d) => sum + d.dealValue, 0);
 
   // Agrupa as negociações abertas por etapa do pipeline, na ordem da etapa; sem etapa fica por último
@@ -114,6 +130,36 @@ export default async function VendasPage({ params }: { params: Promise<{ agentId
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
           <p className="font-semibold mb-3">Receita ganha por mês</p>
           <VendasChart data={monthly.map(m => ({ mes: m.mes, total: m.total }))} />
+        </div>
+
+        {/* Motivos de encerramento */}
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+          <p className="font-semibold mb-1">Motivos de encerramento</p>
+          <p className="text-xs text-gray-500 mb-4">Por que os atendimentos são finalizados — informado ao encerrar a conversa no chat.</p>
+          {motivos.length === 0 ? (
+            <p className="text-sm text-gray-600">Nenhum encerramento com motivo registrado ainda.</p>
+          ) : (
+            <div className="space-y-2">
+              {motivos.map(m => {
+                const pct = totalEncerradas > 0 ? (m.quantidade / totalEncerradas) * 100 : 0;
+                const positivo = m.motivo === "Venda concluída" || m.motivo === "Dúvida resolvida";
+                return (
+                  <div key={m.motivo} className="flex items-center gap-3">
+                    <p className="w-40 md:w-48 text-xs text-gray-300 truncate text-right flex-shrink-0">{m.motivo}</p>
+                    <div className="flex-1 h-6 bg-gray-950 rounded-lg overflow-hidden">
+                      <div
+                        className={`h-full rounded-lg flex items-center px-2 ${positivo ? "bg-green-600/50" : "bg-red-600/40"}`}
+                        style={{ width: `${Math.max(8, pct)}%` }}
+                      >
+                        <span className="text-[10px] font-bold">{m.quantidade}</span>
+                      </div>
+                    </div>
+                    <span className="w-10 text-[11px] text-gray-500 flex-shrink-0">{pct.toFixed(0)}%</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">

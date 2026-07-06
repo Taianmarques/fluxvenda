@@ -192,6 +192,11 @@ export function WhatsappInbox({
   const [signatureEnabled, setSignatureEnabled] = useState(initialSignatureEnabled);
   const [signatureSaving, setSignatureSaving] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  // Encerramento com motivo (relatório de motivos na página Vendas)
+  const [showEncerrar, setShowEncerrar] = useState(false);
+  const [motivoSelecionado, setMotivoSelecionado] = useState("");
+  const [motivoObs, setMotivoObs] = useState("");
+  const [encerrando, setEncerrando] = useState(false);
   const [showQuickReplies, setShowQuickReplies] = useState(false);
   const [noteMode, setNoteMode] = useState(false);
   const [showTransferMenu, setShowTransferMenu] = useState(false);
@@ -562,16 +567,31 @@ export function WhatsappInbox({
     await refreshList();
   }
 
-  async function handleEncerrar() {
+  function handleEncerrar() {
     if (!selectedId) return;
-    if (!confirm("Encerrar esse atendimento? Se o cliente mandar outra mensagem, a conversa reabre automaticamente.")) return;
-    await fetch(`/api/ferramentas/whatsapp/conversas/${selectedId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "FINALIZADO" }),
-    });
-    await refreshDetail(selectedId);
-    await refreshList();
+    setMotivoSelecionado("");
+    setMotivoObs("");
+    setShowEncerrar(true);
+  }
+
+  async function confirmarEncerramento() {
+    if (!selectedId || !motivoSelecionado) return;
+    setEncerrando(true);
+    try {
+      const motivo = motivoSelecionado === "Outro" && motivoObs.trim()
+        ? `Outro: ${motivoObs.trim()}`
+        : motivoObs.trim() ? `${motivoSelecionado} — ${motivoObs.trim()}` : motivoSelecionado;
+      await fetch(`/api/ferramentas/whatsapp/conversas/${selectedId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "FINALIZADO", motivoEncerramento: motivo }),
+      });
+      setShowEncerrar(false);
+      await refreshDetail(selectedId);
+      await refreshList();
+    } finally {
+      setEncerrando(false);
+    }
   }
 
   async function handleReabrir() {
@@ -1043,6 +1063,60 @@ export function WhatsappInbox({
             )}
           </main>
         </div>
+
+      {/* Modal de encerramento com motivo */}
+      {showEncerrar && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className={`w-full max-w-sm rounded-2xl border p-5 space-y-4 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}>
+            <div className="flex items-center justify-between">
+              <p className="font-semibold">Encerrar atendimento</p>
+              <button onClick={() => setShowEncerrar(false)} className="text-gray-500 hover:text-gray-300"><X size={16} /></button>
+            </div>
+            <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+              Qual o motivo do encerramento? Isso alimenta o relatório em Vendas.
+            </p>
+            <div className="space-y-1.5">
+              {["Venda concluída", "Dúvida resolvida", "Sem interesse", "Sem resposta", "Preço", "Comprou de concorrente", "Spam / engano", "Outro"].map(m => (
+                <label
+                  key={m}
+                  className={`flex items-center gap-2 rounded-xl border px-3 py-2 cursor-pointer text-sm transition-colors ${
+                    motivoSelecionado === m
+                      ? "border-blue-500 bg-blue-500/10"
+                      : theme === "dark" ? "border-gray-800 hover:border-gray-600" : "border-gray-200 hover:border-gray-400"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="motivo-encerramento"
+                    checked={motivoSelecionado === m}
+                    onChange={() => setMotivoSelecionado(m)}
+                    className="w-3.5 h-3.5"
+                  />
+                  {m}
+                </label>
+              ))}
+            </div>
+            <textarea
+              value={motivoObs}
+              onChange={e => setMotivoObs(e.target.value)}
+              rows={2}
+              maxLength={150}
+              placeholder={motivoSelecionado === "Outro" ? "Descreva o motivo..." : "Observação (opcional)"}
+              className={`w-full rounded-xl border px-3 py-2 text-sm resize-none focus:outline-none ${theme === "dark" ? "bg-gray-950 border-gray-800" : "bg-gray-50 border-gray-200"}`}
+            />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowEncerrar(false)} className="text-sm text-gray-400 hover:text-gray-200 px-3 py-2">Cancelar</button>
+              <button
+                onClick={confirmarEncerramento}
+                disabled={!motivoSelecionado || (motivoSelecionado === "Outro" && !motivoObs.trim()) || encerrando}
+                className="text-sm font-medium bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white rounded-xl px-4 py-2"
+              >
+                {encerrando ? "Encerrando..." : "Encerrar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
