@@ -18,15 +18,21 @@ const STATUS_LABEL: Record<string, { label: string; color: string }> = {
 
 function formatBRL(v: number) { return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); }
 
-export function CobrancaClient({ agentId, initialCobrancaEnabled, initialCobrancas }: {
+export function CobrancaClient({ agentId, initialCobrancaEnabled, initialCobrancas, initialHasAsaasApiKey, initialAsaasSandbox }: {
   agentId: string;
   initialCobrancaEnabled: boolean;
   initialCobrancas: Cobranca[];
+  initialHasAsaasApiKey?: boolean;
+  initialAsaasSandbox?: boolean;
 }) {
   const [cobrancaEnabled, setCobrancaEnabled] = useState(initialCobrancaEnabled);
   const [showSettings, setShowSettings] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const [cobrancas, setCobrancas] = useState<Cobranca[]>(initialCobrancas);
+  // Conta Asaas (compartilhada com o Comércio — é a conexão de pagamento do agente)
+  const [hasAsaasApiKey, setHasAsaasApiKey] = useState(initialHasAsaasApiKey ?? false);
+  const [asaasSandbox, setAsaasSandbox] = useState(initialAsaasSandbox ?? true);
+  const [asaasApiKeyInput, setAsaasApiKeyInput] = useState("");
 
   const [showForm, setShowForm] = useState(false);
   const [nome, setNome] = useState(""); const [fone, setFone] = useState(""); const [cpfCnpj, setCpfCnpj] = useState(""); const [valor, setValor] = useState("");
@@ -43,10 +49,17 @@ export function CobrancaClient({ agentId, initialCobrancaEnabled, initialCobranc
   async function handleSaveSettings() {
     setSavingSettings(true);
     try {
-      await fetch(`/api/agentes/${agentId}/comercio`, {
+      const res = await fetch(`/api/agentes/${agentId}/comercio`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cobrancaEnabled }),
+        body: JSON.stringify({
+          cobrancaEnabled,
+          asaasSandbox,
+          ...(asaasApiKeyInput.trim() ? { asaasApiKey: asaasApiKeyInput.trim() } : {}),
+        }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (typeof data.hasAsaasApiKey === "boolean") setHasAsaasApiKey(data.hasAsaasApiKey);
+      setAsaasApiKeyInput("");
     } finally { setSavingSettings(false); }
   }
 
@@ -128,11 +141,36 @@ export function CobrancaClient({ agentId, initialCobrancaEnabled, initialCobranc
         </div>
 
         {showSettings && (
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-4">
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={cobrancaEnabled} onChange={e => setCobrancaEnabled(e.target.checked)} className="w-4 h-4" />
               <span className="text-sm font-medium">Ativar agente de cobrança (responde e cobra via WhatsApp)</span>
             </label>
+
+            <div className="border-t border-gray-800 pt-4 space-y-3">
+              <div>
+                <p className="text-sm font-medium">Conta Asaas {hasAsaasApiKey && <span className="text-green-400 text-xs">(conectada)</span>}</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Necessária para gerar boletos e Pix. É a mesma conexão usada pelo Comércio — configurar aqui vale lá também.
+                </p>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={asaasSandbox} onChange={e => setAsaasSandbox(e.target.checked)} className="w-4 h-4" />
+                <span className="text-sm">Usar ambiente de testes (sandbox) do Asaas</span>
+              </label>
+              <div>
+                <label className="text-sm text-gray-400 block mb-1">API key do Asaas</label>
+                <input
+                  type="password"
+                  value={asaasApiKeyInput}
+                  onChange={e => setAsaasApiKeyInput(e.target.value)}
+                  placeholder={hasAsaasApiKey ? "Colar uma nova key pra substituir" : "Cole sua API key do Asaas"}
+                  className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">Gerada no painel do Asaas em Configurações → Integrações → API. Nunca é exibida de volta aqui.</p>
+              </div>
+            </div>
+
             <button onClick={handleSaveSettings} disabled={savingSettings} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl px-5 py-2 text-sm font-medium">
               {savingSettings ? "Salvando..." : "Salvar"}
             </button>

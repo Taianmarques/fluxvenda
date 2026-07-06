@@ -38,6 +38,8 @@ export default async function CobrancaPage({ params }: { params: Promise<{ agent
     <CobrancaClient
       agentId={config.id}
       initialCobrancaEnabled={config.cobrancaEnabled}
+      initialHasAsaasApiKey={Boolean(config.asaasApiKey)}
+      initialAsaasSandbox={config.asaasSandbox}
       initialCobrancas={cobrancas.map(c => ({
         id: c.id,
         nomeDevedor: c.nomeDevedor,
