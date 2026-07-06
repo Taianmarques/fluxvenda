@@ -29,7 +29,7 @@ export default async function FunilPage({ params }: { params: Promise<{ agentId:
     );
   }
 
-  const [pipelines, conversations, opportunities, prospects] = await Promise.all([
+  const [pipelines, conversations, opportunities, prospects, paidOrders, paidCobrancas, feedbacks] = await Promise.all([
     prisma.pipeline.findMany({
       where: { agentConfigId: config.id },
       orderBy: { order: "asc" },
@@ -47,6 +47,18 @@ export default async function FunilPage({ params }: { params: Promise<{ agentId:
       where: { agentConfigId: config.id },
       select: { telefone: true },
     }),
+    prisma.order.findMany({
+      where: { agentConfigId: config.id, status: "PAGO" },
+      select: { contactNumber: true, total: true, deliveryFee: true },
+    }),
+    prisma.cobranca.findMany({
+      where: { agentConfigId: config.id, status: "PAGO" },
+      select: { contactNumber: true, valor: true },
+    }),
+    prisma.posVendaFeedback.findMany({
+      where: { agentConfigId: config.id },
+      select: { contactNumber: true, rating: true },
+    }),
   ]);
 
   // Outbound = contato veio da prospecção ativa (telefone cadastrado como prospect)
@@ -54,6 +66,7 @@ export default async function FunilPage({ params }: { params: Promise<{ agentId:
 
   const leads: FunilLead[] = conversations.map(c => ({
     conversationId: c.id,
+    contactNumber: c.contactNumber,
     origem: outboundPhones.has(c.contactNumber.replace(/\D/g, "")) ? "outbound" as const : "inbound" as const,
     createdAt: c.createdAt.toISOString(),
   }));
@@ -66,11 +79,26 @@ export default async function FunilPage({ params }: { params: Promise<{ agentId:
     wonAt: o.wonAt?.toISOString() ?? null,
   }));
 
+  // Compras por contato (pedidos pagos + cobranças pagas) para a metade de retenção
+  const compras = [
+    ...paidOrders.map(o => ({ contactNumber: o.contactNumber, valor: o.total + o.deliveryFee })),
+    ...paidCobrancas.map(c => ({ contactNumber: c.contactNumber, valor: c.valor })),
+  ];
+
   const funilPipelines: FunilPipeline[] = pipelines.map(p => ({
     id: p.id,
     name: p.name,
     stages: p.stages,
   }));
 
-  return <FunilClient pipelines={funilPipelines} leads={leads} opportunities={opps} agentId={config.id} />;
+  return (
+    <FunilClient
+      pipelines={funilPipelines}
+      leads={leads}
+      opportunities={opps}
+      compras={compras}
+      feedbacks={feedbacks}
+      agentId={config.id}
+    />
+  );
 }
