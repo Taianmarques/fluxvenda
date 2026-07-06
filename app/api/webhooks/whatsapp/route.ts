@@ -9,6 +9,7 @@ import { createAsaasCustomer, createAsaasCharge, cancelAsaasCharge, getAsaasPixQ
 import { ensureStoreSlug } from "@/lib/store-slug";
 import { notifyOrderWebhook } from "@/lib/order-webhook";
 import { notifyProfessionalOfAppointment } from "@/lib/appointment-notify";
+import { emitChatEvent } from "@/lib/realtime";
 
 function mediaMimetype(message: any): string | null {
   return typeof message?.content === "object" && typeof message.content?.mimetype === "string"
@@ -747,6 +748,7 @@ export async function POST(req: NextRequest) {
   const history = recentMessages.reverse();
 
   const savedMsg = await prisma.message.create({ data: { conversationId: conversation.id, role: "user", content: text, mediaUrl, mediaType } });
+  emitChatEvent(config.id, conversation.id); // push em tempo real pro CRM
 
   // Conversa nova + rodízio ativo: já nasce atribuída a um atendente, em ordem
   const isNewConversation = conversation.createdAt.getTime() === conversation.updatedAt.getTime();
@@ -860,6 +862,7 @@ export async function POST(req: NextRequest) {
   }
 
   await prisma.message.create({ data: { conversationId: conversation.id, role: "assistant", content: reply } });
+  emitChatEvent(config.id, conversation.id);
 
   // IA decide quando o lead está qualificado e atribui a um atendente (rodízio), se ainda não tiver dono
   if (config.leadDistributionMode === "IA_QUALIFICACAO" && !conversation.assignedToId) {

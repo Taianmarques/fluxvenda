@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { userBelongsToAgentConfig } from "@/lib/team";
 import { sendWhatsAppTextAsTeam, sendMediaAsTeam, downloadMessageMedia } from "@/lib/whatsapp";
 import { sendInstagramDM } from "@/lib/instagram";
+import { emitChatEvent } from "@/lib/realtime";
 import { z } from "zod";
 
 const schema = z.object({
@@ -84,6 +85,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const message = await prisma.message.create({
     data: { conversationId: id, role: "human", content, mediaUrl, mediaType, senderId: userId },
   });
+  emitChatEvent(conversation.agentConfigId, id); // outros atendentes veem na hora
 
   await prisma.conversation.update({
     where: { id },

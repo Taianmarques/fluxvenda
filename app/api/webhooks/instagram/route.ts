@@ -5,6 +5,7 @@ import { runAgent } from "@/lib/agent-engine";
 import { sendInstagramDM, sendInstagramPrivateReply } from "@/lib/instagram";
 import { logTokenUsage, isOverQuota } from "@/lib/token-usage";
 import { startFunnelExecution, handleFunnelReply } from "@/lib/instagram-funnel";
+import { emitChatEvent } from "@/lib/realtime";
 
 // GET: verificação de webhook pela Meta (hub challenge)
 export async function GET(req: NextRequest) {
@@ -180,6 +181,7 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
   const savedMsg = await prisma.message.create({
     data: { conversationId: conversation.id, role: "user", content: text },
   });
+  emitChatEvent(config.id, conversation.id); // push em tempo real pro CRM
 
   // Debounce: aguarda mensagens em partes antes de responder
   const debounceMs = Number(process.env.MESSAGE_DEBOUNCE_MS ?? "8000");
@@ -227,6 +229,7 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
   const result = await runAgent(config.systemPrompt + emojiInstruction, history, text);
 
   await prisma.message.create({ data: { conversationId: conversation.id, role: "assistant", content: result.reply } });
+  emitChatEvent(config.id, conversation.id);
 
   logTokenUsage({
     teamId: config.teamId,

@@ -340,6 +340,21 @@ export function WhatsappInbox({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Tempo real (SSE): o servidor avisa na hora que chega/sai mensagem — o polling vira fallback.
+  // O EventSource reconecta sozinho em queda de rede (retry embutido do protocolo).
+  useEffect(() => {
+    const es = new EventSource(`/api/agentes/${agentId}/events`);
+    es.onmessage = (ev) => {
+      try {
+        const e = JSON.parse(ev.data) as { conversationId: string };
+        refreshList(true);
+        if (e.conversationId === selectedIdRef.current) refreshDetail(e.conversationId);
+      } catch {}
+    };
+    return () => es.close();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agentId]);
+
   useEffect(() => {
     selectedIdRef.current = selectedId;
     detailFingerprintRef.current = ""; // nova conversa sempre renderiza a primeira carga
