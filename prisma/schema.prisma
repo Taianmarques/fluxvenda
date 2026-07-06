@@ -657,6 +657,7 @@ model AgentConfig {
   igFunnels            InstagramFunnel[]
   storeBanners         StoreBanner[]
   carteiraTouches      CarteiraTouch[]
+  automacoes           Automacao[]
 
   @@index([teamId])
 }
@@ -925,6 +926,31 @@ model QuickReply {
 
   title   String // nome curto pra identificar na lista, ex: "Saudação"
   content String
+
+  automacoes Automacao[]
+}
+
+// Automação determinística do pipeline (sem IA): quando a mensagem rápida vinculada
+// é enviada pelo atendente, o lead move automaticamente para a etapa configurada.
+model Automacao {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  agentConfigId String
+  agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id], onDelete: Cascade)
+
+  nome   String
+  active Boolean @default(true)
+
+  trigger String @default("QUICK_REPLY") // extensível: futuros gatilhos (pedido pago, agendamento...)
+
+  quickReplyId String
+  quickReply   QuickReply @relation(fields: [quickReplyId], references: [id], onDelete: Cascade)
+
+  targetStageId String
+  targetStage   PipelineStage @relation(fields: [targetStageId], references: [id], onDelete: Cascade)
+
+  @@index([agentConfigId])
 }
 
 model Appointment {
@@ -997,6 +1023,7 @@ model PipelineStage {
   agenteInstrucoes String @default("")
 
   opportunities Opportunity[]
+  automacoes    Automacao[]
 }
 
 model LeadStatus {

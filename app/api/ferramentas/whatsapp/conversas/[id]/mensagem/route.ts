@@ -7,6 +7,47 @@ import { sendInstagramDM } from "@/lib/instagram";
 import { emitChatEvent } from "@/lib/realtime";
 import { z } from "zod";
 
+async function runQuickReplyAutomation(agentConfigId: string, conversationId: string, content: string | undefined) {
+  const texto = content?.trim();
+  if (!texto) return;
+
+  const automacoes = await prisma.automacao.findMany({
+    where: { agentConfigId, active: true, trigger: "QUICK_REPLY" },
+    include: { quickReply: { select: { content: true, title: true } }, targetStage: { select: { id: true, name: true } } },
+  });
+  const match = automacoes.find(a => a.quickReply.content.trim() === texto);
+  if (!match) return;
+
+  // Move a oportunidade aberta (ou cria uma) para a etapa alvo
+  const opp = await prisma.opportunity.findFirst({
+    where: { conversationId, wonAt: null },
+    orderBy: { createdAt: "desc" },
+    include: { stage: { select: { name: true } } },
+  });
+
+  if (opp?.stageId === match.targetStage.id) return; // já está lá
+
+  if (opp) {
+    await prisma.opportunity.update({
+      where: { id: opp.id },
+      data: { stageId: match.targetStage.id, stageEnteredAt: new Date() },
+    });
+  } else {
+    await prisma.opportunity.create({
+      data: { conversationId, stageId: match.targetStage.id, stageEnteredAt: new Date(), dealValue: 0 },
+    });
+  }
+
+  await prisma.message.create({
+    data: {
+      conversationId,
+      role: "note",
+      content: `Automação "${match.nome}": lead movido para a etapa "${match.targetStage.name}"${opp?.stage ? ` (antes: "${opp.stage.name}")` : " (entrou no funil)"} pela mensagem rápida "${match.quickReply.title}".`,
+    },
+  });
+  emitChatEvent(agentConfigId, conversationId);
+}
+
 const schema = z.object({
   content: z.string().optional(),
   media: z.object({
@@ -86,6 +127,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     data: { conversationId: id, role: "human", content, mediaUrl, mediaType, senderId: userId },
   });
   emitChatEvent(conversation.agentConfigId, id); // outros atendentes veem na hora
+
+  // Automação por mensagem rápida: se o texto enviado é o conteúdo de uma resposta rápida
+  // vinculada a uma automação ativa, move o lead para a etapa configurada (sem IA)
+  runQuickReplyAutomation(conversation.agentConfigId, id, content).catch(err =>
+    console.warn("[automacao] quick reply:", err?.message ?? err)
+  );
 
   await prisma.conversation.update({
     where: { id },
