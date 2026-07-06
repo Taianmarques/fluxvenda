@@ -3,12 +3,22 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { MessageCircle, KanbanSquare, Calendar, Wallet, ShoppingCart, Landmark, Target, ArrowLeft, ChevronDown, Wifi, GitBranch } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id: string; nome: string }[] }) {
   const pathname = usePathname();
   const router = useRouter();
   const [showSwitcher, setShowSwitcher] = useState(false);
+
+  // Navegação otimista: marca o item clicado e mostra a barra de progresso na hora,
+  // mantendo a página atual visível até a próxima terminar de carregar
+  const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
+  useEffect(() => { setNavigatingTo(null); }, [pathname]);
+
+  function isActive(href: string) {
+    const target = navigatingTo ?? pathname;
+    return href === `/crm/${agentId}` ? target === href : target.startsWith(href);
+  }
 
   const CRM_NAV = [
     { href: `/crm/${agentId}`, label: "Mensagens", icon: MessageCircle },
@@ -32,6 +42,14 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
 
   return (
     <>
+    {/* Barra de progresso da navegação — aparece enquanto a próxima página carrega */}
+    {navigatingTo && (
+      <div className="fixed top-0 inset-x-0 z-[60] h-0.5 overflow-hidden bg-blue-950">
+        <div className="h-full w-1/3 bg-blue-500 rounded-full animate-[crm-progress_1s_ease-in-out_infinite]" />
+        <style>{`@keyframes crm-progress { 0% { transform: translateX(-100%); } 100% { transform: translateX(400%); } }`}</style>
+      </div>
+    )}
+
     {/* Barra horizontal — mobile (some quando uma conversa está aberta) */}
     <div className='md:hidden flex-shrink-0 border-b border-gray-800 bg-black [[data-mobile-chat="1"]_&]:hidden'>
       {agents.length > 1 && (
@@ -47,11 +65,12 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
       )}
       <nav className="flex overflow-x-auto px-2 py-2 gap-1" style={{ scrollbarWidth: "none" }}>
         {CRM_NAV.map(item => {
-          const active = item.href === `/crm/${agentId}` ? pathname === item.href : pathname.startsWith(item.href);
+          const active = isActive(item.href);
           return (
             <Link
               key={item.href}
               href={item.href}
+              onClick={() => { if (pathname !== item.href) setNavigatingTo(item.href); }}
               className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-[10px] font-medium flex-shrink-0 transition-colors ${
                 active ? "text-blue-400 bg-blue-500/10" : "text-gray-400"
               }`}
@@ -102,11 +121,12 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
 
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">
         {CRM_NAV.map(item => {
-          const active = item.href === `/crm/${agentId}` ? pathname === item.href : pathname.startsWith(item.href);
+          const active = isActive(item.href);
           return (
             <Link
               key={item.href}
               href={item.href}
+              onClick={() => { if (pathname !== item.href) setNavigatingTo(item.href); }}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium border-l-2 transition-colors ${
                 active ? "text-white bg-blue-500/10 border-blue-500" : "text-gray-400 border-transparent hover:text-white hover:bg-white/5"
               }`}
