@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { MessageCircle, KanbanSquare, Calendar, Wallet, ShoppingCart, Landmark, Target, ArrowLeft, ChevronDown, Wifi, GitBranch, Briefcase, LayoutGrid, Zap, Filter, UserPlus, ClipboardCheck } from "lucide-react";
+import { MessageCircle, KanbanSquare, Calendar, Wallet, ShoppingCart, Landmark, Target, ArrowLeft, ChevronDown, Wifi, GitBranch, Briefcase, LayoutGrid, Zap, Filter, UserPlus, ClipboardCheck, Radio } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id: string; nome: string }[] }) {
@@ -22,6 +22,7 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
 
   const CRM_NAV = [
     { href: `/crm/${agentId}`, label: "Mensagens", icon: MessageCircle },
+    { href: `/crm/${agentId}/aovivo`, label: "Ao vivo", icon: Radio },
     { href: `/crm/${agentId}/pipeline`, label: "Pipeline", icon: KanbanSquare },
     { href: `/crm/${agentId}/funil`, label: "Funil", icon: Filter },
     { href: `/crm/${agentId}/automacao`, label: "Automação", icon: Zap },
