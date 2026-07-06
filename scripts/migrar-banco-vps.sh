@@ -102,7 +102,10 @@ unset PGHOST PGPORT PGUSER PGPASSWORD PGDATABASE
 echo "    Dump salvo em $DUMP_FILE ($(du -h "$DUMP_FILE" | cut -f1))"
 
 echo "==> 6/8 Restore no banco local..."
-"$PGBIN/pg_restore" --no-owner --no-privileges --clean --if-exists -d "$NEW_URL" "$DUMP_FILE"
+# pg_restore retorna erro por avisos benignos (ex: SET transaction_timeout do PG17
+# num servidor 16) — a verificação de contagens logo abaixo é o teste que vale
+"$PGBIN/pg_restore" --no-owner --no-privileges --clean --if-exists -d "$NEW_URL" "$DUMP_FILE" \
+  || echo "    (avisos ignorados no restore — a verificação a seguir confirma os dados)"
 
 echo "    Verificando dados..."
 AGENTES=$(psql "$NEW_URL" -tAc 'SELECT count(*) FROM "AgentConfig";')
