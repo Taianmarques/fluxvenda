@@ -867,18 +867,23 @@ export async function POST(req: NextRequest) {
     ? "\n\nEmojis: você PODE e DEVE usar emojis nas respostas para tornar a conversa mais amigável e expressiva."
     : "\n\nEmojis: NUNCA use emojis nas respostas. Mantenha o texto limpo, sem símbolos especiais.";
 
-  // Agente da etapa: se o lead está numa etapa do funil com instruções próprias,
-  // elas moldam o comportamento da IA enquanto ele estiver ali
+  // Agente do funil e da etapa: instruções que moldam a IA conforme onde o lead está.
+  // Pipeline vale para o funil inteiro; a etapa refina por cima.
   let stageInstruction = "";
   const currentOpp = await prisma.opportunity.findFirst({
     where: { conversationId: conversation.id, wonAt: null, stageId: { not: null } },
     orderBy: { createdAt: "desc" },
-    include: { stage: { include: { pipeline: { select: { name: true } } } } },
+    include: { stage: { include: { pipeline: { select: { name: true, agenteInstrucoes: true } } } } },
   });
-  if (currentOpp?.stage?.agenteInstrucoes?.trim()) {
-    stageInstruction = `\n\nAGENTE RESPONSÁVEL POR ESTA ETAPA DO FUNIL:
-O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pipeline.name}". Enquanto ele estiver nesta etapa, siga estas orientações com PRIORIDADE sobre o comportamento geral:
-${currentOpp.stage.agenteInstrucoes.trim()}`;
+  if (currentOpp?.stage) {
+    const pipelineInstr = currentOpp.stage.pipeline.agenteInstrucoes?.trim();
+    const stageInstr = currentOpp.stage.agenteInstrucoes?.trim();
+    if (pipelineInstr || stageInstr) {
+      stageInstruction = `\n\nAGENTE RESPONSÁVEL PELO FUNIL:
+O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pipeline.name}". Siga estas orientações com PRIORIDADE sobre o comportamento geral:`;
+      if (pipelineInstr) stageInstruction += `\n\nOrientações do funil "${currentOpp.stage.pipeline.name}" (valem em todas as etapas):\n${pipelineInstr}`;
+      if (stageInstr) stageInstruction += `\n\nOrientações específicas da etapa "${currentOpp.stage.name}" (prioridade máxima):\n${stageInstr}`;
+    }
   }
 
   const activeSystemPrompt = config.systemPrompt + emojiInstruction + stageInstruction;

@@ -971,6 +971,10 @@ model Pipeline {
   name  String
   order Int    @default(0)
 
+  // Agente responsável pelo funil inteiro: instruções aplicadas a leads em qualquer
+  // etapa deste pipeline (as instruções da etapa refinam por cima)
+  agenteInstrucoes String @default("")
+
   stages PipelineStage[]
 }
 

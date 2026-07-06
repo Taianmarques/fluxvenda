@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Bot, X } from "lucide-react";
 import { WhatsappPipeline, type Stage, type PipelineOpportunity } from "../WhatsappPipeline";
 import { type LeadStatus } from "../LeadStatusBadge";
 
-type PipelineSummary = { id: string; name: string; order: number; stages: Stage[] };
+type PipelineSummary = { id: string; name: string; order: number; agenteInstrucoes?: string; stages: Stage[] };
 type ChatTheme = "dark" | "light";
 
 const THEME_STORAGE_KEY = "whatsapp-chat-theme";
@@ -28,6 +29,26 @@ export function PipelineBoard({
   const [showNewPipeline, setShowNewPipeline] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+
+  // Agente responsável pelo pipeline (instruções que valem em todas as etapas dele)
+  const [showAgente, setShowAgente] = useState(false);
+  const [agenteInstrucoes, setAgenteInstrucoes] = useState("");
+  const [salvandoAgente, setSalvandoAgente] = useState(false);
+
+  async function salvarAgentePipeline(pipelineId: string) {
+    setSalvandoAgente(true);
+    try {
+      await fetch(`/api/ferramentas/whatsapp/pipelines/${pipelineId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agenteInstrucoes: agenteInstrucoes.trim() }),
+      });
+      setShowAgente(false);
+      await refreshPipelines();
+    } finally {
+      setSalvandoAgente(false);
+    }
+  }
 
   useEffect(() => {
     const saved = localStorage.getItem(THEME_STORAGE_KEY);
@@ -149,7 +170,52 @@ export function PipelineBoard({
             </button>
           )}
         </div>
+
+        {active && (
+          <button
+            onClick={() => { setAgenteInstrucoes(active.agenteInstrucoes ?? ""); setShowAgente(s => !s); }}
+            title={`Agente responsável pelo pipeline "${active.name}"`}
+            className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${
+              (active.agenteInstrucoes ?? "").trim()
+                ? "text-blue-400 border-blue-800/60 hover:border-blue-600"
+                : theme === "dark" ? "text-gray-500 border-gray-800 hover:text-gray-300" : "text-gray-500 border-gray-300 hover:text-gray-700"
+            }`}
+          >
+            <Bot size={13} />
+            {(active.agenteInstrucoes ?? "").trim() ? "Agente do pipeline" : "Definir agente do pipeline"}
+          </button>
+        )}
       </div>
+
+      {showAgente && active && (
+        <div className={`mx-4 mt-3 rounded-2xl border p-4 space-y-2 flex-shrink-0 ${theme === "dark" ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"}`}>
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold flex items-center gap-1.5"><Bot size={14} /> Agente responsável pelo pipeline "{active.name}"</p>
+            <button onClick={() => setShowAgente(false)} className="text-gray-500 hover:text-gray-300"><X size={15} /></button>
+          </div>
+          <p className="text-xs text-gray-500">
+            Vale para leads em QUALQUER etapa deste pipeline. As instruções configuradas em cada etapa (ícone de robô nas colunas) refinam por cima destas.
+          </p>
+          <textarea
+            value={agenteInstrucoes}
+            onChange={e => setAgenteInstrucoes(e.target.value)}
+            rows={4}
+            maxLength={1500}
+            placeholder={`Ex: este funil é de clientes corporativos — trate com formalidade, foque em contratos anuais e sempre direcione para uma reunião com o time comercial.`}
+            className={`w-full rounded-xl px-3 py-2 text-sm resize-none focus:outline-none border ${theme === "dark" ? "bg-gray-950 border-gray-800 text-white" : "bg-gray-50 border-gray-200"}`}
+          />
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[11px] text-gray-500">Vazio = comportamento padrão do agente.</p>
+            <button
+              onClick={() => salvarAgentePipeline(active.id)}
+              disabled={salvandoAgente}
+              className="text-sm bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl px-4 py-1.5 font-medium"
+            >
+              {salvandoAgente ? "Salvando..." : "Salvar"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {!active ? (
         <div className="flex-1 flex items-center justify-center text-gray-500">Crie um pipeline para começar.</div>
