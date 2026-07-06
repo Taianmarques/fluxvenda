@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Briefcase, Search, X, Instagram, MessageCircle, Users, ShoppingBag, TrendingUp, Bot } from "lucide-react";
+import { Briefcase, Search, X, Instagram, MessageCircle, Bot, Sparkles } from "lucide-react";
 
 export type CarteiraCliente = {
   contactNumber: string;
@@ -12,29 +12,12 @@ export type CarteiraCliente = {
   assignedToName: string | null;
   leadStatusName: string | null;
   leadStatusColor: string | null;
-  totalComprado: number;
-  pedidos: number;
-  lastPurchaseAt: string | null; // ISO
+  conversaStatus: string; // ATIVO | AGUARDANDO | FINALIZADO
+  lastMessageRole: string | null; // user | assistant | human
+  compras: { at: string; valor: number }[]; // pedidos pagos + cobranças pagas + oportunidades ganhas
+  orcamentosAbertos: number;
+  orcamentoAbertoValor: number;
 };
-
-type Filtro = "todos" | "compraram" | "sem_compra" | "inativos";
-type Ordem = "recentes" | "valor" | "pedidos";
-
-const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-
-function isIg(n: string) { return n.startsWith("ig_"); }
-
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const days = Math.floor(diff / 86400000);
-  if (days === 0) return "hoje";
-  if (days === 1) return "ontem";
-  if (days < 30) return `${days}d atrás`;
-  const months = Math.floor(days / 30);
-  return months < 12 ? `${months}m atrás` : `${Math.floor(months / 12)}a atrás`;
-}
-
-const INATIVO_DIAS = 30;
 
 export type CarteiraConfig = {
   carteiraEnabled: boolean;
@@ -46,6 +29,63 @@ export type CarteiraConfig = {
   carteiraInstrucoes: string;
 };
 
+type Periodo = "hoje" | "7d" | "15d" | "30d" | "60d" | "90d" | "mes_atual" | "mes_anterior" | "custom";
+type Segmento = "todos" | "compraram" | "nao_compraram" | "reduziram" | "aumentaram" | "orcamento" | "sem_contato" | "followup";
+type Ordem = "recentes" | "valor" | "valor_periodo";
+
+const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const isIg = (n: string) => n.startsWith("ig_");
+
+function timeAgo(iso: string): string {
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+  if (days === 0) return "hoje";
+  if (days === 1) return "ontem";
+  if (days < 30) return `${days}d atrás`;
+  const months = Math.floor(days / 30);
+  return months < 12 ? `${months}m atrás` : `${Math.floor(months / 12)}a atrás`;
+}
+
+const PERIODOS: { key: Periodo; label: string }[] = [
+  { key: "hoje", label: "Hoje" },
+  { key: "7d", label: "7 dias" },
+  { key: "15d", label: "15 dias" },
+  { key: "30d", label: "30 dias" },
+  { key: "60d", label: "60 dias" },
+  { key: "90d", label: "90 dias" },
+  { key: "mes_atual", label: "Mês atual" },
+  { key: "mes_anterior", label: "Mês anterior" },
+  { key: "custom", label: "Personalizado" },
+];
+
+function rangeFor(p: Periodo, customStart: string, customEnd: string): { start: Date; end: Date } {
+  const now = new Date();
+  const startOfDay = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+  if (p === "hoje") return { start: startOfDay(now), end: now };
+  if (p === "mes_atual") return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: now };
+  if (p === "mes_anterior") {
+    return {
+      start: new Date(now.getFullYear(), now.getMonth() - 1, 1),
+      end: new Date(now.getFullYear(), now.getMonth(), 1),
+    };
+  }
+  if (p === "custom") {
+    const s = customStart ? startOfDay(new Date(`${customStart}T00:00:00`)) : startOfDay(now);
+    const e = customEnd ? new Date(`${customEnd}T23:59:59`) : now;
+    return { start: s, end: e };
+  }
+  const days = { "7d": 7, "15d": 15, "30d": 30, "60d": 60, "90d": 90 }[p] ?? 30;
+  return { start: new Date(now.getTime() - days * 86400000), end: now };
+}
+
+function sumCompras(c: CarteiraCliente, start: Date, end: Date): number {
+  let s = 0;
+  for (const compra of c.compras) {
+    const at = new Date(compra.at);
+    if (at >= start && at <= end) s += compra.valor;
+  }
+  return s;
+}
+
 export function CarteiraClient({ agentId, clientes, initialConfig, isManager }: {
   agentId: string;
   clientes: CarteiraCliente[];
@@ -53,10 +93,13 @@ export function CarteiraClient({ agentId, clientes, initialConfig, isManager }: 
   isManager?: boolean;
 }) {
   const [search, setSearch] = useState("");
-  const [filtro, setFiltro] = useState<Filtro>("todos");
+  const [periodo, setPeriodo] = useState<Periodo>("30d");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+  const [segmento, setSegmento] = useState<Segmento>("todos");
   const [ordem, setOrdem] = useState<Ordem>("recentes");
 
-  // Configuração do agente de carteira (pós-venda + recompra)
+  // Configuração do agente de carteira
   const [showConfig, setShowConfig] = useState(false);
   const [cfg, setCfg] = useState<CarteiraConfig>(initialConfig ?? {
     carteiraEnabled: false, posVendaEnabled: true, posVendaDelayHours: 24,
@@ -64,6 +107,84 @@ export function CarteiraClient({ agentId, clientes, initialConfig, isManager }: 
   });
   const [savingCfg, setSavingCfg] = useState(false);
   const [cfgSaved, setCfgSaved] = useState(false);
+
+  // Análise da IA
+  const [analise, setAnalise] = useState("");
+  const [analisando, setAnalisando] = useState(false);
+  const [analiseError, setAnaliseError] = useState("");
+
+  const { start, end } = useMemo(
+    () => rangeFor(periodo, customStart, customEnd),
+    [periodo, customStart, customEnd]
+  );
+  // Período anterior equivalente (para reduziu/aumentou)
+  const prev = useMemo(() => {
+    const len = end.getTime() - start.getTime();
+    return { start: new Date(start.getTime() - len), end: start };
+  }, [start, end]);
+
+  type ClienteCalc = CarteiraCliente & {
+    valorPeriodo: number;
+    valorPeriodoAnterior: number;
+    totalComprado: number;
+    pedidos: number;
+    lastPurchaseAt: string | null;
+  };
+
+  const calc: ClienteCalc[] = useMemo(() => clientes.map(c => {
+    const totalComprado = c.compras.reduce((s, x) => s + x.valor, 0);
+    const lastPurchaseAt = c.compras.length > 0
+      ? c.compras.reduce((max, x) => (x.at > max ? x.at : max), c.compras[0].at)
+      : null;
+    return {
+      ...c,
+      valorPeriodo: sumCompras(c, start, end),
+      valorPeriodoAnterior: sumCompras(c, prev.start, prev.end),
+      totalComprado,
+      pedidos: c.compras.length,
+      lastPurchaseAt,
+    };
+  }), [clientes, start, end, prev]);
+
+  function inSegment(c: ClienteCalc, seg: Segmento): boolean {
+    switch (seg) {
+      case "todos": return true;
+      case "compraram": return c.valorPeriodo > 0;
+      case "nao_compraram": return c.valorPeriodo === 0;
+      case "reduziram": return c.valorPeriodoAnterior > 0 && c.valorPeriodo < c.valorPeriodoAnterior;
+      case "aumentaram": return c.valorPeriodo > c.valorPeriodoAnterior && c.valorPeriodo > 0;
+      case "orcamento": return c.orcamentosAbertos > 0;
+      case "sem_contato": return new Date(c.lastContactAt) < start;
+      case "followup": return c.conversaStatus !== "FINALIZADO" && (c.lastMessageRole === "assistant" || c.lastMessageRole === "human");
+    }
+  }
+
+  const segCounts = useMemo(() => {
+    const counts: Record<Segmento, number> = {
+      todos: calc.length, compraram: 0, nao_compraram: 0, reduziram: 0,
+      aumentaram: 0, orcamento: 0, sem_contato: 0, followup: 0,
+    };
+    for (const c of calc) {
+      (["compraram", "nao_compraram", "reduziram", "aumentaram", "orcamento", "sem_contato", "followup"] as Segmento[])
+        .forEach(s => { if (inSegment(c, s)) counts[s]++; });
+    }
+    return counts;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calc]);
+
+  const receitaPeriodo = useMemo(() => calc.reduce((s, c) => s + c.valorPeriodo, 0), [calc]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    let base = calc.filter(c => inSegment(c, segmento));
+    if (q) base = base.filter(c => (c.contactName ?? "").toLowerCase().includes(q) || c.contactNumber.includes(q));
+    return [...base].sort((a, b) => {
+      if (ordem === "valor") return b.totalComprado - a.totalComprado;
+      if (ordem === "valor_periodo") return b.valorPeriodo - a.valorPeriodo;
+      return b.lastContactAt.localeCompare(a.lastContactAt);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calc, search, segmento, ordem]);
 
   async function handleSaveConfig() {
     setSavingCfg(true);
@@ -78,41 +199,35 @@ export function CarteiraClient({ agentId, clientes, initialConfig, isManager }: 
     } finally { setSavingCfg(false); }
   }
 
-  const resumo = useMemo(() => {
-    const compraram = clientes.filter(c => c.totalComprado > 0);
-    const receita = compraram.reduce((s, c) => s + c.totalComprado, 0);
-    return {
-      total: clientes.length,
-      compraram: compraram.length,
-      receita,
-      ticket: compraram.length > 0 ? receita / compraram.length : 0,
-    };
-  }, [clientes]);
+  async function handleAnalisar() {
+    setAnalisando(true);
+    setAnaliseError("");
+    try {
+      const res = await fetch(`/api/agentes/${agentId}/carteira/analise`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          periodoLabel: PERIODOS.find(p => p.key === periodo)?.label ?? periodo,
+          inicio: start.toISOString(),
+          fim: end.toISOString(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Erro na análise.");
+      setAnalise(data.analise);
+    } catch (e: any) {
+      setAnaliseError(e.message ?? "Erro na análise.");
+    } finally { setAnalisando(false); }
+  }
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const cutoff = Date.now() - INATIVO_DIAS * 86400000;
-    let base = clientes;
-    if (filtro === "compraram") base = base.filter(c => c.totalComprado > 0);
-    if (filtro === "sem_compra") base = base.filter(c => c.totalComprado === 0);
-    if (filtro === "inativos") base = base.filter(c => new Date(c.lastContactAt).getTime() < cutoff);
-    if (q) {
-      base = base.filter(c =>
-        (c.contactName ?? "").toLowerCase().includes(q) || c.contactNumber.includes(q)
-      );
-    }
-    return [...base].sort((a, b) => {
-      if (ordem === "valor") return b.totalComprado - a.totalComprado;
-      if (ordem === "pedidos") return b.pedidos - a.pedidos;
-      return b.lastContactAt.localeCompare(a.lastContactAt);
-    });
-  }, [clientes, search, filtro, ordem]);
-
-  const FILTROS: { key: Filtro; label: string }[] = [
-    { key: "todos", label: "Todos" },
-    { key: "compraram", label: "Compraram" },
-    { key: "sem_compra", label: "Sem compra" },
-    { key: "inativos", label: `Inativos +${INATIVO_DIAS}d` },
+  const SEGMENTOS: { key: Segmento; label: string; hint: string }[] = [
+    { key: "compraram", label: "Compraram", hint: "no período" },
+    { key: "nao_compraram", label: "Não compraram", hint: "no período" },
+    { key: "reduziram", label: "Reduziram compra", hint: "vs período anterior" },
+    { key: "aumentaram", label: "Aumentaram compra", hint: "vs período anterior" },
+    { key: "orcamento", label: "Orçamento em aberto", hint: "pedido sem pagamento" },
+    { key: "sem_contato", label: "Sem contato recente", hint: "nenhuma interação no período" },
+    { key: "followup", label: "Follow-up pendente", hint: "empresa falou por último" },
   ];
 
   return (
@@ -126,18 +241,42 @@ export function CarteiraClient({ agentId, clientes, initialConfig, isManager }: 
             </h1>
           </div>
           {isManager && (
-            <button
-              onClick={() => setShowConfig(s => !s)}
-              className={`flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
-                cfg.carteiraEnabled ? "bg-green-700 hover:bg-green-600" : "bg-gray-800 hover:bg-gray-700"
-              }`}
-            >
-              <Bot size={15} />
-              {cfg.carteiraEnabled ? "Agente de carteira ativo" : "Configurar agente"}
-            </button>
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={handleAnalisar}
+                disabled={analisando}
+                className="flex items-center gap-1.5 bg-purple-700 hover:bg-purple-600 disabled:opacity-60 rounded-xl px-4 py-2.5 text-sm font-medium"
+              >
+                <Sparkles size={15} />
+                {analisando ? "Analisando..." : "Análise da IA"}
+              </button>
+              <button
+                onClick={() => setShowConfig(s => !s)}
+                className={`flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
+                  cfg.carteiraEnabled ? "bg-green-700 hover:bg-green-600" : "bg-gray-800 hover:bg-gray-700"
+                }`}
+              >
+                <Bot size={15} />
+                {cfg.carteiraEnabled ? "Agente ativo" : "Configurar agente"}
+              </button>
+            </div>
           )}
         </div>
 
+        {/* Análise da IA */}
+        {(analise || analiseError) && (
+          <div className="bg-purple-950/30 border border-purple-800/40 rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-semibold text-purple-300 flex items-center gap-1.5"><Sparkles size={14} /> Análise da carteira</p>
+              <button onClick={() => { setAnalise(""); setAnaliseError(""); }} className="text-gray-500 hover:text-white"><X size={15} /></button>
+            </div>
+            {analiseError
+              ? <p className="text-sm text-red-400">{analiseError}</p>
+              : <p className="text-sm text-gray-200 whitespace-pre-wrap leading-relaxed">{analise}</p>}
+          </div>
+        )}
+
+        {/* Configuração do agente */}
         {showConfig && isManager && (
           <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-5">
             <div>
@@ -152,7 +291,6 @@ export function CarteiraClient({ agentId, clientes, initialConfig, isManager }: 
               <span className="text-sm font-medium">Ativar agente de carteira</span>
             </label>
 
-            {/* Pós-venda */}
             <div className="border-t border-gray-800 pt-4 space-y-3">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={cfg.posVendaEnabled} onChange={e => setCfg(c => ({ ...c, posVendaEnabled: e.target.checked }))} className="w-4 h-4" />
@@ -160,7 +298,7 @@ export function CarteiraClient({ agentId, clientes, initialConfig, isManager }: 
               </label>
               {cfg.posVendaEnabled && (
                 <div className="space-y-3 pl-6">
-                  <div className="flex items-center gap-2 text-sm text-gray-400">
+                  <div className="flex items-center gap-2 text-sm text-gray-400 flex-wrap">
                     Enviar
                     <input
                       type="number" min={1} max={168} value={cfg.posVendaDelayHours}
@@ -185,7 +323,6 @@ export function CarteiraClient({ agentId, clientes, initialConfig, isManager }: 
               )}
             </div>
 
-            {/* Recompra */}
             <div className="border-t border-gray-800 pt-4 space-y-3">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={cfg.recompraEnabled} onChange={e => setCfg(c => ({ ...c, recompraEnabled: e.target.checked }))} className="w-4 h-4" />
@@ -193,7 +330,7 @@ export function CarteiraClient({ agentId, clientes, initialConfig, isManager }: 
               </label>
               {cfg.recompraEnabled && (
                 <div className="space-y-2 pl-6">
-                  <div className="flex items-center gap-2 text-sm text-gray-400">
+                  <div className="flex items-center gap-2 text-sm text-gray-400 flex-wrap">
                     Contatar quem não compra há
                     <input
                       type="number" min={3} max={180} value={cfg.recompraDias}
@@ -209,7 +346,6 @@ export function CarteiraClient({ agentId, clientes, initialConfig, isManager }: 
               )}
             </div>
 
-            {/* Instruções */}
             <div className="border-t border-gray-800 pt-4">
               <label className="text-xs text-gray-400 block mb-1">Orientações para a IA (opcional)</label>
               <textarea
@@ -231,64 +367,84 @@ export function CarteiraClient({ agentId, clientes, initialConfig, isManager }: 
           </div>
         )}
 
-        {/* Resumo */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[
-            { label: "Clientes na carteira", value: String(resumo.total), icon: Users },
-            { label: "Já compraram", value: String(resumo.compraram), icon: ShoppingBag },
-            { label: "Receita total", value: brl(resumo.receita), icon: TrendingUp },
-            { label: "Ticket médio", value: brl(resumo.ticket), icon: TrendingUp },
-          ].map(card => (
-            <div key={card.label} className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
-              <p className="text-xl md:text-2xl font-bold text-blue-400 truncate">{card.value}</p>
-              <p className="text-xs text-gray-500 mt-1">{card.label}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Busca + filtros */}
+        {/* Período */}
         <div className="space-y-2">
-          <div className="flex gap-2 flex-wrap">
-            <div className="flex-1 min-w-[200px] flex items-center gap-2 bg-gray-900 border border-gray-800 rounded-xl px-3 py-2">
-              <Search size={14} className="text-gray-500 flex-shrink-0" />
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Buscar por nome ou número..."
-                className="flex-1 bg-transparent text-sm focus:outline-none placeholder:text-gray-600"
-              />
-              {search && <button onClick={() => setSearch("")} className="text-gray-500 hover:text-white"><X size={14} /></button>}
-            </div>
-            <select
-              value={ordem}
-              onChange={e => setOrdem(e.target.value as Ordem)}
-              className="bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-sm"
-            >
-              <option value="recentes">Último contato</option>
-              <option value="valor">Maior valor</option>
-              <option value="pedidos">Mais pedidos</option>
-            </select>
-          </div>
-          <div className="flex gap-1.5 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-            {FILTROS.map(f => (
+          <div className="flex gap-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+            {PERIODOS.map(p => (
               <button
-                key={f.key}
-                onClick={() => setFiltro(f.key)}
+                key={p.key}
+                onClick={() => setPeriodo(p.key)}
                 className={`flex-shrink-0 text-xs font-medium rounded-full px-3 py-1.5 border transition-colors ${
-                  filtro === f.key ? "bg-blue-600 border-blue-600 text-white" : "border-gray-800 text-gray-400 hover:border-gray-600"
+                  periodo === p.key ? "bg-blue-600 border-blue-600 text-white" : "border-gray-800 text-gray-400 hover:border-gray-600"
                 }`}
               >
-                {f.label}
+                {p.label}
               </button>
             ))}
           </div>
+          {periodo === "custom" && (
+            <div className="flex items-center gap-2 text-sm text-gray-400 flex-wrap">
+              De
+              <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="bg-gray-900 border border-gray-800 rounded-lg px-2 py-1.5 text-sm text-white" />
+              até
+              <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="bg-gray-900 border border-gray-800 rounded-lg px-2 py-1.5 text-sm text-white" />
+            </div>
+          )}
+          <p className="text-xs text-gray-600">
+            {calc.length} cliente{calc.length === 1 ? "" : "s"} na carteira · receita no período: <span className="text-green-400 font-medium">{brl(receitaPeriodo)}</span>
+          </p>
+        </div>
+
+        {/* Segmentos */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <button
+            onClick={() => setSegmento("todos")}
+            className={`text-left rounded-xl border p-3 transition-colors ${segmento === "todos" ? "border-blue-500 bg-blue-500/10" : "border-gray-800 bg-gray-900 hover:border-gray-600"}`}
+          >
+            <p className="text-lg font-bold">{segCounts.todos}</p>
+            <p className="text-xs text-gray-400">Todos os clientes</p>
+          </button>
+          {SEGMENTOS.map(s => (
+            <button
+              key={s.key}
+              onClick={() => setSegmento(segmento === s.key ? "todos" : s.key)}
+              className={`text-left rounded-xl border p-3 transition-colors ${segmento === s.key ? "border-blue-500 bg-blue-500/10" : "border-gray-800 bg-gray-900 hover:border-gray-600"}`}
+            >
+              <p className="text-lg font-bold">{segCounts[s.key]}</p>
+              <p className="text-xs text-gray-300">{s.label}</p>
+              <p className="text-[10px] text-gray-600">{s.hint}</p>
+            </button>
+          ))}
+        </div>
+
+        {/* Busca + ordenação */}
+        <div className="flex gap-2 flex-wrap">
+          <div className="flex-1 min-w-[200px] flex items-center gap-2 bg-gray-900 border border-gray-800 rounded-xl px-3 py-2">
+            <Search size={14} className="text-gray-500 flex-shrink-0" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar por nome ou número..."
+              className="flex-1 bg-transparent text-sm focus:outline-none placeholder:text-gray-600"
+            />
+            {search && <button onClick={() => setSearch("")} className="text-gray-500 hover:text-white"><X size={14} /></button>}
+          </div>
+          <select
+            value={ordem}
+            onChange={e => setOrdem(e.target.value as Ordem)}
+            className="bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+          >
+            <option value="recentes">Último contato</option>
+            <option value="valor_periodo">Maior valor no período</option>
+            <option value="valor">Maior valor total</option>
+          </select>
         </div>
 
         {/* Lista */}
         <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
           {filtered.length === 0 ? (
             <p className="text-sm text-gray-500 p-6 text-center">
-              {clientes.length === 0 ? "Nenhum cliente ainda — a carteira se preenche conforme as conversas chegam." : "Nenhum cliente com esse filtro."}
+              {clientes.length === 0 ? "Nenhum cliente ainda — a carteira se preenche conforme as conversas chegam." : "Nenhum cliente nesse segmento/busca."}
             </p>
           ) : (
             <div className="divide-y divide-gray-800">
@@ -313,22 +469,25 @@ export function CarteiraClient({ agentId, clientes, initialConfig, isManager }: 
                           {c.leadStatusName}
                         </span>
                       )}
+                      {c.orcamentosAbertos > 0 && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full border border-amber-700 text-amber-400 flex-shrink-0">
+                          orçamento {brl(c.orcamentoAbertoValor)}
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-gray-500 truncate">
-                      {c.contactName && !isIg(c.contactNumber) ? `${c.contactNumber} · ` : ""}
                       contato {timeAgo(c.lastContactAt)}
+                      {c.lastPurchaseAt && ` · última compra ${timeAgo(c.lastPurchaseAt)}`}
                       {c.assignedToName && ` · ${c.assignedToName}`}
                     </p>
                   </div>
 
                   <div className="text-right flex-shrink-0">
-                    <p className={`text-sm font-bold ${c.totalComprado > 0 ? "text-green-400" : "text-gray-600"}`}>
-                      {c.totalComprado > 0 ? brl(c.totalComprado) : "—"}
+                    <p className={`text-sm font-bold ${c.valorPeriodo > 0 ? "text-green-400" : "text-gray-600"}`}>
+                      {c.valorPeriodo > 0 ? brl(c.valorPeriodo) : "—"}
                     </p>
                     <p className="text-[11px] text-gray-500">
-                      {c.pedidos > 0
-                        ? `${c.pedidos} compra${c.pedidos === 1 ? "" : "s"}${c.lastPurchaseAt ? ` · ${timeAgo(c.lastPurchaseAt)}` : ""}`
-                        : "sem compras"}
+                      total {c.totalComprado > 0 ? brl(c.totalComprado) : "—"} · {c.pedidos} compra{c.pedidos === 1 ? "" : "s"}
                     </p>
                   </div>
                 </Link>

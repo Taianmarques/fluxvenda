@@ -30,7 +30,7 @@ export default async function CarteiraPage({ params }: { params: Promise<{ agent
     );
   }
 
-  const [conversations, paidOrders, paidCobrancas] = await Promise.all([
+  const [conversations, orders, paidCobrancas] = await Promise.all([
     prisma.conversation.findMany({
       where: {
         agentConfigId: config.id,
@@ -42,11 +42,12 @@ export default async function CarteiraPage({ params }: { params: Promise<{ agent
         assignedTo: { select: { name: true } },
         leadStatus: { select: { name: true, color: true } },
         opportunities: { select: { dealValue: true, wonAt: true } },
+        messages: { where: { role: { not: "note" } }, orderBy: { createdAt: "desc" }, take: 1, select: { role: true } },
       },
     }),
     prisma.order.findMany({
-      where: { agentConfigId: config.id, status: "PAGO" },
-      select: { contactNumber: true, total: true, deliveryFee: true, paidAt: true },
+      where: { agentConfigId: config.id, status: { in: ["PAGO", "ABERTO", "AGUARDANDO_PAGAMENTO"] } },
+      select: { contactNumber: true, status: true, total: true, deliveryFee: true, paidAt: true, createdAt: true },
     }),
     prisma.cobranca.findMany({
       where: { agentConfigId: config.id, status: "PAGO" },
@@ -59,9 +60,9 @@ export default async function CarteiraPage({ params }: { params: Promise<{ agent
 
   for (const c of conversations) {
     const existing = byContact.get(c.contactNumber);
-    const wonValue = c.opportunities.filter(o => o.wonAt).reduce((s, o) => s + o.dealValue, 0);
+    const wonOpps = c.opportunities.filter(o => o.wonAt);
     if (existing) {
-      existing.totalComprado += wonValue;
+      for (const o of wonOpps) existing.compras.push({ at: o.wonAt!.toISOString(), valor: o.dealValue });
       if (!existing.contactName && c.contactName) existing.contactName = c.contactName;
       continue;
     }
@@ -73,28 +74,30 @@ export default async function CarteiraPage({ params }: { params: Promise<{ agent
       assignedToName: c.assignedTo?.name ?? null,
       leadStatusName: c.leadStatus?.name ?? null,
       leadStatusColor: c.leadStatus?.color ?? null,
-      totalComprado: wonValue,
-      pedidos: 0,
-      lastPurchaseAt: null,
+      conversaStatus: c.status,
+      lastMessageRole: c.messages[0]?.role ?? null,
+      compras: wonOpps.map(o => ({ at: o.wonAt!.toISOString(), valor: o.dealValue })),
+      orcamentosAbertos: 0,
+      orcamentoAbertoValor: 0,
     });
   }
 
-  for (const o of paidOrders) {
+  for (const o of orders) {
     const client = byContact.get(o.contactNumber);
     if (!client) continue;
-    client.totalComprado += o.total + o.deliveryFee;
-    client.pedidos += 1;
-    const paid = o.paidAt?.toISOString() ?? null;
-    if (paid && (!client.lastPurchaseAt || paid > client.lastPurchaseAt)) client.lastPurchaseAt = paid;
+    if (o.status === "PAGO") {
+      if (o.paidAt) client.compras.push({ at: o.paidAt.toISOString(), valor: o.total + o.deliveryFee });
+    } else {
+      // ABERTO / AGUARDANDO_PAGAMENTO = orçamento em aberto
+      client.orcamentosAbertos += 1;
+      client.orcamentoAbertoValor += o.total + o.deliveryFee;
+    }
   }
 
   for (const cb of paidCobrancas) {
     const client = byContact.get(cb.contactNumber);
-    if (!client) continue;
-    client.totalComprado += cb.valor;
-    client.pedidos += 1;
-    const paid = cb.paidAt?.toISOString() ?? null;
-    if (paid && (!client.lastPurchaseAt || paid > client.lastPurchaseAt)) client.lastPurchaseAt = paid;
+    if (!client || !cb.paidAt) continue;
+    client.compras.push({ at: cb.paidAt.toISOString(), valor: cb.valor });
   }
 
   return (
