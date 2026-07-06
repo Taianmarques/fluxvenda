@@ -18,6 +18,10 @@
 
 set -euo pipefail
 
+# apt 100% não-interativo (needrestart do Ubuntu trava esperando prompt invisível)
+export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=a
+
 APP_DIR="${APP_DIR:-$HOME/fluxvenda}"
 ENV_FILE="$APP_DIR/.env.local"
 DB_NAME="fluxvenda"
