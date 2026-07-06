@@ -6,11 +6,11 @@ import {
   type DragEndEvent, type DragStartEvent,
 } from "@dnd-kit/core";
 import { useDroppable, useDraggable } from "@dnd-kit/core";
-import { ThumbsUp, MessageCircle } from "lucide-react";
+import { ThumbsUp, MessageCircle, Bot, X } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { ConversationPopup } from "./ConversationPopup";
 
-export type Stage = { id: string; name: string; color: string; order: number };
+export type Stage = { id: string; name: string; color: string; order: number; agenteInstrucoes?: string };
 export type PipelineOpportunity = {
   id: string;
   conversationId: string;
@@ -168,7 +168,7 @@ function Card({
 }
 
 function Column({
-  agentId, stage, opportunities, onClickCard, onRename, onDelete, onValueChange, onLeadStatusChange, onMarcarGanho, onOpenChat, leadStatuses, onLeadStatusesChange, dark, t,
+  agentId, stage, opportunities, onClickCard, onRename, onDelete, onStagesChange, onValueChange, onLeadStatusChange, onMarcarGanho, onOpenChat, leadStatuses, onLeadStatusesChange, dark, t,
 }: {
   agentId: string;
   stage: Stage;
@@ -176,6 +176,7 @@ function Column({
   onClickCard: (conversationId: string) => void;
   onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
+  onStagesChange: () => void;
   onValueChange: (id: string, value: number) => void;
   onLeadStatusChange: (conversationId: string, leadStatusId: string | null) => void;
   onMarcarGanho: (id: string) => void;
@@ -188,6 +189,27 @@ function Column({
   const { setNodeRef, isOver } = useDroppable({ id: stage.id });
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(stage.name);
+
+  // Agente da etapa: instruções que a IA segue enquanto o lead está aqui
+  const [showAgente, setShowAgente] = useState(false);
+  const [instrucoes, setInstrucoes] = useState(stage.agenteInstrucoes ?? "");
+  const [salvandoAgente, setSalvandoAgente] = useState(false);
+  const temAgente = (stage.agenteInstrucoes ?? "").trim().length > 0;
+
+  async function salvarAgente() {
+    setSalvandoAgente(true);
+    try {
+      await fetch(`/api/ferramentas/whatsapp/etapas/${stage.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agenteInstrucoes: instrucoes.trim() }),
+      });
+      setShowAgente(false);
+      onStagesChange();
+    } finally {
+      setSalvandoAgente(false);
+    }
+  }
 
   const total = opportunities.reduce((sum, o) => sum + o.dealValue, 0);
 
@@ -208,10 +230,44 @@ function Column({
           ) : (
             <p className="flex-1 font-medium text-sm truncate cursor-text" onClick={() => setEditing(true)}>{stage.name}</p>
           )}
+          <button
+            onClick={() => { setInstrucoes(stage.agenteInstrucoes ?? ""); setShowAgente(s => !s); }}
+            title={temAgente ? "Agente da etapa configurado — clique para editar" : "Configurar agente responsável por esta etapa"}
+            className={`flex-shrink-0 ${temAgente ? "text-blue-400 hover:text-blue-300" : "text-gray-600 hover:text-gray-400"}`}
+          >
+            <Bot size={14} />
+          </button>
           <span className={`text-xs ${t.columnCount}`}>{opportunities.length}</span>
           <button onClick={() => onDelete(stage.id)} className="text-gray-500 hover:text-red-400 text-xs">✕</button>
         </div>
         {total > 0 && <p className="text-xs font-semibold text-green-500 mt-1.5">{formatBRL(total)}</p>}
+
+        {showAgente && (
+          <div className={`mt-2 rounded-xl border p-2.5 space-y-2 ${dark ? "bg-gray-950 border-gray-700" : "bg-white border-gray-300"}`}>
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold flex items-center gap-1"><Bot size={11} /> Agente desta etapa</p>
+              <button onClick={() => setShowAgente(false)} className="text-gray-500 hover:text-gray-300"><X size={12} /></button>
+            </div>
+            <textarea
+              value={instrucoes}
+              onChange={e => setInstrucoes(e.target.value)}
+              rows={4}
+              maxLength={1500}
+              placeholder={`Como a IA deve agir com leads na etapa "${stage.name}"?\nEx: foque em entender a necessidade e agendar uma demonstração; não fale de preço ainda.`}
+              className={`w-full rounded-lg px-2 py-1.5 text-xs resize-none focus:outline-none border ${dark ? "bg-gray-900 border-gray-800 text-white" : "bg-gray-50 border-gray-200"}`}
+            />
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[10px] text-gray-500">Vazio = comportamento padrão do agente.</p>
+              <button
+                onClick={salvarAgente}
+                disabled={salvandoAgente}
+                className="text-xs bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg px-3 py-1 font-medium"
+              >
+                {salvandoAgente ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
       <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[120px]">
         {opportunities.map(o => (
@@ -342,6 +398,7 @@ export function WhatsappPipeline({
               onClickCard={onSelectConversation}
               onRename={() => {}}
               onDelete={() => {}}
+              onStagesChange={() => {}}
               onValueChange={handleValueChange}
               onLeadStatusChange={handleLeadStatusChange}
               onMarcarGanho={handleMarcarGanho}
@@ -361,6 +418,7 @@ export function WhatsappPipeline({
               onClickCard={onSelectConversation}
               onRename={handleRename}
               onDelete={handleDelete}
+              onStagesChange={onStagesChange}
               onValueChange={handleValueChange}
               onLeadStatusChange={handleLeadStatusChange}
               onMarcarGanho={handleMarcarGanho}

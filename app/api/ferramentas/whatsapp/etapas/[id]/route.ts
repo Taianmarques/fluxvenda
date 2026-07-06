@@ -8,6 +8,7 @@ const patchSchema = z.object({
   name: z.string().min(1).max(40).optional(),
   color: z.string().optional(),
   order: z.number().int().optional(),
+  agenteInstrucoes: z.string().max(1500).optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

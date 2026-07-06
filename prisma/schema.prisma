@@ -985,6 +985,10 @@ model PipelineStage {
   color String @default("#3b82f6")
   order Int    @default(0)
 
+  // Agente responsável pela etapa: instruções que moldam o comportamento da IA
+  // enquanto o lead estiver nesta etapa do funil (prioridade sobre o prompt geral)
+  agenteInstrucoes String @default("")
+
   opportunities Opportunity[]
 }
 

@@ -866,7 +866,22 @@ export async function POST(req: NextRequest) {
   const emojiInstruction = config.emojiEnabled
     ? "\n\nEmojis: você PODE e DEVE usar emojis nas respostas para tornar a conversa mais amigável e expressiva."
     : "\n\nEmojis: NUNCA use emojis nas respostas. Mantenha o texto limpo, sem símbolos especiais.";
-  const activeSystemPrompt = config.systemPrompt + emojiInstruction;
+
+  // Agente da etapa: se o lead está numa etapa do funil com instruções próprias,
+  // elas moldam o comportamento da IA enquanto ele estiver ali
+  let stageInstruction = "";
+  const currentOpp = await prisma.opportunity.findFirst({
+    where: { conversationId: conversation.id, wonAt: null, stageId: { not: null } },
+    orderBy: { createdAt: "desc" },
+    include: { stage: { include: { pipeline: { select: { name: true } } } } },
+  });
+  if (currentOpp?.stage?.agenteInstrucoes?.trim()) {
+    stageInstruction = `\n\nAGENTE RESPONSÁVEL POR ESTA ETAPA DO FUNIL:
+O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pipeline.name}". Enquanto ele estiver nesta etapa, siga estas orientações com PRIORIDADE sobre o comportamento geral:
+${currentOpp.stage.agenteInstrucoes.trim()}`;
+  }
+
+  const activeSystemPrompt = config.systemPrompt + emojiInstruction + stageInstruction;
 
   if (await isOverQuota(config.teamId)) {
     await sendWhatsAppTextAsTeam(config.uazapiToken, contactNumber, "Serviço de IA temporariamente indisponível. Por favor, aguarde ou entre em contato com nossa equipe.");
