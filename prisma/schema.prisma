@@ -605,6 +605,15 @@ model AgentConfig {
   igCommentAutoDm    Boolean @default(false)
   igCommentDmMessage String? // fallback quando nenhum fluxo bate — null = IA responde
 
+  // Agente de gestão de carteira: pós-venda e recompra automáticos (via cron /api/cron/carteira)
+  carteiraEnabled    Boolean @default(false)
+  posVendaEnabled    Boolean @default(true)  // mensagem após pagamento confirmado
+  posVendaDelayHours Int     @default(24)    // horas depois do pagamento
+  posVendaMensagem   String  @default("")    // template fixo ({nome} = cliente); vazio = IA gera
+  recompraEnabled    Boolean @default(true)  // reativação de quem não compra há X dias
+  recompraDias       Int     @default(30)
+  carteiraInstrucoes String  @default("")    // orientações pra IA (ofertas, tom, cupons)
+
   // Identidade visual do catálogo público (/loja) — logo base64 como as fotos de produto
   storeLogoBase64   String? @db.Text
   storeLogoMimeType String?
@@ -638,8 +647,24 @@ model AgentConfig {
   igCommentFlows       InstagramCommentFlow[]
   igFunnels            InstagramFunnel[]
   storeBanners         StoreBanner[]
+  carteiraTouches      CarteiraTouch[]
 
   @@index([teamId])
+}
+
+// Registro de cada toque automático da gestão de carteira — evita duplicar envios
+model CarteiraTouch {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+  agentConfigId String
+  agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id], onDelete: Cascade)
+
+  contactNumber String
+  type          String  // "POS_VENDA" | "RECOMPRA"
+  orderId       String? // pós-venda: pedido que originou o toque
+
+  @@index([agentConfigId, contactNumber, type])
+  @@index([agentConfigId, orderId])
 }
 
 // Zona de entrega com taxa própria (ex: "Centro" R$ 5, "Zona Norte" R$ 12)

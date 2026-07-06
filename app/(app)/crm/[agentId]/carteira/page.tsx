@@ -97,5 +97,20 @@ export default async function CarteiraPage({ params }: { params: Promise<{ agent
     if (paid && (!client.lastPurchaseAt || paid > client.lastPurchaseAt)) client.lastPurchaseAt = paid;
   }
 
-  return <CarteiraClient agentId={config.id} clientes={Array.from(byContact.values())} />;
+  return (
+    <CarteiraClient
+      agentId={config.id}
+      clientes={Array.from(byContact.values())}
+      isManager={isManager}
+      initialConfig={{
+        carteiraEnabled: config.carteiraEnabled,
+        posVendaEnabled: config.posVendaEnabled,
+        posVendaDelayHours: config.posVendaDelayHours,
+        posVendaMensagem: config.posVendaMensagem,
+        recompraEnabled: config.recompraEnabled,
+        recompraDias: config.recompraDias,
+        carteiraInstrucoes: config.carteiraInstrucoes,
+      }}
+    />
+  );
 }
