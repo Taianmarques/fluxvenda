@@ -2,11 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { getAgentConfigAsManager } from "@/lib/team";
+import { calcularNiveis, type Nivel } from "@/lib/carteira-nivel";
 import { z } from "zod";
 
 export const audienciaSchema = z.object({
   compradores: z.enum(["todos", "sim", "nao"]).default("todos"),
   inatividade: z.enum(["qualquer", "7d", "30d", "60d"]).default("qualquer"),
+  stageId: z.string().nullable().default(null), // etapa do pipeline em que o lead está agora
+  nivel: z.enum(["A", "B", "C", "INATIVO", "PERDIDO", "PROSPECTO"]).nullable().default(null), // nível da carteira
+  atendenteId: z.string().nullable().default(null), // carteira de um vendedor específico (assignedToId)
 });
 
 export async function resolverAudiencia(agentConfigId: string, filtros: z.infer<typeof audienciaSchema>) {
@@ -18,33 +22,68 @@ export async function resolverAudiencia(agentConfigId: string, filtros: z.infer<
       agentConfigId,
       contactNumber: { not: { startsWith: "ig_" } }, // só WhatsApp
       ...(cutoff ? { updatedAt: { lte: cutoff } } : {}),
+      ...(filtros.atendenteId ? { assignedToId: filtros.atendenteId } : {}),
+      ...(filtros.stageId ? { opportunities: { some: { stageId: filtros.stageId, wonAt: null } } } : {}),
     },
-    select: { contactNumber: true, contactName: true },
+    select: { contactNumber: true, contactName: true, nivelCarteira: true },
     orderBy: { updatedAt: "desc" },
   });
 
-  // Dedup por número (mantém o nome mais recente)
-  const porNumero = new Map<string, string>();
+  // Dedup por número (mantém o nome/nível mais recente)
+  const porNumero = new Map<string, { contactName: string; nivelManual: string | null }>();
   for (const c of conversas) {
-    if (!porNumero.has(c.contactNumber)) porNumero.set(c.contactNumber, c.contactName ?? "");
+    if (!porNumero.has(c.contactNumber)) porNumero.set(c.contactNumber, { contactName: c.contactName ?? "", nivelManual: c.nivelCarteira });
   }
 
-  if (filtros.compradores !== "todos") {
-    const [orders, cobrancas] = await Promise.all([
-      prisma.order.findMany({ where: { agentConfigId, status: "PAGO" }, select: { contactNumber: true } }),
-      prisma.cobranca.findMany({ where: { agentConfigId, status: "PAGO" }, select: { contactNumber: true } }),
+  if (filtros.compradores !== "todos" || filtros.nivel) {
+    const [orders, cobrancas, opportunities] = await Promise.all([
+      prisma.order.findMany({ where: { agentConfigId, status: "PAGO" }, select: { contactNumber: true, total: true, deliveryFee: true, paidAt: true } }),
+      prisma.cobranca.findMany({ where: { agentConfigId, status: "PAGO" }, select: { contactNumber: true, valor: true, paidAt: true } }),
+      filtros.nivel
+        ? prisma.opportunity.findMany({
+            where: { conversation: { agentConfigId }, wonAt: { not: null } },
+            select: { conversation: { select: { contactNumber: true } }, dealValue: true, wonAt: true },
+          })
+        : Promise.resolve([]),
     ]);
     const compraram = new Set([...orders.map(o => o.contactNumber), ...cobrancas.map(c => c.contactNumber)]);
-    for (const numero of Array.from(porNumero.keys())) {
-      const comprou = compraram.has(numero);
-      if (filtros.compradores === "sim" && !comprou) porNumero.delete(numero);
-      if (filtros.compradores === "nao" && comprou) porNumero.delete(numero);
+
+    if (filtros.compradores !== "todos") {
+      for (const numero of Array.from(porNumero.keys())) {
+        const comprou = compraram.has(numero);
+        if (filtros.compradores === "sim" && !comprou) porNumero.delete(numero);
+        if (filtros.compradores === "nao" && comprou) porNumero.delete(numero);
+      }
+    }
+
+    if (filtros.nivel) {
+      const config = await prisma.agentConfig.findUnique({ where: { id: agentConfigId }, select: { carteiraInativoDias: true } });
+      const comprasPorContato = new Map<string, { at: Date; valor: number }[]>();
+      const addCompra = (numero: string, at: Date | null, valor: number) => {
+        if (!at) return;
+        if (!comprasPorContato.has(numero)) comprasPorContato.set(numero, []);
+        comprasPorContato.get(numero)!.push({ at, valor });
+      };
+      for (const o of orders) addCompra(o.contactNumber, o.paidAt, o.total + o.deliveryFee);
+      for (const c of cobrancas) addCompra(c.contactNumber, c.paidAt, c.valor);
+      for (const o of opportunities) addCompra(o.conversation.contactNumber, o.wonAt, o.dealValue);
+
+      const clientes = Array.from(porNumero.entries()).map(([contactNumber, info]) => ({
+        contactNumber,
+        nivelManual: info.nivelManual,
+        compras: comprasPorContato.get(contactNumber) ?? [],
+      }));
+      const niveis = calcularNiveis(clientes, config?.carteiraInativoDias ?? 60);
+
+      for (const numero of Array.from(porNumero.keys())) {
+        if (niveis.get(numero) !== (filtros.nivel as Nivel)) porNumero.delete(numero);
+      }
     }
   }
 
   return Array.from(porNumero.entries())
     .slice(0, 500) // teto de segurança por campanha
-    .map(([contactNumber, contactName]) => ({ contactNumber, contactName }));
+    .map(([contactNumber, info]) => ({ contactNumber, contactName: info.contactName }));
 }
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {
@@ -123,7 +162,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
     }
     destinatarios = Array.from(porNumero.entries()).slice(0, 500).map(([contactNumber, contactName]) => ({ contactNumber, contactName }));
   } else {
-    destinatarios = await resolverAudiencia(agentId, body.data.filtros ?? { compradores: "todos", inatividade: "qualquer" });
+    destinatarios = await resolverAudiencia(agentId, audienciaSchema.parse(body.data.filtros ?? {}));
   }
 
   if (destinatarios.length === 0) {

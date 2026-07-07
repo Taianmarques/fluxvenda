@@ -1,10 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Megaphone, Plus, X, Sparkles, MessageSquareText, Pause, Play, Ban, Users, Clock, ShieldCheck, Upload, FileSpreadsheet, Filter as FilterIcon } from "lucide-react";
+import { Megaphone, Plus, X, Sparkles, MessageSquareText, Pause, Play, Ban, Users, Clock, ShieldCheck, Upload, FileSpreadsheet, Filter as FilterIcon, KanbanSquare, Star, UserSquare2 } from "lucide-react";
 import { parseCsv, downloadCsvTemplate } from "@/lib/csv-parser";
+import { NIVEL_META, type Nivel } from "../carteira/CarteiraClient";
 
 const CSV_TEMPLATE_CONTATOS = "nome;telefone\nMaria Silva;11987654321\nJoão Souza;21998765432\n";
+
+type PipelineStage = { id: string; name: string; color: string };
+type Pipeline = { id: string; name: string; stages: PipelineStage[] };
+type Atendente = { id: string; name: string };
 
 type Campanha = {
   id: string;
@@ -45,7 +50,14 @@ export function CampanhasClient({ agentId }: { agentId: string }) {
   const [ritmo, setRitmo] = useState<"seguro" | "moderado" | "rapido">("seguro");
   const [compradores, setCompradores] = useState<"todos" | "sim" | "nao">("todos");
   const [inatividade, setInatividade] = useState<"qualquer" | "7d" | "30d" | "60d">("qualquer");
+  const [stageId, setStageId] = useState<string>("");
+  const [nivel, setNivel] = useState<Nivel | "">("");
+  const [atendenteId, setAtendenteId] = useState<string>("");
   const [criando, setCriando] = useState(false);
+
+  // Opções dos filtros (carregadas uma vez, junto com as campanhas)
+  const [pipelines, setPipelines] = useState<Pipeline[]>([]);
+  const [atendentes, setAtendentes] = useState<Atendente[]>([]);
 
   // Fonte do público: filtros do CRM (padrão) ou planilha importada
   const [fontePublico, setFontePublico] = useState<"filtros" | "importar">("filtros");
@@ -96,8 +108,19 @@ export function CampanhasClient({ agentId }: { agentId: string }) {
     }
   }
 
+  async function loadOpcoesFiltro() {
+    const [pRes, aRes] = await Promise.all([
+      fetch(`/api/agentes/${agentId}/pipelines`),
+      fetch(`/api/agentes/${agentId}/atendentes`),
+    ]);
+    const [pData, aData] = await Promise.all([pRes.json(), aRes.json()]);
+    setPipelines(pData.pipelines ?? []);
+    setAtendentes(aData.attendants ?? []);
+  }
+
   useEffect(() => {
     loadCampanhas();
+    loadOpcoesFiltro();
     const interval = setInterval(() => { if (!document.hidden) loadCampanhas(); }, 8000);
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -126,13 +149,14 @@ export function CampanhasClient({ agentId }: { agentId: string }) {
           ritmo,
           ...(fontePublico === "importar"
             ? { contatosImportados }
-            : { filtros: { compradores, inatividade } }),
+            : { filtros: { compradores, inatividade, stageId: stageId || null, nivel: nivel || null, atendenteId: atendenteId || null } }),
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Erro ao criar campanha.");
       setNome(""); setMensagem(""); setInstrucoesIA(""); setModo("NORMAL"); setRitmo("seguro");
-      setCompradores("todos"); setInatividade("qualquer"); setShowForm(false);
+      setCompradores("todos"); setInatividade("qualquer"); setStageId(""); setNivel(""); setAtendenteId("");
+      setShowForm(false);
       setFontePublico("filtros"); setContatosImportados([]); setImportError("");
       loadCampanhas();
     } catch (e: any) {
@@ -277,6 +301,33 @@ export function CampanhasClient({ agentId }: { agentId: string }) {
                       <option value="7d">Sem contato há 7+ dias</option>
                       <option value="30d">Sem contato há 30+ dias</option>
                       <option value="60d">Sem contato há 60+ dias</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-gray-500 block mb-1 flex items-center gap-1"><KanbanSquare size={10} /> Etapa do pipeline</label>
+                    <select value={stageId} onChange={e => setStageId(e.target.value)} className="w-full bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 text-sm">
+                      <option value="">Qualquer etapa</option>
+                      {pipelines.map(p => (
+                        <optgroup key={p.id} label={p.name}>
+                          {p.stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-gray-500 block mb-1 flex items-center gap-1"><Star size={10} /> Nível da carteira</label>
+                    <select value={nivel} onChange={e => setNivel(e.target.value as Nivel | "")} className="w-full bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 text-sm">
+                      <option value="">Qualquer nível</option>
+                      {(Object.keys(NIVEL_META) as Nivel[]).map(n => (
+                        <option key={n} value={n}>{NIVEL_META[n].label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-gray-500 block mb-1 flex items-center gap-1"><UserSquare2 size={10} /> Carteira do vendedor</label>
+                    <select value={atendenteId} onChange={e => setAtendenteId(e.target.value)} className="w-full bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 text-sm">
+                      <option value="">Todos os vendedores</option>
+                      {atendentes.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                     </select>
                   </div>
                 </div>
