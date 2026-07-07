@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Megaphone, Plus, X, Sparkles, MessageSquareText, Pause, Play, Ban, Users, Clock, ShieldCheck } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Megaphone, Plus, X, Sparkles, MessageSquareText, Pause, Play, Ban, Users, Clock, ShieldCheck, Upload, FileSpreadsheet, Filter as FilterIcon } from "lucide-react";
+import { parseCsv, downloadCsvTemplate } from "@/lib/csv-parser";
+
+const CSV_TEMPLATE_CONTATOS = "nome;telefone\nMaria Silva;11987654321\nJoão Souza;21998765432\n";
 
 type Campanha = {
   id: string;
@@ -44,6 +47,45 @@ export function CampanhasClient({ agentId }: { agentId: string }) {
   const [inatividade, setInatividade] = useState<"qualquer" | "7d" | "30d" | "60d">("qualquer");
   const [criando, setCriando] = useState(false);
 
+  // Fonte do público: filtros do CRM (padrão) ou planilha importada
+  const [fontePublico, setFontePublico] = useState<"filtros" | "importar">("filtros");
+  const [contatosImportados, setContatosImportados] = useState<{ contactNumber: string; contactName: string }[]>([]);
+  const [importError, setImportError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function handleSelectPlanilha(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setImportError("");
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const rows = parseCsv(String(reader.result ?? ""));
+        const parsed = rows.map(r => {
+          const contactNumber = (r.telefone || r.phone || r.numero || r.whatsapp || "").replace(/\D/g, "");
+          const contactName = r.nome || r.name || r.contato || "";
+          if (contactNumber.length < 8) return null;
+          return { contactNumber, contactName };
+        }).filter((c): c is { contactNumber: string; contactName: string } => c !== null);
+
+        if (parsed.length === 0) {
+          setImportError("Nenhum telefone válido encontrado. Confira se a planilha tem uma coluna \"telefone\" (baixe o modelo).");
+          setContatosImportados([]);
+          return;
+        }
+        if (parsed.length > 500) {
+          setImportError(`A planilha tem ${parsed.length} contatos — só os 500 primeiros serão usados.`);
+        }
+        setContatosImportados(parsed.slice(0, 500));
+      } catch {
+        setImportError("Não foi possível ler o arquivo. Confira se é um CSV válido.");
+        setContatosImportados([]);
+      }
+    };
+    reader.readAsText(file, "utf-8");
+  }
+
   async function loadCampanhas() {
     try {
       const res = await fetch(`/api/agentes/${agentId}/campanhas`);
@@ -66,6 +108,10 @@ export function CampanhasClient({ agentId }: { agentId: string }) {
       setError("Preencha o nome e a mensagem.");
       return;
     }
+    if (fontePublico === "importar" && contatosImportados.length === 0) {
+      setError("Importe uma planilha com pelo menos um contato válido.");
+      return;
+    }
     setCriando(true);
     setError("");
     try {
@@ -78,13 +124,16 @@ export function CampanhasClient({ agentId }: { agentId: string }) {
           modo,
           instrucoesIA: instrucoesIA.trim(),
           ritmo,
-          filtros: { compradores, inatividade },
+          ...(fontePublico === "importar"
+            ? { contatosImportados }
+            : { filtros: { compradores, inatividade } }),
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Erro ao criar campanha.");
       setNome(""); setMensagem(""); setInstrucoesIA(""); setModo("NORMAL"); setRitmo("seguro");
       setCompradores("todos"); setInatividade("qualquer"); setShowForm(false);
+      setFontePublico("filtros"); setContatosImportados([]); setImportError("");
       loadCampanhas();
     } catch (e: any) {
       setError(e.message);
@@ -191,25 +240,70 @@ export function CampanhasClient({ agentId }: { agentId: string }) {
             {/* Audiência */}
             <div className="border-t border-gray-800 pt-3 space-y-2">
               <p className="text-xs text-gray-400 font-medium flex items-center gap-1.5"><Users size={12} /> Público (só contatos de WhatsApp)</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] text-gray-500 block mb-1">Já compraram?</label>
-                  <select value={compradores} onChange={e => setCompradores(e.target.value as any)} className="w-full bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 text-sm">
-                    <option value="todos">Todos os contatos</option>
-                    <option value="sim">Só quem já comprou</option>
-                    <option value="nao">Só quem nunca comprou</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[11px] text-gray-500 block mb-1">Última interação</label>
-                  <select value={inatividade} onChange={e => setInatividade(e.target.value as any)} className="w-full bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 text-sm">
-                    <option value="qualquer">Qualquer período</option>
-                    <option value="7d">Sem contato há 7+ dias</option>
-                    <option value="30d">Sem contato há 30+ dias</option>
-                    <option value="60d">Sem contato há 60+ dias</option>
-                  </select>
-                </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setFontePublico("filtros")}
+                  className={`flex items-center justify-center gap-1.5 text-sm font-medium rounded-lg py-2 border transition-colors ${
+                    fontePublico === "filtros" ? "border-blue-500 bg-blue-500/10" : "border-gray-800 text-gray-400 hover:border-gray-600"
+                  }`}
+                >
+                  <FilterIcon size={13} /> Filtros do CRM
+                </button>
+                <button
+                  onClick={() => setFontePublico("importar")}
+                  className={`flex items-center justify-center gap-1.5 text-sm font-medium rounded-lg py-2 border transition-colors ${
+                    fontePublico === "importar" ? "border-blue-500 bg-blue-500/10" : "border-gray-800 text-gray-400 hover:border-gray-600"
+                  }`}
+                >
+                  <FileSpreadsheet size={13} /> Importar planilha
+                </button>
               </div>
+
+              {fontePublico === "filtros" ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] text-gray-500 block mb-1">Já compraram?</label>
+                    <select value={compradores} onChange={e => setCompradores(e.target.value as any)} className="w-full bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 text-sm">
+                      <option value="todos">Todos os contatos</option>
+                      <option value="sim">Só quem já comprou</option>
+                      <option value="nao">Só quem nunca comprou</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-gray-500 block mb-1">Última interação</label>
+                    <select value={inatividade} onChange={e => setInatividade(e.target.value as any)} className="w-full bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 text-sm">
+                      <option value="qualquer">Qualquer período</option>
+                      <option value="7d">Sem contato há 7+ dias</option>
+                      <option value="30d">Sem contato há 30+ dias</option>
+                      <option value="60d">Sem contato há 60+ dias</option>
+                    </select>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center gap-1.5 text-sm font-medium bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5"
+                    >
+                      <Upload size={13} /> Escolher arquivo (.csv)
+                    </button>
+                    <button
+                      onClick={() => downloadCsvTemplate(CSV_TEMPLATE_CONTATOS, "modelo-contatos.csv")}
+                      className="text-xs text-gray-500 hover:text-gray-300"
+                    >
+                      Baixar modelo
+                    </button>
+                    <input ref={fileInputRef} type="file" accept=".csv,text/csv" onChange={handleSelectPlanilha} className="hidden" />
+                  </div>
+                  {contatosImportados.length > 0 && (
+                    <p className="text-xs text-green-400">{contatosImportados.length} contato{contatosImportados.length === 1 ? "" : "s"} pronto{contatosImportados.length === 1 ? "" : "s"} para a campanha.</p>
+                  )}
+                  {importError && <p className="text-xs text-amber-400">{importError}</p>}
+                  <p className="text-[11px] text-gray-600">Colunas esperadas: <code className="text-gray-500">nome</code> e <code className="text-gray-500">telefone</code> (com DDD). Máximo 500 contatos.</p>
+                </div>
+              )}
             </div>
 
             {/* Ritmo */}

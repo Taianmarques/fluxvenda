@@ -85,7 +85,12 @@ const criarSchema = z.object({
   modo: z.enum(["NORMAL", "IA_VARIACAO"]).default("NORMAL"),
   instrucoesIA: z.string().max(500).default(""),
   ritmo: z.enum(["seguro", "moderado", "rapido"]).default("seguro"),
-  filtros: audienciaSchema,
+  // Fonte do público: filtros do CRM OU uma lista importada de planilha (mutuamente exclusivos)
+  filtros: audienciaSchema.optional(),
+  contatosImportados: z.array(z.object({
+    contactNumber: z.string().min(8).max(20),
+    contactName: z.string().max(120).default(""),
+  })).max(500).optional(),
 });
 
 const RITMOS = {
@@ -106,9 +111,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
   const body = criarSchema.safeParse(await req.json());
   if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
 
-  const destinatarios = await resolverAudiencia(agentId, body.data.filtros);
+  let destinatarios: { contactNumber: string; contactName: string }[];
+  if (body.data.contatosImportados && body.data.contatosImportados.length > 0) {
+    // Planilha importada: normaliza e deduplica por número (sem acrescentar DDI —
+    // sendWhatsAppTextAsTeam já normaliza na hora do envio)
+    const porNumero = new Map<string, string>();
+    for (const c of body.data.contatosImportados) {
+      const digits = c.contactNumber.replace(/\D/g, "");
+      if (digits.length < 8) continue;
+      if (!porNumero.has(digits)) porNumero.set(digits, c.contactName.trim());
+    }
+    destinatarios = Array.from(porNumero.entries()).slice(0, 500).map(([contactNumber, contactName]) => ({ contactNumber, contactName }));
+  } else {
+    destinatarios = await resolverAudiencia(agentId, body.data.filtros ?? { compradores: "todos", inatividade: "qualquer" });
+  }
+
   if (destinatarios.length === 0) {
-    return NextResponse.json({ error: "Nenhum destinatário para esses filtros." }, { status: 400 });
+    return NextResponse.json({ error: "Nenhum destinatário encontrado para essa audiência." }, { status: 400 });
   }
 
   const ritmo = RITMOS[body.data.ritmo];
