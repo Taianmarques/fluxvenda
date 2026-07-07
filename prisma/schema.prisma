@@ -479,11 +479,16 @@ model Team {
 
   monthlyTokenLimit Int?
 
+  // Créditos de IA comprados pela equipe — não expiram; são consumidos automaticamente
+  // depois que o uso do mês estoura o monthlyTokenLimit (ver lib/token-usage.ts)
+  aiCreditsBalance Int @default(0)
+
   members        TeamMember[]
   departamentos  Departamento[]
   goals          Goal[]
   announcements  Announcement[]
   agentConfigs   AgentConfig[]
+  creditoCompras CreditoCompra[]
   tokenUsageLogs TokenUsageLog[]
 }
 
@@ -1237,6 +1242,23 @@ model TokenUsageLog {
   inputTokens  Int      @default(0)
   outputTokens Int      @default(0)
   costUsd      Float    @default(0)
+
+  @@index([teamId, createdAt])
+}
+
+// Compra de créditos extras de IA (top-up), pagamento único via Stripe Checkout
+model CreditoCompra {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  teamId String
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  packId          String // id do pacote em lib/credits.ts, ex: "popular"
+  tokens          Int
+  valorCentavos   Int
+  status          String @default("PENDENTE") // PENDENTE | PAGO
+  stripeSessionId String @unique
 
   @@index([teamId, createdAt])
 }

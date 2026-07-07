@@ -15,6 +15,7 @@ export async function logTokenUsage(params: {
 }): Promise<void> {
   const rates = COSTS_PER_TOKEN[params.model] ?? { input: 0, output: 0 };
   const costUsd = params.inputTokens * rates.input + params.outputTokens * rates.output;
+  const totalTokens = params.inputTokens + params.outputTokens;
 
   await prisma.tokenUsageLog.create({
     data: {
@@ -26,6 +27,34 @@ export async function logTokenUsage(params: {
       outputTokens: params.outputTokens,
       costUsd,
     },
+  });
+
+  await debitCreditsIfOverPlan(params.teamId, totalTokens).catch(() => {});
+}
+
+// Se a equipe tem cota mensal definida e esse consumo (total ou parcialmente) veio depois
+// que o uso do mês já tinha estourado o limite do plano, abate a diferença dos créditos
+// extras comprados (saldo nunca fica negativo).
+async function debitCreditsIfOverPlan(teamId: string, totalTokensJustLogged: number): Promise<void> {
+  const team = await prisma.team.findUnique({
+    where: { id: teamId },
+    select: { monthlyTokenLimit: true, aiCreditsBalance: true },
+  });
+  if (!team || team.monthlyTokenLimit === null || team.aiCreditsBalance <= 0) return;
+
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const agg = await prisma.tokenUsageLog.aggregate({
+    where: { teamId, createdAt: { gte: start } },
+    _sum: { inputTokens: true, outputTokens: true },
+  });
+  const monthlyUsedIncludingThisCall = (agg._sum.inputTokens ?? 0) + (agg._sum.outputTokens ?? 0);
+  const overage = Math.min(totalTokensJustLogged, Math.max(0, monthlyUsedIncludingThisCall - team.monthlyTokenLimit));
+  if (overage <= 0) return;
+
+  await prisma.team.update({
+    where: { id: teamId },
+    data: { aiCreditsBalance: { decrement: Math.min(overage, team.aiCreditsBalance) } },
   });
 }
 
@@ -40,7 +69,7 @@ export async function getTeamIdForUser(userId: string): Promise<string | null> {
 export async function isOverQuota(teamId: string): Promise<boolean> {
   const team = await prisma.team.findUnique({
     where: { id: teamId },
-    select: { monthlyTokenLimit: true },
+    select: { monthlyTokenLimit: true, aiCreditsBalance: true },
   });
 
   if (!team || team.monthlyTokenLimit === null) return false;
@@ -54,7 +83,33 @@ export async function isOverQuota(teamId: string): Promise<boolean> {
   });
 
   const total = (agg._sum.inputTokens ?? 0) + (agg._sum.outputTokens ?? 0);
-  return total >= team.monthlyTokenLimit;
+  if (total < team.monthlyTokenLimit) return false;
+  // Estourou a cota do plano, mas tem créditos extras comprados — libera mesmo assim
+  // (o consumo é abatido do saldo em debitCreditsIfOverPlan, chamado por logTokenUsage)
+  return team.aiCreditsBalance <= 0;
+}
+
+// Status de uso/créditos para a tela "Créditos de IA" do gestor
+export async function getCreditsStatus(teamId: string) {
+  const team = await prisma.team.findUnique({
+    where: { id: teamId },
+    select: { monthlyTokenLimit: true, aiCreditsBalance: true },
+  });
+
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const agg = await prisma.tokenUsageLog.aggregate({
+    where: { teamId, createdAt: { gte: start } },
+    _sum: { inputTokens: true, outputTokens: true },
+  });
+  const monthlyUsed = (agg._sum.inputTokens ?? 0) + (agg._sum.outputTokens ?? 0);
+
+  return {
+    monthlyTokenLimit: team?.monthlyTokenLimit ?? null,
+    monthlyUsed,
+    aiCreditsBalance: team?.aiCreditsBalance ?? 0,
+    overPlan: team?.monthlyTokenLimit != null && monthlyUsed >= team.monthlyTokenLimit,
+  };
 }
 
 export async function getMonthlyUsageByTeam(year: number, month: number) {

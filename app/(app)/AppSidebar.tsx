@@ -6,7 +6,7 @@ import { UserButton } from "@clerk/nextjs";
 import { useState } from "react";
 import {
   LayoutDashboard, ScanSearch, Target, Gamepad2, BookOpen, MessageSquare,
-  PenTool, BookText, Trophy, Users, Headset, Wrench, ShieldCheck, Menu, X,
+  PenTool, BookText, Trophy, Users, Headset, Wrench, ShieldCheck, Menu, X, Coins,
 } from "lucide-react";
 
 const ICONS = {
@@ -23,6 +23,7 @@ const ICONS = {
   crm: Headset,
   ferramentas: Wrench,
   admin: ShieldCheck,
+  creditos: Coins,
 };
 
 type NavItem = { href: string; label: string; icon: keyof typeof ICONS; show: boolean };

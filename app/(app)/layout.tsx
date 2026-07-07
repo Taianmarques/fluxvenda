@@ -32,6 +32,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/ranking",    label: "Ranking",    icon: "ranking" as const, show: true },
     { href: "/gestor",      label: "Equipe",      icon: "equipe" as const, show: isGestor },
     { href: "/crm",         label: "CRM",         icon: "crm" as const, show: isTeamMember },
+    { href: "/creditos",    label: "Créditos de IA", icon: "creditos" as const, show: isGestor },
     { href: "/ferramentas", label: "Ferramentas", icon: "ferramentas" as const, show: isGestor },
     { href: "/admin",       label: "Super Admin", icon: "admin" as const, show: isAdmin },
   ];
