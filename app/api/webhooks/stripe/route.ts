@@ -22,19 +22,6 @@ export async function POST(req: NextRequest) {
   switch (event.type) {
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
-
-      // Compra de créditos de IA (pagamento único) — distingue da assinatura de plano pelo metadata
-      if (session.metadata?.kind === "ai_credits") {
-        const compra = await prisma.creditoCompra.findUnique({ where: { stripeSessionId: session.id } });
-        if (compra && compra.status !== "PAGO") {
-          await prisma.$transaction([
-            prisma.creditoCompra.update({ where: { id: compra.id }, data: { status: "PAGO" } }),
-            prisma.team.update({ where: { id: compra.teamId }, data: { aiCreditsBalance: { increment: compra.tokens } } }),
-          ]);
-        }
-        break;
-      }
-
       const customerId = session.customer as string;
       const subscriptionId = session.subscription as string;
       const priceId = session.metadata?.priceId ?? "";

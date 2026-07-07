@@ -481,7 +481,10 @@ model Team {
 
   // Créditos de IA comprados pela equipe — não expiram; são consumidos automaticamente
   // depois que o uso do mês estoura o monthlyTokenLimit (ver lib/token-usage.ts)
-  aiCreditsBalance Int @default(0)
+  aiCreditsBalance Int     @default(0)
+  // Cliente na conta Asaas DA PRÓPRIA PLATAFORMA (ASAAS_PLATFORM_API_KEY) — não confundir
+  // com o Asaas de cada agente (AgentConfig.asaasApiKey), que é a conta do cliente pra vender
+  asaasCustomerId  String?
 
   members        TeamMember[]
   departamentos  Departamento[]
@@ -1246,7 +1249,7 @@ model TokenUsageLog {
   @@index([teamId, createdAt])
 }
 
-// Compra de créditos extras de IA (top-up), pagamento único via Stripe Checkout
+// Compra de créditos extras de IA (top-up), pagamento único via Asaas (conta da plataforma)
 model CreditoCompra {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
@@ -1254,11 +1257,16 @@ model CreditoCompra {
   teamId String
   team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
-  packId          String // id do pacote em lib/credits.ts, ex: "popular"
-  tokens          Int
-  valorCentavos   Int
-  status          String @default("PENDENTE") // PENDENTE | PAGO
-  stripeSessionId String @unique
+  packId         String // id do pacote em lib/credits.ts, ex: "popular"
+  tokens         Int
+  valorCentavos  Int
+  status         String  @default("PENDENTE") // PENDENTE | PAGO
+  formaPagamento String  // PIX | CARTAO
+  cpfCnpj        String  @default("")
+
+  asaasPaymentId  String? @unique
+  asaasInvoiceUrl String? // link hospedado do Asaas (usado no pagamento por cartão)
+  asaasPixPayload String? // código Pix copia-e-cola
 
   @@index([teamId, createdAt])
 }

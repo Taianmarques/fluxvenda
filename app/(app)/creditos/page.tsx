@@ -5,11 +5,7 @@ import { getCreditsStatus } from "@/lib/token-usage";
 import { Coins, Lock } from "lucide-react";
 import { CreditosClient } from "./CreditosClient";
 
-export default async function CreditosPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ compra?: string }>;
-}) {
+export default async function CreditosPage() {
   const user = await currentUser();
   if (!user) redirect("/sign-in");
 
@@ -49,8 +45,6 @@ export default async function CreditosPage({
     }),
   ]);
 
-  const { compra } = await searchParams;
-
   return (
     <CreditosClient
       status={status}
@@ -61,7 +55,6 @@ export default async function CreditosPage({
         valorCentavos: c.valorCentavos,
         createdAt: c.createdAt.toISOString(),
       }))}
-      resultadoCompra={compra === "sucesso" ? "sucesso" : compra === "cancelada" ? "cancelada" : null}
     />
   );
 }
