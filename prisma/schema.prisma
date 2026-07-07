@@ -680,6 +680,7 @@ model AgentConfig {
   storeBanners         StoreBanner[]
   carteiraTouches      CarteiraTouch[]
   automacoes           Automacao[]
+  campanhas            Campanha[]
 
   @@index([teamId])
 }
@@ -697,6 +698,49 @@ model PosVendaFeedback {
   comment       String  @default("")
 
   @@index([agentConfigId, createdAt])
+}
+
+// Campanha de disparo em massa via WhatsApp — processada pelo cron /api/cron/campanhas
+// com intervalo aleatório entre envios (anti-bloqueio)
+model Campanha {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  agentConfigId String
+  agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id], onDelete: Cascade)
+
+  nome     String
+  mensagem String // mensagem base ({nome} = primeiro nome do contato)
+  modo     String @default("NORMAL") // NORMAL | IA_VARIACAO (IA reescreve por destinatário)
+  instrucoesIA String @default("")   // orientações extras pra variação (tom, o que preservar)
+
+  status String @default("ENVIANDO") // ENVIANDO | PAUSADA | CONCLUIDA | CANCELADA
+
+  intervaloMinSeg Int @default(45)
+  intervaloMaxSeg Int @default(120)
+  nextSendAt      DateTime?
+  startedAt       DateTime @default(now())
+  finishedAt      DateTime?
+
+  destinatarios CampanhaDestinatario[]
+
+  @@index([agentConfigId])
+  @@index([status, nextSendAt])
+}
+
+model CampanhaDestinatario {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now())
+  campanhaId String
+  campanha   Campanha @relation(fields: [campanhaId], references: [id], onDelete: Cascade)
+
+  contactNumber String
+  contactName   String  @default("")
+  status        String  @default("PENDENTE") // PENDENTE | ENVIADO | ERRO
+  mensagemEnviada String?
+  sentAt        DateTime?
+
+  @@index([campanhaId, status])
 }
 
 // Registro de cada toque automático da gestão de carteira — evita duplicar envios
