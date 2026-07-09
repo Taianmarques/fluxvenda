@@ -634,6 +634,16 @@ model AgentConfig {
   // O agente de IA move leads pelas etapas do pipeline conforme a conversa evolui
   pipelineAutoAvancar Boolean @default(false)
 
+  // Agente de ligação via Twilio + ElevenLabs
+  phoneEnabled         Boolean @default(false)
+  twilioAccountSid     String?
+  twilioAuthToken      String?
+  twilioPhoneNumber    String? // número Twilio de origem, ex: +5511...
+  elevenlabsApiKey       String?
+  elevenlabsVoiceId      String? // ID da voz no ElevenLabs
+  phoneCallPrompt        String  @default("") // instruções extras para ligações
+  whatsappVoiceEnabled   Boolean @default(false) // enviar também como áudio de voz no WhatsApp
+
   // Resposta automática a comentários do Instagram via DM
   igCommentAutoDm    Boolean @default(false)
   igCommentDmMessage String? // fallback quando nenhum fluxo bate — null = IA responde
@@ -672,6 +682,7 @@ model AgentConfig {
   deliveryZones     DeliveryZone[]          // zonas com taxa própria (bairro/região)
 
   conversations        Conversation[]
+  phoneCalls           PhoneCall[]
   pipelines            Pipeline[]
   leadStatuses         LeadStatus[]
   appointments         Appointment[]
@@ -1169,6 +1180,7 @@ model Conversation {
   opportunities     Opportunity[]
   scheduledMessages ScheduledMessage[]
   orders            Order[]
+  phoneCalls        PhoneCall[]
 
   @@unique([agentConfigId, contactNumber])
 }
@@ -1269,6 +1281,51 @@ model CreditoCompra {
   asaasPixPayload String? // código Pix copia-e-cola
 
   @@index([teamId, createdAt])
+}
+
+// ─── Agente de Ligação (Twilio + ElevenLabs) ─────────────────────────────────
+
+enum PhoneCallStatus {
+  EM_ANDAMENTO
+  CONCLUIDA
+  PERDIDA
+  FALHADA
+}
+
+model PhoneCall {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  agentConfigId String
+  agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id], onDelete: Cascade)
+
+  direction     String          // "INBOUND" | "OUTBOUND"
+  contactNumber String
+  contactName   String          @default("")
+  status        PhoneCallStatus @default(EM_ANDAMENTO)
+  twilioCallSid String?         @unique
+  durationSecs  Int?
+
+  // Vincula ao lead existente no CRM
+  conversationId String?
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  turns PhoneCallTurn[]
+
+  @@index([agentConfigId, createdAt])
+}
+
+model PhoneCallTurn {
+  id        String    @id @default(cuid())
+  createdAt DateTime  @default(now())
+  callId    String
+  call      PhoneCall @relation(fields: [callId], references: [id], onDelete: Cascade)
+
+  role      String   // "user" | "assistant"
+  content   String   // transcript ou resposta IA
+  audioData String?  @db.Text // base64 do áudio ElevenLabs (assistant turns)
+
+  @@index([callId])
 }
 
 // ─── Instagram DM ─────────────────────────────────────────────────────────────

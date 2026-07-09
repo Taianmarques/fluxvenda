@@ -8,6 +8,7 @@ import { WhatsappAgentClient } from "../WhatsappAgentClient";
 import { DistribuicaoClient } from "../DistribuicaoClient";
 import { QrConnect } from "../QrConnect";
 import { AgentActions } from "../AgentActions";
+import { PhoneAgentClient } from "../PhoneAgentClient";
 import { getInstanceStatus } from "@/lib/whatsapp";
 
 function daysAgo(n: number) {
@@ -149,6 +150,20 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
         </Link>
 
         <DistribuicaoClient agentId={config.id} initialMode={config.leadDistributionMode} />
+
+        <PhoneAgentClient
+          agentId={config.id}
+          initialConfig={{
+            phoneEnabled: config.phoneEnabled,
+            whatsappVoiceEnabled: config.whatsappVoiceEnabled,
+            twilioAccountSid: config.twilioAccountSid ?? "",
+            twilioAuthToken: config.twilioAuthToken ?? "",
+            twilioPhoneNumber: config.twilioPhoneNumber ?? "",
+            elevenlabsApiKey: config.elevenlabsApiKey ?? "",
+            elevenlabsVoiceId: config.elevenlabsVoiceId ?? "",
+            phoneCallPrompt: config.phoneCallPrompt,
+          }}
+        />
 
         <div>
           <h2 className="text-xl font-bold mb-4">Configurações do agente</h2>

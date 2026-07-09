@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { runAgent, runAgentWithImage, runAgentWithTools, transcribeAudio, classifyLeadQualified, SCHEDULING_TOOLS, COMMERCE_TOOLS, BILLING_TOOLS, PROSPECTING_TOOLS, POSVENDA_TOOLS, PIPELINE_TOOLS, DEPARTAMENTO_TOOLS } from "@/lib/agent-engine";
 import { sendWhatsAppTextAsTeam, sendMediaAsTeam, downloadMessageMedia } from "@/lib/whatsapp";
+import { textToSpeech } from "@/lib/elevenlabs";
 import { logTokenUsage, isOverQuota } from "@/lib/token-usage";
 import { getAvailableSlots, isSlotAvailable, formatSlotsForAgent, type AvailabilityRule } from "@/lib/scheduling";
 import { assignNextAttendant } from "@/lib/assignment";
@@ -1077,6 +1078,14 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
   }
 
   await sendWhatsAppTextAsTeam(config.uazapiToken, contactNumber, reply);
+
+  if (config.whatsappVoiceEnabled && config.elevenlabsApiKey) {
+    textToSpeech(reply, { apiKey: config.elevenlabsApiKey, voiceId: config.elevenlabsVoiceId ?? undefined })
+      .then(audioBuffer =>
+        sendMediaAsTeam(config.uazapiToken!, contactNumber, "audio", audioBuffer.toString("base64"))
+      )
+      .catch(err => console.error("[whatsapp-webhook] erro ao enviar áudio ElevenLabs:", err));
+  }
 
   return NextResponse.json({ ok: true });
 }
