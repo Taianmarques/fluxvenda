@@ -4,6 +4,7 @@ import Link from "next/link";
 import { getEffectiveProducts, hasProduct } from "@/lib/products";
 import { listMyAgentConfigs } from "@/lib/team";
 import { CrmWelcome } from "./CrmWelcome";
+import { TrialBanner } from "../TrialBanner";
 
 export default async function DashboardPage() {
   const user = await currentUser();
@@ -14,7 +15,12 @@ export default async function DashboardPage() {
   const products = await getEffectiveProducts(user!.id);
   if (!hasProduct(products, "PLATAFORMA")) {
     const result = await listMyAgentConfigs(user!.id);
-    return <CrmWelcome firstName={user?.firstName ?? ""} agentCount={result?.configs.length ?? 0} />;
+    return (
+      <div className="h-full flex flex-col overflow-y-auto">
+        <TrialBanner />
+        <CrmWelcome firstName={user?.firstName ?? ""} agentCount={result?.configs.length ?? 0} />
+      </div>
+    );
   }
 
   const profile = await prisma.profile.findUnique({

@@ -22,6 +22,7 @@ const schema = z.object({
   managerPlanExpiresAt: z.string().nullable().optional(), // ISO date string ou null
   // Produtos contratados — controlado exclusivamente pelo super admin (sem checkout automático ainda)
   productsOwned: z.array(z.enum(["CRM", "PLATAFORMA"])).optional(),
+  crmTrialEndsAt: z.string().nullable().optional(), // ISO date string ou null (null = sem limite de teste)
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -37,7 +38,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const body = schema.safeParse(await req.json());
   if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
 
-  const { name, businessModel, segment, subsegment, size, managerName, managerPhone, managerPlan, managerPlanExpiresAt, productsOwned } = body.data;
+  const { name, businessModel, segment, subsegment, size, managerName, managerPhone, managerPlan, managerPlanExpiresAt, productsOwned, crmTrialEndsAt } = body.data;
 
   const [updatedTeam] = await prisma.$transaction([
     prisma.team.update({
@@ -49,6 +50,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         ...(subsegment !== undefined && { subsegment }),
         ...(size !== undefined && { size }),
         ...(productsOwned !== undefined && { productsOwned }),
+        ...(crmTrialEndsAt !== undefined && { crmTrialEndsAt: crmTrialEndsAt ? new Date(crmTrialEndsAt) : null }),
       },
     }),
     prisma.profile.update({

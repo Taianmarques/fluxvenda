@@ -21,7 +21,7 @@ export default function CrmLandingPage() {
               href="/sign-up?product=crm"
               className="px-8 py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-semibold transition-colors"
             >
-              Começar grátis
+              Testar grátis por 7 dias
             </Link>
             <Link
               href="/sign-in"
@@ -30,6 +30,7 @@ export default function CrmLandingPage() {
               Entrar
             </Link>
           </div>
+          <p className="text-xs text-gray-500">Sem cartão de crédito — 7 dias grátis, cancele quando quiser.</p>
           <Link href="/produtos/plataforma" className="block text-sm text-gray-500 hover:text-gray-300 pt-2">
             Procurando a plataforma de treinamento de vendas? →
           </Link>

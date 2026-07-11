@@ -51,6 +51,12 @@ export async function POST(req: NextRequest) {
     if (role === "GESTOR") {
       const existing = await prisma.team.findUnique({ where: { managerId: userId } });
       if (!existing) {
+        // Produtos contratados — se não vier nada (fluxo antigo/API direta), assume os dois
+        const productsOwned: ("CRM" | "PLATAFORMA")[] = products && products.length > 0 ? products : ["CRM", "PLATAFORMA"];
+        // Cadastro self-serve com CRM ainda não tem cobrança automática — libera 7 dias de
+        // teste grátis automaticamente; o super admin remove o limite ao confirmar o pagamento
+        const crmTrialEndsAt = productsOwned.includes("CRM") ? new Date(Date.now() + 7 * 86_400_000) : null;
+
         await prisma.team.create({
           data: {
             managerId:    userId,
@@ -59,8 +65,8 @@ export async function POST(req: NextRequest) {
             segment:      segment ?? "",
             subsegment:   subsegment ?? "",
             size:         teamSize ?? "1-10",
-            // Produtos contratados — se não vier nada (fluxo antigo/API direta), assume os dois
-            productsOwned: products && products.length > 0 ? products : ["CRM", "PLATAFORMA"],
+            productsOwned,
+            crmTrialEndsAt,
           },
         });
       }

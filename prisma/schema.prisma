@@ -495,6 +495,11 @@ model Team {
   // já existentes; novas equipes escolhem no onboarding (ver app/api/onboarding/route.ts)
   productsOwned SoldProduct[] @default([CRM, PLATAFORMA])
 
+  // Teste grátis do CRM — setado automaticamente pelo onboarding quando o cadastro inclui
+  // CRM; passada a data, getEffectiveProducts() para de considerar CRM como contratado
+  // mesmo que ainda conste em productsOwned (ver lib/products.ts). null = sem trial ativo.
+  crmTrialEndsAt DateTime?
+
   // Créditos de IA comprados pela equipe — não expiram; são consumidos automaticamente
   // depois que o uso do mês estoura o monthlyTokenLimit (ver lib/token-usage.ts)
   aiCreditsBalance Int     @default(0)

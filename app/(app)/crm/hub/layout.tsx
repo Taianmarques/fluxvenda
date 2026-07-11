@@ -2,6 +2,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { listMyAgentConfigs } from "@/lib/team";
 import { CrmSidebar } from "../CrmSidebar";
+import { TrialBanner } from "../../TrialBanner";
 
 // Diferente de crm/[agentId]/layout.tsx, esse layout funciona mesmo sem nenhum agente
 // criado ainda — é o único lugar do CRM alcançável nesse estado (CrmSidebar mostra só o
@@ -16,9 +17,12 @@ export default async function CrmHubLayout({ children }: { children: React.React
   if (!result) redirect("/dashboard");
 
   return (
-    <div className="h-full flex flex-col md:flex-row bg-gray-950">
-      <CrmSidebar agentId={result.configs[0]?.id ?? ""} agents={result.configs.map(c => ({ id: c.id, nome: c.nome }))} />
-      <div className="flex-1 overflow-hidden">{children}</div>
+    <div className="h-full flex flex-col bg-gray-950">
+      <TrialBanner />
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+        <CrmSidebar agentId={result.configs[0]?.id ?? ""} agents={result.configs.map(c => ({ id: c.id, nome: c.nome }))} />
+        <div className="flex-1 overflow-hidden">{children}</div>
+      </div>
     </div>
   );
 }

@@ -12,6 +12,7 @@ type Props = {
     name: string; businessModel: string; segment: string; subsegment: string; size: string;
     managerName: string; managerPhone: string; managerPlan: string; managerPlanExpiresAt: string | null;
     productsOwned: SoldProduct[];
+    crmTrialEndsAt: string | null;
   };
 };
 
@@ -41,6 +42,7 @@ export function EditEmpresaForm({ teamId, initial }: Props) {
     initial.managerPlanExpiresAt ? initial.managerPlanExpiresAt.slice(0, 10) : ""
   );
   const [productsOwned, setProductsOwned] = useState<Set<SoldProduct>>(new Set(initial.productsOwned));
+  const [crmTrialEndsAt, setCrmTrialEndsAt] = useState(initial.crmTrialEndsAt ? initial.crmTrialEndsAt.slice(0, 10) : "");
 
   function toggleProduct(p: SoldProduct) {
     setProductsOwned(prev => {
@@ -63,6 +65,7 @@ export function EditEmpresaForm({ teamId, initial }: Props) {
           managerName: managerName.trim(), managerPhone: managerPhone.trim(),
           managerPlan, managerPlanExpiresAt: managerPlanExpiresAt || null,
           productsOwned: Array.from(productsOwned),
+          crmTrialEndsAt: crmTrialEndsAt || null,
         }),
       });
       if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.error ?? "Erro ao salvar."); return; }
@@ -136,6 +139,26 @@ export function EditEmpresaForm({ teamId, initial }: Props) {
             </label>
           ))}
         </div>
+      </div>
+
+      <div>
+        <label className="text-xs text-gray-400 block mb-1">Teste grátis do CRM expira em (vazio = sem limite de teste)</label>
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            value={crmTrialEndsAt}
+            onChange={e => setCrmTrialEndsAt(e.target.value)}
+            className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+          />
+          {crmTrialEndsAt && (
+            <button type="button" onClick={() => setCrmTrialEndsAt("")} className="text-xs text-gray-400 hover:text-gray-200 px-3 py-2 whitespace-nowrap">
+              Remover limite
+            </button>
+          )}
+        </div>
+        <p className="text-[11px] text-gray-600 mt-1">
+          Passada essa data, o acesso ao CRM fica bloqueado mesmo com o checkbox marcado. Remova o limite ao confirmar o pagamento.
+        </p>
       </div>
 
       <hr className="border-gray-800" />

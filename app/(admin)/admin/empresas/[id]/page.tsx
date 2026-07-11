@@ -57,6 +57,17 @@ export default async function AdminEmpresaDetailPage({
                   </span>
                 ))
               )}
+              {team.crmTrialEndsAt && (
+                <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${
+                  team.crmTrialEndsAt.getTime() < Date.now()
+                    ? "bg-red-900/40 text-red-300 border-red-800/50"
+                    : "bg-amber-900/40 text-amber-300 border-amber-800/50"
+                }`}>
+                  {team.crmTrialEndsAt.getTime() < Date.now()
+                    ? "Trial CRM expirado"
+                    : `Trial CRM até ${team.crmTrialEndsAt.toLocaleDateString("pt-BR")}`}
+                </span>
+              )}
               <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-blue-900/40 text-blue-300 border border-blue-800/50">
                 Plano {team.manager.plan}
               </span>
@@ -73,6 +84,7 @@ export default async function AdminEmpresaDetailPage({
                   managerPlan: team.manager.plan,
                   managerPlanExpiresAt: team.manager.planExpiresAt?.toISOString() ?? null,
                   productsOwned: team.productsOwned,
+                  crmTrialEndsAt: team.crmTrialEndsAt?.toISOString() ?? null,
                 }}
               />
             </div>

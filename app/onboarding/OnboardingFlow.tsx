@@ -15,8 +15,8 @@ export type OnboardingVariant = "crm" | "plataforma" | "generic";
 const COMPANY_COPY: Record<OnboardingVariant, { title: string; subtitle: string; button: string }> = {
   crm: {
     title: "Configure sua empresa",
-    subtitle: "Essas informações preparam o agente de WhatsApp e o CRM da sua equipe.",
-    button: "💬 Criar empresa e configurar o agente",
+    subtitle: "Essas informações preparam o agente de WhatsApp e o CRM da sua equipe. Seu teste grátis de 7 dias começa assim que você criar a empresa.",
+    button: "💬 Começar teste grátis de 7 dias",
   },
   plataforma: {
     title: "Dados da sua empresa",

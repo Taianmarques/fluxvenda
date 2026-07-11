@@ -86,6 +86,15 @@ export default async function AdminEmpresasPage({
                         </span>
                       ))
                     )}
+                    {team.crmTrialEndsAt && (
+                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                        team.crmTrialEndsAt.getTime() < Date.now()
+                          ? "bg-red-900/40 text-red-300 border-red-800/50"
+                          : "bg-amber-900/40 text-amber-300 border-amber-800/50"
+                      }`}>
+                        {team.crmTrialEndsAt.getTime() < Date.now() ? "Trial expirado" : "Trial"}
+                      </span>
+                    )}
                   </div>
                   <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-900/40 text-blue-300 border border-blue-800/50">
                     {team.manager.plan}

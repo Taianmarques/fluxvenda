@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Bot } from "lucide-react";
 import { NovoAgenteCard } from "./NovoAgenteCard";
 import { ProductGate } from "../ProductGate";
+import { TrialBanner } from "../TrialBanner";
 
 export default async function FerramentasPage() {
   const user = await currentUser();
@@ -21,6 +22,7 @@ export default async function FerramentasPage() {
 
   return (
     <ProductGate product="CRM">
+    <TrialBanner />
     <div className="min-h-screen bg-gray-950 text-white p-6">
       <div className="max-w-5xl mx-auto space-y-8">
         <div>
