@@ -46,6 +46,17 @@ export default async function AdminEmpresaDetailPage({
               <p className="text-gray-400">{team.businessModel} • {team.segment || "—"}{team.subsegment ? ` / ${team.subsegment}` : ""} • {team.size} pessoas</p>
             </div>
             <div className="flex items-center gap-3">
+              {team.productsOwned.length === 0 ? (
+                <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-gray-800 text-gray-500 border border-gray-700">Nenhum produto</span>
+              ) : (
+                team.productsOwned.map(p => (
+                  <span key={p} className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${
+                    p === "CRM" ? "bg-emerald-900/40 text-emerald-300 border-emerald-800/50" : "bg-purple-900/40 text-purple-300 border-purple-800/50"
+                  }`}>
+                    {p === "CRM" ? "CRM" : "Plataforma"}
+                  </span>
+                ))
+              )}
               <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-blue-900/40 text-blue-300 border border-blue-800/50">
                 Plano {team.manager.plan}
               </span>
@@ -61,6 +72,7 @@ export default async function AdminEmpresaDetailPage({
                   managerPhone: team.manager.phone ?? "",
                   managerPlan: team.manager.plan,
                   managerPlanExpiresAt: team.manager.planExpiresAt?.toISOString() ?? null,
+                  productsOwned: team.productsOwned,
                 }}
               />
             </div>

@@ -20,6 +20,8 @@ const schema = z.object({
   managerPhone: z.string().optional(),
   managerPlan: z.enum(["FREE", "PRO", "TEAM"]).optional(),
   managerPlanExpiresAt: z.string().nullable().optional(), // ISO date string ou null
+  // Produtos contratados — controlado exclusivamente pelo super admin (sem checkout automático ainda)
+  productsOwned: z.array(z.enum(["CRM", "PLATAFORMA"])).optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -35,7 +37,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const body = schema.safeParse(await req.json());
   if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
 
-  const { name, businessModel, segment, subsegment, size, managerName, managerPhone, managerPlan, managerPlanExpiresAt } = body.data;
+  const { name, businessModel, segment, subsegment, size, managerName, managerPhone, managerPlan, managerPlanExpiresAt, productsOwned } = body.data;
 
   const [updatedTeam] = await prisma.$transaction([
     prisma.team.update({
@@ -46,6 +48,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         ...(segment !== undefined && { segment }),
         ...(subsegment !== undefined && { subsegment }),
         ...(size !== undefined && { size }),
+        ...(productsOwned !== undefined && { productsOwned }),
       },
     }),
     prisma.profile.update({

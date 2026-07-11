@@ -27,6 +27,8 @@ export default async function AdminEmpresasPage({
     },
   });
 
+  const PRODUCT_LABEL: Record<string, string> = { CRM: "CRM", PLATAFORMA: "Plataforma" };
+
   return (
     <div className="min-h-screen p-6">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -71,6 +73,19 @@ export default async function AdminEmpresasPage({
                   <div>
                     <p className="text-sm font-medium">{team.members.length}</p>
                     <p className="text-xs text-gray-500">membros</p>
+                  </div>
+                  <div className="flex gap-1.5">
+                    {team.productsOwned.length === 0 ? (
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-800 text-gray-500 border border-gray-700">Nenhum produto</span>
+                    ) : (
+                      team.productsOwned.map(p => (
+                        <span key={p} className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                          p === "CRM" ? "bg-emerald-900/40 text-emerald-300 border-emerald-800/50" : "bg-purple-900/40 text-purple-300 border-purple-800/50"
+                        }`}>
+                          {PRODUCT_LABEL[p]}
+                        </span>
+                      ))
+                    )}
                   </div>
                   <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-900/40 text-blue-300 border border-blue-800/50">
                     {team.manager.plan}

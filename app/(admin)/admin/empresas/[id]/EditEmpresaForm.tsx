@@ -4,17 +4,24 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil, X, Save } from "lucide-react";
 
+type SoldProduct = "CRM" | "PLATAFORMA";
+
 type Props = {
   teamId: string;
   initial: {
     name: string; businessModel: string; segment: string; subsegment: string; size: string;
     managerName: string; managerPhone: string; managerPlan: string; managerPlanExpiresAt: string | null;
+    productsOwned: SoldProduct[];
   };
 };
 
 const PLANS = ["FREE", "PRO", "TEAM"] as const;
 const SIZES = ["1-10", "11-50", "51-200", "201-500", "500+"];
 const BUSINESS_MODELS = ["B2B", "B2C", "B2B2C"];
+const PRODUCTS: { key: SoldProduct; label: string }[] = [
+  { key: "CRM", label: "CRM (agente de WhatsApp)" },
+  { key: "PLATAFORMA", label: "Plataforma de treinamento" },
+];
 
 export function EditEmpresaForm({ teamId, initial }: Props) {
   const router = useRouter();
@@ -33,6 +40,15 @@ export function EditEmpresaForm({ teamId, initial }: Props) {
   const [managerPlanExpiresAt, setManagerPlanExpiresAt] = useState(
     initial.managerPlanExpiresAt ? initial.managerPlanExpiresAt.slice(0, 10) : ""
   );
+  const [productsOwned, setProductsOwned] = useState<Set<SoldProduct>>(new Set(initial.productsOwned));
+
+  function toggleProduct(p: SoldProduct) {
+    setProductsOwned(prev => {
+      const next = new Set(prev);
+      next.has(p) ? next.delete(p) : next.add(p);
+      return next;
+    });
+  }
 
   async function handleSave() {
     if (!name.trim()) { setError("Nome da empresa é obrigatório."); return; }
@@ -46,6 +62,7 @@ export function EditEmpresaForm({ teamId, initial }: Props) {
           name: name.trim(), businessModel, segment: segment.trim(), subsegment: subsegment.trim(), size,
           managerName: managerName.trim(), managerPhone: managerPhone.trim(),
           managerPlan, managerPlanExpiresAt: managerPlanExpiresAt || null,
+          productsOwned: Array.from(productsOwned),
         }),
       });
       if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.error ?? "Erro ao salvar."); return; }
@@ -104,6 +121,20 @@ export function EditEmpresaForm({ teamId, initial }: Props) {
         <div>
           <label className="text-xs text-gray-400 block mb-1">Subsegmento</label>
           <input value={subsegment} onChange={e => setSubsegment(e.target.value)} className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600" />
+        </div>
+      </div>
+
+      <hr className="border-gray-800" />
+
+      <div>
+        <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Produtos contratados</p>
+        <div className="flex flex-wrap gap-3">
+          {PRODUCTS.map(p => (
+            <label key={p.key} className="flex items-center gap-2 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={productsOwned.has(p.key)} onChange={() => toggleProduct(p.key)} className="w-3.5 h-3.5" />
+              {p.label}
+            </label>
+          ))}
         </div>
       </div>
 
