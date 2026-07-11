@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { ProductGate } from "../ProductGate";
 
 const FUNNEL_LABELS: Record<string, string> = {
   PROSPECCAO: "Prospecção",
@@ -27,6 +28,7 @@ export default async function PlaybookPage({
   const categories = Object.keys(FUNNEL_LABELS);
 
   return (
+    <ProductGate product="PLATAFORMA">
     <div className="p-8 max-w-5xl mx-auto space-y-8">
       <div>
         <h1 className="text-2xl font-bold">Playbook Interativo</h1>
@@ -90,5 +92,6 @@ export default async function PlaybookPage({
         </div>
       )}
     </div>
+    </ProductGate>
   );
 }

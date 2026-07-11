@@ -6,7 +6,7 @@ import { UserButton } from "@clerk/nextjs";
 import { useState } from "react";
 import {
   LayoutDashboard, ScanSearch, Target, Gamepad2, BookOpen, MessageSquare,
-  PenTool, BookText, Trophy, Users, Headset, Wrench, ShieldCheck, Menu, X, Coins,
+  PenTool, BookText, Trophy, Users, Headset, Wrench, ShieldCheck, Menu, X, Coins, Lock,
 } from "lucide-react";
 
 const ICONS = {
@@ -26,7 +26,7 @@ const ICONS = {
   creditos: Coins,
 };
 
-type NavItem = { href: string; label: string; icon: keyof typeof ICONS; show: boolean };
+type NavItem = { href: string; label: string; icon: keyof typeof ICONS; show: boolean; locked: boolean };
 
 export function AppSidebar({
   nav, profileName, email,
@@ -60,7 +60,7 @@ export function AppSidebar({
           </div>
           <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">
             {nav.filter(i => i.show).map((item) => {
-              const active = item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href);
+              const active = !item.locked && (item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href));
               const Icon = ICONS[item.icon];
               return (
                 <Link
@@ -68,11 +68,16 @@ export function AppSidebar({
                   href={item.href}
                   onClick={() => setMobileOpen(false)}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium border-l-2 transition-colors ${
-                    active ? "text-white bg-blue-500/10 border-blue-500" : "text-gray-400 border-transparent hover:text-white hover:bg-white/5"
+                    active
+                      ? "text-white bg-blue-500/10 border-blue-500"
+                      : item.locked
+                        ? "text-gray-600 border-transparent hover:text-gray-400"
+                        : "text-gray-400 border-transparent hover:text-white hover:bg-white/5"
                   }`}
                 >
                   <Icon size={17} className={active ? "text-blue-400" : ""} />
                   {item.label}
+                  {item.locked && <Lock size={12} className="ml-auto flex-shrink-0" />}
                 </Link>
               );
             })}
@@ -98,7 +103,7 @@ export function AppSidebar({
 
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">
         {nav.filter(i => i.show).map((item) => {
-          const active = item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href);
+          const active = !item.locked && (item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href));
           const Icon = ICONS[item.icon];
           return (
             <Link
@@ -107,11 +112,14 @@ export function AppSidebar({
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium border-l-2 transition-colors ${
                 active
                   ? "text-white bg-blue-500/10 border-blue-500"
-                  : "text-gray-400 border-transparent hover:text-white hover:bg-white/5"
+                  : item.locked
+                    ? "text-gray-600 border-transparent hover:text-gray-400"
+                    : "text-gray-400 border-transparent hover:text-white hover:bg-white/5"
               }`}
             >
               <Icon size={17} className={active ? "text-blue-400" : ""} />
               {item.label}
+              {item.locked && <Lock size={12} className="ml-auto flex-shrink-0" />}
             </Link>
           );
         })}

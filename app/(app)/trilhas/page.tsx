@@ -1,6 +1,7 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
+import { ProductGate } from "../ProductGate";
 
 export default async function TrilhasPage() {
   const user = await currentUser();
@@ -16,6 +17,7 @@ export default async function TrilhasPage() {
   });
 
   return (
+    <ProductGate product="PLATAFORMA">
     <div className="p-8 max-w-5xl mx-auto space-y-8">
       <div>
         <h1 className="text-2xl font-bold">Trilhas de Aprendizado</h1>
@@ -61,5 +63,6 @@ export default async function TrilhasPage() {
         </div>
       )}
     </div>
+    </ProductGate>
   );
 }

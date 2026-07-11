@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { currentUser } from "@clerk/nextjs/server";
+import { ProductGate } from "../ProductGate";
 
 export default async function RankingPage() {
   const user = await currentUser();
@@ -13,6 +14,7 @@ export default async function RankingPage() {
   const myRank = profiles.findIndex((p) => p.id === user!.id) + 1;
 
   return (
+    <ProductGate product="PLATAFORMA">
     <div className="p-8 max-w-3xl mx-auto space-y-8">
       <div>
         <h1 className="text-2xl font-bold">Ranking</h1>
@@ -53,5 +55,6 @@ export default async function RankingPage() {
         })}
       </div>
     </div>
+    </ProductGate>
   );
 }

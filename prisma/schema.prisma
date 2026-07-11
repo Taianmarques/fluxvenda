@@ -30,6 +30,10 @@ model Profile {
   plan                 Plan    @default(FREE)
   planExpiresAt        DateTime?
 
+  // Produtos contratados individualmente — só usado quando o profile NÃO pertence a
+  // nenhum Team (vendedor/funcionário avulso); quem tem Team herda de Team.productsOwned
+  productsOwned SoldProduct[] @default([PLATAFORMA])
+
   // Gamificação
   xp    Int @default(0)
   level Int @default(1)
@@ -63,6 +67,14 @@ enum Plan {
   FREE
   PRO
   TEAM
+}
+
+// CRM (agente de WhatsApp/atendimento) e Plataforma (treinamento) podem ser vendidos
+// separadamente — ver lib/products.ts e o gate de acesso em app/(app)/ProductGate.tsx
+// (nome "SoldProduct" pra não colidir com o model Product do catálogo de comércio)
+enum SoldProduct {
+  CRM
+  PLATAFORMA
 }
 
 // ===================================
@@ -478,6 +490,10 @@ model Team {
   invite        String  @unique @default(cuid()) // código de convite
 
   monthlyTokenLimit Int?
+
+  // Produtos contratados por essa equipe — default com os dois pra não quebrar equipes
+  // já existentes; novas equipes escolhem no onboarding (ver app/api/onboarding/route.ts)
+  productsOwned SoldProduct[] @default([CRM, PLATAFORMA])
 
   // Créditos de IA comprados pela equipe — não expiram; são consumidos automaticamente
   // depois que o uso do mês estoura o monthlyTokenLimit (ver lib/token-usage.ts)

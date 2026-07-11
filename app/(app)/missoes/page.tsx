@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { generateMissionsFromDiagnostic } from "@/lib/missoes";
 import { MissoesClient } from "./MissoesClient";
 import Link from "next/link";
+import { ProductGate } from "../ProductGate";
 
 export default async function MissoesPage() {
   const user = await currentUser();
@@ -93,6 +94,7 @@ export default async function MissoesPage() {
   };
 
   return (
+    <ProductGate product="PLATAFORMA">
     <div className="p-8 max-w-3xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-4">
@@ -192,5 +194,6 @@ export default async function MissoesPage() {
         segment={diagnostic?.segment ?? null}
       />
     </div>
+    </ProductGate>
   );
 }

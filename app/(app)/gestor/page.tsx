@@ -2,6 +2,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { CopyInviteButton } from "./CopyInviteButton";
+import { ProductGate } from "../ProductGate";
 
 function getSalesLevel(score: number) {
   if (score >= 75) return { label: "Sênior", icon: "⭐", color: "text-yellow-300", border: "border-yellow-600", bg: "bg-yellow-900/30" };
@@ -43,6 +44,7 @@ export default async function GestorPage() {
     : null;
 
   return (
+    <ProductGate product="PLATAFORMA">
     <div className="min-h-screen bg-gray-950 text-white p-6">
       <div className="max-w-5xl mx-auto space-y-8">
 
@@ -164,5 +166,6 @@ export default async function GestorPage() {
 
       </div>
     </div>
+    </ProductGate>
   );
 }

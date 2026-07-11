@@ -2,6 +2,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { AppSidebar } from "./AppSidebar";
+import { getEffectiveProducts, hasProduct } from "@/lib/products";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await currentUser();
@@ -20,21 +21,27 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Atendentes (membros de equipe, qualquer role) também acessam o CRM do número da equipe
   const isTeamMember = isGestor || Boolean(await prisma.teamMember.findUnique({ where: { profileId: user.id } }));
 
+  // CRM e Plataforma podem ser vendidos separadamente — item de menu de um produto não
+  // contratado continua visível, só fica com cadeado (ver AppSidebar + ProductGate)
+  const products = await getEffectiveProducts(user.id);
+  const hasCrm = hasProduct(products, "CRM");
+  const hasPlataforma = hasProduct(products, "PLATAFORMA");
+
   const NAV = [
-    { href: "/dashboard",  label: "Dashboard",  icon: "dashboard" as const, show: true },
-    { href: "/scanner",    label: "Scanner",    icon: "scanner" as const, show: true },
-    { href: "/missoes",    label: "Plano de Ação", icon: "missoes" as const, show: true },
-    { href: "/simulacao",  label: "Simulação",  icon: "simulacao" as const, show: true },
-    { href: "/trilhas",    label: "Trilhas",    icon: "trilhas" as const, show: true },
-    { href: "/objecoes",   label: "Objeções",   icon: "objecoes" as const, show: true },
-    { href: "/scripts",    label: "Scripts",    icon: "scripts" as const, show: true },
-    { href: "/playbook",   label: "Playbook",   icon: "playbook" as const, show: true },
-    { href: "/ranking",    label: "Ranking",    icon: "ranking" as const, show: true },
-    { href: "/gestor",      label: "Equipe",      icon: "equipe" as const, show: isGestor },
-    { href: "/crm",         label: "CRM",         icon: "crm" as const, show: isTeamMember },
-    { href: "/creditos",    label: "Créditos de IA", icon: "creditos" as const, show: isGestor },
-    { href: "/ferramentas", label: "Ferramentas", icon: "ferramentas" as const, show: isGestor },
-    { href: "/admin",       label: "Super Admin", icon: "admin" as const, show: isAdmin },
+    { href: "/dashboard",  label: "Dashboard",  icon: "dashboard" as const, show: true, locked: false },
+    { href: "/scanner",    label: "Scanner",    icon: "scanner" as const, show: true, locked: !hasPlataforma },
+    { href: "/missoes",    label: "Plano de Ação", icon: "missoes" as const, show: true, locked: !hasPlataforma },
+    { href: "/simulacao",  label: "Simulação",  icon: "simulacao" as const, show: true, locked: !hasPlataforma },
+    { href: "/trilhas",    label: "Trilhas",    icon: "trilhas" as const, show: true, locked: !hasPlataforma },
+    { href: "/objecoes",   label: "Objeções",   icon: "objecoes" as const, show: true, locked: !hasPlataforma },
+    { href: "/scripts",    label: "Scripts",    icon: "scripts" as const, show: true, locked: !hasPlataforma },
+    { href: "/playbook",   label: "Playbook",   icon: "playbook" as const, show: true, locked: !hasPlataforma },
+    { href: "/ranking",    label: "Ranking",    icon: "ranking" as const, show: true, locked: !hasPlataforma },
+    { href: "/gestor",      label: "Equipe",      icon: "equipe" as const, show: isGestor, locked: !hasPlataforma },
+    { href: "/crm",         label: "CRM",         icon: "crm" as const, show: isTeamMember, locked: !hasCrm },
+    { href: "/creditos",    label: "Créditos de IA", icon: "creditos" as const, show: isGestor, locked: false },
+    { href: "/ferramentas", label: "Ferramentas", icon: "ferramentas" as const, show: isGestor, locked: !hasCrm },
+    { href: "/admin",       label: "Super Admin", icon: "admin" as const, show: isAdmin, locked: false },
   ];
 
   return (

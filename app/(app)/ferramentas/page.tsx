@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Bot } from "lucide-react";
 import { NovoAgenteCard } from "./NovoAgenteCard";
+import { ProductGate } from "../ProductGate";
 
 export default async function FerramentasPage() {
   const user = await currentUser();
@@ -19,6 +20,7 @@ export default async function FerramentasPage() {
   const agentConfigs = team?.agentConfigs ?? [];
 
   return (
+    <ProductGate product="CRM">
     <div className="min-h-screen bg-gray-950 text-white p-6">
       <div className="max-w-5xl mx-auto space-y-8">
         <div>
@@ -62,5 +64,6 @@ export default async function FerramentasPage() {
         <NovoAgenteCard />
       </div>
     </div>
+    </ProductGate>
   );
 }

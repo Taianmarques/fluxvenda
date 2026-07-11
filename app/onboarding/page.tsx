@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useClerk, useUser } from "@clerk/nextjs";
 import { SEGMENTS, SUBSEGMENTS } from "@/lib/segments";
 
@@ -9,11 +9,21 @@ const TEAM_SIZES = ["1-5", "6-15", "16-50", "51-200", "200+"];
 
 type Step = "role" | "company" | "vendedor" | "funcionario";
 type BusinessModel = "B2B" | "B2C";
+type SoldProduct = "CRM" | "PLATAFORMA";
 
 export default function OnboardingPage() {
+  return (
+    <Suspense fallback={null}>
+      <OnboardingForm />
+    </Suspense>
+  );
+}
+
+function OnboardingForm() {
   const { user } = useUser();
   const { session } = useClerk();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [step, setStep] = useState<Step>("role");
   const [role, setRole] = useState<"GESTOR" | "VENDEDOR" | "FUNCIONARIO" | "">("");
@@ -24,6 +34,22 @@ export default function OnboardingPage() {
   const [segment, setSegment] = useState("");
   const [subsegment, setSubsegment] = useState("");
   const [teamSize, setTeamSize] = useState("");
+
+  // Produtos contratados (CRM / Plataforma) — pré-selecionado conforme ?product= vindo da
+  // landing page de origem; sem indicação, assume os dois (comportamento histórico)
+  const productParam = searchParams.get("product");
+  const [products, setProducts] = useState<Set<SoldProduct>>(() => {
+    if (productParam === "crm") return new Set(["CRM"]);
+    if (productParam === "plataforma") return new Set(["PLATAFORMA"]);
+    return new Set(["CRM", "PLATAFORMA"]);
+  });
+  function toggleProduct(p: SoldProduct) {
+    setProducts(prev => {
+      const next = new Set(prev);
+      if (next.has(p)) { if (next.size > 1) next.delete(p); } else next.add(p);
+      return next;
+    });
+  }
 
   // Vendedor fields
   const [vendSegment, setVendSegment] = useState("");
@@ -60,6 +86,7 @@ export default function OnboardingPage() {
           segment:       role === "GESTOR" ? segment : role === "VENDEDOR" ? vendSegment : undefined,
           subsegment:    role === "GESTOR" ? subsegment : undefined,
           teamSize:      role === "GESTOR" ? teamSize : undefined,
+          products:      role === "GESTOR" ? Array.from(products) : undefined,
           inviteCode:    (role === "VENDEDOR" || role === "FUNCIONARIO") && inviteCode.trim() ? inviteCode.trim() : undefined,
         }),
       });
@@ -195,6 +222,23 @@ export default function OnboardingPage() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-300">O que vocês contrataram? *</label>
+              <div className="grid grid-cols-2 gap-3">
+                {([
+                  { key: "CRM" as const, title: "CRM", desc: "Agente de WhatsApp com IA + atendimento" },
+                  { key: "PLATAFORMA" as const, title: "Plataforma", desc: "Scanner, trilhas, simulações e treinamento" },
+                ]).map(p => (
+                  <button key={p.key} type="button" onClick={() => toggleProduct(p.key)}
+                    className={`p-4 rounded-xl border text-left transition-all ${products.has(p.key) ? "border-blue-500 bg-blue-950/40" : "border-gray-700 hover:border-gray-600 bg-gray-900"}`}>
+                    <p className={`font-bold ${products.has(p.key) ? "text-blue-300" : "text-white"}`}>{p.title}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{p.desc}</p>
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500">Pode marcar os dois — dá pra ajustar depois com o suporte.</p>
             </div>
 
             <div className="space-y-2">

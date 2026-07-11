@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
+import { ProductGate } from "../ProductGate";
 
 export default async function ScannerPage() {
   const user = await currentUser();
@@ -39,6 +40,7 @@ export default async function ScannerPage() {
   };
 
   return (
+    <ProductGate product="PLATAFORMA">
     <div className="p-8 max-w-5xl mx-auto space-y-10">
 
       {/* Header */}
@@ -143,5 +145,6 @@ export default async function ScannerPage() {
       </div>
 
     </div>
+    </ProductGate>
   );
 }

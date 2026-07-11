@@ -15,6 +15,7 @@ const schema = z.object({
   segment:       z.string().optional(),
   subsegment:    z.string().optional(),
   teamSize:      z.string().optional(),
+  products:      z.array(z.enum(["CRM", "PLATAFORMA"])).optional(), // produtos contratados (só gestor)
   // vendedor
   inviteCode: z.string().optional(),
 });
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
     const body = schema.safeParse(await req.json());
     if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
 
-    const { role, name, email, phone, companyName, businessModel, segment, subsegment, teamSize, inviteCode } = body.data;
+    const { role, name, email, phone, companyName, businessModel, segment, subsegment, teamSize, products, inviteCode } = body.data;
 
     // Cria ou atualiza o perfil
     await prisma.profile.upsert({
@@ -58,6 +59,8 @@ export async function POST(req: NextRequest) {
             segment:      segment ?? "",
             subsegment:   subsegment ?? "",
             size:         teamSize ?? "1-10",
+            // Produtos contratados — se não vier nada (fluxo antigo/API direta), assume os dois
+            productsOwned: products && products.length > 0 ? products : ["CRM", "PLATAFORMA"],
           },
         });
       }

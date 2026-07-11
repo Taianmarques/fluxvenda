@@ -1,6 +1,7 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
+import { ProductGate } from "../ProductGate";
 
 export default async function SimulacaoPage() {
   const user = await currentUser();
@@ -22,6 +23,7 @@ export default async function SimulacaoPage() {
   // Vendedor sem sessão → CTA direto (auto-setup na API)
   if (!company) {
     return (
+      <ProductGate product="PLATAFORMA">
       <div className="p-8 max-w-3xl mx-auto text-center space-y-6 py-20">
         <p className="text-5xl">🎮</p>
         <h1 className="text-2xl font-bold">
@@ -48,6 +50,7 @@ export default async function SimulacaoPage() {
           </Link>
         )}
       </div>
+      </ProductGate>
     );
   }
 
@@ -59,6 +62,7 @@ export default async function SimulacaoPage() {
   }, company.rounds[0]);
 
   return (
+    <ProductGate product="PLATAFORMA">
     <div className="p-8 max-w-5xl mx-auto space-y-8">
       <div className="flex items-center justify-between">
         <div>
@@ -149,5 +153,6 @@ export default async function SimulacaoPage() {
         </div>
       )}
     </div>
+    </ProductGate>
   );
 }
