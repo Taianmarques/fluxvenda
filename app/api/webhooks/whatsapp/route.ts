@@ -1084,7 +1084,7 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
   if (sendAsAudio) {
     try {
       const audioBuffer = await textToSpeech(reply, { apiKey: config.elevenlabsApiKey!, voiceId: config.elevenlabsVoiceId ?? undefined });
-      await sendMediaAsTeam(config.uazapiToken, contactNumber, "audio", audioBuffer.toString("base64"));
+      await sendMediaAsTeam(config.uazapiToken, contactNumber, "myaudio", audioBuffer.toString("base64"));
     } catch (err) {
       console.error("[whatsapp-webhook] erro ao enviar áudio ElevenLabs, caindo para texto:", err);
       await sendWhatsAppTextAsTeam(config.uazapiToken, contactNumber, reply);

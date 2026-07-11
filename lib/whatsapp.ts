@@ -43,7 +43,9 @@ export async function sendWhatsAppTextAsTeam(token: string, phone: string, text:
   await sendText(UAZAPI_URL, token, phone, text);
 }
 
-export type MediaType = "image" | "video" | "audio" | "document";
+// "audio" = arquivo comum (aparece como anexo encaminhado); "myaudio" = nota de voz nativa
+// (balão com forma de onda e ícone de microfone) — usar "myaudio" para respostas faladas da IA.
+export type MediaType = "image" | "video" | "audio" | "myaudio" | "document";
 
 // Envia uma mídia (foto, vídeo, áudio ou documento) pela instância própria de uma empresa.
 // `fileBase64` é o conteúdo puro em base64 (sem prefixo "data:...;base64,").
