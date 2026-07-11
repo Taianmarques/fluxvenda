@@ -5,6 +5,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { MessageCircle, KanbanSquare, Calendar, Wallet, ShoppingCart, Landmark, Target, ArrowLeft, ChevronDown, Wifi, GitBranch, Briefcase, LayoutGrid, Zap, Filter, UserPlus, ClipboardCheck, Radio, Megaphone, Phone } from "lucide-react";
 import { useEffect, useState } from "react";
 
+type NavItem = { href: string; label: string; icon: typeof MessageCircle; isHub?: boolean };
+type NavCategory = { key: string; label: string; items: NavItem[] };
+
 export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id: string; nome: string }[] }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -26,26 +29,62 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
   // Sem nenhum agente ainda não dá pra montar uma URL real (/crm/[agentId]/...) — todas as
   // abas continuam visíveis, mas apontam pro Hub, onde o primeiro agente é criado.
   const agentPath = (suffix: string) => agentId ? `/crm/${agentId}${suffix}` : "/crm/hub";
-  const CRM_NAV = [
-    { href: agentPath(""), label: "Mensagens", icon: MessageCircle },
-    { href: agentPath("/aovivo"), label: "Ao vivo", icon: Radio },
-    { href: agentPath("/pipeline"), label: "Pipeline", icon: KanbanSquare },
-    { href: agentPath("/funil"), label: "Funil", icon: Filter },
-    { href: `/crm/hub`, label: "Hub", icon: LayoutGrid, isHub: true },
-    { href: agentPath("/automacao"), label: "Automação", icon: Zap },
-    { href: agentPath("/agenda"), label: "Agenda", icon: Calendar },
-    { href: agentPath("/vendas"), label: "Vendas", icon: Wallet },
-    { href: agentPath("/carteira"), label: "Carteira", icon: Briefcase },
-    { href: agentPath("/comercio"), label: "Comércio", icon: ShoppingCart },
-    { href: agentPath("/cobranca"), label: "Cobranças", icon: Landmark },
-    { href: agentPath("/prospeccao"), label: "Prospecção", icon: Target },
-    { href: agentPath("/campanhas"), label: "Campanhas", icon: Megaphone },
-    { href: agentPath("/ligacoes"), label: "Ligações", icon: Phone },
-    { href: agentPath("/canais"), label: "Canais", icon: Wifi },
-    { href: agentPath("/condicoes"), label: "Condições", icon: GitBranch },
-    { href: agentPath("/equipe"), label: "Equipe", icon: UserPlus },
-    { href: agentPath("/auditoria"), label: "Auditoria", icon: ClipboardCheck },
+
+  const HUB_ITEM: NavItem = { href: "/crm/hub", label: "Hub", icon: LayoutGrid, isHub: true };
+
+  const CATEGORIES: NavCategory[] = [
+    { key: "atendimento", label: "Atendimento", items: [
+      { href: agentPath(""), label: "Mensagens", icon: MessageCircle },
+      { href: agentPath("/aovivo"), label: "Ao vivo", icon: Radio },
+    ] },
+    { key: "vendas", label: "Vendas", items: [
+      { href: agentPath("/pipeline"), label: "Pipeline", icon: KanbanSquare },
+      { href: agentPath("/funil"), label: "Funil", icon: Filter },
+      { href: agentPath("/agenda"), label: "Agenda", icon: Calendar },
+      { href: agentPath("/vendas"), label: "Vendas", icon: Wallet },
+      { href: agentPath("/carteira"), label: "Carteira", icon: Briefcase },
+    ] },
+    { key: "comercio", label: "Comércio", items: [
+      { href: agentPath("/comercio"), label: "Comércio", icon: ShoppingCart },
+      { href: agentPath("/cobranca"), label: "Cobranças", icon: Landmark },
+    ] },
+    { key: "aquisicao", label: "Aquisição", items: [
+      { href: agentPath("/prospeccao"), label: "Prospecção", icon: Target },
+      { href: agentPath("/campanhas"), label: "Campanhas", icon: Megaphone },
+      { href: agentPath("/ligacoes"), label: "Ligações", icon: Phone },
+    ] },
+    { key: "automacao", label: "Automação", items: [
+      { href: agentPath("/automacao"), label: "Automação", icon: Zap },
+      { href: agentPath("/condicoes"), label: "Condições", icon: GitBranch },
+    ] },
+    { key: "config", label: "Configurações", items: [
+      { href: agentPath("/canais"), label: "Canais", icon: Wifi },
+      { href: agentPath("/equipe"), label: "Equipe", icon: UserPlus },
+      { href: agentPath("/auditoria"), label: "Auditoria", icon: ClipboardCheck },
+    ] },
   ];
+
+  const FLAT_NAV: NavItem[] = [HUB_ITEM, ...CATEGORIES.flatMap(c => c.items)];
+
+  // Categorias abertas no menu desktop — a que contém a página atual abre sozinha; as demais
+  // o usuário abre/fecha manualmente, e várias podem ficar abertas ao mesmo tempo.
+  const [openCategories, setOpenCategories] = useState<Set<string>>(() => {
+    const active = CATEGORIES.find(cat => cat.items.some(item => isActive(item)));
+    return new Set(active ? [active.key] : []);
+  });
+  useEffect(() => {
+    const active = CATEGORIES.find(cat => cat.items.some(item => isActive(item)));
+    if (active) setOpenCategories(prev => (prev.has(active.key) ? prev : new Set(prev).add(active.key)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  function toggleCategory(key: string) {
+    setOpenCategories(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  }
 
   const currentAgent = agents.find(a => a.id === agentId);
 
@@ -65,7 +104,7 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
       </div>
     )}
 
-    {/* Barra horizontal — mobile (some quando uma conversa está aberta) */}
+    {/* Barra horizontal — mobile (some quando uma conversa está aberta) — lista plana, sem categorias */}
     <div className='md:hidden flex-shrink-0 border-b border-gray-800 bg-black [[data-mobile-chat="1"]_&]:hidden'>
       {agents.length > 1 && (
         <div className="px-3 pt-2">
@@ -79,7 +118,7 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
         </div>
       )}
       <nav className="flex overflow-x-auto px-2 py-2 gap-1" style={{ scrollbarWidth: "none" }}>
-        {CRM_NAV.map(item => {
+        {FLAT_NAV.map(item => {
           const active = isActive(item);
           return (
             <Link
@@ -98,7 +137,7 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
       </nav>
     </div>
 
-    {/* Sidebar vertical — desktop */}
+    {/* Sidebar vertical — desktop, itens agrupados por categoria com dropdown */}
     <aside className="hidden md:flex w-56 flex-shrink-0 border-r border-gray-800 bg-black flex-col">
       <div className="px-5 py-5 border-b border-gray-800">
         <p className="font-bold text-lg">
@@ -135,20 +174,57 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
       )}
 
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">
-        {CRM_NAV.map(item => {
-          const active = isActive(item);
+        {/* Hub fica fixo no topo, fora de qualquer categoria */}
+        {(() => {
+          const active = isActive(HUB_ITEM);
           return (
             <Link
-              key={item.label}
-              href={item.href}
-              onClick={() => { if (pathname !== item.href) setNavigatingTo(item.href); }}
+              href={HUB_ITEM.href}
+              onClick={() => { if (pathname !== HUB_ITEM.href) setNavigatingTo(HUB_ITEM.href); }}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium border-l-2 transition-colors ${
                 active ? "text-white bg-blue-500/10 border-blue-500" : "text-gray-400 border-transparent hover:text-white hover:bg-white/5"
               }`}
             >
-              <item.icon size={17} className={active ? "text-blue-400" : ""} />
-              {item.label}
+              <HUB_ITEM.icon size={17} className={active ? "text-blue-400" : ""} />
+              {HUB_ITEM.label}
             </Link>
+          );
+        })()}
+
+        <div className="border-t border-gray-800 my-2" />
+
+        {CATEGORIES.map(cat => {
+          const isOpen = openCategories.has(cat.key);
+          return (
+            <div key={cat.key}>
+              <button
+                onClick={() => toggleCategory(cat.key)}
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-gray-500 hover:text-gray-300 uppercase tracking-wider transition-colors"
+              >
+                {cat.label}
+                <ChevronDown size={13} className={`transition-transform ${isOpen ? "rotate-180" : ""}`} />
+              </button>
+              {isOpen && (
+                <div className="space-y-0.5 mb-1">
+                  {cat.items.map(item => {
+                    const active = isActive(item);
+                    return (
+                      <Link
+                        key={item.label}
+                        href={item.href}
+                        onClick={() => { if (pathname !== item.href) setNavigatingTo(item.href); }}
+                        className={`flex items-center gap-3 pl-4 pr-3 py-2 rounded-xl text-sm font-medium border-l-2 transition-colors ${
+                          active ? "text-white bg-blue-500/10 border-blue-500" : "text-gray-400 border-transparent hover:text-white hover:bg-white/5"
+                        }`}
+                      >
+                        <item.icon size={16} className={active ? "text-blue-400" : ""} />
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           );
         })}
       </nav>
