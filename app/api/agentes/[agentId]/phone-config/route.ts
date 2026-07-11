@@ -27,6 +27,7 @@ export async function PATCH(
       elevenlabsVoiceId: body.elevenlabsVoiceId || null,
       phoneCallPrompt: body.phoneCallPrompt ?? "",
       whatsappVoiceEnabled: Boolean(body.whatsappVoiceEnabled),
+      whatsappVoicePercent: Math.min(100, Math.max(0, Math.round(Number(body.whatsappVoicePercent) || 0))),
     },
     select: {
       id: true,

@@ -642,7 +642,8 @@ model AgentConfig {
   elevenlabsApiKey       String?
   elevenlabsVoiceId      String? // ID da voz no ElevenLabs
   phoneCallPrompt        String  @default("") // instruções extras para ligações
-  whatsappVoiceEnabled   Boolean @default(false) // enviar também como áudio de voz no WhatsApp
+  whatsappVoiceEnabled   Boolean @default(false) // responder por áudio de voz no WhatsApp (nunca junto com o texto)
+  whatsappVoicePercent   Int     @default(30) // % de respostas enviadas como áudio (resto é texto)
 
   // Resposta automática a comentários do Instagram via DM
   igCommentAutoDm    Boolean @default(false)

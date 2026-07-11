@@ -6,6 +6,7 @@ import { Phone, Eye, EyeOff, Save, CheckCircle, Mic } from "lucide-react";
 type PhoneConfig = {
   phoneEnabled: boolean;
   whatsappVoiceEnabled: boolean;
+  whatsappVoicePercent: number;
   twilioAccountSid: string;
   twilioAuthToken: string;
   twilioPhoneNumber: string;
@@ -29,7 +30,7 @@ export function PhoneAgentClient({
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
 
-  function set(key: keyof PhoneConfig, value: string | boolean) {
+  function set(key: keyof PhoneConfig, value: string | boolean | number) {
     setCfg(prev => ({ ...prev, [key]: value }));
   }
 
@@ -127,6 +128,28 @@ export function PhoneAgentClient({
               </div>
             </div>
           </div>
+
+          {/* Porcentagem de áudio — só quando "Áudio no WhatsApp" habilitado */}
+          {cfg.whatsappVoiceEnabled && (
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-gray-300 flex items-center justify-between">
+                <span>Chance de responder em áudio</span>
+                <span className="text-green-400">{cfg.whatsappVoicePercent}%</span>
+              </label>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={5}
+                value={cfg.whatsappVoicePercent}
+                onChange={e => set("whatsappVoicePercent", Number(e.target.value))}
+                className="w-full accent-green-500"
+              />
+              <p className="text-[10px] text-gray-600">
+                Cada resposta do agente sai OU em áudio OU em texto, nunca os dois. {cfg.whatsappVoicePercent}% das respostas saem como áudio; o restante, como texto.
+              </p>
+            </div>
+          )}
 
           {/* Twilio — só quando ligação habilitada */}
           {cfg.phoneEnabled && (

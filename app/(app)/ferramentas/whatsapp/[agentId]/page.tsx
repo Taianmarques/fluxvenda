@@ -156,6 +156,7 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
           initialConfig={{
             phoneEnabled: config.phoneEnabled,
             whatsappVoiceEnabled: config.whatsappVoiceEnabled,
+            whatsappVoicePercent: config.whatsappVoicePercent,
             twilioAccountSid: config.twilioAccountSid ?? "",
             twilioAuthToken: config.twilioAuthToken ?? "",
             twilioPhoneNumber: config.twilioPhoneNumber ?? "",

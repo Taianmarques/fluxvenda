@@ -1077,14 +1077,20 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
     }
   }
 
-  await sendWhatsAppTextAsTeam(config.uazapiToken, contactNumber, reply);
+  // Com áudio ativado, cada resposta sai OU como voz OU como texto (nunca os dois) —
+  // a porcentagem decide a chance de sair em áudio; se o TTS falhar, cai pro texto.
+  const sendAsAudio = config.whatsappVoiceEnabled && config.elevenlabsApiKey && Math.random() * 100 < config.whatsappVoicePercent;
 
-  if (config.whatsappVoiceEnabled && config.elevenlabsApiKey) {
-    textToSpeech(reply, { apiKey: config.elevenlabsApiKey, voiceId: config.elevenlabsVoiceId ?? undefined })
-      .then(audioBuffer =>
-        sendMediaAsTeam(config.uazapiToken!, contactNumber, "audio", audioBuffer.toString("base64"))
-      )
-      .catch(err => console.error("[whatsapp-webhook] erro ao enviar áudio ElevenLabs:", err));
+  if (sendAsAudio) {
+    try {
+      const audioBuffer = await textToSpeech(reply, { apiKey: config.elevenlabsApiKey!, voiceId: config.elevenlabsVoiceId ?? undefined });
+      await sendMediaAsTeam(config.uazapiToken, contactNumber, "audio", audioBuffer.toString("base64"));
+    } catch (err) {
+      console.error("[whatsapp-webhook] erro ao enviar áudio ElevenLabs, caindo para texto:", err);
+      await sendWhatsAppTextAsTeam(config.uazapiToken, contactNumber, reply);
+    }
+  } else {
+    await sendWhatsAppTextAsTeam(config.uazapiToken, contactNumber, reply);
   }
 
   return NextResponse.json({ ok: true });
