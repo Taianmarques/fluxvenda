@@ -8,8 +8,8 @@ import { useEffect, useRef, useState } from "react";
 type NavItem = { href: string; label: string; icon: typeof MessageCircle; isHub?: boolean };
 type NavCategory = { key: string; label: string; items: NavItem[] };
 
-// Categoria que expande pra baixo (accordion) — usado por todas menos "Marketing", que tem
-// um flyout flutuante próprio (ver CrmSidebar).
+// Categoria que expande pra baixo (accordion) — usado pela maioria; Marketing e Automação
+// usam CategoryFlyout (submenu flutuante pro lado) em vez desse.
 function CategoryAccordion({ cat, isOpen, onToggle, isActive, pathname, onNavigate }: {
   cat: NavCategory;
   isOpen: boolean;
@@ -46,6 +46,76 @@ function CategoryAccordion({ cat, isOpen, onToggle, isActive, pathname, onNaviga
             );
           })}
         </div>
+      )}
+    </div>
+  );
+}
+
+// Categoria com submenu flutuante pro lado (flyout), em vez de expandir pra baixo.
+// Usa position:fixed com coordenadas calculadas via getBoundingClientRect() do botão — o
+// <nav> pai tem overflow-y-auto, e por regra do CSS isso também clipa o eixo horizontal
+// (overflow-x vira "auto" junto), então position:absolute ficaria preso dentro do menu.
+function CategoryFlyout({ label, icon: Icon, items, isActive, pathname, onNavigate }: {
+  label: string;
+  icon: typeof MessageCircle;
+  items: NavItem[];
+  isActive: (item: NavItem) => boolean;
+  pathname: string;
+  onNavigate: (href: string) => void;
+}) {
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const active = items.some(isActive);
+
+  function toggle() {
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setPos({ top: rect.top, left: rect.right + 8 });
+    }
+    setOpen(s => !s);
+  }
+
+  return (
+    <div className="relative">
+      <button
+        ref={btnRef}
+        onClick={toggle}
+        className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+          active ? "text-white bg-blue-500/10" : "text-gray-400 hover:text-white hover:bg-white/5"
+        }`}
+      >
+        <span className="flex items-center gap-3">
+          <Icon size={17} className={active ? "text-blue-400" : ""} />
+          {label}
+        </span>
+        <ChevronDown size={13} className={`-rotate-90 transition-transform ${open ? "rotate-0" : ""}`} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div
+            className="fixed z-20 w-52 bg-gray-900 border border-gray-800 rounded-xl shadow-xl p-1.5 space-y-0.5"
+            style={{ top: pos.top, left: pos.left }}
+          >
+            {items.map(item => {
+              const itemActive = isActive(item);
+              return (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  onClick={() => { setOpen(false); if (pathname !== item.href) onNavigate(item.href); }}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    itemActive ? "text-white bg-blue-500/10" : "text-gray-300 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <item.icon size={16} className={itemActive ? "text-blue-400" : ""} />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
   );
@@ -91,10 +161,6 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
       { href: agentPath("/comercio"), label: "Comércio", icon: ShoppingCart },
       { href: agentPath("/cobranca"), label: "Cobranças", icon: Landmark },
     ] },
-    { key: "automacao", label: "Automação", items: [
-      { href: agentPath("/automacao"), label: "Automação", icon: Zap },
-      { href: agentPath("/condicoes"), label: "Condições", icon: GitBranch },
-    ] },
     { key: "config", label: "Configurações", items: [
       { href: agentPath("/canais"), label: "Canais", icon: Wifi },
       { href: agentPath("/equipe"), label: "Equipe", icon: UserPlus },
@@ -102,15 +168,18 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
     ] },
   ];
 
-  // Marketing tem tratamento visual à parte: em vez de expandir pra baixo como as outras
-  // categorias, abre um flyout flutuante pro lado (estilo referência do usuário).
+  // Marketing e Automação usam o flyout flutuante (CategoryFlyout) em vez do accordion.
   const MARKETING_ITEMS: NavItem[] = [
     { href: agentPath("/campanhas"), label: "Campanhas", icon: Megaphone },
     { href: agentPath("/ligacoes"), label: "Ligações", icon: Phone },
     { href: agentPath("/prospeccao"), label: "Prospecção", icon: Target },
   ];
+  const AUTOMACAO_ITEMS: NavItem[] = [
+    { href: agentPath("/automacao"), label: "Automação", icon: Zap },
+    { href: agentPath("/condicoes"), label: "Condições", icon: GitBranch },
+  ];
 
-  const FLAT_NAV: NavItem[] = [HUB_ITEM, ...CATEGORIES.flatMap(c => c.items), ...MARKETING_ITEMS];
+  const FLAT_NAV: NavItem[] = [HUB_ITEM, ...CATEGORIES.flatMap(c => c.items), ...MARKETING_ITEMS, ...AUTOMACAO_ITEMS];
 
   // Categorias abertas no menu desktop — a que contém a página atual abre sozinha; as demais
   // o usuário abre/fecha manualmente, e várias podem ficar abertas ao mesmo tempo.
@@ -130,23 +199,6 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
       next.has(key) ? next.delete(key) : next.add(key);
       return next;
     });
-  }
-
-  // O flyout usa position:fixed com coordenadas calculadas do botão em vez de position:absolute,
-  // porque o <nav> pai tem overflow-y-auto — e por regra do CSS isso também clipa o eixo
-  // horizontal (overflow-x vira "auto" junto), cortando qualquer conteúdo absoluto que tente
-  // escapar pra fora do <nav>. position:fixed ignora esse clip.
-  const marketingBtnRef = useRef<HTMLButtonElement>(null);
-  const [showMarketingFlyout, setShowMarketingFlyout] = useState(false);
-  const [flyoutPos, setFlyoutPos] = useState({ top: 0, left: 0 });
-  const marketingActive = MARKETING_ITEMS.some(item => isActive(item));
-
-  function toggleMarketingFlyout() {
-    if (!showMarketingFlyout && marketingBtnRef.current) {
-      const rect = marketingBtnRef.current.getBoundingClientRect();
-      setFlyoutPos({ top: rect.top, left: rect.right + 8 });
-    }
-    setShowMarketingFlyout(s => !s);
   }
 
   const currentAgent = agents.find(a => a.id === agentId);
@@ -260,48 +312,8 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
           <CategoryAccordion key={cat.key} cat={cat} isOpen={openCategories.has(cat.key)} onToggle={toggleCategory} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} />
         ))}
 
-        {/* Marketing — flyout flutuante pro lado, em vez de expandir pra baixo */}
-        <div className="relative">
-          <button
-            ref={marketingBtnRef}
-            onClick={toggleMarketingFlyout}
-            className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-              marketingActive ? "text-white bg-blue-500/10" : "text-gray-400 hover:text-white hover:bg-white/5"
-            }`}
-          >
-            <span className="flex items-center gap-3">
-              <Megaphone size={17} className={marketingActive ? "text-blue-400" : ""} />
-              Marketing
-            </span>
-            <ChevronDown size={13} className={`-rotate-90 transition-transform ${showMarketingFlyout ? "rotate-0" : ""}`} />
-          </button>
-          {showMarketingFlyout && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => setShowMarketingFlyout(false)} />
-              <div
-                className="fixed z-20 w-52 bg-gray-900 border border-gray-800 rounded-xl shadow-xl p-1.5 space-y-0.5"
-                style={{ top: flyoutPos.top, left: flyoutPos.left }}
-              >
-                {MARKETING_ITEMS.map(item => {
-                  const active = isActive(item);
-                  return (
-                    <Link
-                      key={item.label}
-                      href={item.href}
-                      onClick={() => { setShowMarketingFlyout(false); if (pathname !== item.href) setNavigatingTo(item.href); }}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        active ? "text-white bg-blue-500/10" : "text-gray-300 hover:text-white hover:bg-white/5"
-                      }`}
-                    >
-                      <item.icon size={16} className={active ? "text-blue-400" : ""} />
-                      {item.label}
-                    </Link>
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </div>
+        <CategoryFlyout label="Marketing" icon={Megaphone} items={MARKETING_ITEMS} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} />
+        <CategoryFlyout label="Automação" icon={Zap} items={AUTOMACAO_ITEMS} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} />
 
         {CATEGORIES.slice(3).map(cat => (
           <CategoryAccordion key={cat.key} cat={cat} isOpen={openCategories.has(cat.key)} onToggle={toggleCategory} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} />
