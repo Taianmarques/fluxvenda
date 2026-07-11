@@ -6,7 +6,7 @@ import { ArrowLeft, ArrowRight, Bot, Smartphone, MessageCircle } from "lucide-re
 import { getAgentConfigAsManager } from "@/lib/team";
 import { WhatsappAgentClient } from "../WhatsappAgentClient";
 import { DistribuicaoClient } from "../DistribuicaoClient";
-import { QrConnect } from "../QrConnect";
+import { WhatsappCloudConnect } from "../WhatsappCloudConnect";
 import { AgentActions } from "../AgentActions";
 import { PhoneAgentClient } from "../PhoneAgentClient";
 import { getInstanceStatus } from "@/lib/whatsapp";
@@ -56,18 +56,30 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
     prisma.instagramConnection.findUnique({ where: { agentConfigId: config.id } }),
   ]);
 
+  const cloudApiConnected = config.whatsappProvider === "CLOUD_API" && Boolean(config.cloudApiPhoneNumberId && config.cloudApiAccessToken);
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const cloudConfigProps = {
+    whatsappProvider: config.whatsappProvider,
+    cloudApiPhoneNumberId: config.cloudApiPhoneNumberId ?? "",
+    cloudApiWabaId: config.cloudApiWabaId ?? "",
+    cloudApiAccessToken: config.cloudApiAccessToken ?? "",
+    cloudApiVerifyToken: config.cloudApiVerifyToken ?? "",
+    cloudApiPhoneNumber: config.cloudApiPhoneNumber ?? "",
+    cloudApiVerifiedName: config.cloudApiVerifiedName ?? "",
+  };
+
   // Só bloqueia na tela de conexão se NENHUM canal estiver conectado
-  if (!instanceStatus.connected && !igConnection) {
+  if (!instanceStatus.connected && !igConnection && !cloudApiConnected) {
     return (
       <div className="min-h-screen bg-gray-950 text-white p-6">
         <div className="max-w-2xl mx-auto space-y-6">
           <div>
             <Link href="/ferramentas" className="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1 w-fit"><ArrowLeft size={12} /> Ferramentas</Link>
             <h1 className="text-2xl font-bold mt-2 flex items-center gap-2"><Smartphone size={24} className="text-blue-400" /> Conecte um canal</h1>
-            <p className="text-gray-400 mt-1">{config.nome} já está configurado. Escaneie o QR code com o WhatsApp do número <span className="text-gray-300">{config.uazapiInstance}</span> — ou conecte o Instagram se preferir.</p>
+            <p className="text-gray-400 mt-1">{config.nome} já está configurado. Escaneie o QR code com o WhatsApp do número <span className="text-gray-300">{config.uazapiInstance}</span>, conecte pela API oficial da Meta, ou conecte o Instagram se preferir.</p>
           </div>
           <div className="max-w-md space-y-4">
-            <QrConnect agentId={config.id} />
+            <WhatsappCloudConnect agentId={config.id} appUrl={appUrl} initialConfig={cloudConfigProps} />
             <Link
               href="/crm/canais"
               className="block text-center text-sm text-purple-400 hover:text-purple-300 border border-purple-800/50 hover:border-purple-600/50 rounded-xl px-4 py-2.5 transition-colors"
@@ -109,7 +121,7 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
             <h1 className="text-3xl font-bold mt-2 flex items-center gap-2"><Bot size={28} className="text-blue-400" /> {config.nome}</h1>
             <p className="text-gray-400 mt-1">
               Agente de atendimento conectado {[
-                instanceStatus.connected && "ao WhatsApp",
+                (instanceStatus.connected || cloudApiConnected) && "ao WhatsApp",
                 igConnection && "ao Instagram",
               ].filter(Boolean).join(" e ")} da sua empresa.
             </p>
@@ -148,6 +160,11 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
           </div>
           <ArrowRight size={20} className="text-green-400 flex-shrink-0" />
         </Link>
+
+        <div>
+          <h2 className="text-xl font-bold mb-4">Conexão do WhatsApp</h2>
+          <WhatsappCloudConnect agentId={config.id} appUrl={appUrl} initialConfig={cloudConfigProps} />
+        </div>
 
         <DistribuicaoClient agentId={config.id} initialMode={config.leadDistributionMode} />
 

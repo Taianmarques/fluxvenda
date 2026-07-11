@@ -40,5 +40,5 @@ export default async function CampanhasPage({ params }: { params: Promise<{ agen
     );
   }
 
-  return <CampanhasClient agentId={config.id} />;
+  return <CampanhasClient agentId={config.id} isCloudApi={config.whatsappProvider === "CLOUD_API"} />;
 }

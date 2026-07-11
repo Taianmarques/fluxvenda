@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Megaphone, Plus, X, Sparkles, MessageSquareText, Pause, Play, Ban, Users, Clock, ShieldCheck, Upload, FileSpreadsheet, Filter as FilterIcon, KanbanSquare, Star, UserSquare2 } from "lucide-react";
+import { Megaphone, Plus, X, Sparkles, MessageSquareText, Pause, Play, Ban, Users, Clock, ShieldCheck, Upload, FileSpreadsheet, Filter as FilterIcon, KanbanSquare, Star, UserSquare2, Globe2, User } from "lucide-react";
 import { parseCsv, downloadCsvTemplate } from "@/lib/csv-parser";
 import { NIVEL_META, type Nivel } from "../carteira/CarteiraClient";
 
@@ -11,17 +11,34 @@ type PipelineStage = { id: string; name: string; color: string };
 type Pipeline = { id: string; name: string; stages: PipelineStage[] };
 type Atendente = { id: string; name: string };
 
+type MessageTemplate = {
+  name: string;
+  status: string;
+  language: string;
+  category: string;
+  components: { type: string; text?: string; format?: string }[];
+};
+
 type Campanha = {
   id: string;
   nome: string;
   modo: "NORMAL" | "IA_VARIACAO";
   status: "ENVIANDO" | "PAUSADA" | "CONCLUIDA" | "CANCELADA";
   mensagem: string;
+  origemMensagem?: "TEXTO_LIVRE" | "TEMPLATE_META";
+  templateName?: string | null;
   createdAt: string;
   total: number;
   enviados: number;
   erros: number;
 };
+
+// Conta quantas variáveis {{1}}, {{2}}... o corpo do template usa
+function countTemplateVars(template: MessageTemplate): number {
+  const body = template.components.find(c => c.type === "BODY")?.text ?? "";
+  const matches = body.match(/\{\{(\d+)\}\}/g) ?? [];
+  return new Set(matches).size;
+}
 
 const STATUS_LABEL: Record<Campanha["status"], { label: string; color: string }> = {
   ENVIANDO: { label: "Enviando", color: "bg-green-900/40 text-green-300 border-green-800/50" },
@@ -36,7 +53,7 @@ const RITMOS = [
   { key: "rapido", label: "Rápido", desc: "15 a 45s entre envios — só para listas pequenas e números aquecidos" },
 ] as const;
 
-export function CampanhasClient({ agentId }: { agentId: string }) {
+export function CampanhasClient({ agentId, isCloudApi = false }: { agentId: string; isCloudApi?: boolean }) {
   const [campanhas, setCampanhas] = useState<Campanha[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -48,6 +65,14 @@ export function CampanhasClient({ agentId }: { agentId: string }) {
   const [modo, setModo] = useState<"NORMAL" | "IA_VARIACAO">("NORMAL");
   const [instrucoesIA, setInstrucoesIA] = useState("");
   const [ritmo, setRitmo] = useState<"seguro" | "moderado" | "rapido">("seguro");
+
+  // Template aprovado da Meta — obrigatório quando o agente usa a API oficial (WhatsApp Cloud API)
+  const [templates, setTemplates] = useState<MessageTemplate[]>([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [templateError, setTemplateError] = useState("");
+  const [templateName, setTemplateName] = useState<string>("");
+  const [templateVars, setTemplateVars] = useState<string[]>([]);
+  const selectedTemplate = templates.find(t => t.name === templateName) ?? null;
   const [compradores, setCompradores] = useState<"todos" | "sim" | "nao">("todos");
   const [inatividade, setInatividade] = useState<"qualquer" | "7d" | "30d" | "60d">("qualquer");
   const [stageId, setStageId] = useState<string>("");
@@ -118,17 +143,47 @@ export function CampanhasClient({ agentId }: { agentId: string }) {
     setAtendentes(aData.attendants ?? []);
   }
 
+  async function loadTemplates() {
+    setLoadingTemplates(true);
+    setTemplateError("");
+    try {
+      const res = await fetch(`/api/agentes/${agentId}/whatsapp-cloud/templates`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Erro ao buscar templates.");
+      setTemplates(data.templates ?? []);
+    } catch (e: any) {
+      setTemplateError(e.message);
+    } finally {
+      setLoadingTemplates(false);
+    }
+  }
+
+  function selectTemplate(name: string) {
+    setTemplateName(name);
+    const t = templates.find(tpl => tpl.name === name);
+    setTemplateVars(t ? Array(countTemplateVars(t)).fill("") : []);
+  }
+
   useEffect(() => {
     loadCampanhas();
     loadOpcoesFiltro();
+    if (isCloudApi) loadTemplates();
     const interval = setInterval(() => { if (!document.hidden) loadCampanhas(); }, 8000);
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleCriar() {
-    if (!nome.trim() || !mensagem.trim()) {
-      setError("Preencha o nome e a mensagem.");
+    if (!nome.trim()) {
+      setError("Preencha o nome da campanha.");
+      return;
+    }
+    if (isCloudApi && !selectedTemplate) {
+      setError("Selecione um template aprovado.");
+      return;
+    }
+    if (!isCloudApi && !mensagem.trim()) {
+      setError("Preencha a mensagem.");
       return;
     }
     if (fontePublico === "importar" && contatosImportados.length === 0) {
@@ -143,10 +198,16 @@ export function CampanhasClient({ agentId }: { agentId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nome: nome.trim(),
-          mensagem: mensagem.trim(),
-          modo,
-          instrucoesIA: instrucoesIA.trim(),
           ritmo,
+          ...(isCloudApi
+            ? {
+                origemMensagem: "TEMPLATE_META",
+                mensagem: `[Template] ${selectedTemplate!.name}`,
+                templateName: selectedTemplate!.name,
+                templateLanguage: selectedTemplate!.language,
+                templateVariaveis: templateVars,
+              }
+            : { origemMensagem: "TEXTO_LIVRE", mensagem: mensagem.trim(), modo, instrucoesIA: instrucoesIA.trim() }),
           ...(fontePublico === "importar"
             ? { contatosImportados }
             : { filtros: { compradores, inatividade, stageId: stageId || null, nivel: nivel || null, atendenteId: atendenteId || null } }),
@@ -156,6 +217,7 @@ export function CampanhasClient({ agentId }: { agentId: string }) {
       if (!res.ok) throw new Error(data.error ?? "Erro ao criar campanha.");
       setNome(""); setMensagem(""); setInstrucoesIA(""); setModo("NORMAL"); setRitmo("seguro");
       setCompradores("todos"); setInatividade("qualquer"); setStageId(""); setNivel(""); setAtendenteId("");
+      setTemplateName(""); setTemplateVars([]);
       setShowForm(false);
       setFontePublico("filtros"); setContatosImportados([]); setImportError("");
       loadCampanhas();
@@ -217,48 +279,108 @@ export function CampanhasClient({ agentId }: { agentId: string }) {
               />
             </div>
 
-            {/* Modo */}
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => setModo("NORMAL")}
-                className={`text-left p-3 rounded-xl border transition-colors ${modo === "NORMAL" ? "border-blue-500 bg-blue-500/10" : "border-gray-800 hover:border-gray-600"}`}
-              >
-                <p className="text-sm font-medium flex items-center gap-1.5"><MessageSquareText size={13} /> Disparo normal</p>
-                <p className="text-xs text-gray-500 mt-0.5">Mesma mensagem para todos (com {"{nome}"} personalizando)</p>
-              </button>
-              <button
-                onClick={() => setModo("IA_VARIACAO")}
-                className={`text-left p-3 rounded-xl border transition-colors ${modo === "IA_VARIACAO" ? "border-purple-500 bg-purple-500/10" : "border-gray-800 hover:border-gray-600"}`}
-              >
-                <p className="text-sm font-medium flex items-center gap-1.5"><Sparkles size={13} className="text-purple-400" /> Variação por IA</p>
-                <p className="text-xs text-gray-500 mt-0.5">Cada envio é reescrito — reduz risco de bloqueio por spam</p>
-              </button>
-            </div>
+            {isCloudApi ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-xs text-blue-300 bg-blue-950/30 border border-blue-800/40 rounded-xl px-3 py-2">
+                  <Globe2 size={13} className="flex-shrink-0" />
+                  API oficial da Meta: campanhas só podem usar templates aprovados.
+                </div>
 
-            <div>
-              <label className="text-xs text-gray-400 block mb-1">Mensagem base</label>
-              <textarea
-                value={mensagem}
-                onChange={e => setMensagem(e.target.value)}
-                rows={4}
-                maxLength={2000}
-                placeholder={"Oi {nome}! Temos uma condição especial essa semana pra você..."}
-                className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm resize-none"
-              />
-              <p className="text-xs text-gray-600 mt-0.5">{"{nome}"} vira o primeiro nome do contato.</p>
-            </div>
+                {loadingTemplates && <p className="text-sm text-gray-500">Buscando templates aprovados...</p>}
+                {templateError && <p className="text-sm text-red-400">{templateError}</p>}
 
-            {modo === "IA_VARIACAO" && (
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">Orientações para a IA (opcional)</label>
-                <input
-                  value={instrucoesIA}
-                  onChange={e => setInstrucoesIA(e.target.value)}
-                  placeholder="Ex: manter tom informal; preservar o valor R$ 99 sem alterar"
-                  className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
-                  maxLength={500}
-                />
+                {!loadingTemplates && !templateError && (
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Template aprovado</label>
+                    <select
+                      value={templateName}
+                      onChange={e => selectTemplate(e.target.value)}
+                      className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+                    >
+                      <option value="">Selecione um template...</option>
+                      {templates.map(t => (
+                        <option key={t.name} value={t.name}>{t.name} ({t.language})</option>
+                      ))}
+                    </select>
+                    {templates.length === 0 && (
+                      <p className="text-xs text-gray-600 mt-1">Nenhum template aprovado encontrado na sua conta WhatsApp Business.</p>
+                    )}
+                  </div>
+                )}
+
+                {selectedTemplate && templateVars.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-gray-400">Variáveis do template ({"{{1}}"}, {"{{2}}"}...)</p>
+                    {templateVars.map((v, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <input
+                          value={v}
+                          onChange={e => setTemplateVars(prev => prev.map((x, idx) => idx === i ? e.target.value : x))}
+                          placeholder={`Variável ${i + 1}`}
+                          disabled={v === "{nome}"}
+                          className="flex-1 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm disabled:text-gray-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setTemplateVars(prev => prev.map((x, idx) => idx === i ? (x === "{nome}" ? "" : "{nome}") : x))}
+                          className={`flex items-center gap-1 text-xs px-2 py-2 rounded-lg border flex-shrink-0 ${
+                            v === "{nome}" ? "border-blue-500 bg-blue-500/10 text-blue-300" : "border-gray-800 text-gray-500 hover:border-gray-600"
+                          }`}
+                          title="Usar o nome do contato"
+                        >
+                          <User size={12} /> Nome
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
+            ) : (
+              <>
+                {/* Modo */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setModo("NORMAL")}
+                    className={`text-left p-3 rounded-xl border transition-colors ${modo === "NORMAL" ? "border-blue-500 bg-blue-500/10" : "border-gray-800 hover:border-gray-600"}`}
+                  >
+                    <p className="text-sm font-medium flex items-center gap-1.5"><MessageSquareText size={13} /> Disparo normal</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Mesma mensagem para todos (com {"{nome}"} personalizando)</p>
+                  </button>
+                  <button
+                    onClick={() => setModo("IA_VARIACAO")}
+                    className={`text-left p-3 rounded-xl border transition-colors ${modo === "IA_VARIACAO" ? "border-purple-500 bg-purple-500/10" : "border-gray-800 hover:border-gray-600"}`}
+                  >
+                    <p className="text-sm font-medium flex items-center gap-1.5"><Sparkles size={13} className="text-purple-400" /> Variação por IA</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Cada envio é reescrito — reduz risco de bloqueio por spam</p>
+                  </button>
+                </div>
+
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Mensagem base</label>
+                  <textarea
+                    value={mensagem}
+                    onChange={e => setMensagem(e.target.value)}
+                    rows={4}
+                    maxLength={2000}
+                    placeholder={"Oi {nome}! Temos uma condição especial essa semana pra você..."}
+                    className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm resize-none"
+                  />
+                  <p className="text-xs text-gray-600 mt-0.5">{"{nome}"} vira o primeiro nome do contato.</p>
+                </div>
+
+                {modo === "IA_VARIACAO" && (
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Orientações para a IA (opcional)</label>
+                    <input
+                      value={instrucoesIA}
+                      onChange={e => setInstrucoesIA(e.target.value)}
+                      placeholder="Ex: manter tom informal; preservar o valor R$ 99 sem alterar"
+                      className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+                      maxLength={500}
+                    />
+                  </div>
+                )}
+              </>
             )}
 
             {/* Audiência */}
@@ -406,6 +528,7 @@ export function CampanhasClient({ agentId }: { agentId: string }) {
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold flex items-center gap-1.5">
+                      {c.origemMensagem === "TEMPLATE_META" && <Globe2 size={12} className="text-blue-400 flex-shrink-0" />}
                       {c.modo === "IA_VARIACAO" && <Sparkles size={12} className="text-purple-400 flex-shrink-0" />}
                       {c.nome}
                     </p>

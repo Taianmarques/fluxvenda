@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { runAgent } from "@/lib/agent-engine";
 import { sendWhatsAppTextAsTeam } from "@/lib/whatsapp";
+import { sendCloudTemplate, type TemplateComponent } from "@/lib/whatsapp-cloud";
 import { logTokenUsage, isOverQuota } from "@/lib/token-usage";
 
 // Máximo de destinatários processados por execução do cron — o intervalo entre eles
@@ -28,13 +29,22 @@ export async function POST(req: NextRequest) {
 
   const campanhas = await prisma.campanha.findMany({
     where: { status: "ENVIANDO", nextSendAt: { lte: new Date() } },
-    include: { agentConfig: { select: { uazapiToken: true, teamId: true } } },
+    include: {
+      agentConfig: {
+        select: { uazapiToken: true, teamId: true, whatsappProvider: true, cloudApiPhoneNumberId: true, cloudApiAccessToken: true },
+      },
+    },
   });
 
   let processadas = 0;
 
   for (const campanha of campanhas) {
-    if (!campanha.agentConfig.uazapiToken) {
+    const isCloudApi = campanha.agentConfig.whatsappProvider === "CLOUD_API";
+    const isConnected = isCloudApi
+      ? Boolean(campanha.agentConfig.cloudApiPhoneNumberId && campanha.agentConfig.cloudApiAccessToken)
+      : Boolean(campanha.agentConfig.uazapiToken);
+
+    if (!isConnected) {
       await prisma.campanha.update({ where: { id: campanha.id }, data: { status: "PAUSADA", nextSendAt: null } });
       continue;
     }
@@ -54,25 +64,48 @@ export async function POST(req: NextRequest) {
 
     for (const dest of proximos) {
       const primeiroNome = (dest.contactName || "").trim().split(" ")[0] || "";
-      let texto = campanha.mensagem.replaceAll("{nome}", primeiroNome);
 
       try {
-        if (campanha.modo === "IA_VARIACAO" && !overQuota) {
-          const instrucao = campanha.instrucoesIA ? `\n\nOrientações adicionais: ${campanha.instrucoesIA}` : "";
-          const result = await runAgent(
-            VARIACAO_PROMPT + instrucao,
-            [],
-            `Mensagem original (destinatário: ${primeiroNome || "cliente"}):\n${texto}`
-          );
-          texto = result.reply.trim() || texto;
-          logTokenUsage({ teamId: campanha.agentConfig.teamId, provider: "openai", model: "gpt-4o-mini", feature: "campanha_variacao", ...result.usage });
-        }
+        if (campanha.origemMensagem === "TEMPLATE_META") {
+          // Campanha via template aprovado da Meta — obrigatório na API oficial, texto livre não é permitido fora da janela de 24h
+          const variaveis: string[] = campanha.templateVariaveis ? JSON.parse(campanha.templateVariaveis) : [];
+          const resolved = variaveis.map(v => v === "{nome}" ? (primeiroNome || "cliente") : v);
+          const components: TemplateComponent[] = resolved.length > 0
+            ? [{ type: "body", parameters: resolved.map(text => ({ type: "text" as const, text })) }]
+            : [];
 
-        await sendWhatsAppTextAsTeam(campanha.agentConfig.uazapiToken, dest.contactNumber, texto);
-        await prisma.campanhaDestinatario.update({
-          where: { id: dest.id },
-          data: { status: "ENVIADO", mensagemEnviada: texto, sentAt: new Date() },
-        });
+          await sendCloudTemplate(
+            campanha.agentConfig.cloudApiPhoneNumberId!,
+            campanha.agentConfig.cloudApiAccessToken!,
+            dest.contactNumber,
+            campanha.templateName!,
+            campanha.templateLanguage ?? "pt_BR",
+            components
+          );
+          await prisma.campanhaDestinatario.update({
+            where: { id: dest.id },
+            data: { status: "ENVIADO", mensagemEnviada: `[template: ${campanha.templateName}]`, sentAt: new Date() },
+          });
+        } else {
+          let texto = campanha.mensagem.replaceAll("{nome}", primeiroNome);
+
+          if (campanha.modo === "IA_VARIACAO" && !overQuota) {
+            const instrucao = campanha.instrucoesIA ? `\n\nOrientações adicionais: ${campanha.instrucoesIA}` : "";
+            const result = await runAgent(
+              VARIACAO_PROMPT + instrucao,
+              [],
+              `Mensagem original (destinatário: ${primeiroNome || "cliente"}):\n${texto}`
+            );
+            texto = result.reply.trim() || texto;
+            logTokenUsage({ teamId: campanha.agentConfig.teamId, provider: "openai", model: "gpt-4o-mini", feature: "campanha_variacao", ...result.usage });
+          }
+
+          await sendWhatsAppTextAsTeam(campanha.agentConfig.uazapiToken!, dest.contactNumber, texto);
+          await prisma.campanhaDestinatario.update({
+            where: { id: dest.id },
+            data: { status: "ENVIADO", mensagemEnviada: texto, sentAt: new Date() },
+          });
+        }
       } catch (err: any) {
         console.error("[campanha] erro ao enviar:", err?.message ?? err);
         await prisma.campanhaDestinatario.update({ where: { id: dest.id }, data: { status: "ERRO" } });

@@ -110,6 +110,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ age
       modo: c.modo,
       status: c.status,
       mensagem: c.mensagem,
+      origemMensagem: c.origemMensagem,
+      templateName: c.templateName,
       createdAt: c.createdAt.toISOString(),
       total: c.destinatarios.length,
       enviados: c.destinatarios.filter(d => d.status === "ENVIADO").length,
@@ -120,7 +122,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ age
 
 const criarSchema = z.object({
   nome: z.string().min(1).max(60),
-  mensagem: z.string().min(1).max(2000),
+  // Texto livre — obrigatório quando origemMensagem = TEXTO_LIVRE
+  mensagem: z.string().max(2000).default(""),
   modo: z.enum(["NORMAL", "IA_VARIACAO"]).default("NORMAL"),
   instrucoesIA: z.string().max(500).default(""),
   ritmo: z.enum(["seguro", "moderado", "rapido"]).default("seguro"),
@@ -130,6 +133,11 @@ const criarSchema = z.object({
     contactNumber: z.string().min(8).max(20),
     contactName: z.string().max(120).default(""),
   })).max(500).optional(),
+  // Template aprovado da Meta — obrigatório quando o agente usa WhatsApp Cloud API
+  origemMensagem: z.enum(["TEXTO_LIVRE", "TEMPLATE_META"]).default("TEXTO_LIVRE"),
+  templateName: z.string().max(200).optional(),
+  templateLanguage: z.string().max(20).optional(),
+  templateVariaveis: z.array(z.string().max(200)).max(10).optional(), // cada item: texto fixo ou o token "{nome}"
 });
 
 const RITMOS = {
@@ -145,10 +153,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
   const { agentId } = await params;
   const config = await getAgentConfigAsManager(userId, agentId);
   if (!config) return NextResponse.json({ error: "Só o gestor cria campanhas" }, { status: 403 });
-  if (!config.uazapiToken) return NextResponse.json({ error: "WhatsApp não conectado" }, { status: 400 });
+
+  const isCloudApi = config.whatsappProvider === "CLOUD_API";
+  const isConnected = isCloudApi
+    ? Boolean(config.cloudApiPhoneNumberId && config.cloudApiAccessToken)
+    : Boolean(config.uazapiToken);
+  if (!isConnected) return NextResponse.json({ error: "WhatsApp não conectado" }, { status: 400 });
 
   const body = criarSchema.safeParse(await req.json());
   if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
+
+  // Campanhas via API oficial só podem sair por template aprovado da Meta — texto livre
+  // fora da janela de 24h é rejeitado pela própria Meta.
+  if (isCloudApi && body.data.origemMensagem !== "TEMPLATE_META") {
+    return NextResponse.json({ error: "Com a API oficial, a campanha precisa usar um template aprovado." }, { status: 400 });
+  }
+  if (body.data.origemMensagem === "TEMPLATE_META" && !body.data.templateName) {
+    return NextResponse.json({ error: "Selecione um template." }, { status: 400 });
+  }
+  if (body.data.origemMensagem === "TEXTO_LIVRE" && !body.data.mensagem) {
+    return NextResponse.json({ error: "Escreva a mensagem da campanha." }, { status: 400 });
+  }
 
   let destinatarios: { contactNumber: string; contactName: string }[];
   if (body.data.contatosImportados && body.data.contatosImportados.length > 0) {
@@ -180,6 +205,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
       intervaloMinSeg: ritmo.min,
       intervaloMaxSeg: ritmo.max,
       nextSendAt: new Date(),
+      origemMensagem: body.data.origemMensagem,
+      templateName: body.data.templateName ?? null,
+      templateLanguage: body.data.templateLanguage ?? null,
+      templateVariaveis: body.data.templateVariaveis ? JSON.stringify(body.data.templateVariaveis) : null,
       destinatarios: { createMany: { data: destinatarios } },
     },
   });

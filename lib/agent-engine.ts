@@ -1,12 +1,9 @@
 import { openai, MODEL } from "@/lib/openai";
 import { AGENT_WIZARD_QUESTIONS, DEFAULT_WIZARD_QUESTIONS } from "@/lib/agent-wizard-questions";
 
-export async function transcribeAudio(fileURL: string, mimetype: string): Promise<string> {
-  const res = await fetch(fileURL);
-  if (!res.ok) throw new Error(`Erro ao baixar áudio para transcrição: ${res.status}`);
-  const buffer = Buffer.from(await res.arrayBuffer());
+export async function transcribeAudioBuffer(buffer: Buffer, mimetype: string): Promise<string> {
   const ext = mimetype.includes("mpeg") ? "mp3" : mimetype.includes("ogg") ? "ogg" : "wav";
-  const file = new File([buffer], `audio.${ext}`, { type: mimetype });
+  const file = new File([new Uint8Array(buffer)], `audio.${ext}`, { type: mimetype });
 
   const result = await openai.audio.transcriptions.create({
     file,
@@ -14,6 +11,13 @@ export async function transcribeAudio(fileURL: string, mimetype: string): Promis
     language: "pt",
   });
   return result.text.trim();
+}
+
+export async function transcribeAudio(fileURL: string, mimetype: string): Promise<string> {
+  const res = await fetch(fileURL);
+  if (!res.ok) throw new Error(`Erro ao baixar áudio para transcrição: ${res.status}`);
+  const buffer = Buffer.from(await res.arrayBuffer());
+  return transcribeAudioBuffer(buffer, mimetype);
 }
 
 export type AgentConfigInput = {

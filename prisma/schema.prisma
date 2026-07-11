@@ -586,6 +586,15 @@ model AgentConfig {
   uazapiInstance String?
   uazapiToken    String?
 
+  // WhatsApp Cloud API (Meta oficial) — alternativa exclusiva à UazAPI, escolhida via whatsappProvider
+  whatsappProvider      WhatsappProvider @default(UAZAPI)
+  cloudApiPhoneNumberId String?
+  cloudApiWabaId        String?
+  cloudApiAccessToken   String?
+  cloudApiVerifyToken   String? // gerado ao salvar; comparado no handshake GET do webhook da Meta
+  cloudApiPhoneNumber   String? // display_phone_number confirmado via "testar conexão"
+  cloudApiVerifiedName  String?
+
   followupEnabled       Boolean @default(true)
   followupDelaysMinutes Json    @default("[1440]") // minutos de espera por tentativa, ex: [1440, 720] = 24h, depois +12h. O número de tentativas é o tamanho do array.
 
@@ -730,9 +739,15 @@ model Campanha {
   agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id], onDelete: Cascade)
 
   nome     String
-  mensagem String // mensagem base ({nome} = primeiro nome do contato)
-  modo     String @default("NORMAL") // NORMAL | IA_VARIACAO (IA reescreve por destinatário)
+  mensagem String // mensagem base ({nome} = primeiro nome do contato) — usada quando origemMensagem = TEXTO_LIVRE
+  modo     String @default("NORMAL") // NORMAL | IA_VARIACAO (IA reescreve por destinatário) — só se aplica a TEXTO_LIVRE
   instrucoesIA String @default("")   // orientações extras pra variação (tom, o que preservar)
+
+  // Envio via template aprovado da Meta — obrigatório quando o agente usa WhatsApp Cloud API
+  origemMensagem    CampanhaOrigemMensagem @default(TEXTO_LIVRE)
+  templateName      String?
+  templateLanguage  String?
+  templateVariaveis String? // JSON: array posicional; cada item é texto fixo ou o token "{nome}"
 
   status String @default("ENVIANDO") // ENVIANDO | PAUSADA | CONCLUIDA | CANCELADA
 
@@ -812,6 +827,16 @@ enum LeadDistributionMode {
   PRIMEIRO_A_ASSUMIR  // quem mandar a 1ª mensagem manual na conversa fica responsável
   RODIZIO             // toda conversa nova já nasce atribuída, alternando entre atendentes
   IA_QUALIFICACAO     // a IA avalia a conversa e atribui (rodízio) quando o lead parece qualificado
+}
+
+enum WhatsappProvider {
+  UAZAPI    // pareamento por QR code, não oficial
+  CLOUD_API // WhatsApp Cloud API oficial da Meta
+}
+
+enum CampanhaOrigemMensagem {
+  TEXTO_LIVRE  // mensagem digitada, com {nome} interpolado (UazAPI ou Cloud API dentro da janela de 24h)
+  TEMPLATE_META // template aprovado pela Meta, obrigatório para campanhas via WhatsApp Cloud API
 }
 
 // Se a empresa não cadastrar nenhum profissional, o agendamento usa a disponibilidade

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createHmac } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { runAgent } from "@/lib/agent-engine";
 import { sendInstagramDM, sendInstagramPrivateReply } from "@/lib/instagram";
 import { logTokenUsage, isOverQuota } from "@/lib/token-usage";
 import { startFunnelExecution, handleFunnelReply } from "@/lib/instagram-funnel";
 import { emitChatEvent } from "@/lib/realtime";
+import { verifyMetaHandshake, verifyMetaSignature } from "@/lib/meta-webhook";
 
 // GET: verificação de webhook pela Meta (hub challenge)
 export async function GET(req: NextRequest) {
@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("hub.verify_token");
   const challenge = req.nextUrl.searchParams.get("hub.challenge");
 
-  if (mode === "subscribe" && token === process.env.INSTAGRAM_VERIFY_TOKEN) {
+  if (verifyMetaHandshake(mode, token, process.env.INSTAGRAM_VERIFY_TOKEN)) {
     return new Response(challenge ?? "", { status: 200 });
   }
   return new Response("Forbidden", { status: 403 });
@@ -23,11 +23,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
 
-  // Verifica assinatura HMAC quando a secret está configurada
   const signature = req.headers.get("x-hub-signature-256");
-  if (signature && process.env.META_APP_SECRET) {
-    const expected = "sha256=" + createHmac("sha256", process.env.META_APP_SECRET).update(rawBody).digest("hex");
-    if (signature !== expected) return new Response("Invalid signature", { status: 401 });
+  if (!verifyMetaSignature(rawBody, signature, process.env.META_APP_SECRET)) {
+    return new Response("Invalid signature", { status: 401 });
   }
 
   let body: any;
