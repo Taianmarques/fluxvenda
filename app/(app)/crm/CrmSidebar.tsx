@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { MessageCircle, KanbanSquare, Calendar, Wallet, ShoppingCart, Landmark, Target, ArrowLeft, ChevronDown, Wifi, GitBranch, Briefcase, LayoutGrid, Zap, Filter, UserPlus, ClipboardCheck, Radio, Megaphone, Phone } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type NavItem = { href: string; label: string; icon: typeof MessageCircle; isHub?: boolean };
 type NavCategory = { key: string; label: string; items: NavItem[] };
@@ -132,8 +132,22 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
     });
   }
 
+  // O flyout usa position:fixed com coordenadas calculadas do botão em vez de position:absolute,
+  // porque o <nav> pai tem overflow-y-auto — e por regra do CSS isso também clipa o eixo
+  // horizontal (overflow-x vira "auto" junto), cortando qualquer conteúdo absoluto que tente
+  // escapar pra fora do <nav>. position:fixed ignora esse clip.
+  const marketingBtnRef = useRef<HTMLButtonElement>(null);
   const [showMarketingFlyout, setShowMarketingFlyout] = useState(false);
+  const [flyoutPos, setFlyoutPos] = useState({ top: 0, left: 0 });
   const marketingActive = MARKETING_ITEMS.some(item => isActive(item));
+
+  function toggleMarketingFlyout() {
+    if (!showMarketingFlyout && marketingBtnRef.current) {
+      const rect = marketingBtnRef.current.getBoundingClientRect();
+      setFlyoutPos({ top: rect.top, left: rect.right + 8 });
+    }
+    setShowMarketingFlyout(s => !s);
+  }
 
   const currentAgent = agents.find(a => a.id === agentId);
 
@@ -249,7 +263,8 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
         {/* Marketing — flyout flutuante pro lado, em vez de expandir pra baixo */}
         <div className="relative">
           <button
-            onClick={() => setShowMarketingFlyout(s => !s)}
+            ref={marketingBtnRef}
+            onClick={toggleMarketingFlyout}
             className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
               marketingActive ? "text-white bg-blue-500/10" : "text-gray-400 hover:text-white hover:bg-white/5"
             }`}
@@ -263,7 +278,10 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
           {showMarketingFlyout && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setShowMarketingFlyout(false)} />
-              <div className="absolute z-20 left-full top-0 ml-2 w-52 bg-gray-900 border border-gray-800 rounded-xl shadow-xl p-1.5 space-y-0.5">
+              <div
+                className="fixed z-20 w-52 bg-gray-900 border border-gray-800 rounded-xl shadow-xl p-1.5 space-y-0.5"
+                style={{ top: flyoutPos.top, left: flyoutPos.left }}
+              >
                 {MARKETING_ITEMS.map(item => {
                   const active = isActive(item);
                   return (
