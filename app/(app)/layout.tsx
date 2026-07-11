@@ -27,17 +27,23 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const hasCrm = hasProduct(products, "CRM");
   const hasPlataforma = hasProduct(products, "PLATAFORMA");
 
+  // Quem não contratou a Plataforma não precisa ver os 9 itens individuais bloqueados —
+  // colapsa tudo num único link de upsell que leva direto pra landing do produto.
   const NAV = [
     { href: "/dashboard",  label: "Dashboard",  icon: "dashboard" as const, show: true, locked: false },
-    { href: "/scanner",    label: "Scanner",    icon: "scanner" as const, show: true, locked: !hasPlataforma },
-    { href: "/missoes",    label: "Plano de Ação", icon: "missoes" as const, show: true, locked: !hasPlataforma },
-    { href: "/simulacao",  label: "Simulação",  icon: "simulacao" as const, show: true, locked: !hasPlataforma },
-    { href: "/trilhas",    label: "Trilhas",    icon: "trilhas" as const, show: true, locked: !hasPlataforma },
-    { href: "/objecoes",   label: "Objeções",   icon: "objecoes" as const, show: true, locked: !hasPlataforma },
-    { href: "/scripts",    label: "Scripts",    icon: "scripts" as const, show: true, locked: !hasPlataforma },
-    { href: "/playbook",   label: "Playbook",   icon: "playbook" as const, show: true, locked: !hasPlataforma },
-    { href: "/ranking",    label: "Ranking",    icon: "ranking" as const, show: true, locked: !hasPlataforma },
-    { href: "/gestor",      label: "Equipe",      icon: "equipe" as const, show: isGestor, locked: !hasPlataforma },
+    ...(hasPlataforma ? [
+      { href: "/scanner",    label: "Scanner",    icon: "scanner" as const, show: true, locked: false },
+      { href: "/missoes",    label: "Plano de Ação", icon: "missoes" as const, show: true, locked: false },
+      { href: "/simulacao",  label: "Simulação",  icon: "simulacao" as const, show: true, locked: false },
+      { href: "/trilhas",    label: "Trilhas",    icon: "trilhas" as const, show: true, locked: false },
+      { href: "/objecoes",   label: "Objeções",   icon: "objecoes" as const, show: true, locked: false },
+      { href: "/scripts",    label: "Scripts",    icon: "scripts" as const, show: true, locked: false },
+      { href: "/playbook",   label: "Playbook",   icon: "playbook" as const, show: true, locked: false },
+      { href: "/ranking",    label: "Ranking",    icon: "ranking" as const, show: true, locked: false },
+      { href: "/gestor",     label: "Equipe",     icon: "equipe" as const, show: isGestor, locked: false },
+    ] : [
+      { href: "/produtos/plataforma", label: "Plataforma B2B", icon: "plataforma" as const, show: true, locked: true },
+    ]),
     { href: "/crm",         label: "CRM",         icon: "crm" as const, show: isTeamMember, locked: !hasCrm },
     { href: "/creditos",    label: "Créditos de IA", icon: "creditos" as const, show: isGestor, locked: false },
     { href: "/ferramentas", label: "Ferramentas", icon: "ferramentas" as const, show: isGestor, locked: !hasCrm },

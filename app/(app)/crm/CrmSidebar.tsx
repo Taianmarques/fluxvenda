@@ -20,7 +20,9 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
     return href === `/crm/${agentId}` ? target === href : target.startsWith(href);
   }
 
-  const CRM_NAV = [
+  // Sem nenhum agente ainda, os itens que dependem de agentId não levam a lugar nenhum —
+  // só o Hub (onde o primeiro agente é criado) fica disponível.
+  const CRM_NAV = agentId ? [
     { href: `/crm/${agentId}`, label: "Mensagens", icon: MessageCircle },
     { href: `/crm/${agentId}/aovivo`, label: "Ao vivo", icon: Radio },
     { href: `/crm/${agentId}/pipeline`, label: "Pipeline", icon: KanbanSquare },
@@ -39,6 +41,8 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
     { href: `/crm/${agentId}/condicoes`, label: "Condições", icon: GitBranch },
     { href: `/crm/${agentId}/equipe`, label: "Equipe", icon: UserPlus },
     { href: `/crm/${agentId}/auditoria`, label: "Auditoria", icon: ClipboardCheck },
+  ] : [
+    { href: `/crm/hub`, label: "Hub", icon: LayoutGrid },
   ];
 
   const currentAgent = agents.find(a => a.id === agentId);
