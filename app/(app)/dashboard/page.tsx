@@ -1,9 +1,22 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
+import { getEffectiveProducts, hasProduct } from "@/lib/products";
+import { listMyAgentConfigs } from "@/lib/team";
+import { CrmWelcome } from "./CrmWelcome";
 
 export default async function DashboardPage() {
   const user = await currentUser();
+
+  // Quem não tem Plataforma não vê o dashboard de treinamento (XP, missões, trilhas) —
+  // isso não faz sentido pra quem só contratou o CRM. Mostra uma home orientada a criar
+  // o primeiro agente de IA em vez disso.
+  const products = await getEffectiveProducts(user!.id);
+  if (!hasProduct(products, "PLATAFORMA")) {
+    const result = await listMyAgentConfigs(user!.id);
+    return <CrmWelcome firstName={user?.firstName ?? ""} agentCount={result?.configs.length ?? 0} />;
+  }
+
   const profile = await prisma.profile.findUnique({
     where: { id: user!.id },
     include: {

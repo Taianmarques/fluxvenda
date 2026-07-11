@@ -28,7 +28,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const hasPlataforma = hasProduct(products, "PLATAFORMA");
 
   // Quem não contratou a Plataforma não precisa ver os 9 itens individuais bloqueados —
-  // colapsa tudo num único link de upsell que leva direto pra landing do produto.
+  // colapsa tudo num único link de upsell (último do menu) que leva direto pra landing do produto.
   const NAV = [
     { href: "/dashboard",  label: "Dashboard",  icon: "dashboard" as const, show: true, locked: false },
     ...(hasPlataforma ? [
@@ -41,13 +41,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       { href: "/playbook",   label: "Playbook",   icon: "playbook" as const, show: true, locked: false },
       { href: "/ranking",    label: "Ranking",    icon: "ranking" as const, show: true, locked: false },
       { href: "/gestor",     label: "Equipe",     icon: "equipe" as const, show: isGestor, locked: false },
-    ] : [
-      { href: "/produtos/plataforma", label: "Plataforma B2B", icon: "plataforma" as const, show: true, locked: true },
-    ]),
+    ] : []),
     { href: "/crm",         label: "CRM",         icon: "crm" as const, show: isTeamMember, locked: !hasCrm },
     { href: "/creditos",    label: "Créditos de IA", icon: "creditos" as const, show: isGestor, locked: false },
     { href: "/ferramentas", label: "Ferramentas", icon: "ferramentas" as const, show: isGestor, locked: !hasCrm },
     { href: "/admin",       label: "Super Admin", icon: "admin" as const, show: isAdmin, locked: false },
+    ...(hasPlataforma ? [] : [
+      { href: "/produtos/plataforma", label: "Plataforma B2B", icon: "plataforma" as const, show: true, locked: true },
+    ]),
   ];
 
   return (
