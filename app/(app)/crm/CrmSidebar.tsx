@@ -15,9 +15,12 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
   useEffect(() => { setNavigatingTo(null); }, [pathname]);
 
-  function isActive(href: string) {
+  // Sem agente, todas as abas redirecionam pro Hub — mas só o item "Hub" de verdade deve
+  // aparecer destacado, senão todas ficam "ativas" ao mesmo tempo.
+  function isActive(item: { href: string; isHub?: boolean }) {
     const target = navigatingTo ?? pathname;
-    return href === `/crm/${agentId}` ? target === href : target.startsWith(href);
+    if (!agentId) return Boolean(item.isHub) && target.startsWith("/crm/hub");
+    return item.href === `/crm/${agentId}` ? target === item.href : target.startsWith(item.href);
   }
 
   // Sem nenhum agente ainda não dá pra montar uma URL real (/crm/[agentId]/...) — todas as
@@ -28,7 +31,7 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
     { href: agentPath("/aovivo"), label: "Ao vivo", icon: Radio },
     { href: agentPath("/pipeline"), label: "Pipeline", icon: KanbanSquare },
     { href: agentPath("/funil"), label: "Funil", icon: Filter },
-    { href: `/crm/hub`, label: "Hub", icon: LayoutGrid },
+    { href: `/crm/hub`, label: "Hub", icon: LayoutGrid, isHub: true },
     { href: agentPath("/automacao"), label: "Automação", icon: Zap },
     { href: agentPath("/agenda"), label: "Agenda", icon: Calendar },
     { href: agentPath("/vendas"), label: "Vendas", icon: Wallet },
@@ -77,7 +80,7 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
       )}
       <nav className="flex overflow-x-auto px-2 py-2 gap-1" style={{ scrollbarWidth: "none" }}>
         {CRM_NAV.map(item => {
-          const active = isActive(item.href);
+          const active = isActive(item);
           return (
             <Link
               key={item.label}
@@ -133,7 +136,7 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
 
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">
         {CRM_NAV.map(item => {
-          const active = isActive(item.href);
+          const active = isActive(item);
           return (
             <Link
               key={item.label}
