@@ -21,10 +21,10 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
   }
 
   const CRM_NAV = [
-    { href: `/crm/hub`, label: "Hub", icon: LayoutGrid },
     { href: `/crm/${agentId}`, label: "Mensagens", icon: MessageCircle },
     { href: `/crm/${agentId}/aovivo`, label: "Ao vivo", icon: Radio },
     { href: `/crm/${agentId}/pipeline`, label: "Pipeline", icon: KanbanSquare },
+    { href: `/crm/hub`, label: "Hub", icon: LayoutGrid },
     { href: `/crm/${agentId}/funil`, label: "Funil", icon: Filter },
     { href: `/crm/${agentId}/automacao`, label: "Automação", icon: Zap },
     { href: `/crm/${agentId}/agenda`, label: "Agenda", icon: Calendar },
