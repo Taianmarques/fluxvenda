@@ -6,6 +6,7 @@ import { LayoutGrid, ArrowLeft, Plus } from "lucide-react";
 import { listMyAgentConfigs } from "@/lib/team";
 import { getInstanceStatus } from "@/lib/whatsapp";
 import { HubClient, type HubAgent } from "./HubClient";
+import { NovoAgenteCard } from "../../ferramentas/NovoAgenteCard";
 
 // Hub de agentes de IA: catálogo dos "funcionários virtuais" da empresa —
 // o que cada um faz, status e ativação com um clique.
@@ -17,13 +18,17 @@ export default async function HubPage() {
   if (!result || result.configs.length === 0) {
     return (
       <div className="min-h-full bg-gray-950 text-white p-6 flex items-center justify-center">
-        <div className="max-w-md text-center space-y-4">
-          <LayoutGrid size={48} className="mx-auto text-blue-400" />
-          <h1 className="text-2xl font-bold">Nenhum agente ainda</h1>
-          <p className="text-gray-400">Crie o primeiro agente para montar sua equipe de IA.</p>
-          <Link href="/ferramentas" className="inline-block bg-blue-600 hover:bg-blue-500 rounded-xl px-5 py-2.5 text-sm font-medium">
-            Ir para Ferramentas
-          </Link>
+        <div className="max-w-md w-full space-y-6">
+          <div className="text-center space-y-3">
+            <LayoutGrid size={48} className="mx-auto text-blue-400" />
+            <h1 className="text-2xl font-bold">Nenhum agente ainda</h1>
+            <p className="text-gray-400">
+              {result?.isManager
+                ? "Crie o primeiro agente para montar sua equipe de IA."
+                : "Peça ao gestor da equipe para criar o primeiro agente de IA."}
+            </p>
+          </div>
+          {result?.isManager && <NovoAgenteCard />}
         </div>
       </div>
     );
