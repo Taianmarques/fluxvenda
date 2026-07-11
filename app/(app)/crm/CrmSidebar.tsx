@@ -8,6 +8,49 @@ import { useEffect, useState } from "react";
 type NavItem = { href: string; label: string; icon: typeof MessageCircle; isHub?: boolean };
 type NavCategory = { key: string; label: string; items: NavItem[] };
 
+// Categoria que expande pra baixo (accordion) — usado por todas menos "Marketing", que tem
+// um flyout flutuante próprio (ver CrmSidebar).
+function CategoryAccordion({ cat, isOpen, onToggle, isActive, pathname, onNavigate }: {
+  cat: NavCategory;
+  isOpen: boolean;
+  onToggle: (key: string) => void;
+  isActive: (item: NavItem) => boolean;
+  pathname: string;
+  onNavigate: (href: string) => void;
+}) {
+  return (
+    <div>
+      <button
+        onClick={() => onToggle(cat.key)}
+        className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-gray-500 hover:text-gray-300 uppercase tracking-wider transition-colors"
+      >
+        {cat.label}
+        <ChevronDown size={13} className={`transition-transform ${isOpen ? "rotate-180" : ""}`} />
+      </button>
+      {isOpen && (
+        <div className="space-y-0.5 mb-1">
+          {cat.items.map(item => {
+            const active = isActive(item);
+            return (
+              <Link
+                key={item.label}
+                href={item.href}
+                onClick={() => { if (pathname !== item.href) onNavigate(item.href); }}
+                className={`flex items-center gap-3 pl-4 pr-3 py-2 rounded-xl text-sm font-medium border-l-2 transition-colors ${
+                  active ? "text-white bg-blue-500/10 border-blue-500" : "text-gray-400 border-transparent hover:text-white hover:bg-white/5"
+                }`}
+              >
+                <item.icon size={16} className={active ? "text-blue-400" : ""} />
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id: string; nome: string }[] }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -48,11 +91,6 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
       { href: agentPath("/comercio"), label: "Comércio", icon: ShoppingCart },
       { href: agentPath("/cobranca"), label: "Cobranças", icon: Landmark },
     ] },
-    { key: "aquisicao", label: "Aquisição", items: [
-      { href: agentPath("/prospeccao"), label: "Prospecção", icon: Target },
-      { href: agentPath("/campanhas"), label: "Campanhas", icon: Megaphone },
-      { href: agentPath("/ligacoes"), label: "Ligações", icon: Phone },
-    ] },
     { key: "automacao", label: "Automação", items: [
       { href: agentPath("/automacao"), label: "Automação", icon: Zap },
       { href: agentPath("/condicoes"), label: "Condições", icon: GitBranch },
@@ -64,7 +102,15 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
     ] },
   ];
 
-  const FLAT_NAV: NavItem[] = [HUB_ITEM, ...CATEGORIES.flatMap(c => c.items)];
+  // Marketing tem tratamento visual à parte: em vez de expandir pra baixo como as outras
+  // categorias, abre um flyout flutuante pro lado (estilo referência do usuário).
+  const MARKETING_ITEMS: NavItem[] = [
+    { href: agentPath("/campanhas"), label: "Campanhas", icon: Megaphone },
+    { href: agentPath("/ligacoes"), label: "Ligações", icon: Phone },
+    { href: agentPath("/prospeccao"), label: "Prospecção", icon: Target },
+  ];
+
+  const FLAT_NAV: NavItem[] = [HUB_ITEM, ...CATEGORIES.flatMap(c => c.items), ...MARKETING_ITEMS];
 
   // Categorias abertas no menu desktop — a que contém a página atual abre sozinha; as demais
   // o usuário abre/fecha manualmente, e várias podem ficar abertas ao mesmo tempo.
@@ -85,6 +131,9 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
       return next;
     });
   }
+
+  const [showMarketingFlyout, setShowMarketingFlyout] = useState(false);
+  const marketingActive = MARKETING_ITEMS.some(item => isActive(item));
 
   const currentAgent = agents.find(a => a.id === agentId);
 
@@ -193,40 +242,52 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
 
         <div className="border-t border-gray-800 my-2" />
 
-        {CATEGORIES.map(cat => {
-          const isOpen = openCategories.has(cat.key);
-          return (
-            <div key={cat.key}>
-              <button
-                onClick={() => toggleCategory(cat.key)}
-                className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-gray-500 hover:text-gray-300 uppercase tracking-wider transition-colors"
-              >
-                {cat.label}
-                <ChevronDown size={13} className={`transition-transform ${isOpen ? "rotate-180" : ""}`} />
-              </button>
-              {isOpen && (
-                <div className="space-y-0.5 mb-1">
-                  {cat.items.map(item => {
-                    const active = isActive(item);
-                    return (
-                      <Link
-                        key={item.label}
-                        href={item.href}
-                        onClick={() => { if (pathname !== item.href) setNavigatingTo(item.href); }}
-                        className={`flex items-center gap-3 pl-4 pr-3 py-2 rounded-xl text-sm font-medium border-l-2 transition-colors ${
-                          active ? "text-white bg-blue-500/10 border-blue-500" : "text-gray-400 border-transparent hover:text-white hover:bg-white/5"
-                        }`}
-                      >
-                        <item.icon size={16} className={active ? "text-blue-400" : ""} />
-                        {item.label}
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {CATEGORIES.slice(0, 3).map(cat => (
+          <CategoryAccordion key={cat.key} cat={cat} isOpen={openCategories.has(cat.key)} onToggle={toggleCategory} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} />
+        ))}
+
+        {/* Marketing — flyout flutuante pro lado, em vez de expandir pra baixo */}
+        <div className="relative">
+          <button
+            onClick={() => setShowMarketingFlyout(s => !s)}
+            className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+              marketingActive ? "text-white bg-blue-500/10" : "text-gray-400 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            <span className="flex items-center gap-3">
+              <Megaphone size={17} className={marketingActive ? "text-blue-400" : ""} />
+              Marketing
+            </span>
+            <ChevronDown size={13} className={`-rotate-90 transition-transform ${showMarketingFlyout ? "rotate-0" : ""}`} />
+          </button>
+          {showMarketingFlyout && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setShowMarketingFlyout(false)} />
+              <div className="absolute z-20 left-full top-0 ml-2 w-52 bg-gray-900 border border-gray-800 rounded-xl shadow-xl p-1.5 space-y-0.5">
+                {MARKETING_ITEMS.map(item => {
+                  const active = isActive(item);
+                  return (
+                    <Link
+                      key={item.label}
+                      href={item.href}
+                      onClick={() => { setShowMarketingFlyout(false); if (pathname !== item.href) setNavigatingTo(item.href); }}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        active ? "text-white bg-blue-500/10" : "text-gray-300 hover:text-white hover:bg-white/5"
+                      }`}
+                    >
+                      <item.icon size={16} className={active ? "text-blue-400" : ""} />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+
+        {CATEGORIES.slice(3).map(cat => (
+          <CategoryAccordion key={cat.key} cat={cat} isOpen={openCategories.has(cat.key)} onToggle={toggleCategory} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} />
+        ))}
       </nav>
 
       <div className="px-3 py-4 border-t border-gray-800">
