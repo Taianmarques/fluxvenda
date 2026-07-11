@@ -20,29 +20,28 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
     return href === `/crm/${agentId}` ? target === href : target.startsWith(href);
   }
 
-  // Sem nenhum agente ainda, os itens que dependem de agentId não levam a lugar nenhum —
-  // só o Hub (onde o primeiro agente é criado) fica disponível.
-  const CRM_NAV = agentId ? [
-    { href: `/crm/${agentId}`, label: "Mensagens", icon: MessageCircle },
-    { href: `/crm/${agentId}/aovivo`, label: "Ao vivo", icon: Radio },
-    { href: `/crm/${agentId}/pipeline`, label: "Pipeline", icon: KanbanSquare },
-    { href: `/crm/${agentId}/funil`, label: "Funil", icon: Filter },
+  // Sem nenhum agente ainda não dá pra montar uma URL real (/crm/[agentId]/...) — todas as
+  // abas continuam visíveis, mas apontam pro Hub, onde o primeiro agente é criado.
+  const agentPath = (suffix: string) => agentId ? `/crm/${agentId}${suffix}` : "/crm/hub";
+  const CRM_NAV = [
+    { href: agentPath(""), label: "Mensagens", icon: MessageCircle },
+    { href: agentPath("/aovivo"), label: "Ao vivo", icon: Radio },
+    { href: agentPath("/pipeline"), label: "Pipeline", icon: KanbanSquare },
+    { href: agentPath("/funil"), label: "Funil", icon: Filter },
     { href: `/crm/hub`, label: "Hub", icon: LayoutGrid },
-    { href: `/crm/${agentId}/automacao`, label: "Automação", icon: Zap },
-    { href: `/crm/${agentId}/agenda`, label: "Agenda", icon: Calendar },
-    { href: `/crm/${agentId}/vendas`, label: "Vendas", icon: Wallet },
-    { href: `/crm/${agentId}/carteira`, label: "Carteira", icon: Briefcase },
-    { href: `/crm/${agentId}/comercio`, label: "Comércio", icon: ShoppingCart },
-    { href: `/crm/${agentId}/cobranca`, label: "Cobranças", icon: Landmark },
-    { href: `/crm/${agentId}/prospeccao`, label: "Prospecção", icon: Target },
-    { href: `/crm/${agentId}/campanhas`, label: "Campanhas", icon: Megaphone },
-    { href: `/crm/${agentId}/ligacoes`, label: "Ligações", icon: Phone },
-    { href: `/crm/${agentId}/canais`, label: "Canais", icon: Wifi },
-    { href: `/crm/${agentId}/condicoes`, label: "Condições", icon: GitBranch },
-    { href: `/crm/${agentId}/equipe`, label: "Equipe", icon: UserPlus },
-    { href: `/crm/${agentId}/auditoria`, label: "Auditoria", icon: ClipboardCheck },
-  ] : [
-    { href: `/crm/hub`, label: "Hub", icon: LayoutGrid },
+    { href: agentPath("/automacao"), label: "Automação", icon: Zap },
+    { href: agentPath("/agenda"), label: "Agenda", icon: Calendar },
+    { href: agentPath("/vendas"), label: "Vendas", icon: Wallet },
+    { href: agentPath("/carteira"), label: "Carteira", icon: Briefcase },
+    { href: agentPath("/comercio"), label: "Comércio", icon: ShoppingCart },
+    { href: agentPath("/cobranca"), label: "Cobranças", icon: Landmark },
+    { href: agentPath("/prospeccao"), label: "Prospecção", icon: Target },
+    { href: agentPath("/campanhas"), label: "Campanhas", icon: Megaphone },
+    { href: agentPath("/ligacoes"), label: "Ligações", icon: Phone },
+    { href: agentPath("/canais"), label: "Canais", icon: Wifi },
+    { href: agentPath("/condicoes"), label: "Condições", icon: GitBranch },
+    { href: agentPath("/equipe"), label: "Equipe", icon: UserPlus },
+    { href: agentPath("/auditoria"), label: "Auditoria", icon: ClipboardCheck },
   ];
 
   const currentAgent = agents.find(a => a.id === agentId);
@@ -81,7 +80,7 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
           const active = isActive(item.href);
           return (
             <Link
-              key={item.href}
+              key={item.label}
               href={item.href}
               onClick={() => { if (pathname !== item.href) setNavigatingTo(item.href); }}
               className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-[10px] font-medium flex-shrink-0 transition-colors ${
@@ -137,7 +136,7 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
           const active = isActive(item.href);
           return (
             <Link
-              key={item.href}
+              key={item.label}
               href={item.href}
               onClick={() => { if (pathname !== item.href) setNavigatingTo(item.href); }}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium border-l-2 transition-colors ${
