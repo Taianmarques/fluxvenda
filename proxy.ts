@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 const isPublicRoute = createRouteMatcher([
   "/",
+  "/produtos(.*)",          // landing pages de CRM e Plataforma — públicas, sem login
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/onboarding(.*)",
