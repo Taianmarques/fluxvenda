@@ -70,7 +70,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
 
   const availability = (professional?.availability ?? config.availability) as unknown as AvailabilityRule[];
 
-  const available = isSlotAvailable(availability, durationMinutes, busy, scheduledAt);
+  const available = isSlotAvailable(availability, durationMinutes, busy, scheduledAt, config.agendarAteEncerramento);
   if (!available) return NextResponse.json({ error: "Horário indisponível ou conflita com outro agendamento" }, { status: 409 });
 
   const appointment = await prisma.appointment.create({

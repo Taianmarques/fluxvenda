@@ -15,6 +15,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ agen
       slotDurationMinutes: true,
       availability: true,
       askProfessionalEnabled: true,
+      agendarAteEncerramento: true,
     },
   });
   if (!config?.schedulingEnabled) {
@@ -55,7 +56,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ agen
         select: { scheduledAt: true, durationMinutes: true },
       });
       const availability = (pro.availability ?? config.availability) as unknown as AvailabilityRule[];
-      for (const day of getAvailableSlots(availability, durationMinutes, busy)) {
+      for (const day of getAvailableSlots(availability, durationMinutes, busy, undefined, undefined, config.agendarAteEncerramento)) {
         const entry = dayMap.get(day.date) ?? { weekday: day.weekday, slots: new Set<string>() };
         for (const s of day.slots) entry.slots.add(s);
         dayMap.set(day.date, entry);
@@ -81,6 +82,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ agen
   });
   const availability = (professional?.availability ?? config.availability) as unknown as AvailabilityRule[];
 
-  const days = getAvailableSlots(availability, durationMinutes, busy);
+  const days = getAvailableSlots(availability, durationMinutes, busy, undefined, undefined, config.agendarAteEncerramento);
   return NextResponse.json({ days }, { headers: { "Cache-Control": "no-store" } });
 }

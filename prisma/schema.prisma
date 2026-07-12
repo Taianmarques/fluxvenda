@@ -651,6 +651,7 @@ model AgentConfig {
   atendimentoEspecialDescricao String  @default("") // condições do atendimento especial
   askProfessionalEnabled       Boolean @default(true) // com vários profissionais: true = agente pergunta com quem; false = atribui a qualquer um livre
   schedulingViaLink            Boolean @default(false) // true = a IA envia o link da página pública (/agendar) em vez de marcar por mensagem
+  agendarAteEncerramento       Boolean @default(false) // aceita horário que começa dentro do funcionamento mesmo terminando após o fechamento
   agendaAccessToken            String? @unique // link da agenda geral da empresa (/agenda/[token], PWA)
 
   // Como conversas novas são distribuídas entre os atendentes da equipe

@@ -13,15 +13,22 @@ function pad(n: number): string {
 
 // Gera os horários livres dos próximos `days` dias, respeitando as regras de disponibilidade
 // e excluindo horários já ocupados por outros agendamentos confirmados.
+// `untilClose`: aceita horários que começam dentro do funcionamento mesmo que o atendimento
+// termine depois do fechamento (opcional, por agente — AgentConfig.agendarAteEncerramento).
 export function getAvailableSlots(
   availability: AvailabilityRule[],
   slotDurationMinutes: number,
   busy: { scheduledAt: Date; durationMinutes: number }[],
   fromDate: Date = new Date(),
-  days = 14
+  days = 14,
+  untilClose = false
 ): { date: string; weekday: string; slots: string[] }[] {
   const result: { date: string; weekday: string; slots: string[] }[] = [];
   const now = new Date();
+
+  // Serviços longos avançam de hora em hora (em vez de pular a duração inteira) pra grade
+  // não ficar "quebrada" — ex: serviço de 2h oferece 09:00, 10:00, 11:00... e não só 09/11/13.
+  const step = Math.min(slotDurationMinutes, 60);
 
   for (let d = 0; d < days; d++) {
     const day = new Date(fromDate);
@@ -36,7 +43,7 @@ export function getAvailableSlots(
     for (const rule of rules) {
       const startMin = parseTime(rule.start);
       const endMin = parseTime(rule.end);
-      for (let t = startMin; t + slotDurationMinutes <= endMin; t += slotDurationMinutes) {
+      for (let t = startMin; untilClose ? t < endMin : t + slotDurationMinutes <= endMin; t += step) {
         const slotStart = new Date(day);
         slotStart.setMinutes(t);
         if (slotStart <= now) continue; // não oferece horário no passado
@@ -67,14 +74,16 @@ export function isSlotAvailable(
   availability: AvailabilityRule[],
   slotDurationMinutes: number,
   busy: { scheduledAt: Date; durationMinutes: number }[],
-  scheduledAt: Date
+  scheduledAt: Date,
+  untilClose = false
 ): boolean {
   const dayOfWeek = scheduledAt.getDay();
   const minutesOfDay = scheduledAt.getHours() * 60 + scheduledAt.getMinutes();
 
   const withinRule = availability.some(r => {
     if (r.dayOfWeek !== dayOfWeek) return false;
-    return minutesOfDay >= parseTime(r.start) && minutesOfDay + slotDurationMinutes <= parseTime(r.end);
+    if (minutesOfDay < parseTime(r.start)) return false;
+    return untilClose ? minutesOfDay < parseTime(r.end) : minutesOfDay + slotDurationMinutes <= parseTime(r.end);
   });
   if (!withinRule) return false;
   if (scheduledAt <= new Date()) return false;

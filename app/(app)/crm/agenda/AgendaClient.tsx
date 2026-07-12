@@ -167,7 +167,7 @@ function fmtDate(d: Date): string {
 
 export function AgendaClient({
   agentId, initialSchedulingEnabled, initialSlotDurationMinutes, initialAvailability, initialAppointmentReminderHours, initialRequisitosAgendamento, initialRestricoesAgendamento, initialAtendimentoEspecialEnabled, initialAtendimentoEspecialDescricao,
-  initialAskProfessionalEnabled, initialSchedulingViaLink, agendaAccessToken, bookingSlug,
+  initialAskProfessionalEnabled, initialSchedulingViaLink, initialAgendarAteEncerramento, agendaAccessToken, bookingSlug,
 }: {
   agentId: string;
   initialSchedulingEnabled: boolean;
@@ -180,6 +180,7 @@ export function AgendaClient({
   initialAtendimentoEspecialDescricao: string;
   initialAskProfessionalEnabled?: boolean;
   initialSchedulingViaLink?: boolean;
+  initialAgendarAteEncerramento?: boolean;
   agendaAccessToken?: string | null;
   bookingSlug?: string | null;
 }) {
@@ -194,6 +195,7 @@ export function AgendaClient({
   const [atendimentoEspecialDescricao, setAtendimentoEspecialDescricao] = useState(initialAtendimentoEspecialDescricao);
   const [askProfessionalEnabled, setAskProfessionalEnabled] = useState(initialAskProfessionalEnabled ?? true);
   const [schedulingViaLink, setSchedulingViaLink] = useState(initialSchedulingViaLink ?? false);
+  const [agendarAteEncerramento, setAgendarAteEncerramento] = useState(initialAgendarAteEncerramento ?? false);
   const [rules, setRules] = useState(() => rulesFromAvailability(initialAvailability));
   const [savingSettings, setSavingSettings] = useState(false);
   const [agendaLinkCopied, setAgendaLinkCopied] = useState(false);
@@ -310,7 +312,7 @@ export function AgendaClient({
       await fetch(`/api/agentes/${agentId}/agenda`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ schedulingEnabled, slotDurationMinutes, availability, appointmentReminderHours, requisitosAgendamento, restricoesAgendamento, atendimentoEspecialEnabled, atendimentoEspecialDescricao, askProfessionalEnabled, schedulingViaLink }),
+        body: JSON.stringify({ schedulingEnabled, slotDurationMinutes, availability, appointmentReminderHours, requisitosAgendamento, restricoesAgendamento, atendimentoEspecialEnabled, atendimentoEspecialDescricao, askProfessionalEnabled, schedulingViaLink, agendarAteEncerramento }),
       });
     } finally {
       setSavingSettings(false);
@@ -600,6 +602,23 @@ export function AgendaClient({
                   <p className="text-sm font-medium">Perguntar com qual profissional o cliente quer agendar</p>
                   <p className="text-xs text-gray-500">
                     Vale quando há mais de um profissional. Desligado: o agente oferece os horários de toda a equipe e o sistema atribui automaticamente a um profissional livre.
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            <div className="border border-gray-800 rounded-xl p-4">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={agendarAteEncerramento}
+                  onChange={e => setAgendarAteEncerramento(e.target.checked)}
+                  className="w-4 h-4"
+                />
+                <div>
+                  <p className="text-sm font-medium">Aceitar agendamentos até o horário de encerramento</p>
+                  <p className="text-xs text-gray-500">
+                    Serviços longos podem começar perto do fechamento mesmo que terminem depois dele. Ex: funcionamento até 18h, serviço de 2h pode começar às 17h. Desligado: o serviço precisa terminar dentro do horário.
                   </p>
                 </div>
               </label>

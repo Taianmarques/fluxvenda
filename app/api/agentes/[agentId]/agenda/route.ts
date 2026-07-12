@@ -37,6 +37,7 @@ const schema = z.object({
   atendimentoEspecialDescricao: z.string().max(500).optional(),
   askProfessionalEnabled: z.boolean().optional(),
   schedulingViaLink: z.boolean().optional(),
+  agendarAteEncerramento: z.boolean().optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {

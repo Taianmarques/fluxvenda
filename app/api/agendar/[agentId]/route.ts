@@ -27,6 +27,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
       slotDurationMinutes: true,
       availability: true,
       askProfessionalEnabled: true,
+      agendarAteEncerramento: true,
       uazapiToken: true,
     },
   });
@@ -89,7 +90,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
         select: { scheduledAt: true, durationMinutes: true },
       });
       const availPro = (pro.availability ?? config.availability) as unknown as AvailabilityRule[];
-      if (isSlotAvailable(availPro, durationMinutes, busyPro, scheduledAt)) {
+      if (isSlotAvailable(availPro, durationMinutes, busyPro, scheduledAt, config.agendarAteEncerramento)) {
         professional = pro;
         break;
       }
@@ -107,7 +108,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
     select: { scheduledAt: true, durationMinutes: true },
   });
   const availability = (professional?.availability ?? config.availability) as unknown as AvailabilityRule[];
-  if (!isSlotAvailable(availability, durationMinutes, busy, scheduledAt)) {
+  if (!isSlotAvailable(availability, durationMinutes, busy, scheduledAt, config.agendarAteEncerramento)) {
     return NextResponse.json({ error: "Horário indisponível" }, { status: 409 });
   }
 
