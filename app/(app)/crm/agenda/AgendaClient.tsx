@@ -167,7 +167,7 @@ function fmtDate(d: Date): string {
 
 export function AgendaClient({
   agentId, initialSchedulingEnabled, initialSlotDurationMinutes, initialAvailability, initialAppointmentReminderHours, initialRequisitosAgendamento, initialRestricoesAgendamento, initialAtendimentoEspecialEnabled, initialAtendimentoEspecialDescricao,
-  initialAskProfessionalEnabled, agendaAccessToken,
+  initialAskProfessionalEnabled, agendaAccessToken, bookingSlug,
 }: {
   agentId: string;
   initialSchedulingEnabled: boolean;
@@ -180,6 +180,7 @@ export function AgendaClient({
   initialAtendimentoEspecialDescricao: string;
   initialAskProfessionalEnabled?: boolean;
   agendaAccessToken?: string | null;
+  bookingSlug?: string | null;
 }) {
   const [showSettings, setShowSettings] = useState(false);
   const [showTeam, setShowTeam] = useState(false);
@@ -194,12 +195,21 @@ export function AgendaClient({
   const [rules, setRules] = useState(() => rulesFromAvailability(initialAvailability));
   const [savingSettings, setSavingSettings] = useState(false);
   const [agendaLinkCopied, setAgendaLinkCopied] = useState(false);
+  const [bookingLinkCopied, setBookingLinkCopied] = useState(false);
 
   function copyClinicAgendaLink() {
     if (!agendaAccessToken) return;
     navigator.clipboard.writeText(`${window.location.origin}/agenda/${agendaAccessToken}`).then(() => {
       setAgendaLinkCopied(true);
       setTimeout(() => setAgendaLinkCopied(false), 2000);
+    }).catch(() => {});
+  }
+
+  function copyBookingLink() {
+    if (!bookingSlug) return;
+    navigator.clipboard.writeText(`${window.location.origin}/agendar/${bookingSlug}`).then(() => {
+      setBookingLinkCopied(true);
+      setTimeout(() => setBookingLinkCopied(false), 2000);
     }).catch(() => {});
   }
 
@@ -374,6 +384,15 @@ export function AgendaClient({
                 title="Página PWA com todos os agendamentos, para acompanhar no celular"
               >
                 {agendaLinkCopied ? "Copiado!" : "Link da agenda geral"}
+              </button>
+            )}
+            {bookingSlug && (
+              <button
+                onClick={copyBookingLink}
+                className="bg-gray-800 hover:bg-gray-700 rounded-xl px-4 py-2.5 text-sm font-medium text-blue-300"
+                title="Página pública onde o cliente escolhe o serviço e o horário sozinho"
+              >
+                {bookingLinkCopied ? "Copiado!" : "Link de agendamento"}
               </button>
             )}
           </div>

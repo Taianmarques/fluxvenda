@@ -5,9 +5,19 @@ import { Calendar } from "lucide-react";
 import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { getAgentConfigWithRole } from "@/lib/team";
+import { ensureStoreSlug } from "@/lib/store-slug";
+import { CrmPageGate } from "@/app/(app)/crm/CrmPageGate";
 import { AgendaClient } from "../../agenda/AgendaClient";
 
-export default async function AgendaPage({ params }: { params: Promise<{ agentId: string }> }) {
+export default function AgendaPage(props: { params: Promise<{ agentId: string }> }) {
+  return (
+    <CrmPageGate pageKey="agenda">
+      <AgendaPageContent {...props} />
+    </CrmPageGate>
+  );
+}
+
+async function AgendaPageContent({ params }: { params: Promise<{ agentId: string }> }) {
   const user = await currentUser();
   if (!user) redirect("/sign-in");
 
@@ -37,6 +47,9 @@ export default async function AgendaPage({ params }: { params: Promise<{ agentId
     await prisma.agentConfig.update({ where: { id: config.id }, data: { agendaAccessToken } });
   }
 
+  // Slug do link público de auto-agendamento (/agendar/...) — mesmo slug da loja
+  const bookingSlug = await ensureStoreSlug(config.id);
+
   return (
     <AgendaClient
       agentId={config.id}
@@ -50,6 +63,7 @@ export default async function AgendaPage({ params }: { params: Promise<{ agentId
       initialAtendimentoEspecialDescricao={config.atendimentoEspecialDescricao}
       initialAskProfessionalEnabled={config.askProfessionalEnabled}
       agendaAccessToken={agendaAccessToken}
+      bookingSlug={bookingSlug}
     />
   );
 }
