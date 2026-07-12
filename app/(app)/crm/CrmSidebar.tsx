@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { MessageCircle, KanbanSquare, Calendar, Wallet, ShoppingCart, Landmark, Target, ArrowLeft, ChevronDown, Wifi, GitBranch, Briefcase, LayoutGrid, Zap, Filter, UserPlus, ClipboardCheck, Radio, Megaphone, Phone, Settings } from "lucide-react";
+import { MessageCircle, KanbanSquare, Calendar, Wallet, ShoppingCart, Landmark, Target, ArrowLeft, ChevronDown, Wifi, GitBranch, Briefcase, LayoutGrid, Zap, Filter, UserPlus, ClipboardCheck, Radio, Megaphone, Phone, Settings, Coins } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 type NavItem = { href: string; label: string; icon: typeof MessageCircle; isHub?: boolean };
@@ -177,6 +177,7 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
     { href: agentPath("/canais"), label: "Canais", icon: Wifi },
     { href: agentPath("/equipe"), label: "Equipe", icon: UserPlus },
     { href: agentPath("/auditoria"), label: "Auditoria", icon: ClipboardCheck },
+    { href: "/creditos", label: "Créditos de IA", icon: Coins },
   ];
 
   const FLAT_NAV: NavItem[] = [HUB_ITEM, ...CATEGORIES.flatMap(c => c.items), ...MARKETING_ITEMS, ...AUTOMACAO_ITEMS, ...CONFIG_ITEMS];
