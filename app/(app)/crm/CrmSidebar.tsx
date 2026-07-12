@@ -143,7 +143,7 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
   // abas continuam visíveis, mas apontam pro Hub, onde o primeiro agente é criado.
   const agentPath = (suffix: string) => agentId ? `/crm/${agentId}${suffix}` : "/crm/hub";
 
-  const HUB_ITEM: NavItem = { href: "/crm/hub", label: "Hub", icon: LayoutGrid, isHub: true };
+  const HUB_ITEM: NavItem = { href: "/crm/hub", label: "Hub de IA", icon: LayoutGrid, isHub: true };
 
   const CATEGORIES: NavCategory[] = [
     { key: "atendimento", label: "Atendimento", items: [
