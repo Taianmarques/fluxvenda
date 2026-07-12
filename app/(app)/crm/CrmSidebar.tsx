@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { MessageCircle, KanbanSquare, Calendar, Wallet, ShoppingCart, Landmark, Target, ArrowLeft, ChevronDown, Wifi, GitBranch, Briefcase, LayoutGrid, Zap, Filter, UserPlus, ClipboardCheck, Radio, Megaphone, Phone, Settings, Coins } from "lucide-react";
+import { MessageCircle, KanbanSquare, Calendar, Wallet, ShoppingCart, Landmark, Target, ArrowLeft, ChevronDown, Wifi, GitBranch, Briefcase, LayoutGrid, Zap, Filter, UserPlus, ClipboardCheck, Radio, Megaphone, Phone, Settings, Coins, TrendingUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 type NavItem = { href: string; label: string; icon: typeof MessageCircle; isHub?: boolean };
@@ -152,22 +152,24 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
     ] },
     { key: "vendas", label: "Vendas", items: [
       { href: agentPath("/pipeline"), label: "Pipeline", icon: KanbanSquare },
-      { href: agentPath("/funil"), label: "Funil", icon: Filter },
       { href: agentPath("/agenda"), label: "Agenda", icon: Calendar },
       { href: agentPath("/vendas"), label: "Vendas", icon: Wallet },
-      { href: agentPath("/carteira"), label: "Carteira", icon: Briefcase },
     ] },
     { key: "comercio", label: "Comércio", items: [
       { href: agentPath("/comercio"), label: "Produtos", icon: ShoppingCart },
-      { href: agentPath("/cobranca"), label: "Cobranças", icon: Landmark },
     ] },
   ];
 
-  // Marketing, Automação e Configurações usam o flyout flutuante (CategoryFlyout) em vez do accordion.
+  // Marketing, Gestão, Automação e Configurações usam o flyout flutuante (CategoryFlyout) em vez do accordion.
   const MARKETING_ITEMS: NavItem[] = [
     { href: agentPath("/campanhas"), label: "Campanhas", icon: Megaphone },
     { href: agentPath("/ligacoes"), label: "Ligações", icon: Phone },
     { href: agentPath("/prospeccao"), label: "Prospecção", icon: Target },
+  ];
+  const GESTAO_ITEMS: NavItem[] = [
+    { href: agentPath("/cobranca"), label: "Cobranças", icon: Landmark },
+    { href: agentPath("/funil"), label: "Funil", icon: Filter },
+    { href: agentPath("/carteira"), label: "Carteira", icon: Briefcase },
   ];
   const AUTOMACAO_ITEMS: NavItem[] = [
     { href: agentPath("/automacao"), label: "Automação", icon: Zap },
@@ -180,7 +182,7 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
     { href: agentPath("/creditos"), label: "Créditos de IA", icon: Coins },
   ];
 
-  const FLAT_NAV: NavItem[] = [HUB_ITEM, ...CATEGORIES.flatMap(c => c.items), ...MARKETING_ITEMS, ...AUTOMACAO_ITEMS, ...CONFIG_ITEMS];
+  const FLAT_NAV: NavItem[] = [HUB_ITEM, ...CATEGORIES.flatMap(c => c.items), ...MARKETING_ITEMS, ...GESTAO_ITEMS, ...AUTOMACAO_ITEMS, ...CONFIG_ITEMS];
 
   // Categorias abertas no menu desktop — a que contém a página atual abre sozinha; as demais
   // o usuário abre/fecha manualmente, e várias podem ficar abertas ao mesmo tempo.
@@ -314,6 +316,7 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
         ))}
 
         <CategoryFlyout label="Marketing" icon={Megaphone} items={MARKETING_ITEMS} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} />
+        <CategoryFlyout label="Gestão" icon={TrendingUp} items={GESTAO_ITEMS} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} />
         <CategoryFlyout label="Automação" icon={Zap} items={AUTOMACAO_ITEMS} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} />
         <CategoryFlyout label="Configurações" icon={Settings} items={CONFIG_ITEMS} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} />
       </nav>
