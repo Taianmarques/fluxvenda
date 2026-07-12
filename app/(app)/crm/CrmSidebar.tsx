@@ -154,8 +154,6 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
       { href: agentPath("/pipeline"), label: "Pipeline", icon: KanbanSquare },
       { href: agentPath("/agenda"), label: "Agenda", icon: Calendar },
       { href: agentPath("/vendas"), label: "Vendas", icon: Wallet },
-    ] },
-    { key: "comercio", label: "Comércio", items: [
       { href: agentPath("/comercio"), label: "Produtos", icon: ShoppingCart },
     ] },
   ];
