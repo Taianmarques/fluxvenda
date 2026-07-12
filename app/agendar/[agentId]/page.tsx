@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { prisma } from "@/lib/prisma";
+import { getInstanceStatus } from "@/lib/whatsapp";
 import { AgendarClient } from "./AgendarClient";
 import { CalendarX } from "lucide-react";
 
@@ -17,6 +18,7 @@ async function findBooking(idOrSlug: string) {
       schedulingEnabled: true,
       slotDurationMinutes: true,
       askProfessionalEnabled: true,
+      uazapiToken: true,
       storeLogoBase64: true,
       storeLogoMimeType: true,
       team: { select: { name: true } },
@@ -63,7 +65,7 @@ export default async function AgendarPage({ params }: { params: Promise<{ agentI
 
   if (!config || !config.schedulingEnabled) return <Indisponivel />;
 
-  const [services, professionals] = await Promise.all([
+  const [services, professionals, instanceStatus] = await Promise.all([
     prisma.service.findMany({
       where: { agentConfigId: config.id, active: true },
       orderBy: { createdAt: "asc" },
@@ -75,12 +77,19 @@ export default async function AgendarPage({ params }: { params: Promise<{ agentI
       orderBy: { createdAt: "asc" },
       select: { id: true, name: true },
     }),
+    // Número do WhatsApp da empresa — pro cliente cair na conversa após confirmar (igual à loja)
+    config.uazapiToken
+      ? getInstanceStatus(config.uazapiToken).catch(() => null)
+      : Promise.resolve(null),
   ]);
+
+  const whatsappNumber = instanceStatus?.ownerNumber?.replace(/\D/g, "") || null;
 
   return (
     <AgendarClient
       agentId={config.id}
       businessName={config.team?.name || "Agendamento"}
+      whatsappNumber={whatsappNumber}
       logo={config.storeLogoBase64 ? `data:${config.storeLogoMimeType ?? "image/png"};base64,${config.storeLogoBase64}` : null}
       services={services}
       professionals={professionals}

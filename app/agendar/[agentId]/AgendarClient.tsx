@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Calendar, CalendarCheck, ChevronLeft, Clock, Loader2, Scissors, User } from "lucide-react";
+import { Calendar, CalendarCheck, ChevronLeft, Clock, Loader2, MessageCircle, Scissors, User } from "lucide-react";
 
 type Service = { id: string; name: string; durationMinutes: number };
 type Professional = { id: string; name: string };
@@ -22,9 +22,10 @@ function formatDateLong(iso: string): string {
   return new Date(y, m - 1, d).toLocaleDateString("pt-BR", { day: "2-digit", month: "long" });
 }
 
-export function AgendarClient({ agentId, businessName, logo, services, professionals, askProfessionalEnabled, defaultDurationMinutes }: {
+export function AgendarClient({ agentId, businessName, whatsappNumber, logo, services, professionals, askProfessionalEnabled, defaultDurationMinutes }: {
   agentId: string;
   businessName: string;
+  whatsappNumber: string | null;
   logo: string | null;
   services: Service[];
   professionals: Professional[];
@@ -95,6 +96,9 @@ export function AgendarClient({ agentId, businessName, logo, services, professio
       if (res.ok) {
         setConfirmado(data.appointment);
         setStep("confirmado");
+        // Igual ao catálogo: já cai na conversa do WhatsApp da empresa com a confirmação.
+        // Se o navegador bloquear o popup, o botão da tela de confirmação faz o mesmo.
+        abrirWhatsApp(data.appointment);
       } else if (res.status === 409) {
         setErro("Este horário acabou de ser preenchido. Escolha outro.");
         setStep("horario");
@@ -106,6 +110,15 @@ export function AgendarClient({ agentId, businessName, logo, services, professio
     } finally {
       setEnviando(false);
     }
+  }
+
+  function abrirWhatsApp(c: Confirmado) {
+    if (!whatsappNumber) return;
+    const dt = new Date(c.scheduledAt);
+    const quando = dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) +
+      " às " + dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    const msg = `Olá! Acabei de agendar pelo site: ${c.serviceName ? `${c.serviceName} ` : ""}em ${quando}${c.professionalName ? ` com ${c.professionalName}` : ""}. Meu nome é ${nome.trim()}.`;
+    window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(msg)}`, "_blank");
   }
 
   function voltar() {
@@ -294,6 +307,15 @@ export function AgendarClient({ agentId, businessName, logo, services, professio
               </p>
               <p><span className="text-gray-500">Duração:</span> <span className="font-medium">{formatDuration(confirmado.durationMinutes)}</span></p>
             </div>
+            {whatsappNumber && (
+              <button
+                onClick={() => abrirWhatsApp(confirmado)}
+                className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white font-semibold rounded-2xl px-5 py-3 text-sm transition-colors"
+              >
+                <MessageCircle size={16} />
+                Continuar no WhatsApp
+              </button>
+            )}
             <p className="text-xs text-gray-500 max-w-xs mx-auto">
               Enviamos a confirmação no seu WhatsApp. Precisa remarcar? É só chamar a empresa por lá.
             </p>
