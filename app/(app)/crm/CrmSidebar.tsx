@@ -177,7 +177,7 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
     { href: agentPath("/canais"), label: "Canais", icon: Wifi },
     { href: agentPath("/equipe"), label: "Equipe", icon: UserPlus },
     { href: agentPath("/auditoria"), label: "Auditoria", icon: ClipboardCheck },
-    { href: "/creditos", label: "Créditos de IA", icon: Coins },
+    { href: agentPath("/creditos"), label: "Créditos de IA", icon: Coins },
   ];
 
   const FLAT_NAV: NavItem[] = [HUB_ITEM, ...CATEGORIES.flatMap(c => c.items), ...MARKETING_ITEMS, ...AUTOMACAO_ITEMS, ...CONFIG_ITEMS];
