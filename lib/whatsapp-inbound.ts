@@ -71,6 +71,21 @@ Você também pode receber, no meio da conversa, um lembrete automático pergunt
 - Se ele disser que não pode ir ou quer cancelar, use cancelar_agendamento e, na mesma resposta, já ofereça reagendar — pergunte o novo dia/período de preferência (ou, se ele já tiver dito, use consultar_horarios_disponiveis e siga o fluxo normal de agendamento).`;
 }
 
+// Modo "agendamento por link": em vez de negociar horários na conversa, a IA envia o link
+// da página pública (/agendar), onde o cliente escolhe serviço e horário sozinho. A tool
+// cancelar_agendamento continua disponível pra responder aos lembretes de confirmação.
+function buildSchedulingLinkContext(bookingUrl: string): string {
+  return `\n\nAGENDAMENTO POR LINK:
+Essa empresa agenda pela página online. Quando o cliente quiser agendar, marcar horário, remarcar ou saber os horários disponíveis, envie o link abaixo e explique em uma frase que lá ele vê os horários em tempo real e confirma na hora:
+${bookingUrl}
+- NUNCA proponha, negocie ou confirme horários pela conversa — o agendamento acontece só pelo link.
+- Envie o link como texto puro, sem formatação em volta.
+
+Você também pode receber, no meio da conversa, um lembrete automático perguntando se o cliente confirma presença num agendamento já marcado:
+- Se o cliente confirmar (ex: "sim", "confirmado"), apenas agradeça brevemente, sem chamar nenhuma ferramenta.
+- Se ele disser que não pode ir ou quer cancelar, use cancelar_agendamento e, na mesma resposta, envie o link acima pra ele remarcar.`;
+}
+
 // Lista os departamentos humanos e ensina o agente a transferir quando o assunto exigir
 function buildDepartamentosContext(departamentos: { nome: string; descricao: string }[]): string {
   const lista = departamentos
@@ -979,8 +994,14 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
     select: { nome: true, descricao: true },
   });
 
+  // Modo link: a IA só mantém cancelar_agendamento (pros lembretes de confirmação);
+  // o resto do fluxo acontece na página pública /agendar
+  const schedulingTools = config.schedulingViaLink
+    ? SCHEDULING_TOOLS.filter(t => t.function.name === "cancelar_agendamento")
+    : SCHEDULING_TOOLS;
+
   const tools = [
-    ...(config.schedulingEnabled ? SCHEDULING_TOOLS : []),
+    ...(config.schedulingEnabled ? schedulingTools : []),
     ...commerceTools,
     ...(config.cobrancaEnabled ? BILLING_TOOLS : []),
     ...(config.posVendaEnabled ? POSVENDA_TOOLS : []),
@@ -1026,7 +1047,12 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
     reply = result.reply;
     logTokenUsage({ teamId: config.teamId, provider: "openai", model: "gpt-4o-mini", feature: "whatsapp_agent", ...result.usage });
   } else if (tools.length > 0) {
-    const extraContext = (config.schedulingEnabled ? await buildSchedulingContext(config.id, config.requisitosAgendamento || undefined, config.restricoesAgendamento || undefined, { enabled: config.atendimentoEspecialEnabled, descricao: config.atendimentoEspecialDescricao }) : "")
+    const bookingUrl = `${process.env.NEXT_PUBLIC_APP_URL}/agendar/${config.storeSlug ?? config.id}`;
+    const extraContext = (config.schedulingEnabled
+        ? (config.schedulingViaLink
+            ? buildSchedulingLinkContext(bookingUrl)
+            : await buildSchedulingContext(config.id, config.requisitosAgendamento || undefined, config.restricoesAgendamento || undefined, { enabled: config.atendimentoEspecialEnabled, descricao: config.atendimentoEspecialDescricao }))
+        : "")
       + (config.commerceEnabled ? await buildCommerceContext(config.id, config) : "")
       + (config.cobrancaEnabled ? await buildBillingContext(config.id, contactNumber) : "")
       + (config.posVendaEnabled ? buildPosVendaContext(config.posVendaReviewLink) : "")

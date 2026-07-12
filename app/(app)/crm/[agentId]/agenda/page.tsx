@@ -62,6 +62,7 @@ async function AgendaPageContent({ params }: { params: Promise<{ agentId: string
       initialAtendimentoEspecialEnabled={config.atendimentoEspecialEnabled}
       initialAtendimentoEspecialDescricao={config.atendimentoEspecialDescricao}
       initialAskProfessionalEnabled={config.askProfessionalEnabled}
+      initialSchedulingViaLink={config.schedulingViaLink}
       agendaAccessToken={agendaAccessToken}
       bookingSlug={bookingSlug}
     />

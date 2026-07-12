@@ -167,7 +167,7 @@ function fmtDate(d: Date): string {
 
 export function AgendaClient({
   agentId, initialSchedulingEnabled, initialSlotDurationMinutes, initialAvailability, initialAppointmentReminderHours, initialRequisitosAgendamento, initialRestricoesAgendamento, initialAtendimentoEspecialEnabled, initialAtendimentoEspecialDescricao,
-  initialAskProfessionalEnabled, agendaAccessToken, bookingSlug,
+  initialAskProfessionalEnabled, initialSchedulingViaLink, agendaAccessToken, bookingSlug,
 }: {
   agentId: string;
   initialSchedulingEnabled: boolean;
@@ -179,6 +179,7 @@ export function AgendaClient({
   initialAtendimentoEspecialEnabled: boolean;
   initialAtendimentoEspecialDescricao: string;
   initialAskProfessionalEnabled?: boolean;
+  initialSchedulingViaLink?: boolean;
   agendaAccessToken?: string | null;
   bookingSlug?: string | null;
 }) {
@@ -192,6 +193,7 @@ export function AgendaClient({
   const [atendimentoEspecialEnabled, setAtendimentoEspecialEnabled] = useState(initialAtendimentoEspecialEnabled);
   const [atendimentoEspecialDescricao, setAtendimentoEspecialDescricao] = useState(initialAtendimentoEspecialDescricao);
   const [askProfessionalEnabled, setAskProfessionalEnabled] = useState(initialAskProfessionalEnabled ?? true);
+  const [schedulingViaLink, setSchedulingViaLink] = useState(initialSchedulingViaLink ?? false);
   const [rules, setRules] = useState(() => rulesFromAvailability(initialAvailability));
   const [savingSettings, setSavingSettings] = useState(false);
   const [agendaLinkCopied, setAgendaLinkCopied] = useState(false);
@@ -308,7 +310,7 @@ export function AgendaClient({
       await fetch(`/api/agentes/${agentId}/agenda`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ schedulingEnabled, slotDurationMinutes, availability, appointmentReminderHours, requisitosAgendamento, restricoesAgendamento, atendimentoEspecialEnabled, atendimentoEspecialDescricao, askProfessionalEnabled }),
+        body: JSON.stringify({ schedulingEnabled, slotDurationMinutes, availability, appointmentReminderHours, requisitosAgendamento, restricoesAgendamento, atendimentoEspecialEnabled, atendimentoEspecialDescricao, askProfessionalEnabled, schedulingViaLink }),
       });
     } finally {
       setSavingSettings(false);
@@ -476,6 +478,36 @@ export function AgendaClient({
               <input type="checkbox" checked={schedulingEnabled} onChange={e => setSchedulingEnabled(e.target.checked)} className="w-4 h-4" />
               <span className="text-sm font-medium">Ativar agendamento automático pelo agente de IA</span>
             </label>
+
+            <div className="border border-gray-800 rounded-xl p-4 space-y-2">
+              <p className="text-sm font-medium">Como a IA agenda pelo WhatsApp</p>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="radio"
+                  name="modoAgendamento"
+                  checked={!schedulingViaLink}
+                  onChange={() => setSchedulingViaLink(false)}
+                  className="w-4 h-4 mt-0.5"
+                />
+                <div>
+                  <p className="text-sm">Por mensagem, na conversa</p>
+                  <p className="text-xs text-gray-500">A IA consulta os horários, oferece opções e confirma o agendamento dentro do próprio WhatsApp.</p>
+                </div>
+              </label>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="radio"
+                  name="modoAgendamento"
+                  checked={schedulingViaLink}
+                  onChange={() => setSchedulingViaLink(true)}
+                  className="w-4 h-4 mt-0.5"
+                />
+                <div>
+                  <p className="text-sm">Enviando o link de agendamento</p>
+                  <p className="text-xs text-gray-500">A IA envia o link da página pública, onde o cliente escolhe serviço e horário sozinho e confirma na hora. Cancelamento pelo lembrete continua funcionando na conversa.</p>
+                </div>
+              </label>
+            </div>
 
             <div>
               <label className="text-sm text-gray-400 block mb-1">Duração de cada atendimento (minutos)</label>
