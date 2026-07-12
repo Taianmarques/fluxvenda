@@ -4,9 +4,18 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Target } from "lucide-react";
 import { getAgentConfigWithRole } from "@/lib/team";
+import { CrmPageGate } from "@/app/(app)/crm/CrmPageGate";
 import { ProspeccaoClient } from "../../prospeccao/ProspeccaoClient";
 
-export default async function ProspeccaoPage({ params }: { params: Promise<{ agentId: string }> }) {
+export default function ProspeccaoPage(props: { params: Promise<{ agentId: string }> }) {
+  return (
+    <CrmPageGate pageKey="prospeccao">
+      <ProspeccaoPageContent {...props} />
+    </CrmPageGate>
+  );
+}
+
+async function ProspeccaoPageContent({ params }: { params: Promise<{ agentId: string }> }) {
   const user = await currentUser();
   if (!user) redirect("/sign-in");
 

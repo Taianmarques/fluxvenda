@@ -4,9 +4,18 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Filter } from "lucide-react";
 import { getAgentConfigWithRole } from "@/lib/team";
+import { CrmPageGate } from "@/app/(app)/crm/CrmPageGate";
 import { FunilClient, type FunilPipeline, type FunilLead } from "../../funil/FunilClient";
 
-export default async function FunilPage({ params }: { params: Promise<{ agentId: string }> }) {
+export default function FunilPage(props: { params: Promise<{ agentId: string }> }) {
+  return (
+    <CrmPageGate pageKey="funil">
+      <FunilPageContent {...props} />
+    </CrmPageGate>
+  );
+}
+
+async function FunilPageContent({ params }: { params: Promise<{ agentId: string }> }) {
   const user = await currentUser();
   if (!user) redirect("/sign-in");
 

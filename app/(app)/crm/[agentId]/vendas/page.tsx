@@ -4,13 +4,22 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Wallet, TrendingUp, Handshake, Receipt, Clock, KanbanSquare } from "lucide-react";
 import { getAgentConfigWithRole } from "@/lib/team";
+import { CrmPageGate } from "@/app/(app)/crm/CrmPageGate";
 import { VendasChart } from "../../vendas/VendasChart";
 
 function formatBRL(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-export default async function VendasPage({ params }: { params: Promise<{ agentId: string }> }) {
+export default function VendasPage(props: { params: Promise<{ agentId: string }> }) {
+  return (
+    <CrmPageGate pageKey="vendas">
+      <VendasPageContent {...props} />
+    </CrmPageGate>
+  );
+}
+
+async function VendasPageContent({ params }: { params: Promise<{ agentId: string }> }) {
   const user = await currentUser();
   if (!user) redirect("/sign-in");
 

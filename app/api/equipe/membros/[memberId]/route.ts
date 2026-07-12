@@ -4,10 +4,11 @@ import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
 const patchSchema = z.object({
-  departamentoId: z.string().nullable(),
+  departamentoId: z.string().nullable().optional(),
+  accessProfileId: z.string().nullable().optional(),
 });
 
-// Define o departamento de um membro — só o gestor
+// Define o departamento e/ou o perfil de acesso de um membro — só o gestor
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ memberId: string }> }) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -25,8 +26,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ me
     const dep = await prisma.departamento.findFirst({ where: { id: body.data.departamentoId, teamId: member.teamId } });
     if (!dep) return NextResponse.json({ error: "Departamento inválido" }, { status: 400 });
   }
+  if (body.data.accessProfileId) {
+    const perfil = await prisma.crmAccessProfile.findFirst({ where: { id: body.data.accessProfileId, teamId: member.teamId } });
+    if (!perfil) return NextResponse.json({ error: "Perfil inválido" }, { status: 400 });
+  }
 
-  await prisma.teamMember.update({ where: { id: memberId }, data: { departamentoId: body.data.departamentoId } });
+  await prisma.teamMember.update({ where: { id: memberId }, data: body.data });
   return NextResponse.json({ ok: true });
 }
 

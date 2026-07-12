@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { UserPlus, Copy, Check, Crown, User, Trash2, MessageCircle, Building2, Plus, X } from "lucide-react";
+import { UserPlus, Copy, Check, Crown, User, Trash2, MessageCircle, Building2, Plus, X, Shield, Pencil, ChevronDown } from "lucide-react";
+import { CRM_CATEGORIES } from "@/lib/crm-nav-config";
 
 type Membro = {
   memberId: string;
@@ -11,17 +12,20 @@ type Membro = {
   email: string;
   joinedAt: string;
   departamentoId: string | null;
+  accessProfileId: string | null;
 };
 
 type Departamento = { id: string; nome: string; descricao: string };
+type Perfil = { id: string; nome: string; allowedPages: string[] };
 
-export function EquipeClient({ teamName, isManager, inviteLink, manager, members, departamentos, currentUserId }: {
+export function EquipeClient({ teamName, isManager, inviteLink, manager, members, departamentos, perfis, currentUserId }: {
   teamName: string;
   isManager: boolean;
   inviteLink: string | null;
   manager: { id: string; name: string; email: string };
   members: Membro[];
   departamentos: Departamento[];
+  perfis: Perfil[];
   currentUserId: string;
 }) {
   const router = useRouter();
@@ -33,6 +37,12 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
   const [depNome, setDepNome] = useState("");
   const [depDescricao, setDepDescricao] = useState("");
   const [salvandoDep, setSalvandoDep] = useState(false);
+
+  // Perfis de acesso
+  const [showNovoPerfil, setShowNovoPerfil] = useState(false);
+  const [perfilNome, setPerfilNome] = useState("");
+  const [salvandoPerfil, setSalvandoPerfil] = useState(false);
+  const [expandedPerfilId, setExpandedPerfilId] = useState<string | null>(null);
 
   async function handleCriarDepartamento() {
     if (!depNome.trim()) return;
@@ -60,6 +70,59 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ departamentoId: departamentoId || null }),
+    });
+    router.refresh();
+  }
+
+  async function handleCriarPerfil() {
+    if (!perfilNome.trim()) return;
+    setSalvandoPerfil(true);
+    try {
+      const res = await fetch(`/api/equipe/perfis`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nome: perfilNome.trim(), allowedPages: [] }),
+      });
+      if (res.ok) { setPerfilNome(""); setShowNovoPerfil(false); router.refresh(); }
+    } finally {
+      setSalvandoPerfil(false);
+    }
+  }
+
+  async function handleRenomearPerfil(p: Perfil) {
+    const novoNome = window.prompt("Novo nome do perfil", p.nome);
+    if (!novoNome || !novoNome.trim() || novoNome.trim() === p.nome) return;
+    await fetch(`/api/equipe/perfis/${p.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nome: novoNome.trim() }),
+    });
+    router.refresh();
+  }
+
+  async function handleExcluirPerfil(p: Perfil) {
+    if (!confirm(`Excluir o perfil "${p.nome}"? Membros com esse perfil passam a ter acesso total ao CRM.`)) return;
+    await fetch(`/api/equipe/perfis/${p.id}`, { method: "DELETE" });
+    router.refresh();
+  }
+
+  async function handleTogglePagina(p: Perfil, pageKey: string) {
+    const allowedPages = p.allowedPages.includes(pageKey)
+      ? p.allowedPages.filter(k => k !== pageKey)
+      : [...p.allowedPages, pageKey];
+    await fetch(`/api/equipe/perfis/${p.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ allowedPages }),
+    });
+    router.refresh();
+  }
+
+  async function handleSetPerfil(memberId: string, accessProfileId: string) {
+    await fetch(`/api/equipe/membros/${memberId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accessProfileId: accessProfileId || null }),
     });
     router.refresh();
   }
@@ -202,6 +265,103 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
           )}
         </div>
 
+        {/* Perfis de acesso */}
+        {isManager && (
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <p className="font-semibold text-sm flex items-center gap-1.5"><Shield size={15} className="text-blue-400" /> Perfis de acesso</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Escolha quais páginas do CRM cada perfil enxerga. Membro sem perfil atribuído mantém acesso total.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowNovoPerfil(s => !s)}
+                className="flex items-center gap-1 text-xs font-medium text-blue-400 hover:text-blue-300 border border-blue-800/50 hover:border-blue-600/50 rounded-lg px-3 py-1.5 transition-colors"
+              >
+                <Plus size={12} /> Novo perfil
+              </button>
+            </div>
+
+            {showNovoPerfil && (
+              <div className="bg-gray-950 border border-gray-800 rounded-xl p-3 space-y-2">
+                <input
+                  value={perfilNome}
+                  onChange={e => setPerfilNome(e.target.value)}
+                  placeholder="Nome (ex: Atendente, Financeiro...)"
+                  className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm"
+                  maxLength={40}
+                />
+                <div className="flex gap-2">
+                  <button onClick={handleCriarPerfil} disabled={salvandoPerfil || !perfilNome.trim()} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium">
+                    {salvandoPerfil ? "Criando..." : "Criar"}
+                  </button>
+                  <button onClick={() => setShowNovoPerfil(false)} className="text-xs text-gray-400 hover:text-gray-200 px-2">Cancelar</button>
+                </div>
+              </div>
+            )}
+
+            {perfis.length === 0 ? (
+              <p className="text-xs text-gray-600">Nenhum perfil ainda. Sem perfis, todos os membros têm acesso total ao CRM.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {perfis.map(p => {
+                  const membrosCount = members.filter(m => m.accessProfileId === p.id).length;
+                  const expanded = expandedPerfilId === p.id;
+                  return (
+                    <div key={p.id} className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2.5">
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => setExpandedPerfilId(expanded ? null : p.id)}
+                          className="flex-1 min-w-0 flex items-center gap-2 text-left"
+                        >
+                          <ChevronDown size={13} className={`text-gray-500 flex-shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`} />
+                          <span className="text-sm font-medium truncate">{p.nome}</span>
+                          <span className="text-[10px] text-gray-500 flex-shrink-0">{p.allowedPages.length} página{p.allowedPages.length === 1 ? "" : "s"}</span>
+                        </button>
+                        <span className="text-[10px] text-gray-500 flex-shrink-0">
+                          {membrosCount} membro{membrosCount === 1 ? "" : "s"}
+                        </span>
+                        <button onClick={() => handleRenomearPerfil(p)} className="text-gray-600 hover:text-gray-300 flex-shrink-0">
+                          <Pencil size={13} />
+                        </button>
+                        <button onClick={() => handleExcluirPerfil(p)} className="text-gray-600 hover:text-red-400 flex-shrink-0">
+                          <X size={13} />
+                        </button>
+                      </div>
+
+                      {expanded && (
+                        <div className="mt-3 pt-3 border-t border-gray-800 grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
+                          {CRM_CATEGORIES.map(cat => {
+                            const pages = cat.pages.filter(pg => !pg.managerOnly);
+                            if (pages.length === 0) return null;
+                            return (
+                              <div key={cat.key} className="space-y-1">
+                                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{cat.label}</p>
+                                {pages.map(pg => (
+                                  <label key={pg.key} className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={p.allowedPages.includes(pg.key)}
+                                      onChange={() => handleTogglePagina(p, pg.key)}
+                                      className="rounded border-gray-700 bg-gray-900"
+                                    />
+                                    {pg.label}
+                                  </label>
+                                ))}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Lista de membros */}
         <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
           <p className="font-semibold p-5 pb-3">
@@ -226,7 +386,7 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
 
             {/* Atendentes */}
             {members.map(m => (
-              <div key={m.memberId} className="flex items-center gap-3 px-5 py-3">
+              <div key={m.memberId} className="flex items-center gap-3 px-5 py-3 flex-wrap">
                 <div className="w-9 h-9 rounded-full bg-blue-900/40 text-blue-400 flex items-center justify-center flex-shrink-0">
                   <User size={15} />
                 </div>
@@ -252,6 +412,17 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
                   <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-blue-900/40 text-blue-300 border border-blue-800/50 flex-shrink-0">
                     {departamentos.find(d => d.id === m.departamentoId)?.nome ?? "Atendente"}
                   </span>
+                )}
+                {isManager && perfis.length > 0 && (
+                  <select
+                    value={m.accessProfileId ?? ""}
+                    onChange={e => handleSetPerfil(m.memberId, e.target.value)}
+                    className="text-xs bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 flex-shrink-0 max-w-[130px]"
+                    title="Perfil de acesso no CRM"
+                  >
+                    <option value="">Acesso total</option>
+                    {perfis.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                  </select>
                 )}
                 {isManager && (
                   <button

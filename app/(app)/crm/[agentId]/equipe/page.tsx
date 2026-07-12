@@ -4,9 +4,18 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { UserPlus } from "lucide-react";
 import { getAgentConfigWithRole } from "@/lib/team";
+import { CrmPageGate } from "@/app/(app)/crm/CrmPageGate";
 import { EquipeClient } from "../../equipe/EquipeClient";
 
-export default async function EquipeCrmPage({ params }: { params: Promise<{ agentId: string }> }) {
+export default function EquipeCrmPage(props: { params: Promise<{ agentId: string }> }) {
+  return (
+    <CrmPageGate pageKey="equipe">
+      <EquipeCrmPageContent {...props} />
+    </CrmPageGate>
+  );
+}
+
+async function EquipeCrmPageContent({ params }: { params: Promise<{ agentId: string }> }) {
   const user = await currentUser();
   if (!user) redirect("/sign-in");
 
@@ -38,6 +47,7 @@ export default async function EquipeCrmPage({ params }: { params: Promise<{ agen
         orderBy: { joinedAt: "asc" },
       },
       departamentos: { orderBy: { createdAt: "asc" }, select: { id: true, nome: true, descricao: true } },
+      crmAccessProfiles: { orderBy: { createdAt: "asc" }, select: { id: true, nome: true, allowedPages: true } },
     },
   });
 
@@ -58,8 +68,10 @@ export default async function EquipeCrmPage({ params }: { params: Promise<{ agen
         email: m.profile.email,
         joinedAt: m.joinedAt.toISOString(),
         departamentoId: m.departamentoId,
+        accessProfileId: m.accessProfileId,
       }))}
       departamentos={team.departamentos}
+      perfis={team.crmAccessProfiles}
       currentUserId={user.id}
     />
   );

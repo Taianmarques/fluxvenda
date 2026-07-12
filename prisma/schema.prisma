@@ -507,13 +507,14 @@ model Team {
   // com o Asaas de cada agente (AgentConfig.asaasApiKey), que é a conta do cliente pra vender
   asaasCustomerId  String?
 
-  members        TeamMember[]
-  departamentos  Departamento[]
-  goals          Goal[]
-  announcements  Announcement[]
-  agentConfigs   AgentConfig[]
-  creditoCompras CreditoCompra[]
-  tokenUsageLogs TokenUsageLog[]
+  members           TeamMember[]
+  departamentos     Departamento[]
+  crmAccessProfiles CrmAccessProfile[]
+  goals             Goal[]
+  announcements     Announcement[]
+  agentConfigs      AgentConfig[]
+  creditoCompras    CreditoCompra[]
+  tokenUsageLogs    TokenUsageLog[]
 }
 
 model TeamMember {
@@ -526,6 +527,9 @@ model TeamMember {
 
   departamentoId String?
   departamento   Departamento? @relation(fields: [departamentoId], references: [id], onDelete: SetNull)
+
+  accessProfileId String?
+  accessProfile   CrmAccessProfile? @relation(fields: [accessProfileId], references: [id], onDelete: SetNull)
 
   @@unique([teamId, profileId])
 }
@@ -544,6 +548,24 @@ model Departamento {
 
   membros       TeamMember[]
   conversations Conversation[]
+
+  @@index([teamId])
+}
+
+// Perfil de acesso configurável do CRM — restringe quais páginas do CRM um membro do
+// time enxerga/acessa. Sem perfil atribuído (TeamMember.accessProfileId null), o membro
+// mantém acesso total (comportamento padrão) — só fica restrito quando um perfil é atribuído.
+model CrmAccessProfile {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  teamId String
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  nome         String
+  allowedPages String[] @default([]) // chaves de lib/crm-nav-config.ts (CrmPageKey[])
+
+  membros TeamMember[]
 
   @@index([teamId])
 }

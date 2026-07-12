@@ -2,11 +2,20 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { MessageCircle, KanbanSquare, Calendar, Wallet, ShoppingCart, Landmark, Target, ArrowLeft, ChevronDown, Wifi, GitBranch, Briefcase, LayoutGrid, Zap, Filter, UserPlus, ClipboardCheck, Radio, Megaphone, Phone, Settings, Coins, TrendingUp } from "lucide-react";
+import { ArrowLeft, ChevronDown, LayoutGrid, Megaphone, TrendingUp, Zap, Settings, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { CRM_CATEGORIES, type CrmPageDef, type CrmPageKey } from "@/lib/crm-nav-config";
 
-type NavItem = { href: string; label: string; icon: typeof MessageCircle; isHub?: boolean };
-type NavCategory = { key: string; label: string; items: NavItem[] };
+type NavItem = { href: string; label: string; icon: LucideIcon; isHub?: boolean };
+type NavCategory = { key: string; label: string; variant: "accordion" | "flyout"; items: NavItem[] };
+
+// Ícone de cada categoria flyout — CRM_CATEGORIES só define ícone por página, não por categoria
+const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  marketing: Megaphone,
+  gestao: TrendingUp,
+  automacao: Zap,
+  configuracoes: Settings,
+};
 
 // Categoria que expande pra baixo (accordion) — usado pela maioria; Marketing e Automação
 // usam CategoryFlyout (submenu flutuante pro lado) em vez desse.
@@ -57,7 +66,7 @@ function CategoryAccordion({ cat, isOpen, onToggle, isActive, pathname, onNaviga
 // (overflow-x vira "auto" junto), então position:absolute ficaria preso dentro do menu.
 function CategoryFlyout({ label, icon: Icon, items, isActive, pathname, onNavigate }: {
   label: string;
-  icon: typeof MessageCircle;
+  icon: LucideIcon;
   items: NavItem[];
   isActive: (item: NavItem) => boolean;
   pathname: string;
@@ -121,7 +130,12 @@ function CategoryFlyout({ label, icon: Icon, items, isActive, pathname, onNaviga
   );
 }
 
-export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id: string; nome: string }[] }) {
+export function CrmSidebar({ agentId, agents, allowedPages }: {
+  agentId: string;
+  agents: { id: string; nome: string }[];
+  // null = acesso total (gestor, ou membro sem perfil atribuído)
+  allowedPages: CrmPageKey[] | null;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const [showSwitcher, setShowSwitcher] = useState(false);
@@ -145,51 +159,35 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
 
   const HUB_ITEM: NavItem = { href: "/crm/hub", label: "Hub de IA", icon: LayoutGrid, isHub: true };
 
-  const CATEGORIES: NavCategory[] = [
-    { key: "atendimento", label: "Atendimento", items: [
-      { href: agentPath(""), label: "Mensagens", icon: MessageCircle },
-      { href: agentPath("/aovivo"), label: "Ao vivo", icon: Radio },
-    ] },
-    { key: "vendas", label: "Vendas", items: [
-      { href: agentPath("/pipeline"), label: "Pipeline", icon: KanbanSquare },
-      { href: agentPath("/agenda"), label: "Agenda", icon: Calendar },
-      { href: agentPath("/vendas"), label: "Vendas", icon: Wallet },
-      { href: agentPath("/comercio"), label: "Produtos", icon: ShoppingCart },
-    ] },
-  ];
+  // managerOnly (aovivo/campanhas/auditoria) continua sempre visível no menu — o bloqueio
+  // delas é feito pela própria página, não pelo perfil de acesso; as demais somem do menu
+  // quando o perfil atribuído ao usuário não inclui aquela página.
+  function isPageVisible(page: CrmPageDef) {
+    return Boolean(page.managerOnly) || allowedPages === null || allowedPages.includes(page.key);
+  }
 
-  // Marketing, Gestão, Automação e Configurações usam o flyout flutuante (CategoryFlyout) em vez do accordion.
-  const MARKETING_ITEMS: NavItem[] = [
-    { href: agentPath("/campanhas"), label: "Campanhas", icon: Megaphone },
-    { href: agentPath("/ligacoes"), label: "Ligações", icon: Phone },
-    { href: agentPath("/prospeccao"), label: "Prospecção", icon: Target },
-  ];
-  const GESTAO_ITEMS: NavItem[] = [
-    { href: agentPath("/cobranca"), label: "Cobranças", icon: Landmark },
-    { href: agentPath("/funil"), label: "Funil", icon: Filter },
-    { href: agentPath("/carteira"), label: "Carteira", icon: Briefcase },
-  ];
-  const AUTOMACAO_ITEMS: NavItem[] = [
-    { href: agentPath("/automacao"), label: "Automação", icon: Zap },
-    { href: agentPath("/condicoes"), label: "Condições", icon: GitBranch },
-  ];
-  const CONFIG_ITEMS: NavItem[] = [
-    { href: agentPath("/canais"), label: "Canais", icon: Wifi },
-    { href: agentPath("/equipe"), label: "Equipe", icon: UserPlus },
-    { href: agentPath("/auditoria"), label: "Auditoria", icon: ClipboardCheck },
-    { href: agentPath("/creditos"), label: "Créditos de IA", icon: Coins },
-  ];
+  const CATEGORIES: NavCategory[] = CRM_CATEGORIES
+    .map(cat => ({
+      key: cat.key,
+      label: cat.label,
+      variant: cat.variant,
+      items: cat.pages.filter(isPageVisible).map(p => ({ href: agentPath(p.suffix), label: p.label, icon: p.icon })),
+    }))
+    .filter(cat => cat.items.length > 0);
 
-  const FLAT_NAV: NavItem[] = [HUB_ITEM, ...CATEGORIES.flatMap(c => c.items), ...MARKETING_ITEMS, ...GESTAO_ITEMS, ...AUTOMACAO_ITEMS, ...CONFIG_ITEMS];
+  const ACCORDION_CATEGORIES = CATEGORIES.filter(c => c.variant === "accordion");
+  const FLYOUT_CATEGORIES = CATEGORIES.filter(c => c.variant === "flyout");
+
+  const FLAT_NAV: NavItem[] = [HUB_ITEM, ...CATEGORIES.flatMap(c => c.items)];
 
   // Categorias abertas no menu desktop — a que contém a página atual abre sozinha; as demais
   // o usuário abre/fecha manualmente, e várias podem ficar abertas ao mesmo tempo.
   const [openCategories, setOpenCategories] = useState<Set<string>>(() => {
-    const active = CATEGORIES.find(cat => cat.items.some(item => isActive(item)));
+    const active = ACCORDION_CATEGORIES.find(cat => cat.items.some(item => isActive(item)));
     return new Set(active ? [active.key] : []);
   });
   useEffect(() => {
-    const active = CATEGORIES.find(cat => cat.items.some(item => isActive(item)));
+    const active = ACCORDION_CATEGORIES.find(cat => cat.items.some(item => isActive(item)));
     if (active) setOpenCategories(prev => (prev.has(active.key) ? prev : new Set(prev).add(active.key)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
@@ -309,14 +307,13 @@ export function CrmSidebar({ agentId, agents }: { agentId: string; agents: { id:
 
         <div className="border-t border-gray-800 my-2" />
 
-        {CATEGORIES.map(cat => (
+        {ACCORDION_CATEGORIES.map(cat => (
           <CategoryAccordion key={cat.key} cat={cat} isOpen={openCategories.has(cat.key)} onToggle={toggleCategory} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} />
         ))}
 
-        <CategoryFlyout label="Marketing" icon={Megaphone} items={MARKETING_ITEMS} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} />
-        <CategoryFlyout label="Gestão" icon={TrendingUp} items={GESTAO_ITEMS} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} />
-        <CategoryFlyout label="Automação" icon={Zap} items={AUTOMACAO_ITEMS} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} />
-        <CategoryFlyout label="Configurações" icon={Settings} items={CONFIG_ITEMS} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} />
+        {FLYOUT_CATEGORIES.map(cat => (
+          <CategoryFlyout key={cat.key} label={cat.label} icon={CATEGORY_ICONS[cat.key]} items={cat.items} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} />
+        ))}
       </nav>
 
       <div className="px-3 py-4 border-t border-gray-800">

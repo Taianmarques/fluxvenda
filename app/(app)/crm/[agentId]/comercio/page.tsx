@@ -5,9 +5,18 @@ import Link from "next/link";
 import { ShoppingCart } from "lucide-react";
 import { getAgentConfigWithRole } from "@/lib/team";
 import { ensureStoreSlug } from "@/lib/store-slug";
+import { CrmPageGate } from "@/app/(app)/crm/CrmPageGate";
 import { ComercioClient } from "../../comercio/ComercioClient";
 
-export default async function ComercioPage({ params }: { params: Promise<{ agentId: string }> }) {
+export default function ComercioPage(props: { params: Promise<{ agentId: string }> }) {
+  return (
+    <CrmPageGate pageKey="comercio">
+      <ComercioPageContent {...props} />
+    </CrmPageGate>
+  );
+}
+
+async function ComercioPageContent({ params }: { params: Promise<{ agentId: string }> }) {
   const user = await currentUser();
   if (!user) redirect("/sign-in");
 

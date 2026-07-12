@@ -2,9 +2,18 @@ import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { getAgentConfigWithRole } from "@/lib/team";
 import { prisma } from "@/lib/prisma";
+import { CrmPageGate } from "@/app/(app)/crm/CrmPageGate";
 import { CondicoesClient } from "../../condicoes/CondicoesClient";
 
-export default async function CondicoesPage({
+export default function CondicoesPage(props: { params: Promise<{ agentId: string }> }) {
+  return (
+    <CrmPageGate pageKey="condicoes">
+      <CondicoesPageContent {...props} />
+    </CrmPageGate>
+  );
+}
+
+async function CondicoesPageContent({
   params,
 }: {
   params: Promise<{ agentId: string }>;

@@ -4,9 +4,21 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { MessageCircle } from "lucide-react";
 import { getAgentConfigWithRole } from "@/lib/team";
+import { CrmPageGate } from "@/app/(app)/crm/CrmPageGate";
 import { WhatsappInbox } from "../WhatsappInbox";
 
-export default async function WhatsappInboxPage({
+export default function WhatsappInboxPage(props: {
+  params: Promise<{ agentId: string }>;
+  searchParams: Promise<{ c?: string }>;
+}) {
+  return (
+    <CrmPageGate pageKey="mensagens">
+      <WhatsappInboxPageContent {...props} />
+    </CrmPageGate>
+  );
+}
+
+async function WhatsappInboxPageContent({
   params, searchParams,
 }: {
   params: Promise<{ agentId: string }>;

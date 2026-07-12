@@ -3,13 +3,22 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCreditsStatus } from "@/lib/token-usage";
 import { Coins, Lock } from "lucide-react";
+import { CrmPageGate } from "@/app/(app)/crm/CrmPageGate";
 import { CreditosClient } from "../../../creditos/CreditosClient";
 
 // Mesmo conteúdo de app/(app)/creditos/page.tsx, só que dentro do layout do CRM
 // (crm/[agentId]/layout.tsx) — assim o menu do CRM continua visível ao acessar por lá,
 // em vez de trocar pro menu principal da Plataforma B2B. Créditos são por equipe, não por
 // agente — o agentId na URL só mantém o contexto do sidebar/agent-switcher.
-export default async function CrmCreditosPage() {
+export default function CrmCreditosPage() {
+  return (
+    <CrmPageGate pageKey="creditos">
+      <CrmCreditosPageContent />
+    </CrmPageGate>
+  );
+}
+
+async function CrmCreditosPageContent() {
   const user = await currentUser();
   if (!user) redirect("/sign-in");
 

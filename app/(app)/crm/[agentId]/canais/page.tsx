@@ -2,9 +2,18 @@ import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { listMyAgentConfigs } from "@/lib/team";
 import { prisma } from "@/lib/prisma";
+import { CrmPageGate } from "@/app/(app)/crm/CrmPageGate";
 import { CanaisClient } from "../../canais/CanaisClient";
 
-export default async function CanaisPage({
+export default function CanaisPage(props: { params: Promise<{ agentId: string }> }) {
+  return (
+    <CrmPageGate pageKey="canais">
+      <CanaisPageContent {...props} />
+    </CrmPageGate>
+  );
+}
+
+async function CanaisPageContent({
   params,
 }: {
   params: Promise<{ agentId: string }>;

@@ -3,9 +3,18 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Zap } from "lucide-react";
 import { getAgentConfigWithRole } from "@/lib/team";
+import { CrmPageGate } from "@/app/(app)/crm/CrmPageGate";
 import { AutomacaoClient } from "../../automacao/AutomacaoClient";
 
-export default async function AutomacaoPage({ params }: { params: Promise<{ agentId: string }> }) {
+export default function AutomacaoPage(props: { params: Promise<{ agentId: string }> }) {
+  return (
+    <CrmPageGate pageKey="automacao">
+      <AutomacaoPageContent {...props} />
+    </CrmPageGate>
+  );
+}
+
+async function AutomacaoPageContent({ params }: { params: Promise<{ agentId: string }> }) {
   const user = await currentUser();
   if (!user) redirect("/sign-in");
 

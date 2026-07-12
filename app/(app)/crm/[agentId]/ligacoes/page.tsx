@@ -1,9 +1,18 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { getAgentConfigWithRole } from "@/lib/team";
+import { CrmPageGate } from "@/app/(app)/crm/CrmPageGate";
 import { LigacoesClient } from "@/app/(app)/crm/ligacoes/LigacoesClient";
 
-export default async function LigacoesPage({
+export default function LigacoesPage(props: { params: Promise<{ agentId: string }> }) {
+  return (
+    <CrmPageGate pageKey="ligacoes">
+      <LigacoesPageContent {...props} />
+    </CrmPageGate>
+  );
+}
+
+async function LigacoesPageContent({
   params,
 }: {
   params: Promise<{ agentId: string }>;

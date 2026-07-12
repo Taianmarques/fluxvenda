@@ -4,9 +4,18 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Briefcase } from "lucide-react";
 import { getAgentConfigWithRole } from "@/lib/team";
+import { CrmPageGate } from "@/app/(app)/crm/CrmPageGate";
 import { CarteiraClient, type CarteiraCliente } from "../../carteira/CarteiraClient";
 
-export default async function CarteiraPage({ params }: { params: Promise<{ agentId: string }> }) {
+export default function CarteiraPage(props: { params: Promise<{ agentId: string }> }) {
+  return (
+    <CrmPageGate pageKey="carteira">
+      <CarteiraPageContent {...props} />
+    </CrmPageGate>
+  );
+}
+
+async function CarteiraPageContent({ params }: { params: Promise<{ agentId: string }> }) {
   const user = await currentUser();
   if (!user) redirect("/sign-in");
 

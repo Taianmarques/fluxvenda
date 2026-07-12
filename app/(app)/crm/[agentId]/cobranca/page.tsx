@@ -4,9 +4,18 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Landmark } from "lucide-react";
 import { getAgentConfigWithRole } from "@/lib/team";
+import { CrmPageGate } from "@/app/(app)/crm/CrmPageGate";
 import { CobrancaClient } from "../../cobranca/CobrancaClient";
 
-export default async function CobrancaPage({ params }: { params: Promise<{ agentId: string }> }) {
+export default function CobrancaPage(props: { params: Promise<{ agentId: string }> }) {
+  return (
+    <CrmPageGate pageKey="cobranca">
+      <CobrancaPageContent {...props} />
+    </CrmPageGate>
+  );
+}
+
+async function CobrancaPageContent({ params }: { params: Promise<{ agentId: string }> }) {
   const user = await currentUser();
   if (!user) redirect("/sign-in");
 
