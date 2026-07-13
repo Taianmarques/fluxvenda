@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { BookUser, Search, Pencil, MessageCircle, Download, Instagram } from "lucide-react";
+import { BookUser, Search, Pencil, MessageCircle, Download, Upload, Instagram, X } from "lucide-react";
 
 export type Contato = {
   conversationId: string;
@@ -27,6 +27,9 @@ export function ContatosClient({ agentId, contatos }: { agentId: string; contato
   const router = useRouter();
   const [busca, setBusca] = useState("");
   const [salvando, setSalvando] = useState<string | null>(null);
+  const [importando, setImportando] = useState(false);
+  const [importResult, setImportResult] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -49,6 +52,49 @@ export function ContatosClient({ agentId, contatos }: { agentId: string; contato
       router.refresh();
     } finally {
       setSalvando(null);
+    }
+  }
+
+  // Aceita CSV com "nome;numero", "numero;nome" ou só "numero" por linha (separador ; ou ,).
+  // Detecta qual coluna é o número pela quantidade de dígitos.
+  function parseCsv(text: string): { nome?: string; numero: string }[] {
+    const contatos: { nome?: string; numero: string }[] = [];
+    for (const linha of text.split(/\r?\n/)) {
+      if (!linha.trim()) continue;
+      const cols = linha.split(linha.includes(";") ? ";" : ",").map(c => c.trim().replace(/^"|"$/g, ""));
+      const numeroCol = cols.find(c => c.replace(/\D/g, "").length >= 10);
+      if (!numeroCol) continue; // cabeçalho ou linha sem número
+      const nome = cols.find(c => c !== numeroCol && c.replace(/\D/g, "").length < 8 && c.length > 1);
+      contatos.push({ nome: nome || undefined, numero: numeroCol.replace(/\D/g, "") });
+    }
+    return contatos;
+  }
+
+  async function handleImportFile(file: File) {
+    setImportando(true);
+    setImportResult(null);
+    try {
+      const text = await file.text();
+      const parsed = parseCsv(text).slice(0, 1000);
+      if (parsed.length === 0) {
+        setImportResult("Nenhum contato encontrado no arquivo. Use uma coluna com o número (DDD + número) e, opcionalmente, uma com o nome.");
+        return;
+      }
+      const res = await fetch(`/api/agentes/${agentId}/contatos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contatos: parsed }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setImportResult(`Importação concluída: ${data.criados} novo${data.criados === 1 ? "" : "s"}, ${data.atualizados} atualizado${data.atualizados === 1 ? "" : "s"}${data.ignorados > 0 ? `, ${data.ignorados} ignorado${data.ignorados === 1 ? "" : "s"} (número inválido ou repetido)` : ""}.`);
+        router.refresh();
+      } else {
+        setImportResult(data.error ?? "Não foi possível importar. Tente novamente.");
+      }
+    } finally {
+      setImportando(false);
+      if (fileRef.current) fileRef.current.value = "";
     }
   }
 
@@ -85,14 +131,37 @@ export function ContatosClient({ agentId, contatos }: { agentId: string; contato
               Todos os contatos que já conversaram com esse agente. {contatos.length} no total.
             </p>
           </div>
-          <button
-            onClick={exportarCsv}
-            disabled={filtrados.length === 0}
-            className="flex items-center gap-1.5 text-sm font-medium text-blue-400 hover:text-blue-300 border border-blue-800/50 hover:border-blue-600/50 disabled:opacity-50 rounded-xl px-4 py-2 transition-colors"
-          >
-            <Download size={14} /> Exportar CSV
-          </button>
+          <div className="flex gap-2 flex-wrap">
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".csv,text/csv,text/plain"
+              className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleImportFile(f); }}
+            />
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={importando}
+              className="flex items-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl px-4 py-2 transition-colors"
+            >
+              <Upload size={14} /> {importando ? "Importando..." : "Importar CSV"}
+            </button>
+            <button
+              onClick={exportarCsv}
+              disabled={filtrados.length === 0}
+              className="flex items-center gap-1.5 text-sm font-medium text-blue-400 hover:text-blue-300 border border-blue-800/50 hover:border-blue-600/50 disabled:opacity-50 rounded-xl px-4 py-2 transition-colors"
+            >
+              <Download size={14} /> Exportar CSV
+            </button>
+          </div>
         </div>
+
+        {importResult && (
+          <div className="bg-gray-900 border border-blue-800/40 text-sm text-gray-300 rounded-xl px-4 py-3 flex items-start justify-between gap-3">
+            <span>{importResult}</span>
+            <button onClick={() => setImportResult(null)} className="text-gray-500 hover:text-white flex-shrink-0"><X size={14} /></button>
+          </div>
+        )}
 
         <div className="relative">
           <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" />
