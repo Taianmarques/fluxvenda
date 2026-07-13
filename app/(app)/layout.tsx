@@ -14,7 +14,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     where: { id: user.id },
     select: { onboarded: true, role: true, name: true },
   });
-  if (!profile?.onboarded) redirect("/onboarding");
+  if (!profile?.onboarded) {
+    // Quem já entrou numa equipe pelo convite faz o onboarding mínimo de membro
+    const membership = await prisma.teamMember.findUnique({ where: { profileId: user.id }, select: { id: true } });
+    redirect(membership ? "/onboarding/membro" : "/onboarding");
+  }
 
   const isGestor = profile.role === "GESTOR" || profile.role === "ADMIN";
   const isAdmin = profile.role === "ADMIN";

@@ -7,12 +7,13 @@ import { SEGMENTS, SUBSEGMENTS } from "@/lib/segments";
 
 const TEAM_SIZES = ["1-5", "6-15", "16-50", "51-200", "200+"];
 
-type Step = "role" | "company" | "vendedor" | "funcionario";
+type Step = "role" | "company" | "vendedor" | "funcionario" | "membro";
 type BusinessModel = "B2B" | "B2C";
 type SoldProduct = "CRM" | "PLATAFORMA";
-export type OnboardingVariant = "crm" | "plataforma" | "generic";
+export type OnboardingVariant = "crm" | "plataforma" | "generic" | "membro";
 
-const COMPANY_COPY: Record<OnboardingVariant, { title: string; subtitle: string; button: string }> = {
+// "membro" nunca chega no passo company — o copy só existe pras variantes de gestor
+const COMPANY_COPY: Record<Exclude<OnboardingVariant, "membro">, { title: string; subtitle: string; button: string }> = {
   crm: {
     title: "Configure sua empresa",
     subtitle: "Essas informações preparam o agente de WhatsApp e o CRM da sua equipe. Seu teste grátis de 7 dias começa assim que você criar a empresa.",
@@ -30,23 +31,29 @@ const COMPANY_COPY: Record<OnboardingVariant, { title: string; subtitle: string;
   },
 };
 
-export function OnboardingFlow({ variant }: { variant: OnboardingVariant }) {
+// teamName/memberDestino/memberRole: só na variante "membro" (convidado que já entrou numa
+// equipe pelo link — onboarding mínimo, sem escolha de papel/produtos)
+type MemberProps = { teamName?: string; memberDestino?: string; memberRole?: "VENDEDOR" | "FUNCIONARIO" };
+
+export function OnboardingFlow({ variant, ...memberProps }: { variant: OnboardingVariant } & MemberProps) {
   return (
     <Suspense fallback={null}>
-      <OnboardingForm variant={variant} />
+      <OnboardingForm variant={variant} {...memberProps} />
     </Suspense>
   );
 }
 
-function OnboardingForm({ variant }: { variant: OnboardingVariant }) {
+function OnboardingForm({ variant, teamName, memberDestino, memberRole }: { variant: OnboardingVariant } & MemberProps) {
   const { user } = useUser();
   const { session } = useClerk();
   const router = useRouter();
   const searchParams = useSearchParams();
 
   // CRM: sempre quem contratou é o gestor — pula a escolha de papel e vai direto pra empresa
-  const [step, setStep] = useState<Step>(variant === "crm" ? "company" : "role");
-  const [role, setRole] = useState<"GESTOR" | "VENDEDOR" | "FUNCIONARIO" | "">(variant === "crm" ? "GESTOR" : "");
+  const [step, setStep] = useState<Step>(variant === "crm" ? "company" : variant === "membro" ? "membro" : "role");
+  const [role, setRole] = useState<"GESTOR" | "VENDEDOR" | "FUNCIONARIO" | "">(
+    variant === "crm" ? "GESTOR" : variant === "membro" ? (memberRole ?? "FUNCIONARIO") : ""
+  );
 
   // Gestor fields
   const [companyName, setCompanyName] = useState("");
@@ -121,7 +128,10 @@ function OnboardingForm({ variant }: { variant: OnboardingVariant }) {
       await res.json();
       try { await session?.reload(); } catch {}
 
-      if (role === "GESTOR") {
+      if (variant === "membro") {
+        // Convidado: já é membro da equipe — cai direto no produto dela (CRM ou dashboard)
+        router.push(memberDestino ?? "/dashboard");
+      } else if (role === "GESTOR") {
         // Time sem Plataforma (só CRM) não tem acesso a /gestor — manda pra configuração do agente
         router.push(products.has("PLATAFORMA") ? "/gestor" : "/ferramentas");
       } else {
@@ -131,6 +141,45 @@ function OnboardingForm({ variant }: { variant: OnboardingVariant }) {
       setError(err?.message ?? "Não foi possível salvar. Tente novamente.");
       setSaving(false);
     }
+  }
+
+  // ── STEP: membro convidado (já entrou na equipe pelo link) — só o WhatsApp ─
+  if (step === "membro") {
+    return (
+      <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center px-4">
+        <div className="w-full max-w-lg space-y-8">
+          <div className="text-center space-y-2">
+            <p className="text-gray-400 text-sm">Bem-vindo(a) à equipe</p>
+            <h1 className="text-3xl font-bold">{teamName ?? "Sua equipe"}</h1>
+            <p className="text-gray-400">Só falta um passo pra começar a atender.</p>
+          </div>
+
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4">
+            <div>
+              <label className="text-sm text-gray-400 block mb-1.5">Seu WhatsApp (com DDD)</label>
+              <input
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+                placeholder="(11) 99999-9999"
+                inputMode="tel"
+                className="w-full bg-gray-950 border border-gray-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500"
+              />
+              <p className="text-xs text-gray-500 mt-1.5">Opcional — usado pra avisos da equipe.</p>
+            </div>
+
+            {error && <p className="text-red-400 text-sm">{error}</p>}
+
+            <button
+              onClick={submit}
+              disabled={saving}
+              className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl font-bold text-lg transition-colors"
+            >
+              {saving ? "Entrando..." : memberDestino === "/crm" ? "Concluir e abrir o CRM" : "Concluir e acessar"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // ── STEP: escolha de role (pulado no fluxo do CRM) ──────────────────────
@@ -205,7 +254,7 @@ function OnboardingForm({ variant }: { variant: OnboardingVariant }) {
   if (step === "company") {
     const subsegments = segment ? (SUBSEGMENTS[segment] ?? []) : [];
     const canNext = companyName.trim() && segment && subsegment && teamSize;
-    const copy = COMPANY_COPY[variant];
+    const copy = COMPANY_COPY[variant === "membro" ? "generic" : variant];
 
     return (
       <div className="min-h-screen bg-gray-950 text-white p-6">

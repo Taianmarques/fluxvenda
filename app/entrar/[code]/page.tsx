@@ -41,7 +41,7 @@ export default function EntrarCodigoPage() {
       });
       const data = await res.json().catch(() => ({} as { error?: string }));
       if (!res.ok) throw new Error(data.error ?? "Erro ao entrar na equipe. Tente novamente.");
-      router.push("/dashboard");
+      router.push("/onboarding/membro");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao entrar na equipe.");
       setJoining(false);
