@@ -232,24 +232,27 @@ export function CrmSidebar({ agentId, agents, allowedPages }: {
           </select>
         </div>
       )}
-      <nav className="flex overflow-x-auto px-2 py-2 gap-1" style={{ scrollbarWidth: "none" }}>
-        {FLAT_NAV.map(item => {
-          const active = isActive(item);
-          return (
-            <Link
-              key={item.label}
-              href={item.href}
-              onClick={() => { if (pathname !== item.href) setNavigatingTo(item.href); }}
-              className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-[10px] font-medium flex-shrink-0 transition-colors ${
-                active ? "text-blue-400 bg-blue-500/10" : "text-gray-400"
-              }`}
-            >
-              <item.icon size={17} />
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
+      <div className="flex items-center">
+        <nav className="flex-1 flex overflow-x-auto px-2 py-2 gap-1" style={{ scrollbarWidth: "none" }}>
+          {FLAT_NAV.map(item => {
+            const active = isActive(item);
+            return (
+              <Link
+                key={item.label}
+                href={item.href}
+                onClick={() => { if (pathname !== item.href) setNavigatingTo(item.href); }}
+                className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-[10px] font-medium flex-shrink-0 transition-colors ${
+                  active ? "text-blue-400 bg-blue-500/10" : "text-gray-400"
+                }`}
+              >
+                <item.icon size={17} />
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+        <NotificationsButton compact />
+      </div>
     </div>
 
     {/* Sidebar vertical — desktop, itens agrupados por categoria com dropdown */}

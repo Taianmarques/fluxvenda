@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, BellRing } from "lucide-react";
+import { Bell, BellOff, BellRing } from "lucide-react";
 
 // Botão de ativar web push (OneSignal) — pede a permissão só no clique, nunca no carregamento.
 // O SDK já foi carregado e o usuário vinculado pelo OneSignalInit no layout.
-export function NotificationsButton() {
+// `compact`: só o sininho, pra barra horizontal do CRM no celular.
+export function NotificationsButton({ compact = false }: { compact?: boolean }) {
   const [status, setStatus] = useState<"default" | "granted" | "denied" | "unsupported">("default");
 
   useEffect(() => {
@@ -26,6 +27,26 @@ export function NotificationsButton() {
   }
 
   if (status === "unsupported" || !process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID) return null;
+
+  if (compact) {
+    if (status === "granted") {
+      return (
+        <span className="p-2 flex-shrink-0" title="Notificações ativas">
+          <BellRing size={17} className="text-green-500" />
+        </span>
+      );
+    }
+    return (
+      <button
+        onClick={ativar}
+        title={status === "denied" ? "Notificações bloqueadas — libere nas permissões do navegador" : "Ativar notificações"}
+        className="p-2 flex-shrink-0 text-gray-400 hover:text-white"
+        aria-label="Ativar notificações"
+      >
+        {status === "denied" ? <BellOff size={17} /> : <Bell size={17} />}
+      </button>
+    );
+  }
 
   if (status === "granted") {
     return (
