@@ -3,15 +3,23 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useUser } from "@clerk/nextjs";
+import { Link2 } from "lucide-react";
 
 export default function EntrarPage() {
   const router = useRouter();
+  const { isSignedIn } = useUser();
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   async function handleJoin() {
     if (!code.trim()) return;
+    // Sem conta ainda: cria o acesso e cai direto na página do convite, que completa a entrada
+    if (!isSignedIn) {
+      router.push(`/sign-up?redirect_url=${encodeURIComponent(`/entrar/${code.trim()}?auto=1`)}`);
+      return;
+    }
     setLoading(true); setError("");
     try {
       const res = await fetch("/api/equipe/entrar", {
@@ -19,11 +27,12 @@ export default function EntrarPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ inviteCode: code.trim() }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({} as { error?: string }));
       if (!res.ok) throw new Error(data.error ?? "Código inválido");
       router.push("/dashboard");
-    } catch (e: any) {
-      setError(e.message); setLoading(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Código inválido");
+      setLoading(false);
     }
   }
 
@@ -31,7 +40,7 @@ export default function EntrarPage() {
     <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center px-4">
       <div className="w-full max-w-md space-y-8 text-center">
         <div className="space-y-3">
-          <div className="w-20 h-20 rounded-3xl bg-blue-900/40 border border-blue-700 flex items-center justify-center text-4xl mx-auto">🔗</div>
+          <div className="w-20 h-20 rounded-3xl bg-blue-900/40 border border-blue-700 flex items-center justify-center mx-auto"><Link2 size={36} className="text-blue-300" /></div>
           <h1 className="text-2xl font-bold">Entrar em uma equipe</h1>
           <p className="text-gray-400 text-sm">Peça ao seu gestor o link ou código de convite da equipe.</p>
         </div>
