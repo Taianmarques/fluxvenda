@@ -741,6 +741,7 @@ model AgentConfig {
   phoneCalls           PhoneCall[]
   pipelines            Pipeline[]
   leadStatuses         LeadStatus[]
+  etiquetas            Etiqueta[]
   appointments         Appointment[]
   professionals        Professional[]
   services             Service[]
@@ -1197,6 +1198,23 @@ model LeadStatus {
   conversations Conversation[]
 }
 
+// Etiqueta estilo WhatsApp Business — um contato pode ter várias ao mesmo tempo
+// (diferente do LeadStatus, que é um só por conversa)
+model Etiqueta {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  agentConfigId String
+  agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id], onDelete: Cascade)
+
+  nome String
+  cor  String @default("#6b7280")
+
+  conversations Conversation[]
+
+  @@index([agentConfigId])
+}
+
 model Conversation {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
@@ -1229,6 +1247,9 @@ model Conversation {
   // pode ver e assumir). Quem atribui/quando depende do leadDistributionMode do AgentConfig.
   assignedToId String?
   assignedTo   Profile? @relation("AssignedConversations", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  // Etiquetas estilo WhatsApp Business — várias por contato, cadastradas por agente
+  etiquetas Etiqueta[]
 
   followupCount  Int       @default(0)
   lastFollowupAt DateTime?

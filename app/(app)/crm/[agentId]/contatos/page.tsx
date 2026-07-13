@@ -38,19 +38,28 @@ async function ContatosPageContent({ params }: { params: Promise<{ agentId: stri
     );
   }
 
-  const conversations = await prisma.conversation.findMany({
-    where: {
-      agentConfigId: config.id,
-      // Atendente vê os contatos das conversas dele (mesma regra da caixa de entrada)
-      ...(isManager ? {} : { OR: [{ assignedToId: user.id }, { assignedToId: null }] }),
-    },
-    orderBy: { updatedAt: "desc" },
-    include: {
-      leadStatus: { select: { name: true, color: true } },
-      opportunities: { select: { dealValue: true, wonAt: true } },
-      messages: { where: { role: { not: "note" } }, orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } },
-    },
-  });
+  const [conversations, etiquetas] = await Promise.all([
+    prisma.conversation.findMany({
+      where: {
+        agentConfigId: config.id,
+        // Atendente vê os contatos das conversas dele (mesma regra da caixa de entrada)
+        ...(isManager ? {} : { OR: [{ assignedToId: user.id }, { assignedToId: null }] }),
+      },
+      orderBy: { updatedAt: "desc" },
+      include: {
+        leadStatus: { select: { name: true, color: true } },
+        opportunities: { select: { dealValue: true, wonAt: true } },
+        messages: { where: { role: { not: "note" } }, orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } },
+        assignedTo: { select: { name: true } },
+        etiquetas: { select: { id: true, nome: true, cor: true } },
+      },
+    }),
+    prisma.etiqueta.findMany({
+      where: { agentConfigId: config.id },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, nome: true, cor: true },
+    }),
+  ]);
 
   // Um contato por número — se houver mais de uma conversa, fica a de interação mais recente
   const byNumber = new Map<string, Contato>();
@@ -64,8 +73,10 @@ async function ContatosPageContent({ params }: { params: Promise<{ agentId: stri
       leadStatusColor: c.leadStatus?.color ?? null,
       totalGanho: c.opportunities.filter(o => o.wonAt).reduce((s, o) => s + o.dealValue, 0),
       lastMessageAt: c.messages[0]?.createdAt.toISOString() ?? null,
+      atendenteNome: c.assignedTo?.name ?? null,
+      etiquetas: c.etiquetas,
     });
   }
 
-  return <ContatosClient agentId={config.id} contatos={Array.from(byNumber.values())} />;
+  return <ContatosClient agentId={config.id} contatos={Array.from(byNumber.values())} etiquetas={etiquetas} />;
 }
