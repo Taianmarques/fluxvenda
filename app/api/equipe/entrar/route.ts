@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(req: NextRequest) {
@@ -21,6 +21,21 @@ export async function POST(req: NextRequest) {
     if (existing) {
       if (existing.teamId === team.id) return NextResponse.json({ ok: true, alreadyMember: true });
       return NextResponse.json({ error: "Você já faz parte de uma equipe" }, { status: 400 });
+    }
+
+    // Convidado que acabou de criar a conta ainda não tem Profile (ele nasce no onboarding) —
+    // sem essa linha o create abaixo estoura a FK de TeamMember.profileId. Cria o mínimo com
+    // os dados do Clerk; o onboarding completa o resto depois (nome, telefone, papel).
+    const profile = await prisma.profile.findUnique({ where: { id: userId } });
+    if (!profile) {
+      const user = await currentUser();
+      await prisma.profile.create({
+        data: {
+          id: userId,
+          email: user?.emailAddresses[0]?.emailAddress ?? `${userId}@placeholder.com`,
+          name: [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "Usuário",
+        },
+      });
     }
 
     await prisma.teamMember.create({
