@@ -98,7 +98,7 @@ export function AgendarClient({ agentId, businessName, whatsappNumber, logo, ser
         setStep("confirmado");
         // Igual ao catálogo: já cai na conversa do WhatsApp da empresa com a confirmação.
         // Se o navegador bloquear o popup, o botão da tela de confirmação faz o mesmo.
-        abrirWhatsApp(data.appointment);
+        abrirWhatsApp();
       } else if (res.status === 409) {
         setErro("Este horário acabou de ser preenchido. Escolha outro.");
         setStep("horario");
@@ -112,13 +112,11 @@ export function AgendarClient({ agentId, businessName, whatsappNumber, logo, ser
     }
   }
 
-  function abrirWhatsApp(c: Confirmado) {
+  // Abre a conversa sem mensagem pronta — a confirmação enviada pela empresa já está lá,
+  // então texto pré-preenchido só duplicaria a informação (e acionaria a IA à toa)
+  function abrirWhatsApp() {
     if (!whatsappNumber) return;
-    const dt = new Date(c.scheduledAt);
-    const quando = dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) +
-      " às " + dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-    const msg = `Olá! Acabei de agendar pelo site: ${c.serviceName ? `${c.serviceName} ` : ""}em ${quando}${c.professionalName ? ` com ${c.professionalName}` : ""}. Meu nome é ${nome.trim()}.`;
-    window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(msg)}`, "_blank");
+    window.open(`https://wa.me/${whatsappNumber}`, "_blank");
   }
 
   function voltar() {
@@ -309,7 +307,7 @@ export function AgendarClient({ agentId, businessName, whatsappNumber, logo, ser
             </div>
             {whatsappNumber && (
               <button
-                onClick={() => abrirWhatsApp(confirmado)}
+                onClick={abrirWhatsApp}
                 className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white font-semibold rounded-2xl px-5 py-3 text-sm transition-colors"
               >
                 <MessageCircle size={16} />
