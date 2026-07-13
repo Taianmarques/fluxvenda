@@ -25,9 +25,10 @@ export type ChannelMediaType = "image" | "video" | "audio" | "document";
 
 // Adapter de envio: cada webhook (UazAPI, Cloud API) fornece sua própria implementação —
 // o pipeline abaixo nunca fala diretamente com a UazAPI nem com o Graph API da Meta.
+// Retornam o id da mensagem no provedor (quando disponível) pra habilitar citação nativa.
 export type ChannelAdapter = {
-  sendText: (phone: string, text: string) => Promise<void>;
-  sendMedia: (phone: string, type: ChannelMediaType, base64: string, opts?: { caption?: string; fileName?: string }) => Promise<void>;
+  sendText: (phone: string, text: string) => Promise<string | null>;
+  sendMedia: (phone: string, type: ChannelMediaType, base64: string, opts?: { caption?: string; fileName?: string }) => Promise<string | null>;
 };
 
 export type IncomingMessage = {
@@ -38,6 +39,8 @@ export type IncomingMessage = {
   mediaUrl: string | null;
   mediaType: string | null;
   imageUrl: string | null;
+  waMessageId?: string | null;       // id da mensagem no provedor (UazAPI messageid / Cloud wamid)
+  quotedWaMessageId?: string | null; // id da mensagem citada, quando o cliente responde citando
 };
 
 async function buildSchedulingContext(agentConfigId: string, requisitosAgendamento?: string, restricoesAgendamento?: string, atendimentoEspecial?: { enabled: boolean; descricao: string }): Promise<string> {
@@ -934,7 +937,17 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
   });
   const history = recentMessages.reverse();
 
-  const savedMsg = await prisma.message.create({ data: { conversationId: conversation.id, role: "user", content: text, mediaUrl, mediaType } });
+  // Cliente respondeu citando uma mensagem: resolve pra nossa Message pelo id do provedor
+  const replyToId = msg.quotedWaMessageId
+    ? (await prisma.message.findFirst({
+        where: { conversationId: conversation.id, waMessageId: msg.quotedWaMessageId },
+        select: { id: true },
+      }))?.id ?? null
+    : null;
+
+  const savedMsg = await prisma.message.create({
+    data: { conversationId: conversation.id, role: "user", content: text, mediaUrl, mediaType, waMessageId: msg.waMessageId ?? null, replyToId },
+  });
   emitChatEvent(config.id, conversation.id); // push em tempo real pro CRM
 
   // Conversa nova + rodízio ativo: já nasce atribuída a um atendente, em ordem
@@ -1110,7 +1123,7 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
     logTokenUsage({ teamId: config.teamId, provider: "openai", model: "gpt-4o-mini", feature: "whatsapp_agent", ...result.usage });
   }
 
-  await prisma.message.create({ data: { conversationId: conversation.id, role: "assistant", content: reply } });
+  const assistantMsg = await prisma.message.create({ data: { conversationId: conversation.id, role: "assistant", content: reply } });
   emitChatEvent(config.id, conversation.id);
 
   // IA decide quando o lead está qualificado e atribui a um atendente (rodízio), se ainda não tiver dono
@@ -1127,15 +1140,21 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
   // a porcentagem decide a chance de sair em áudio; se o TTS falhar, cai pro texto.
   const sendAsAudio = config.whatsappVoiceEnabled && config.elevenlabsApiKey && Math.random() * 100 < config.whatsappVoicePercent;
 
+  let providerId: string | null = null;
   if (sendAsAudio) {
     try {
       const audioBuffer = await textToSpeech(reply, { apiKey: config.elevenlabsApiKey!, voiceId: config.elevenlabsVoiceId ?? undefined });
-      await adapter.sendMedia(contactNumber, "audio", audioBuffer.toString("base64"));
+      providerId = await adapter.sendMedia(contactNumber, "audio", audioBuffer.toString("base64"));
     } catch (err) {
       console.error("[whatsapp-inbound] erro ao enviar áudio ElevenLabs, caindo para texto:", err);
-      await adapter.sendText(contactNumber, reply);
+      providerId = await adapter.sendText(contactNumber, reply);
     }
   } else {
-    await adapter.sendText(contactNumber, reply);
+    providerId = await adapter.sendText(contactNumber, reply);
+  }
+
+  // Guarda o id do provedor pra resposta da IA poder ser citada depois (pelo cliente ou pelo atendente)
+  if (providerId) {
+    await prisma.message.update({ where: { id: assistantMsg.id }, data: { waMessageId: providerId } }).catch(() => {});
   }
 }

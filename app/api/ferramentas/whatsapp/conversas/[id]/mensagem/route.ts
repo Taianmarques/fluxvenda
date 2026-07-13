@@ -55,6 +55,7 @@ const schema = z.object({
     type: z.enum(["image", "video", "audio", "document"]),
     fileName: z.string().optional(),
   }).optional(),
+  replyToMessageId: z.string().optional(), // responder citando (estilo WhatsApp)
 }).refine(d => d.content || d.media, { message: "content ou media é obrigatório" });
 
 // Envia uma mensagem (texto e/ou mídia) como atendente humano — assume a conversa e pausa o agente de IA
@@ -80,6 +81,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   let mediaType: string | null = null;
   let content = body.data.content ?? "";
 
+  // Mensagem citada — guard de conversa impede citar mensagem de outro chat. Sem waMessageId
+  // (mensagens antigas), a citação sai só no CRM: envia sem replyid, mas grava replyToId.
+  const replyTarget = body.data.replyToMessageId
+    ? await prisma.message.findFirst({ where: { id: body.data.replyToMessageId, conversationId: id } })
+    : null;
+  const replyId = replyTarget?.waMessageId ?? undefined;
+  let waMessageId: string | null = null;
+
   if (isInstagram) {
     if (!content) return NextResponse.json({ error: "Instagram DM só suporta texto" }, { status: 400 });
     const igConn = await prisma.instagramConnection.findUnique({ where: { agentConfigId: conversation.agentConfigId } });
@@ -103,11 +112,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         sent = await sendMediaAsTeam(config.uazapiToken, conversation.contactNumber, type, base64, {
           caption: body.data.content ? `${signaturePrefix}${body.data.content}` : (signaturePrefix || undefined),
           fileName,
+          replyId,
         });
       } catch (err) {
         console.error("[mensagem] erro ao enviar mídia:", err);
         return NextResponse.json({ error: "Não foi possível enviar a mídia" }, { status: 502 });
       }
+      waMessageId = sent.messageid ?? null;
 
       try {
         const media = await downloadMessageMedia(config.uazapiToken, sent.messageid);
@@ -119,12 +130,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
       if (!content) content = fileName ? `[${type}] ${fileName}` : `[${type}]`;
     } else {
-      await sendWhatsAppTextAsTeam(config.uazapiToken, conversation.contactNumber, `${signaturePrefix}${content}`);
+      waMessageId = await sendWhatsAppTextAsTeam(config.uazapiToken, conversation.contactNumber, `${signaturePrefix}${content}`, replyId);
     }
   }
 
   const message = await prisma.message.create({
-    data: { conversationId: id, role: "human", content, mediaUrl, mediaType, senderId: userId },
+    data: { conversationId: id, role: "human", content, mediaUrl, mediaType, senderId: userId, waMessageId, replyToId: replyTarget?.id ?? null },
   });
   emitChatEvent(conversation.agentConfigId, id); // outros atendentes veem na hora
 

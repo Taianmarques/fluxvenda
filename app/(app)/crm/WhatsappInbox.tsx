@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   MessageCircle, Search, X, Trophy, Lock, Unlock, Bot, User, UserPlus,
   FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap, StickyNote, ArrowRightLeft, HandCoins, CalendarClock, ListFilter, Instagram, ArrowLeft,
+  Reply, Forward, ChevronDown,
 } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { EmojiPicker } from "./EmojiPicker";
@@ -42,6 +43,8 @@ type Message = {
   mediaType?: string | null;
   createdAt: string;
   sender?: { name: string } | null;
+  forwarded?: boolean;
+  replyTo?: { id: string; content: string; role: string; mediaType?: string | null; sender?: { name: string } | null } | null;
 };
 
 type MediaKind = "image" | "video" | "audio" | "document";
@@ -200,6 +203,13 @@ export function WhatsappInbox({
   const [showQuickReplies, setShowQuickReplies] = useState(false);
   const [noteMode, setNoteMode] = useState(false);
   const [showTransferMenu, setShowTransferMenu] = useState(false);
+  // Responder/encaminhar estilo WhatsApp
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [forwardingMessage, setForwardingMessage] = useState<Message | null>(null);
+  const [msgMenuId, setMsgMenuId] = useState<string | null>(null);
+  const [forwardTargets, setForwardTargets] = useState<string[]>([]);
+  const [forwardSearch, setForwardSearch] = useState("");
+  const [forwarding, setForwarding] = useState(false);
   const [showOpportunities, setShowOpportunities] = useState(false);
   const [showScheduled, setShowScheduled] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -379,6 +389,8 @@ export function WhatsappInbox({
     selectedIdRef.current = selectedId;
     detailFingerprintRef.current = ""; // nova conversa sempre renderiza a primeira carga
     nearBottomRef.current = true;
+    setReplyingTo(null); // resposta em andamento não atravessa pra outra conversa
+    setMsgMenuId(null);
     if (!selectedId) { setDetail(null); setScheduledMessages([]); return; }
     refreshDetail(selectedId);
     refreshScheduled(selectedId);
@@ -515,8 +527,10 @@ export function WhatsappInbox({
     if ((!input.trim() && !attachment) || !selectedId || sending) return;
     const content = input.trim();
     const media = attachment;
+    const replyTo = replyingTo;
     setInput("");
     setAttachment(null);
+    setReplyingTo(null);
     setSending(true);
     try {
       await fetch(`/api/ferramentas/whatsapp/conversas/${selectedId}/mensagem`, {
@@ -525,6 +539,7 @@ export function WhatsappInbox({
         body: JSON.stringify({
           ...(content && { content }),
           ...(media && { media: { base64: media.base64, type: media.type, fileName: media.fileName } }),
+          ...(replyTo && { replyToMessageId: replyTo.id }),
         }),
       });
       await refreshDetail(selectedId);
@@ -554,6 +569,45 @@ export function WhatsappInbox({
   function handlePrimaryAction() {
     if (noteMode) handleSendNote();
     else handleSend();
+  }
+
+  // Nome mostrado no bloco de citação: quem escreveu a mensagem citada
+  function replyAuthorLabel(m: { role: string; sender?: { name: string } | null }): string {
+    if (m.role === "assistant") return agentName;
+    if (m.role === "human") return m.sender?.name ?? "Atendente";
+    return detail?.contactName || detail?.contactNumber || "Cliente";
+  }
+
+  function replySnippet(m: { content: string; mediaType?: string | null }): string {
+    if (m.mediaType && (!m.content || m.content.startsWith("["))) return "Mídia";
+    return m.content;
+  }
+
+  function scrollToMessage(messageId: string) {
+    document.getElementById(`msg-${messageId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  async function handleForward() {
+    if (!forwardingMessage || !selectedId || forwardTargets.length === 0 || forwarding) return;
+    setForwarding(true);
+    try {
+      const res = await fetch(`/api/ferramentas/whatsapp/conversas/${selectedId}/encaminhar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageId: forwardingMessage.id, targetConversationIds: forwardTargets }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error ?? "Não foi possível encaminhar.");
+        return;
+      }
+      setForwardingMessage(null);
+      setForwardTargets([]);
+      setForwardSearch("");
+      await refreshList();
+    } finally {
+      setForwarding(false);
+    }
   }
 
   async function handleRetomar() {
@@ -948,18 +1002,60 @@ export function WhatsappInbox({
                     }
                     const isOutgoing = m.role === "assistant" || m.role === "human";
                     return (
-                      <div key={m.id} className={`flex ${isOutgoing ? "justify-end" : "justify-start"}`}>
-                        <div className={`max-w-[70%] rounded-lg px-3 py-2 text-sm ${
+                      <div key={m.id} id={`msg-${m.id}`} className={`flex ${isOutgoing ? "justify-end" : "justify-start"}`}>
+                        <div className={`group relative max-w-[70%] rounded-lg px-3 py-2 text-sm ${
                           m.role === "human" ? t.bubbleHuman :
                           m.role === "assistant" ? t.bubbleAssistant :
                           t.bubbleIncoming
                         }`}>
-                          {m.role === "human" && <p className="text-[10px] opacity-70 mb-0.5 flex items-center gap-1"><User size={10} /> {m.sender?.name ?? "Atendente"}</p>}
-                          {m.role === "assistant" && <p className="text-[10px] opacity-70 mb-0.5 flex items-center gap-1"><Bot size={10} /> {agentName}</p>}
+                          {/* Menu da mensagem (responder/encaminhar) — hover no desktop, sempre sutil no mobile */}
+                          <button
+                            onClick={() => setMsgMenuId(msgMenuId === m.id ? null : m.id)}
+                            className="absolute top-1 right-1 p-0.5 rounded opacity-40 md:opacity-0 md:group-hover:opacity-100 hover:bg-black/20 transition-opacity"
+                            aria-label="Ações da mensagem"
+                          >
+                            <ChevronDown size={14} />
+                          </button>
+                          {msgMenuId === m.id && (
+                            <>
+                              <div className="fixed inset-0 z-10" onClick={() => setMsgMenuId(null)} />
+                              <div className={`absolute z-20 top-6 ${isOutgoing ? "right-1" : "left-1"} w-40 rounded-xl border shadow-xl p-1 space-y-0.5 ${theme === "dark" ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}`}>
+                                <button
+                                  onClick={() => { setReplyingTo(m); setMsgMenuId(null); }}
+                                  className={`w-full flex items-center gap-2 text-left text-sm px-3 py-2 rounded-lg ${theme === "dark" ? "text-gray-200 hover:bg-gray-800" : "text-gray-700 hover:bg-gray-100"}`}
+                                >
+                                  <Reply size={14} /> Responder
+                                </button>
+                                <button
+                                  onClick={() => { setForwardingMessage(m); setForwardTargets([]); setForwardSearch(""); setMsgMenuId(null); }}
+                                  className={`w-full flex items-center gap-2 text-left text-sm px-3 py-2 rounded-lg ${theme === "dark" ? "text-gray-200 hover:bg-gray-800" : "text-gray-700 hover:bg-gray-100"}`}
+                                >
+                                  <Forward size={14} /> Encaminhar
+                                </button>
+                              </div>
+                            </>
+                          )}
+
+                          {m.forwarded && (
+                            <p className="text-[10px] opacity-60 mb-0.5 flex items-center gap-1 italic"><Forward size={10} /> Encaminhada</p>
+                          )}
+                          {m.replyTo && (
+                            <button
+                              onClick={() => scrollToMessage(m.replyTo!.id)}
+                              className="w-full text-left mb-1 rounded border-l-2 border-green-400 bg-black/20 px-2 py-1"
+                            >
+                              <p className="text-[10px] font-semibold opacity-80">{replyAuthorLabel(m.replyTo)}</p>
+                              <p className="text-xs opacity-70 line-clamp-2">
+                                {replySnippet(m.replyTo) === "Mídia" ? <span className="italic">Mídia</span> : replySnippet(m.replyTo)}
+                              </p>
+                            </button>
+                          )}
+                          {m.role === "human" && <p className="text-[10px] opacity-70 mb-0.5 flex items-center gap-1 pr-5"><User size={10} /> {m.sender?.name ?? "Atendente"}</p>}
+                          {m.role === "assistant" && <p className="text-[10px] opacity-70 mb-0.5 flex items-center gap-1 pr-5"><Bot size={10} /> {agentName}</p>}
                           {m.mediaUrl && m.mediaType ? (
                             <MediaContent mediaUrl={m.mediaUrl} mediaType={m.mediaType} content={m.content} />
                           ) : (
-                            <p className="whitespace-pre-wrap">{m.content}</p>
+                            <p className="whitespace-pre-wrap pr-4">{m.content}</p>
                           )}
                           <p className="text-[10px] opacity-60 mt-1 text-right">{new Date(m.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</p>
                         </div>
@@ -971,6 +1067,18 @@ export function WhatsappInbox({
 
                 <div className={`p-4 border-t ${t.inputBar}`}>
                   {attachError && <p className="text-xs text-red-400 mb-2">{attachError}</p>}
+                  {replyingTo && (
+                    <div className={`flex items-center gap-2 mb-2 p-2 rounded-lg border border-l-2 border-l-green-500 ${t.inputField}`}>
+                      <Reply size={14} className="opacity-60 flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-semibold opacity-70">Respondendo a {replyAuthorLabel(replyingTo)}</p>
+                        <p className="text-xs truncate opacity-70">
+                          {replySnippet(replyingTo) === "Mídia" ? <span className="italic">Mídia</span> : replySnippet(replyingTo)}
+                        </p>
+                      </div>
+                      <button onClick={() => setReplyingTo(null)} className="text-gray-500 hover:text-red-400 px-1 flex-shrink-0"><X size={14} /></button>
+                    </div>
+                  )}
                   {attachment && (
                     <div className={`flex items-center gap-2 mb-2 p-2 rounded-lg border ${t.inputField}`}>
                       {attachment.type === "image" ? (
@@ -1136,6 +1244,69 @@ export function WhatsappInbox({
                 className="text-sm font-medium bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white rounded-xl px-4 py-2"
               >
                 {encerrando ? "Encerrando..." : "Encerrar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de encaminhar mensagem */}
+      {forwardingMessage && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className={`w-full max-w-sm rounded-2xl border p-5 space-y-3 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}>
+            <div className="flex items-center justify-between">
+              <p className="font-semibold flex items-center gap-2"><Forward size={16} /> Encaminhar mensagem</p>
+              <button onClick={() => setForwardingMessage(null)} className="text-gray-500 hover:text-gray-300"><X size={16} /></button>
+            </div>
+            <p className={`text-xs truncate rounded-lg border-l-2 border-green-500 px-2 py-1 ${theme === "dark" ? "bg-gray-950 text-gray-400" : "bg-gray-50 text-gray-500"}`}>
+              {replySnippet(forwardingMessage) === "Mídia" ? <span className="italic">Mídia</span> : replySnippet(forwardingMessage)}
+            </p>
+            <input
+              value={forwardSearch}
+              onChange={e => setForwardSearch(e.target.value)}
+              placeholder="Buscar contato..."
+              className={`w-full rounded-xl border px-3 py-2 text-sm focus:outline-none ${theme === "dark" ? "bg-gray-950 border-gray-800" : "bg-gray-50 border-gray-200"}`}
+            />
+            <div className="max-h-64 overflow-y-auto space-y-1">
+              {conversations
+                .filter(c => c.id !== selectedId && !c.contactNumber.startsWith("ig_"))
+                .filter(c => {
+                  const q = forwardSearch.trim().toLowerCase();
+                  return !q || (c.contactName ?? "").toLowerCase().includes(q) || c.contactNumber.includes(q);
+                })
+                .slice(0, 50)
+                .map(c => {
+                  const checked = forwardTargets.includes(c.id);
+                  const disabled = !checked && forwardTargets.length >= 10;
+                  return (
+                    <label
+                      key={c.id}
+                      className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors ${disabled ? "opacity-40" : "cursor-pointer"} ${
+                        checked
+                          ? "border-green-500 bg-green-500/10"
+                          : theme === "dark" ? "border-gray-800 hover:border-gray-600" : "border-gray-200 hover:border-gray-400"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={disabled}
+                        onChange={() => setForwardTargets(prev => checked ? prev.filter(x => x !== c.id) : [...prev, c.id])}
+                        className="w-3.5 h-3.5"
+                      />
+                      <span className="truncate">{c.contactName || c.contactNumber}</span>
+                    </label>
+                  );
+                })}
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setForwardingMessage(null)} className="text-sm text-gray-400 hover:text-gray-200 px-3 py-2">Cancelar</button>
+              <button
+                onClick={handleForward}
+                disabled={forwardTargets.length === 0 || forwarding}
+                className="text-sm font-medium bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white rounded-xl px-4 py-2"
+              >
+                {forwarding ? "Encaminhando..." : `Encaminhar (${forwardTargets.length})`}
               </button>
             </div>
           </div>

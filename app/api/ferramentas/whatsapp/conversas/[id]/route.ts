@@ -14,7 +14,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     include: {
       // Últimas 100 mensagens (desc + take + reverse) — o polling de 3s do chat não pode
       // carregar o histórico inteiro de conversas longas a cada tick
-      messages: { orderBy: { createdAt: "desc" }, take: 100, include: { sender: { select: { name: true } } } },
+      messages: {
+        orderBy: { createdAt: "desc" },
+        take: 100,
+        include: {
+          sender: { select: { name: true } },
+          replyTo: { select: { id: true, content: true, role: true, mediaType: true, sender: { select: { name: true } } } },
+        },
+      },
       opportunities: { orderBy: { createdAt: "asc" } },
     },
   });

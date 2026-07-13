@@ -109,7 +109,11 @@ async function handleOneMessage(
 
   await processIncomingMessage(
     config,
-    { text, caption, contactNumber, contactName, mediaUrl, mediaType, imageUrl },
+    {
+      text, caption, contactNumber, contactName, mediaUrl, mediaType, imageUrl,
+      waMessageId: message.id ?? null,             // wamid da Meta
+      quotedWaMessageId: message.context?.id ?? null, // presente quando o cliente responde citando
+    },
     adapter,
     { enforceSessionWindow: true }
   );

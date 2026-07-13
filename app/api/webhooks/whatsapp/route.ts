@@ -68,15 +68,23 @@ export async function POST(req: NextRequest) {
   const contactNumber: string = String(message.sender_pn || message.chatid).split("@")[0];
   const contactName: string | undefined = message.senderName || body.chat?.wa_contactName || body.chat?.name;
 
+  // Id da mensagem no provedor + id da mensagem citada (quando o cliente responde citando).
+  // Os campos do quoted variam por versão da UazAPI — extração defensiva.
+  const waMessageId: string | null = message.id || message.messageid || null;
+  const quotedWaMessageId: string | null =
+    message.quoted?.id ?? message.quoted?.messageid ?? (typeof message.quoted === "string" ? message.quoted : null)
+    ?? message.quotedMsgId ?? message.reply_id ?? message.replyid
+    ?? message.content?.contextInfo?.stanzaId ?? null;
+
   const uazapiToken = config.uazapiToken;
   const adapter: ChannelAdapter = {
     sendText: (phone, t) => sendWhatsAppTextAsTeam(uazapiToken, phone, t),
     // "audio" vira "myaudio" na UazAPI — é o que faz a mensagem sair como nota de voz nativa,
     // em vez de anexo encaminhado (ver lib/whatsapp.ts MediaType).
-    sendMedia: async (phone, type, base64, opts) => { await sendMediaAsTeam(uazapiToken, phone, type === "audio" ? "myaudio" : type, base64, opts); },
+    sendMedia: async (phone, type, base64, opts) => (await sendMediaAsTeam(uazapiToken, phone, type === "audio" ? "myaudio" : type, base64, opts))?.messageid ?? null,
   };
 
-  await processIncomingMessage(config, { text, caption, contactNumber, contactName, mediaUrl, mediaType, imageUrl }, adapter);
+  await processIncomingMessage(config, { text, caption, contactNumber, contactName, mediaUrl, mediaType, imageUrl, waMessageId, quotedWaMessageId }, adapter);
 
   return NextResponse.json({ ok: true });
 }

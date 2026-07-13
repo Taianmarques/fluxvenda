@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { X, Bot, User as UserIcon, StickyNote } from "lucide-react";
+import { X, Bot, User as UserIcon, StickyNote, Forward } from "lucide-react";
 
 type Message = {
   id: string;
@@ -11,6 +11,8 @@ type Message = {
   mediaType?: string | null;
   createdAt: string;
   sender?: { name: string } | null;
+  forwarded?: boolean;
+  replyTo?: { id: string; content: string; role: string; mediaType?: string | null; sender?: { name: string } | null } | null;
 };
 
 type ConversationDetail = {
@@ -105,6 +107,19 @@ export function ConversationPopup({ conversationId, onClose, dark }: { conversat
                       dark ? "bg-[#202c33] text-gray-100" : "bg-white text-gray-900"
                     }`}
                   >
+                    {m.forwarded && (
+                      <p className="text-[10px] opacity-60 mb-0.5 flex items-center gap-1 italic"><Forward size={10} /> Encaminhada</p>
+                    )}
+                    {m.replyTo && (
+                      <div className="mb-1 rounded border-l-2 border-green-400 bg-black/20 px-2 py-1">
+                        <p className="text-[10px] font-semibold opacity-80">
+                          {m.replyTo.role === "assistant" ? "Agente" : m.replyTo.role === "human" ? (m.replyTo.sender?.name ?? "Atendente") : (detail?.contactName || detail?.contactNumber || "Cliente")}
+                        </p>
+                        <p className="text-xs opacity-70 line-clamp-2">
+                          {m.replyTo.mediaType && (!m.replyTo.content || m.replyTo.content.startsWith("[")) ? <span className="italic">Mídia</span> : m.replyTo.content}
+                        </p>
+                      </div>
+                    )}
                     {m.role === "human" && <p className="text-[10px] opacity-70 mb-0.5 flex items-center gap-1"><UserIcon size={10} /> {m.sender?.name ?? "Atendente"}</p>}
                     {m.role === "assistant" && <p className="text-[10px] opacity-70 mb-0.5 flex items-center gap-1"><Bot size={10} /> Agente</p>}
                     {m.mediaUrl ? (

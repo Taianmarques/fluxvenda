@@ -7,7 +7,9 @@ function formatPhone(phone: string): string {
   return digits.startsWith("55") ? digits : `55${digits}`;
 }
 
-async function sendText(url: string, token: string, phone: string, text: string): Promise<void> {
+// `replyId` = messageid da mensagem citada (reply nativo do WhatsApp).
+// Retorna o messageid da mensagem enviada (usado pra permitir citações futuras), ou null.
+async function sendText(url: string, token: string, phone: string, text: string, replyId?: string): Promise<string | null> {
   const number = formatPhone(phone);
 
   const res = await fetch(`${url}/send/text`, {
@@ -16,31 +18,35 @@ async function sendText(url: string, token: string, phone: string, text: string)
       "Content-Type": "application/json",
       token,
     },
-    body: JSON.stringify({ number, text }),
+    body: JSON.stringify({ number, text, ...(replyId && { replyid: replyId }) }),
   });
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     console.error(`[whatsapp] Erro ao enviar mensagem: ${res.status} ${body}`);
+    return null;
   }
+
+  const data = await res.json().catch(() => null);
+  return data?.messageid ?? data?.id ?? null;
 }
 
 // Envia pela instância global da plataforma (notificações de onboarding, etc.)
-export async function sendWhatsAppText(phone: string, text: string): Promise<void> {
+export async function sendWhatsAppText(phone: string, text: string): Promise<string | null> {
   if (!UAZAPI_URL || !UAZAPI_TOKEN) {
     console.warn("[whatsapp] UazAPI não configurado — mensagem não enviada");
-    return;
+    return null;
   }
-  await sendText(UAZAPI_URL, UAZAPI_TOKEN, phone, text);
+  return sendText(UAZAPI_URL, UAZAPI_TOKEN, phone, text);
 }
 
 // Envia pela instância própria de uma empresa (agente de atendimento por equipe)
-export async function sendWhatsAppTextAsTeam(token: string, phone: string, text: string): Promise<void> {
+export async function sendWhatsAppTextAsTeam(token: string, phone: string, text: string, replyId?: string): Promise<string | null> {
   if (!UAZAPI_URL || !token) {
     console.warn("[whatsapp] Instância da equipe não configurada — mensagem não enviada");
-    return;
+    return null;
   }
-  await sendText(UAZAPI_URL, token, phone, text);
+  return sendText(UAZAPI_URL, token, phone, text, replyId);
 }
 
 // "audio" = arquivo comum (aparece como anexo encaminhado); "myaudio" = nota de voz nativa
@@ -54,7 +60,7 @@ export async function sendMediaAsTeam(
   phone: string,
   type: MediaType,
   fileBase64: string,
-  options?: { caption?: string; fileName?: string }
+  options?: { caption?: string; fileName?: string; replyId?: string }
 ): Promise<{ messageid: string }> {
   const number = formatPhone(phone);
 
@@ -67,6 +73,7 @@ export async function sendMediaAsTeam(
       file: fileBase64,
       ...(options?.caption && { caption: options.caption }),
       ...(options?.fileName && { docName: options.fileName }),
+      ...(options?.replyId && { replyid: options.replyId }),
     }),
   });
 

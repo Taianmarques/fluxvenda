@@ -1335,6 +1335,15 @@ model Message {
 
   senderId String?  // qual atendente mandou (role "human"), pra CRM multiusuário
   sender   Profile? @relation(fields: [senderId], references: [id], onDelete: SetNull)
+
+  // Reply/encaminhar estilo WhatsApp
+  waMessageId String? // id da mensagem no provedor (UazAPI messageid / Cloud wamid) — habilita citação nativa
+  forwarded   Boolean @default(false)
+  replyToId   String?
+  replyTo     Message?  @relation("MessageReply", fields: [replyToId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  replies     Message[] @relation("MessageReply")
+
+  @@index([conversationId, waMessageId])
 }
 
 // ─── Controle de consumo de tokens de IA ─────────────────────────────────────

@@ -22,8 +22,9 @@ async function graphFetch(url: string, accessToken: string, init?: RequestInit):
   return data;
 }
 
-export async function sendCloudText(phoneNumberId: string, accessToken: string, to: string, text: string): Promise<void> {
-  await graphFetch(`${GRAPH_BASE}/${phoneNumberId}/messages`, accessToken, {
+// Retorna o wamid da mensagem enviada — usado pra permitir citações futuras
+export async function sendCloudText(phoneNumberId: string, accessToken: string, to: string, text: string): Promise<string | null> {
+  const data = await graphFetch(`${GRAPH_BASE}/${phoneNumberId}/messages`, accessToken, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -33,6 +34,7 @@ export async function sendCloudText(phoneNumberId: string, accessToken: string, 
       text: { body: text },
     }),
   });
+  return data?.messages?.[0]?.id ?? null;
 }
 
 export type TemplateComponent = {
@@ -87,11 +89,11 @@ export async function sendCloudMedia(
   type: CloudMediaType,
   base64: string,
   opts?: { caption?: string; mimetype?: string; fileName?: string }
-): Promise<void> {
+): Promise<string | null> {
   const mimetype = opts?.mimetype ?? (type === "audio" ? "audio/mpeg" : type === "image" ? "image/jpeg" : "application/octet-stream");
   const mediaId = await uploadCloudMedia(phoneNumberId, accessToken, base64, mimetype);
 
-  await graphFetch(`${GRAPH_BASE}/${phoneNumberId}/messages`, accessToken, {
+  const data = await graphFetch(`${GRAPH_BASE}/${phoneNumberId}/messages`, accessToken, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -105,6 +107,7 @@ export async function sendCloudMedia(
       },
     }),
   });
+  return data?.messages?.[0]?.id ?? null;
 }
 
 // Baixa uma mídia recebida (áudio, imagem) — diferente da UazAPI, a URL da mídia da Meta
