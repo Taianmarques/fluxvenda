@@ -16,6 +16,7 @@ import { createAsaasCustomer, createAsaasCharge, cancelAsaasCharge, getAsaasPixQ
 import { ensureStoreSlug } from "@/lib/store-slug";
 import { notifyOrderWebhook } from "@/lib/order-webhook";
 import { notifyProfessionalOfAppointment } from "@/lib/appointment-notify";
+import { notifyUsers } from "@/lib/onesignal";
 import { emitChatEvent } from "@/lib/realtime";
 
 type AgentConfigFull = NonNullable<Awaited<ReturnType<typeof prisma.agentConfig.findFirst>>>;
@@ -69,6 +70,36 @@ Quando o cliente quiser agendar algo:
 Você também pode receber, no meio da conversa, um lembrete automático perguntando se o cliente confirma presença num agendamento já marcado:
 - Se o cliente confirmar (ex: "sim", "confirmado", "pode contar comigo"), apenas agradeça brevemente, sem chamar nenhuma ferramenta.
 - Se ele disser que não pode ir ou quer cancelar, use cancelar_agendamento e, na mesma resposta, já ofereça reagendar — pergunte o novo dia/período de preferência (ou, se ele já tiver dito, use consultar_horarios_disponiveis e siga o fluxo normal de agendamento).`;
+}
+
+// Web push pro atendente quando chega mensagem numa conversa em atendimento humano —
+// a IA não vai responder, então alguém precisa ver. Sem atendente vinculado, avisa
+// o gestor e todos os membros da equipe.
+async function notifyHumanTakeoverMessage(
+  config: AgentConfigFull,
+  conversationId: string,
+  assignedToId: string | null,
+  contato: string,
+  texto: string,
+): Promise<void> {
+  let destinatarios: string[];
+  if (assignedToId) {
+    destinatarios = [assignedToId];
+  } else {
+    const team = await prisma.team.findUnique({
+      where: { id: config.teamId },
+      select: { managerId: true, members: { select: { profileId: true } } },
+    });
+    if (!team) return;
+    destinatarios = [team.managerId, ...team.members.map(m => m.profileId)];
+  }
+  const preview = texto.length > 120 ? `${texto.slice(0, 120)}...` : texto;
+  await notifyUsers(
+    destinatarios,
+    `Nova mensagem de ${contato}`,
+    preview || "Mensagem recebida",
+    `${process.env.NEXT_PUBLIC_APP_URL}/crm/${config.id}?c=${conversationId}`,
+  );
 }
 
 // Modo "agendamento por link": em vez de negociar horários na conversa, a IA envia o link
@@ -912,8 +943,13 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
     await assignNextAttendant(config.id, config.teamId, conversation.id);
   }
 
-  // Atendente humano assumiu essa conversa — apenas registra a mensagem, sem o agente responder
-  if (conversation.humanTakeover) return;
+  // Atendente humano assumiu essa conversa — apenas registra a mensagem, sem o agente
+  // responder. Aqui a IA não avisa ninguém respondendo, então dispara web push pro
+  // atendente responsável (ou pra equipe toda, se a conversa ainda não tem dono).
+  if (conversation.humanTakeover) {
+    notifyHumanTakeoverMessage(config, conversation.id, conversation.assignedToId, conversation.contactName ?? contactNumber, text).catch(() => {});
+    return;
+  }
 
   // Debounce: aguarda antes de chamar a IA para contextualizar mensagens enviadas em partes.
   // Se outra mensagem do mesmo contato chegar nesse intervalo, ela é salva no banco e esta

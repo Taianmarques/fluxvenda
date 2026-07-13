@@ -2,6 +2,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { AppSidebar } from "./AppSidebar";
+import { OneSignalInit } from "./OneSignalInit";
 import { getEffectiveProducts, hasProduct } from "@/lib/products";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -53,6 +54,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex flex-col md:flex-row h-dvh bg-gray-950 text-white overflow-hidden">
+      <OneSignalInit userId={user.id} />
       <AppSidebar nav={NAV} profileName={profile.name ?? user.firstName ?? ""} email={user.emailAddresses[0]?.emailAddress ?? ""} />
       <main className="flex-1 overflow-y-auto">{children}</main>
     </div>

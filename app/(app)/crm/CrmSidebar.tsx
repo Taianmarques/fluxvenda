@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { ArrowLeft, ChevronDown, LayoutGrid, Megaphone, TrendingUp, Zap, Settings, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { CRM_CATEGORIES, type CrmPageDef, type CrmPageKey } from "@/lib/crm-nav-config";
+import { NotificationsButton } from "./NotificationsButton";
 
 type NavItem = { href: string; label: string; icon: LucideIcon; isHub?: boolean };
 type NavCategory = { key: string; label: string; variant: "accordion" | "flyout"; items: NavItem[] };
@@ -316,7 +317,8 @@ export function CrmSidebar({ agentId, agents, allowedPages }: {
         ))}
       </nav>
 
-      <div className="px-3 py-4 border-t border-gray-800">
+      <div className="px-3 py-4 border-t border-gray-800 space-y-0.5">
+        <NotificationsButton />
         <Link
           href="/dashboard"
           className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-colors"

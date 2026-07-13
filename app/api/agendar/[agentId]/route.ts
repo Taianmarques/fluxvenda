@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isSlotAvailable, type AvailabilityRule } from "@/lib/scheduling";
 import { notifyProfessionalOfAppointment } from "@/lib/appointment-notify";
+import { notifyUsers } from "@/lib/onesignal";
 import { sendWhatsAppTextAsTeam } from "@/lib/whatsapp";
 import { z } from "zod";
 
@@ -24,6 +25,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
     where: { OR: [{ storeSlug: agentId }, { id: agentId }] },
     select: {
       id: true,
+      teamId: true,
       schedulingEnabled: true,
       slotDurationMinutes: true,
       availability: true,
@@ -143,6 +145,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
 
   // Avisa o profissional no WhatsApp (fire-and-forget)
   notifyProfessionalOfAppointment(appointment.id, "novo");
+
+  // Web push pro gestor da equipe (fire-and-forget)
+  prisma.team.findUnique({ where: { id: config.teamId }, select: { managerId: true } })
+    .then(team => {
+      if (!team) return;
+      const quandoPush = scheduledAt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) +
+        " às " + scheduledAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      return notifyUsers(
+        [team.managerId],
+        "Novo agendamento pelo site",
+        `${body.data.nome} — ${service ? `${service.name} ` : ""}em ${quandoPush}${professional ? ` com ${professional.name}` : ""}`,
+        `${process.env.NEXT_PUBLIC_APP_URL}/crm/${config.id}/agenda`,
+      );
+    })
+    .catch(() => {});
 
   // Confirmação pro cliente no WhatsApp da empresa (fire-and-forget, falha silenciosa)
   if (config.uazapiToken) {
