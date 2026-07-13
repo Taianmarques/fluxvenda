@@ -12,6 +12,7 @@ const schema = z.object({
   time: z.string().regex(/^\d{2}:\d{2}$/),
   nome: z.string().trim().min(2).max(80),
   whatsapp: z.string().transform(v => v.replace(/\D/g, "")).pipe(z.string().min(10).max(13)),
+  respostas: z.record(z.string(), z.string().max(300)).optional(),
 });
 
 // Cria o agendamento a partir da página pública — mesma lógica do POST autenticado de
@@ -28,6 +29,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
       availability: true,
       askProfessionalEnabled: true,
       agendarAteEncerramento: true,
+      bookingFormFields: true,
       uazapiToken: true,
     },
   });
@@ -61,6 +63,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
   if (body.data.serviceId && !service) return NextResponse.json({ error: "Serviço inválido" }, { status: 400 });
 
   const durationMinutes = service?.durationMinutes ?? config.slotDurationMinutes;
+
+  // Campos extras configurados pelo gestor — valida os obrigatórios e monta as observações
+  const formFields = (config.bookingFormFields as { label: string; obrigatorio: boolean }[]) ?? [];
+  const respostas = body.data.respostas ?? {};
+  for (const f of formFields) {
+    if (f.obrigatorio && !(respostas[f.label] ?? "").trim()) {
+      return NextResponse.json({ error: `Preencha o campo "${f.label}"` }, { status: 400 });
+    }
+  }
+  const respostasNotes = formFields
+    .map(f => ({ label: f.label, valor: (respostas[f.label] ?? "").trim() }))
+    .filter(r => r.valor)
+    .map(r => `${r.label}: ${r.valor}`)
+    .join("\n");
 
   // Limite barato anti-abuso: um mesmo número não acumula mais que 3 agendamentos futuros
   const futuros = await prisma.appointment.count({
@@ -119,7 +135,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
       contactNumber: body.data.whatsapp,
       scheduledAt,
       durationMinutes,
-      notes: "Agendado pela página pública",
+      notes: respostasNotes ? `Agendado pela página pública\n${respostasNotes}` : "Agendado pela página pública",
       professionalId: professional?.id,
       serviceId: service?.id,
     },

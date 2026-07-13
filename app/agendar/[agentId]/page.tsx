@@ -18,6 +18,7 @@ async function findBooking(idOrSlug: string) {
       schedulingEnabled: true,
       slotDurationMinutes: true,
       askProfessionalEnabled: true,
+      bookingFormFields: true,
       uazapiToken: true,
       storeLogoBase64: true,
       storeLogoMimeType: true,
@@ -95,6 +96,7 @@ export default async function AgendarPage({ params }: { params: Promise<{ agentI
       professionals={professionals}
       askProfessionalEnabled={config.askProfessionalEnabled}
       defaultDurationMinutes={config.slotDurationMinutes}
+      formFields={(config.bookingFormFields as { label: string; obrigatorio: boolean }[]) ?? []}
     />
   );
 }

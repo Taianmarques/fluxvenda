@@ -38,6 +38,10 @@ const schema = z.object({
   askProfessionalEnabled: z.boolean().optional(),
   schedulingViaLink: z.boolean().optional(),
   agendarAteEncerramento: z.boolean().optional(),
+  bookingFormFields: z.array(z.object({
+    label: z.string().trim().min(1).max(60),
+    obrigatorio: z.boolean(),
+  })).max(10).optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {

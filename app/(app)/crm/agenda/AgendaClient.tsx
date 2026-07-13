@@ -167,7 +167,7 @@ function fmtDate(d: Date): string {
 
 export function AgendaClient({
   agentId, initialSchedulingEnabled, initialSlotDurationMinutes, initialAvailability, initialAppointmentReminderHours, initialRequisitosAgendamento, initialRestricoesAgendamento, initialAtendimentoEspecialEnabled, initialAtendimentoEspecialDescricao,
-  initialAskProfessionalEnabled, initialSchedulingViaLink, initialAgendarAteEncerramento, agendaAccessToken, bookingSlug,
+  initialAskProfessionalEnabled, initialSchedulingViaLink, initialAgendarAteEncerramento, initialBookingFormFields, agendaAccessToken, bookingSlug,
 }: {
   agentId: string;
   initialSchedulingEnabled: boolean;
@@ -181,6 +181,7 @@ export function AgendaClient({
   initialAskProfessionalEnabled?: boolean;
   initialSchedulingViaLink?: boolean;
   initialAgendarAteEncerramento?: boolean;
+  initialBookingFormFields?: { label: string; obrigatorio: boolean }[];
   agendaAccessToken?: string | null;
   bookingSlug?: string | null;
 }) {
@@ -196,6 +197,8 @@ export function AgendaClient({
   const [askProfessionalEnabled, setAskProfessionalEnabled] = useState(initialAskProfessionalEnabled ?? true);
   const [schedulingViaLink, setSchedulingViaLink] = useState(initialSchedulingViaLink ?? false);
   const [agendarAteEncerramento, setAgendarAteEncerramento] = useState(initialAgendarAteEncerramento ?? false);
+  const [bookingFormFields, setBookingFormFields] = useState<{ label: string; obrigatorio: boolean }[]>(initialBookingFormFields ?? []);
+  const [newFieldLabel, setNewFieldLabel] = useState("");
   const [rules, setRules] = useState(() => rulesFromAvailability(initialAvailability));
   const [savingSettings, setSavingSettings] = useState(false);
   const [agendaLinkCopied, setAgendaLinkCopied] = useState(false);
@@ -312,7 +315,7 @@ export function AgendaClient({
       await fetch(`/api/agentes/${agentId}/agenda`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ schedulingEnabled, slotDurationMinutes, availability, appointmentReminderHours, requisitosAgendamento, restricoesAgendamento, atendimentoEspecialEnabled, atendimentoEspecialDescricao, askProfessionalEnabled, schedulingViaLink, agendarAteEncerramento }),
+        body: JSON.stringify({ schedulingEnabled, slotDurationMinutes, availability, appointmentReminderHours, requisitosAgendamento, restricoesAgendamento, atendimentoEspecialEnabled, atendimentoEspecialDescricao, askProfessionalEnabled, schedulingViaLink, agendarAteEncerramento, bookingFormFields }),
       });
     } finally {
       setSavingSettings(false);
@@ -622,6 +625,63 @@ export function AgendaClient({
                   </p>
                 </div>
               </label>
+            </div>
+
+            <div className="border border-gray-800 rounded-xl p-4 space-y-3">
+              <div>
+                <p className="text-sm font-medium">Campos do agendamento pelo link</p>
+                <p className="text-xs text-gray-500">
+                  Nome e WhatsApp são sempre pedidos. Adicione campos extras que o cliente preenche antes de confirmar — as respostas aparecem nas observações do agendamento.
+                </p>
+              </div>
+              {bookingFormFields.length > 0 && (
+                <div className="space-y-1.5">
+                  {bookingFormFields.map((f, i) => (
+                    <div key={i} className="flex items-center gap-3 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2">
+                      <p className="flex-1 text-sm truncate">{f.label}</p>
+                      <label className="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer flex-shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={f.obrigatorio}
+                          onChange={e => setBookingFormFields(fields => fields.map((x, j) => j === i ? { ...x, obrigatorio: e.target.checked } : x))}
+                          className="w-3.5 h-3.5"
+                        />
+                        Obrigatório
+                      </label>
+                      <button
+                        onClick={() => setBookingFormFields(fields => fields.filter((_, j) => j !== i))}
+                        className="text-gray-600 hover:text-red-400 text-xs flex-shrink-0"
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {bookingFormFields.length < 10 && (
+                <div className="flex gap-2">
+                  <input
+                    value={newFieldLabel}
+                    onChange={e => setNewFieldLabel(e.target.value)}
+                    placeholder="Ex: Convênio, Placa do carro, Nome do pet..."
+                    maxLength={60}
+                    className="flex-1 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+                  />
+                  <button
+                    onClick={() => {
+                      const label = newFieldLabel.trim();
+                      if (!label) return;
+                      setBookingFormFields(fields => [...fields, { label, obrigatorio: true }]);
+                      setNewFieldLabel("");
+                    }}
+                    disabled={!newFieldLabel.trim()}
+                    className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl px-4 py-2 text-sm font-medium"
+                  >
+                    Adicionar
+                  </button>
+                </div>
+              )}
+              <p className="text-xs text-gray-600">Lembre de clicar em Salvar abaixo pra aplicar as mudanças.</p>
             </div>
 
             <div>

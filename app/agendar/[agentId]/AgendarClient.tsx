@@ -22,7 +22,7 @@ function formatDateLong(iso: string): string {
   return new Date(y, m - 1, d).toLocaleDateString("pt-BR", { day: "2-digit", month: "long" });
 }
 
-export function AgendarClient({ agentId, businessName, whatsappNumber, logo, services, professionals, askProfessionalEnabled, defaultDurationMinutes }: {
+export function AgendarClient({ agentId, businessName, whatsappNumber, logo, services, professionals, askProfessionalEnabled, defaultDurationMinutes, formFields }: {
   agentId: string;
   businessName: string;
   whatsappNumber: string | null;
@@ -31,6 +31,7 @@ export function AgendarClient({ agentId, businessName, whatsappNumber, logo, ser
   professionals: Professional[];
   askProfessionalEnabled: boolean;
   defaultDurationMinutes: number;
+  formFields: { label: string; obrigatorio: boolean }[];
 }) {
   const temServicos = services.length > 0;
   const pedeProfissional = professionals.length > 1 && askProfessionalEnabled;
@@ -46,6 +47,7 @@ export function AgendarClient({ agentId, businessName, whatsappNumber, logo, ser
 
   const [nome, setNome] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
+  const [respostas, setRespostas] = useState<Record<string, string>>({});
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [confirmado, setConfirmado] = useState<Confirmado | null>(null);
@@ -75,8 +77,10 @@ export function AgendarClient({ agentId, businessName, whatsappNumber, logo, ser
     if (step === "horario") carregarSlots();
   }, [step, carregarSlots]);
 
+  const camposObrigatoriosOk = formFields.every(f => !f.obrigatorio || (respostas[f.label] ?? "").trim().length > 0);
+
   async function confirmar() {
-    if (!selectedDate || !selectedTime || !nome.trim() || whatsapp.replace(/\D/g, "").length < 10) return;
+    if (!selectedDate || !selectedTime || !nome.trim() || whatsapp.replace(/\D/g, "").length < 10 || !camposObrigatoriosOk) return;
     setEnviando(true);
     setErro(null);
     try {
@@ -90,6 +94,7 @@ export function AgendarClient({ agentId, businessName, whatsappNumber, logo, ser
           time: selectedTime,
           nome: nome.trim(),
           whatsapp,
+          respostas,
         }),
       });
       const data = await res.json();
@@ -283,6 +288,19 @@ export function AgendarClient({ agentId, businessName, whatsappNumber, logo, ser
                 />
                 <p className="text-[11px] text-gray-400 mt-1">Você recebe a confirmação e o lembrete nesse número.</p>
               </div>
+              {formFields.map(f => (
+                <div key={f.label}>
+                  <label className="text-xs font-medium text-gray-600">
+                    {f.label} {!f.obrigatorio && <span className="text-gray-400 font-normal">(opcional)</span>}
+                  </label>
+                  <input
+                    value={respostas[f.label] ?? ""}
+                    onChange={e => setRespostas(r => ({ ...r, [f.label]: e.target.value }))}
+                    maxLength={300}
+                    className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              ))}
             </div>
           </>
         )}
@@ -332,7 +350,7 @@ export function AgendarClient({ agentId, businessName, whatsappNumber, logo, ser
             </p>
             <button
               onClick={confirmar}
-              disabled={enviando || !nome.trim() || whatsapp.replace(/\D/g, "").length < 10}
+              disabled={enviando || !nome.trim() || whatsapp.replace(/\D/g, "").length < 10 || !camposObrigatoriosOk}
               className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold rounded-2xl py-3.5 text-sm transition-colors"
             >
               {enviando ? <Loader2 size={16} className="animate-spin" /> : <CalendarCheck size={16} />}

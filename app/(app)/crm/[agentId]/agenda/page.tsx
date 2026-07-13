@@ -64,6 +64,7 @@ async function AgendaPageContent({ params }: { params: Promise<{ agentId: string
       initialAskProfessionalEnabled={config.askProfessionalEnabled}
       initialSchedulingViaLink={config.schedulingViaLink}
       initialAgendarAteEncerramento={config.agendarAteEncerramento}
+      initialBookingFormFields={(config.bookingFormFields as { label: string; obrigatorio: boolean }[]) ?? []}
       agendaAccessToken={agendaAccessToken}
       bookingSlug={bookingSlug}
     />
