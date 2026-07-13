@@ -64,6 +64,14 @@ async function WhatsappInboxPageContent({
     prisma.leadStatus.findMany({ where: { agentConfigId: config.id }, orderBy: { order: "asc" } }),
   ]);
 
+  // Mesma lógica do WhatsApp: ordena pela hora da última mensagem (ver
+  // app/api/agentes/[agentId]/conversas/route.ts, que o polling da lista usa)
+  conversations.sort((a, b) => {
+    const ta = a.messages[0]?.createdAt.getTime() ?? a.updatedAt.getTime();
+    const tb = b.messages[0]?.createdAt.getTime() ?? b.updatedAt.getTime();
+    return tb - ta;
+  });
+
   return (
     <WhatsappInbox
       agentId={config.id}

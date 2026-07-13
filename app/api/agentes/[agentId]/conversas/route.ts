@@ -25,5 +25,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ agentId
     },
   });
 
+  // Mesma lógica do WhatsApp: sobe pro topo pela hora da ÚLTIMA MENSAGEM, não pelo
+  // updatedAt — que é tocado por qualquer mudança (marcar como lida, trocar status,
+  // atribuir atendente...) e jogava conversa pro topo sem mensagem nova.
+  conversations.sort((a, b) => {
+    const ta = a.messages[0]?.createdAt.getTime() ?? a.updatedAt.getTime();
+    const tb = b.messages[0]?.createdAt.getTime() ?? b.updatedAt.getTime();
+    return tb - ta;
+  });
+
   return NextResponse.json({ conversations });
 }
