@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { BookUser, Search, Pencil, MessageCircle, Download, Upload, Instagram, X } from "lucide-react";
+import { BookUser, Search, Pencil, MessageCircle, Download, Upload, Instagram, X, Plus } from "lucide-react";
 
 export type Contato = {
   conversationId: string;
@@ -30,6 +30,12 @@ export function ContatosClient({ agentId, contatos }: { agentId: string; contato
   const [importando, setImportando] = useState(false);
   const [importResult, setImportResult] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Adicionar contato manual
+  const [showNovo, setShowNovo] = useState(false);
+  const [novoNome, setNovoNome] = useState("");
+  const [novoNumero, setNovoNumero] = useState("");
+  const [criando, setCriando] = useState(false);
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -98,6 +104,41 @@ export function ContatosClient({ agentId, contatos }: { agentId: string; contato
     }
   }
 
+  async function handleCriarContato() {
+    const numero = novoNumero.replace(/\D/g, "");
+    if (numero.length < 10) return;
+    setCriando(true);
+    setImportResult(null);
+    try {
+      const res = await fetch(`/api/agentes/${agentId}/contatos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contatos: [{ nome: novoNome.trim() || undefined, numero }] }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (data.criados > 0) {
+          setNovoNome("");
+          setNovoNumero("");
+          setShowNovo(false);
+          router.refresh();
+        } else if (data.atualizados > 0) {
+          setImportResult("Esse número já existia — o nome foi preenchido.");
+          setNovoNome("");
+          setNovoNumero("");
+          setShowNovo(false);
+          router.refresh();
+        } else {
+          setImportResult("Esse número já está nos contatos.");
+        }
+      } else {
+        setImportResult(data.error ?? "Não foi possível adicionar. Tente novamente.");
+      }
+    } finally {
+      setCriando(false);
+    }
+  }
+
   function exportarCsv() {
     const linhas = [
       "nome;numero;status;total_ganho;ultima_interacao",
@@ -140,9 +181,15 @@ export function ContatosClient({ agentId, contatos }: { agentId: string; contato
               onChange={e => { const f = e.target.files?.[0]; if (f) handleImportFile(f); }}
             />
             <button
+              onClick={() => setShowNovo(s => !s)}
+              className="flex items-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-2 transition-colors"
+            >
+              <Plus size={14} /> Adicionar contato
+            </button>
+            <button
               onClick={() => fileRef.current?.click()}
               disabled={importando}
-              className="flex items-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl px-4 py-2 transition-colors"
+              className="flex items-center gap-1.5 text-sm font-medium text-blue-400 hover:text-blue-300 border border-blue-800/50 hover:border-blue-600/50 disabled:opacity-50 rounded-xl px-4 py-2 transition-colors"
             >
               <Upload size={14} /> {importando ? "Importando..." : "Importar CSV"}
             </button>
@@ -160,6 +207,39 @@ export function ContatosClient({ agentId, contatos }: { agentId: string; contato
           <div className="bg-gray-900 border border-blue-800/40 text-sm text-gray-300 rounded-xl px-4 py-3 flex items-start justify-between gap-3">
             <span>{importResult}</span>
             <button onClick={() => setImportResult(null)} className="text-gray-500 hover:text-white flex-shrink-0"><X size={14} /></button>
+          </div>
+        )}
+
+        {showNovo && (
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-2">
+            <p className="font-semibold text-sm">Novo contato</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <input
+                value={novoNome}
+                onChange={e => setNovoNome(e.target.value)}
+                placeholder="Nome (opcional)"
+                maxLength={80}
+                className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+              />
+              <input
+                value={novoNumero}
+                onChange={e => setNovoNumero(e.target.value.replace(/[^\d\s()-]/g, ""))}
+                placeholder="WhatsApp com DDD, ex: (84) 99999-0000"
+                inputMode="tel"
+                maxLength={20}
+                className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleCriarContato}
+                disabled={criando || novoNumero.replace(/\D/g, "").length < 10}
+                className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium"
+              >
+                {criando ? "Adicionando..." : "Adicionar"}
+              </button>
+              <button onClick={() => setShowNovo(false)} className="text-xs text-gray-400 hover:text-gray-200 px-2">Cancelar</button>
+            </div>
           </div>
         )}
 
