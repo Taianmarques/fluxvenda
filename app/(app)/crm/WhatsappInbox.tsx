@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  MessageCircle, Search, X, Trophy, Lock, Unlock, Bot, User,
+  MessageCircle, Search, X, Trophy, Lock, Unlock, Bot, User, UserPlus,
   FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap, StickyNote, ArrowRightLeft, HandCoins, CalendarClock, ListFilter, Instagram, ArrowLeft,
 } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
@@ -286,6 +286,21 @@ export function WhatsappInbox({
       const data = await res.json();
       if (data.quickReplies) setQuickReplies(data.quickReplies);
     } catch {}
+  }
+
+  async function handleSalvarContato() {
+    if (!detail) return;
+    const nome = window.prompt("Nome do contato", detail.contactName ?? "");
+    if (!nome || !nome.trim()) return;
+    const trimmed = nome.trim();
+    setDetail(d => (d ? { ...d, contactName: trimmed } : d));
+    setConversations(prev => prev.map(c => c.id === detail.id ? { ...c, contactName: trimmed } : c));
+    await fetch(`/api/ferramentas/whatsapp/conversas/${detail.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contactName: trimmed }),
+    });
+    refreshList();
   }
 
   async function handleLeadStatusChange(conversationId: string, leadStatusId: string | null) {
@@ -803,6 +818,15 @@ export function WhatsappInbox({
                         ? <Instagram size={14} className="text-pink-400 flex-shrink-0" />
                         : <WhatsAppIcon size={14} />}
                       {detail.contactName || (isIgContact(detail.contactNumber) ? "Instagram DM" : detail.contactNumber)}
+                      {!detail.contactName && (
+                        <button
+                          onClick={handleSalvarContato}
+                          title="Salvar contato"
+                          className="text-blue-500 hover:text-blue-400 flex-shrink-0"
+                        >
+                          <UserPlus size={15} />
+                        </button>
+                      )}
                     </p>
                     <p className={`text-xs ${t.subtitle}`}>
                       {isIgContact(detail.contactNumber) ? `ID: ${detail.contactNumber.replace("ig_", "")}` : detail.contactNumber}
