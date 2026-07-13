@@ -1,7 +1,7 @@
 import {
   MessageCircle, KanbanSquare, Calendar, Wallet, ShoppingCart, Landmark, Target,
   Wifi, GitBranch, Briefcase, Zap, Filter, UserPlus, ClipboardCheck, Radio,
-  Megaphone, Phone, Coins, type LucideIcon,
+  Megaphone, Phone, Coins, BookUser, type LucideIcon,
 } from "lucide-react";
 
 // Fonte única das páginas do CRM — usada pelo CrmSidebar (menu), CrmPageGate (bloqueio
@@ -11,7 +11,7 @@ export type CrmPageKey =
   | "mensagens" | "aovivo"
   | "pipeline" | "agenda" | "vendas" | "comercio"
   | "campanhas" | "ligacoes" | "prospeccao"
-  | "cobranca" | "funil" | "carteira"
+  | "cobranca" | "funil" | "carteira" | "contatos"
   | "automacao" | "condicoes"
   | "canais" | "equipe" | "auditoria" | "creditos";
 
@@ -53,6 +53,7 @@ export const CRM_CATEGORIES: CrmCategoryDef[] = [
     { key: "cobranca", label: "Cobranças", suffix: "/cobranca", icon: Landmark },
     { key: "funil", label: "Funil", suffix: "/funil", icon: Filter },
     { key: "carteira", label: "Carteira", suffix: "/carteira", icon: Briefcase },
+    { key: "contatos", label: "Contatos", suffix: "/contatos", icon: BookUser },
   ] },
   { key: "automacao", label: "Automação", variant: "flyout", pages: [
     { key: "automacao", label: "Automação", suffix: "/automacao", icon: Zap },
