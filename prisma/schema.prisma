@@ -652,6 +652,7 @@ model AgentConfig {
   askProfessionalEnabled       Boolean @default(true) // com vários profissionais: true = agente pergunta com quem; false = atribui a qualquer um livre
   schedulingViaLink            Boolean @default(false) // true = a IA envia o link da página pública (/agendar) em vez de marcar por mensagem
   agendarAteEncerramento       Boolean @default(false) // aceita horário que começa dentro do funcionamento mesmo terminando após o fechamento
+  vagasSimultaneas             Int     @default(1) // atendimentos simultâneos sem profissional (ex: lava-jato com 3 vagas)
   bookingFormFields            Json    @default("[]") // campos extras do agendamento pelo link: [{ label, obrigatorio }] — nome e WhatsApp são sempre pedidos
   agendaAccessToken            String? @unique // link da agenda geral da empresa (/agenda/[token], PWA)
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAvailableSlots, type AvailabilityRule } from "@/lib/scheduling";
+import { getAvailableSlots, resolveAvailability, type AvailabilityRule } from "@/lib/scheduling";
 
 // Horários livres pra página pública de agendamento — sem auth; tudo validado contra o
 // banco e escopado pelo agentConfig resolvido do slug/id da URL.
@@ -16,6 +16,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ agen
       availability: true,
       askProfessionalEnabled: true,
       agendarAteEncerramento: true,
+      vagasSimultaneas: true,
     },
   });
   if (!config?.schedulingEnabled) {
@@ -55,7 +56,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ agen
         where: { agentConfigId: config.id, status: "CONFIRMADO", professionalId: pro.id },
         select: { scheduledAt: true, durationMinutes: true },
       });
-      const availability = (pro.availability ?? config.availability) as unknown as AvailabilityRule[];
+      const availability = resolveAvailability(config.availability as unknown as AvailabilityRule[], pro.availability as unknown as AvailabilityRule[]);
       for (const day of getAvailableSlots(availability, durationMinutes, busy, undefined, undefined, config.agendarAteEncerramento)) {
         const entry = dayMap.get(day.date) ?? { weekday: day.weekday, slots: new Set<string>() };
         for (const s of day.slots) entry.slots.add(s);
@@ -80,8 +81,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ agen
     },
     select: { scheduledAt: true, durationMinutes: true },
   });
-  const availability = (professional?.availability ?? config.availability) as unknown as AvailabilityRule[];
+  const availability = resolveAvailability(config.availability as unknown as AvailabilityRule[], professional?.availability as unknown as AvailabilityRule[] | undefined);
 
-  const days = getAvailableSlots(availability, durationMinutes, busy, undefined, undefined, config.agendarAteEncerramento);
+  // vagasSimultaneas só vale sem profissional — com profissional, capacidade é 1 por pessoa
+  const days = getAvailableSlots(availability, durationMinutes, busy, undefined, undefined, config.agendarAteEncerramento, professional ? 1 : config.vagasSimultaneas);
   return NextResponse.json({ days }, { headers: { "Cache-Control": "no-store" } });
 }

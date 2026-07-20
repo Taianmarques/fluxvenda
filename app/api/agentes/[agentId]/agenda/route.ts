@@ -38,6 +38,7 @@ const schema = z.object({
   askProfessionalEnabled: z.boolean().optional(),
   schedulingViaLink: z.boolean().optional(),
   agendarAteEncerramento: z.boolean().optional(),
+  vagasSimultaneas: z.number().int().min(1).max(50).optional(),
   bookingFormFields: z.array(z.object({
     label: z.string().trim().min(1).max(60),
     obrigatorio: z.boolean(),

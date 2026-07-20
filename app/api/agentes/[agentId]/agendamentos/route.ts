@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { getAgentConfigWithRole } from "@/lib/team";
-import { isSlotAvailable, type AvailabilityRule } from "@/lib/scheduling";
+import { isSlotAvailable, resolveAvailability, type AvailabilityRule } from "@/lib/scheduling";
 import { notifyProfessionalOfAppointment } from "@/lib/appointment-notify";
 import { z } from "zod";
 
@@ -68,9 +68,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
     select: { scheduledAt: true, durationMinutes: true },
   });
 
-  const availability = (professional?.availability ?? config.availability) as unknown as AvailabilityRule[];
+  const availability = resolveAvailability(config.availability as unknown as AvailabilityRule[], professional?.availability as unknown as AvailabilityRule[] | undefined);
 
-  const available = isSlotAvailable(availability, durationMinutes, busy, scheduledAt, config.agendarAteEncerramento);
+  // vagasSimultaneas só vale sem profissional — com profissional, capacidade é 1 por pessoa
+  const available = isSlotAvailable(availability, durationMinutes, busy, scheduledAt, config.agendarAteEncerramento, professional ? 1 : config.vagasSimultaneas);
   if (!available) return NextResponse.json({ error: "Horário indisponível ou conflita com outro agendamento" }, { status: 409 });
 
   const appointment = await prisma.appointment.create({

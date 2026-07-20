@@ -135,6 +135,10 @@ function ProfessionalRow({ professional, onUpdated, onDeleted }: { professional:
               className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
             />
           </div>
+          <p className="text-xs text-gray-500">
+            Deixe os horários vazios para o profissional usar o horário de funcionamento da empresa.
+            Se preencher, valem só os horários que estiverem dentro do funcionamento.
+          </p>
           <AvailabilityEditor rules={rules} onChange={setRules} />
           <button onClick={save} disabled={saving} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium">
             {saving ? "Salvando..." : "Salvar"}
@@ -167,7 +171,7 @@ function fmtDate(d: Date): string {
 
 export function AgendaClient({
   agentId, initialSchedulingEnabled, initialSlotDurationMinutes, initialAvailability, initialAppointmentReminderHours, initialRequisitosAgendamento, initialRestricoesAgendamento, initialAtendimentoEspecialEnabled, initialAtendimentoEspecialDescricao,
-  initialAskProfessionalEnabled, initialSchedulingViaLink, initialAgendarAteEncerramento, initialBookingFormFields, agendaAccessToken, bookingSlug,
+  initialAskProfessionalEnabled, initialSchedulingViaLink, initialAgendarAteEncerramento, initialVagasSimultaneas, initialBookingFormFields, agendaAccessToken, bookingSlug,
 }: {
   agentId: string;
   initialSchedulingEnabled: boolean;
@@ -181,6 +185,7 @@ export function AgendaClient({
   initialAskProfessionalEnabled?: boolean;
   initialSchedulingViaLink?: boolean;
   initialAgendarAteEncerramento?: boolean;
+  initialVagasSimultaneas?: number;
   initialBookingFormFields?: { label: string; obrigatorio: boolean }[];
   agendaAccessToken?: string | null;
   bookingSlug?: string | null;
@@ -197,6 +202,7 @@ export function AgendaClient({
   const [askProfessionalEnabled, setAskProfessionalEnabled] = useState(initialAskProfessionalEnabled ?? true);
   const [schedulingViaLink, setSchedulingViaLink] = useState(initialSchedulingViaLink ?? false);
   const [agendarAteEncerramento, setAgendarAteEncerramento] = useState(initialAgendarAteEncerramento ?? false);
+  const [vagasSimultaneas, setVagasSimultaneas] = useState(initialVagasSimultaneas ?? 1);
   const [bookingFormFields, setBookingFormFields] = useState<{ label: string; obrigatorio: boolean }[]>(initialBookingFormFields ?? []);
   const [newFieldLabel, setNewFieldLabel] = useState("");
   const [rules, setRules] = useState(() => rulesFromAvailability(initialAvailability));
@@ -315,7 +321,7 @@ export function AgendaClient({
       await fetch(`/api/agentes/${agentId}/agenda`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ schedulingEnabled, slotDurationMinutes, availability, appointmentReminderHours, requisitosAgendamento, restricoesAgendamento, atendimentoEspecialEnabled, atendimentoEspecialDescricao, askProfessionalEnabled, schedulingViaLink, agendarAteEncerramento, bookingFormFields }),
+        body: JSON.stringify({ schedulingEnabled, slotDurationMinutes, availability, appointmentReminderHours, requisitosAgendamento, restricoesAgendamento, atendimentoEspecialEnabled, atendimentoEspecialDescricao, askProfessionalEnabled, schedulingViaLink, agendarAteEncerramento, vagasSimultaneas, bookingFormFields }),
       });
     } finally {
       setSavingSettings(false);
@@ -521,6 +527,19 @@ export function AgendaClient({
                 onChange={e => setSlotDurationMinutes(Math.max(5, Number(e.target.value)))}
                 className="w-32 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
               />
+            </div>
+
+            <div>
+              <label className="text-sm text-gray-400 block mb-1">Atendimentos simultâneos</label>
+              <input
+                type="number" min={1} max={50} value={vagasSimultaneas}
+                onChange={e => setVagasSimultaneas(Math.min(50, Math.max(1, Number(e.target.value))))}
+                className="w-32 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Quantos clientes podem ser atendidos no mesmo horário quando não há profissionais cadastrados.
+                Ex: lava-jato com 3 vagas atende 3 carros ao mesmo tempo. Com profissionais, a capacidade é de 1 atendimento por profissional.
+              </p>
             </div>
 
             <div>

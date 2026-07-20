@@ -10,7 +10,7 @@ import {
 } from "@/lib/agent-engine";
 import { textToSpeech } from "@/lib/elevenlabs";
 import { logTokenUsage, isOverQuota } from "@/lib/token-usage";
-import { getAvailableSlots, isSlotAvailable, formatSlotsForAgent, type AvailabilityRule } from "@/lib/scheduling";
+import { getAvailableSlots, isSlotAvailable, resolveAvailability, formatSlotsForAgent, type AvailabilityRule } from "@/lib/scheduling";
 import { assignNextAttendant } from "@/lib/assignment";
 import { createAsaasCustomer, createAsaasCharge, cancelAsaasCharge, getAsaasPixQrCode } from "@/lib/asaas";
 import { ensureStoreSlug } from "@/lib/store-slug";
@@ -330,7 +330,8 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
               where: { agentConfigId, status: "CONFIRMADO", professionalId: pro.id },
               select: { scheduledAt: true, durationMinutes: true },
             });
-            const proSlots = getAvailableSlots(pro.availability as unknown as AvailabilityRule[], slotDurationAll, proBusy, undefined, undefined, config.agendarAteEncerramento);
+            const proAvail = resolveAvailability(config.availability as unknown as AvailabilityRule[], pro.availability as unknown as AvailabilityRule[]);
+            const proSlots = getAvailableSlots(proAvail, slotDurationAll, proBusy, undefined, undefined, config.agendarAteEncerramento);
             for (const day of proSlots) {
               if (!merged.has(day.date)) merged.set(day.date, { date: day.date, weekday: day.weekday, slots: new Set() });
               day.slots.forEach((s) => merged.get(day.date)!.slots.add(s));
@@ -352,14 +353,15 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
         });
       }
 
-      const availability = (professional?.availability ?? config.availability) as unknown as AvailabilityRule[];
+      const availability = resolveAvailability(config.availability as unknown as AvailabilityRule[], professional?.availability as unknown as AvailabilityRule[] | undefined);
       const slotDuration = service?.durationMinutes ?? config.slotDurationMinutes;
 
       const busy = await prisma.appointment.findMany({
         where: { agentConfigId, status: "CONFIRMADO", ...(professional ? { professionalId: professional.id } : {}) },
         select: { scheduledAt: true, durationMinutes: true },
       });
-      const slots = getAvailableSlots(availability, slotDuration, busy, undefined, undefined, config.agendarAteEncerramento);
+      // vagasSimultaneas só vale sem profissional — com profissional, capacidade é 1 por pessoa
+      const slots = getAvailableSlots(availability, slotDuration, busy, undefined, undefined, config.agendarAteEncerramento, professional ? 1 : config.vagasSimultaneas);
       return formatSlotsForAgent(slots);
     }
 
@@ -391,7 +393,8 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
               where: { agentConfigId, status: "CONFIRMADO", professionalId: pro.id },
               select: { scheduledAt: true, durationMinutes: true },
             });
-            if (isSlotAvailable(pro.availability as unknown as AvailabilityRule[], slotDurationPick, proBusy, scheduledAt, config.agendarAteEncerramento)) {
+            const proAvail = resolveAvailability(config.availability as unknown as AvailabilityRule[], pro.availability as unknown as AvailabilityRule[]);
+            if (isSlotAvailable(proAvail, slotDurationPick, proBusy, scheduledAt, config.agendarAteEncerramento)) {
               professional = pro;
               break;
             }
@@ -400,7 +403,7 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
         }
       }
 
-      const availability = (professional?.availability ?? config.availability) as unknown as AvailabilityRule[];
+      const availability = resolveAvailability(config.availability as unknown as AvailabilityRule[], professional?.availability as unknown as AvailabilityRule[] | undefined);
       const slotDuration = service?.durationMinutes ?? config.slotDurationMinutes;
 
       const busy = await prisma.appointment.findMany({
@@ -408,7 +411,7 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
         select: { scheduledAt: true, durationMinutes: true },
       });
 
-      const available = isSlotAvailable(availability, slotDuration, busy, scheduledAt, config.agendarAteEncerramento);
+      const available = isSlotAvailable(availability, slotDuration, busy, scheduledAt, config.agendarAteEncerramento, professional ? 1 : config.vagasSimultaneas);
       if (!available) return "Esse horário não está mais disponível. Consulte os horários disponíveis novamente e ofereça outra opção ao cliente.";
 
       const appointment = await prisma.appointment.create({

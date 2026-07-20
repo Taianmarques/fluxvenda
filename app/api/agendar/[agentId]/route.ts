@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { isSlotAvailable, type AvailabilityRule } from "@/lib/scheduling";
+import { isSlotAvailable, resolveAvailability, type AvailabilityRule } from "@/lib/scheduling";
 import { notifyProfessionalOfAppointment } from "@/lib/appointment-notify";
 import { notifyUsers } from "@/lib/onesignal";
 import { sendWhatsAppTextAsTeam } from "@/lib/whatsapp";
@@ -31,6 +31,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
       availability: true,
       askProfessionalEnabled: true,
       agendarAteEncerramento: true,
+      vagasSimultaneas: true,
       bookingFormFields: true,
       uazapiToken: true,
     },
@@ -107,7 +108,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
         where: { agentConfigId: config.id, status: "CONFIRMADO", professionalId: pro.id },
         select: { scheduledAt: true, durationMinutes: true },
       });
-      const availPro = (pro.availability ?? config.availability) as unknown as AvailabilityRule[];
+      const availPro = resolveAvailability(config.availability as unknown as AvailabilityRule[], pro.availability as unknown as AvailabilityRule[]);
       if (isSlotAvailable(availPro, durationMinutes, busyPro, scheduledAt, config.agendarAteEncerramento)) {
         professional = pro;
         break;
@@ -125,8 +126,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
     },
     select: { scheduledAt: true, durationMinutes: true },
   });
-  const availability = (professional?.availability ?? config.availability) as unknown as AvailabilityRule[];
-  if (!isSlotAvailable(availability, durationMinutes, busy, scheduledAt, config.agendarAteEncerramento)) {
+  const availability = resolveAvailability(config.availability as unknown as AvailabilityRule[], professional?.availability as unknown as AvailabilityRule[] | undefined);
+  // vagasSimultaneas só vale sem profissional — com profissional, capacidade é 1 por pessoa
+  if (!isSlotAvailable(availability, durationMinutes, busy, scheduledAt, config.agendarAteEncerramento, professional ? 1 : config.vagasSimultaneas)) {
     return NextResponse.json({ error: "Horário indisponível" }, { status: 409 });
   }
 
