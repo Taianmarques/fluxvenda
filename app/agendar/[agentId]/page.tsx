@@ -19,6 +19,9 @@ async function findBooking(idOrSlug: string) {
       slotDurationMinutes: true,
       askProfessionalEnabled: true,
       bookingFormFields: true,
+      agendamentoCobrancaEnabled: true,
+      agendamentoSinalValor: true,
+      asaasApiKey: true,
       uazapiToken: true,
       storeLogoBase64: true,
       storeLogoMimeType: true,
@@ -97,6 +100,7 @@ export default async function AgendarPage({ params }: { params: Promise<{ agentI
       askProfessionalEnabled={config.askProfessionalEnabled}
       defaultDurationMinutes={config.slotDurationMinutes}
       formFields={(config.bookingFormFields as { label: string; obrigatorio: boolean }[]) ?? []}
+      sinalValor={config.agendamentoCobrancaEnabled && config.agendamentoSinalValor > 0 && config.asaasApiKey ? config.agendamentoSinalValor : null}
     />
   );
 }

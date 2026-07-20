@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAvailableSlots, resolveAvailability, type AvailabilityRule } from "@/lib/scheduling";
+import { getAvailableSlots, resolveAvailability, busyStatusWhere, PENDING_HOLD_MS, type AvailabilityRule } from "@/lib/scheduling";
 
 // Horários livres pra página pública de agendamento — sem auth; tudo validado contra o
 // banco e escopado pelo agentConfig resolvido do slug/id da URL.
@@ -22,6 +22,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ agen
   if (!config?.schedulingEnabled) {
     return NextResponse.json({ error: "Agendamento indisponível" }, { status: 404 });
   }
+
+  // Expiração lazy: reservas de sinal não pagas em 30 min voltam pra grade
+  await prisma.appointment.updateMany({
+    where: { agentConfigId: config.id, status: "AGUARDANDO_PAGAMENTO", createdAt: { lt: new Date(Date.now() - PENDING_HOLD_MS) } },
+    data: { status: "CANCELADO" },
+  });
 
   const { searchParams } = new URL(req.url);
   const serviceId = searchParams.get("serviceId");
@@ -53,7 +59,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ agen
     const dayMap = new Map<string, { weekday: string; slots: Set<string> }>();
     for (const pro of professionals) {
       const busy = await prisma.appointment.findMany({
-        where: { agentConfigId: config.id, status: "CONFIRMADO", professionalId: pro.id },
+        where: { agentConfigId: config.id, ...busyStatusWhere(), professionalId: pro.id },
         select: { scheduledAt: true, durationMinutes: true },
       });
       const availability = resolveAvailability(config.availability as unknown as AvailabilityRule[], pro.availability as unknown as AvailabilityRule[]);
@@ -76,7 +82,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ agen
   const busy = await prisma.appointment.findMany({
     where: {
       agentConfigId: config.id,
-      status: "CONFIRMADO",
+      ...busyStatusWhere(),
       ...(professional ? { professionalId: professional.id } : {}),
     },
     select: { scheduledAt: true, durationMinutes: true },

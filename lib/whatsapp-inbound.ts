@@ -10,7 +10,7 @@ import {
 } from "@/lib/agent-engine";
 import { textToSpeech } from "@/lib/elevenlabs";
 import { logTokenUsage, isOverQuota } from "@/lib/token-usage";
-import { getAvailableSlots, isSlotAvailable, resolveAvailability, formatSlotsForAgent, type AvailabilityRule } from "@/lib/scheduling";
+import { getAvailableSlots, isSlotAvailable, resolveAvailability, busyStatusWhere, formatSlotsForAgent, type AvailabilityRule } from "@/lib/scheduling";
 import { assignNextAttendant } from "@/lib/assignment";
 import { createAsaasCustomer, createAsaasCharge, cancelAsaasCharge, getAsaasPixQrCode } from "@/lib/asaas";
 import { ensureStoreSlug } from "@/lib/store-slug";
@@ -327,7 +327,7 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
           const merged = new Map<string, { date: string; weekday: string; slots: Set<string> }>();
           for (const pro of activePros) {
             const proBusy = await prisma.appointment.findMany({
-              where: { agentConfigId, status: "CONFIRMADO", professionalId: pro.id },
+              where: { agentConfigId, ...busyStatusWhere(), professionalId: pro.id },
               select: { scheduledAt: true, durationMinutes: true },
             });
             const proAvail = resolveAvailability(config.availability as unknown as AvailabilityRule[], pro.availability as unknown as AvailabilityRule[]);
@@ -357,7 +357,7 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       const slotDuration = service?.durationMinutes ?? config.slotDurationMinutes;
 
       const busy = await prisma.appointment.findMany({
-        where: { agentConfigId, status: "CONFIRMADO", ...(professional ? { professionalId: professional.id } : {}) },
+        where: { agentConfigId, ...busyStatusWhere(), ...(professional ? { professionalId: professional.id } : {}) },
         select: { scheduledAt: true, durationMinutes: true },
       });
       // vagasSimultaneas só vale sem profissional — com profissional, capacidade é 1 por pessoa
@@ -390,7 +390,7 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
           const slotDurationPick = service?.durationMinutes ?? config.slotDurationMinutes;
           for (const pro of activePros) {
             const proBusy = await prisma.appointment.findMany({
-              where: { agentConfigId, status: "CONFIRMADO", professionalId: pro.id },
+              where: { agentConfigId, ...busyStatusWhere(), professionalId: pro.id },
               select: { scheduledAt: true, durationMinutes: true },
             });
             const proAvail = resolveAvailability(config.availability as unknown as AvailabilityRule[], pro.availability as unknown as AvailabilityRule[]);
@@ -407,7 +407,7 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       const slotDuration = service?.durationMinutes ?? config.slotDurationMinutes;
 
       const busy = await prisma.appointment.findMany({
-        where: { agentConfigId, status: "CONFIRMADO", ...(professional ? { professionalId: professional.id } : {}) },
+        where: { agentConfigId, ...busyStatusWhere(), ...(professional ? { professionalId: professional.id } : {}) },
         select: { scheduledAt: true, durationMinutes: true },
       });
 

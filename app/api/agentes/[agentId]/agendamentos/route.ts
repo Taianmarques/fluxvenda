@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { getAgentConfigWithRole } from "@/lib/team";
-import { isSlotAvailable, resolveAvailability, type AvailabilityRule } from "@/lib/scheduling";
+import { isSlotAvailable, resolveAvailability, busyStatusWhere, type AvailabilityRule } from "@/lib/scheduling";
 import { notifyProfessionalOfAppointment } from "@/lib/appointment-notify";
 import { z } from "zod";
 
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
   const busy = await prisma.appointment.findMany({
     where: {
       agentConfigId: config.id,
-      status: "CONFIRMADO",
+      ...busyStatusWhere(),
       ...(professional ? { professionalId: professional.id } : {}),
     },
     select: { scheduledAt: true, durationMinutes: true },

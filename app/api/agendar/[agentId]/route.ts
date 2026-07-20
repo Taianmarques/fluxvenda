@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
-import { isSlotAvailable, resolveAvailability, type AvailabilityRule } from "@/lib/scheduling";
+import { isSlotAvailable, resolveAvailability, busyStatusWhere, PENDING_HOLD_MS, type AvailabilityRule } from "@/lib/scheduling";
 import { notifyProfessionalOfAppointment } from "@/lib/appointment-notify";
 import { notifyUsers } from "@/lib/onesignal";
 import { sendWhatsAppTextAsTeam } from "@/lib/whatsapp";
+import { createAsaasCustomer, createAsaasCharge, getAsaasPixQrCode } from "@/lib/asaas";
 import { z } from "zod";
 
 const schema = z.object({
@@ -18,6 +20,8 @@ const schema = z.object({
 
 // Cria o agendamento a partir da página pública — mesma lógica do POST autenticado de
 // app/api/agentes/[agentId]/agendamentos, trocando a auth Clerk pelo gate schedulingEnabled.
+// Com cobrança de sinal ativa, a reserva nasce AGUARDANDO_PAGAMENTO e só confirma via
+// webhook do Asaas (app/api/webhooks/asaas/[agentId]).
 export async function POST(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {
   const { agentId } = await params;
 
@@ -34,11 +38,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
       vagasSimultaneas: true,
       bookingFormFields: true,
       uazapiToken: true,
+      agendamentoCobrancaEnabled: true,
+      agendamentoSinalValor: true,
+      asaasApiKey: true,
+      asaasSandbox: true,
+      asaasWebhookToken: true,
     },
   });
   if (!config?.schedulingEnabled) {
     return NextResponse.json({ error: "Agendamento indisponível" }, { status: 404 });
   }
+
+  // Expiração lazy: reservas de sinal não pagas em 30 min voltam pra grade
+  await prisma.appointment.updateMany({
+    where: { agentConfigId: config.id, status: "AGUARDANDO_PAGAMENTO", createdAt: { lt: new Date(Date.now() - PENDING_HOLD_MS) } },
+    data: { status: "CANCELADO" },
+  });
 
   const raw = await req.text();
   if (raw.length > 2048) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
@@ -82,8 +97,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
     .join("\n");
 
   // Limite barato anti-abuso: um mesmo número não acumula mais que 3 agendamentos futuros
+  // (confirmados ou reservas de sinal ainda frescas)
   const futuros = await prisma.appointment.count({
-    where: { agentConfigId: config.id, contactNumber: body.data.whatsapp, status: "CONFIRMADO", scheduledAt: { gte: new Date() } },
+    where: { agentConfigId: config.id, contactNumber: body.data.whatsapp, ...busyStatusWhere(), scheduledAt: { gte: new Date() } },
   });
   if (futuros >= 3) {
     return NextResponse.json({ error: "Este número já tem agendamentos demais em aberto. Fale com a empresa pelo WhatsApp." }, { status: 429 });
@@ -105,7 +121,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
     // Auto-atribui o primeiro profissional livre nesse horário
     for (const pro of professionals) {
       const busyPro = await prisma.appointment.findMany({
-        where: { agentConfigId: config.id, status: "CONFIRMADO", professionalId: pro.id },
+        where: { agentConfigId: config.id, ...busyStatusWhere(), professionalId: pro.id },
         select: { scheduledAt: true, durationMinutes: true },
       });
       const availPro = resolveAvailability(config.availability as unknown as AvailabilityRule[], pro.availability as unknown as AvailabilityRule[]);
@@ -117,11 +133,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
     if (!professional) return NextResponse.json({ error: "Horário indisponível" }, { status: 409 });
   }
 
-  // Guard de corrida: revalida contra os agendamentos confirmados no momento do POST
+  // Guard de corrida: revalida contra confirmados + reservas frescas no momento do POST
   const busy = await prisma.appointment.findMany({
     where: {
       agentConfigId: config.id,
-      status: "CONFIRMADO",
+      ...busyStatusWhere(),
       ...(professional ? { professionalId: professional.id } : {}),
     },
     select: { scheduledAt: true, durationMinutes: true },
@@ -131,6 +147,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
   if (!isSlotAvailable(availability, durationMinutes, busy, scheduledAt, config.agendarAteEncerramento, professional ? 1 : config.vagasSimultaneas)) {
     return NextResponse.json({ error: "Horário indisponível" }, { status: 409 });
   }
+
+  const cobrar = config.agendamentoCobrancaEnabled && config.agendamentoSinalValor > 0 && Boolean(config.asaasApiKey);
 
   const appointment = await prisma.appointment.create({
     data: {
@@ -142,9 +160,67 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
       notes: respostasNotes ? `Agendado pela página pública\n${respostasNotes}` : "Agendado pela página pública",
       professionalId: professional?.id,
       serviceId: service?.id,
+      ...(cobrar ? { status: "AGUARDANDO_PAGAMENTO" as const } : {}),
     },
   });
 
+  const quando = scheduledAt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) +
+    " às " + scheduledAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+  if (cobrar) {
+    // Garante o token do webhook do Asaas (mesmo padrão do comércio) — sem ele a
+    // confirmação de pagamento não chega
+    if (!config.asaasWebhookToken) {
+      await prisma.agentConfig.update({ where: { id: config.id }, data: { asaasWebhookToken: randomUUID() } });
+    }
+
+    try {
+      // CPF fallback: fluxo Pix aceita o placeholder (mesmo padrão da cobrança por boleto).
+      // Se a conta Asaas de produção rejeitar, a v2 adiciona campo de CPF no formulário.
+      const customer = await createAsaasCustomer(config.asaasApiKey!, config.asaasSandbox, body.data.nome, body.data.whatsapp, "00000000000");
+      const charge = await createAsaasCharge(
+        config.asaasApiKey!,
+        config.asaasSandbox,
+        customer.id,
+        config.agendamentoSinalValor,
+        `Sinal agendamento — ${service ? `${service.name} ` : ""}${quando}`,
+        "PIX",
+      );
+      const qr = await getAsaasPixQrCode(config.asaasApiKey!, config.asaasSandbox, charge.id);
+
+      await prisma.appointment.update({
+        where: { id: appointment.id },
+        data: { asaasPaymentId: charge.id, asaasPixPayload: qr.payload, asaasInvoiceUrl: charge.invoiceUrl },
+      });
+
+      // Notificações (profissional/gestor/cliente) só disparam quando o pagamento
+      // confirmar, via webhook — aqui o cliente recebe o Pix na própria página
+      return NextResponse.json({
+        ok: true,
+        aguardandoPagamento: true,
+        appointmentId: appointment.id,
+        pagamento: {
+          pixPayload: qr.payload,
+          pixQrBase64: qr.encodedImage,
+          invoiceUrl: charge.invoiceUrl,
+          valor: config.agendamentoSinalValor,
+          expiraEm: new Date(appointment.createdAt.getTime() + PENDING_HOLD_MS).toISOString(),
+        },
+        appointment: {
+          scheduledAt: appointment.scheduledAt.toISOString(),
+          durationMinutes: appointment.durationMinutes,
+          serviceName: service?.name ?? null,
+          professionalName: professional?.name ?? null,
+        },
+      });
+    } catch (err) {
+      console.error("[agendar] erro ao gerar cobrança do sinal:", err);
+      await prisma.appointment.delete({ where: { id: appointment.id } }).catch(() => {});
+      return NextResponse.json({ error: "Não foi possível gerar o pagamento. Tente novamente." }, { status: 502 });
+    }
+  }
+
+  // Sem cobrança: confirma na hora e notifica como sempre
   // Avisa o profissional no WhatsApp (fire-and-forget)
   notifyProfessionalOfAppointment(appointment.id, "novo");
 
@@ -152,12 +228,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
   prisma.team.findUnique({ where: { id: config.teamId }, select: { managerId: true } })
     .then(team => {
       if (!team) return;
-      const quandoPush = scheduledAt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) +
-        " às " + scheduledAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
       return notifyUsers(
         [team.managerId],
         "Novo agendamento pelo site",
-        `${body.data.nome} — ${service ? `${service.name} ` : ""}em ${quandoPush}${professional ? ` com ${professional.name}` : ""}`,
+        `${body.data.nome} — ${service ? `${service.name} ` : ""}em ${quando}${professional ? ` com ${professional.name}` : ""}`,
         `${process.env.NEXT_PUBLIC_APP_URL}/crm/${config.id}/agenda`,
       );
     })
@@ -165,8 +239,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
 
   // Confirmação pro cliente no WhatsApp da empresa (fire-and-forget, falha silenciosa)
   if (config.uazapiToken) {
-    const quando = scheduledAt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) +
-      " às " + scheduledAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
     const texto = `Agendamento confirmado!${service ? ` ${service.name}` : ""} em ${quando}${professional ? ` com ${professional.name}` : ""}. Até lá!`;
     sendWhatsAppTextAsTeam(config.uazapiToken, body.data.whatsapp, texto).catch(() => {});
   }

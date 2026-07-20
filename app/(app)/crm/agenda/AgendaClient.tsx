@@ -10,7 +10,7 @@ type Appointment = {
   contactNumber: string;
   scheduledAt: string;
   durationMinutes: number;
-  status: "CONFIRMADO" | "CANCELADO" | "CONCLUIDO";
+  status: "CONFIRMADO" | "CANCELADO" | "CONCLUIDO" | "AGUARDANDO_PAGAMENTO";
   notes: string;
   professional?: { id: string; name: string } | null;
   service?: { id: string; name: string } | null;
@@ -156,6 +156,7 @@ const STATUS_LABEL: Record<string, { label: string; color: string }> = {
   CONFIRMADO: { label: "Confirmado", color: "bg-green-900/40 text-green-300 border-green-800/50" },
   CANCELADO: { label: "Cancelado", color: "bg-red-900/40 text-red-300 border-red-800/50" },
   CONCLUIDO: { label: "Concluído", color: "bg-gray-800 text-gray-400 border-gray-700" },
+  AGUARDANDO_PAGAMENTO: { label: "Aguardando pagamento", color: "bg-yellow-900/40 text-yellow-300 border-yellow-800/50" },
 };
 
 function startOfWeek(date: Date): Date {
@@ -171,7 +172,8 @@ function fmtDate(d: Date): string {
 
 export function AgendaClient({
   agentId, initialSchedulingEnabled, initialSlotDurationMinutes, initialAvailability, initialAppointmentReminderHours, initialRequisitosAgendamento, initialRestricoesAgendamento, initialAtendimentoEspecialEnabled, initialAtendimentoEspecialDescricao,
-  initialAskProfessionalEnabled, initialSchedulingViaLink, initialAgendarAteEncerramento, initialVagasSimultaneas, initialBookingFormFields, agendaAccessToken, bookingSlug,
+  initialAskProfessionalEnabled, initialSchedulingViaLink, initialAgendarAteEncerramento, initialVagasSimultaneas,
+  initialAgendamentoCobrancaEnabled, initialAgendamentoSinalValor, hasAsaasApiKey, initialBookingFormFields, agendaAccessToken, bookingSlug,
 }: {
   agentId: string;
   initialSchedulingEnabled: boolean;
@@ -186,6 +188,9 @@ export function AgendaClient({
   initialSchedulingViaLink?: boolean;
   initialAgendarAteEncerramento?: boolean;
   initialVagasSimultaneas?: number;
+  initialAgendamentoCobrancaEnabled?: boolean;
+  initialAgendamentoSinalValor?: number;
+  hasAsaasApiKey?: boolean;
   initialBookingFormFields?: { label: string; obrigatorio: boolean }[];
   agendaAccessToken?: string | null;
   bookingSlug?: string | null;
@@ -203,6 +208,8 @@ export function AgendaClient({
   const [schedulingViaLink, setSchedulingViaLink] = useState(initialSchedulingViaLink ?? false);
   const [agendarAteEncerramento, setAgendarAteEncerramento] = useState(initialAgendarAteEncerramento ?? false);
   const [vagasSimultaneas, setVagasSimultaneas] = useState(initialVagasSimultaneas ?? 1);
+  const [agendamentoCobrancaEnabled, setAgendamentoCobrancaEnabled] = useState(initialAgendamentoCobrancaEnabled ?? false);
+  const [agendamentoSinalValor, setAgendamentoSinalValor] = useState(initialAgendamentoSinalValor ?? 0);
   const [bookingFormFields, setBookingFormFields] = useState<{ label: string; obrigatorio: boolean }[]>(initialBookingFormFields ?? []);
   const [newFieldLabel, setNewFieldLabel] = useState("");
   const [rules, setRules] = useState(() => rulesFromAvailability(initialAvailability));
@@ -321,7 +328,7 @@ export function AgendaClient({
       await fetch(`/api/agentes/${agentId}/agenda`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ schedulingEnabled, slotDurationMinutes, availability, appointmentReminderHours, requisitosAgendamento, restricoesAgendamento, atendimentoEspecialEnabled, atendimentoEspecialDescricao, askProfessionalEnabled, schedulingViaLink, agendarAteEncerramento, vagasSimultaneas, bookingFormFields }),
+        body: JSON.stringify({ schedulingEnabled, slotDurationMinutes, availability, appointmentReminderHours, requisitosAgendamento, restricoesAgendamento, atendimentoEspecialEnabled, atendimentoEspecialDescricao, askProfessionalEnabled, schedulingViaLink, agendarAteEncerramento, vagasSimultaneas, agendamentoCobrancaEnabled, agendamentoSinalValor, bookingFormFields }),
       });
     } finally {
       setSavingSettings(false);
@@ -644,6 +651,39 @@ export function AgendaClient({
                   </p>
                 </div>
               </label>
+            </div>
+
+            <div className="border border-gray-800 rounded-xl p-4 space-y-3">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={agendamentoCobrancaEnabled}
+                  disabled={!hasAsaasApiKey}
+                  onChange={e => setAgendamentoCobrancaEnabled(e.target.checked)}
+                  className="w-4 h-4 disabled:opacity-50"
+                />
+                <div>
+                  <p className="text-sm font-medium">Cobrar sinal para confirmar (Pix)</p>
+                  <p className="text-xs text-gray-500">
+                    O cliente paga um Pix do valor abaixo na página pública pra confirmar o horário. Usa a conta Asaas
+                    configurada em Comércio. Se o pagamento não cair em 30 minutos, o horário volta a ficar livre.
+                    Pagamentos recebidos fora do prazo (horário já ocupado por outra pessoa) precisam de estorno manual no Asaas.
+                  </p>
+                </div>
+              </label>
+              {!hasAsaasApiKey && (
+                <p className="text-xs text-amber-400">Configure a chave da API do Asaas na aba Comércio antes de ativar.</p>
+              )}
+              {agendamentoCobrancaEnabled && hasAsaasApiKey && (
+                <div>
+                  <label className="text-sm text-gray-400 block mb-1">Valor do sinal (R$)</label>
+                  <input
+                    type="number" min={0} step={0.01} value={agendamentoSinalValor}
+                    onChange={e => setAgendamentoSinalValor(Math.max(0, Number(e.target.value)))}
+                    className="w-32 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+                  />
+                </div>
+              )}
             </div>
 
             <div className="border border-gray-800 rounded-xl p-4 space-y-3">

@@ -39,6 +39,8 @@ const schema = z.object({
   schedulingViaLink: z.boolean().optional(),
   agendarAteEncerramento: z.boolean().optional(),
   vagasSimultaneas: z.number().int().min(1).max(50).optional(),
+  agendamentoCobrancaEnabled: z.boolean().optional(),
+  agendamentoSinalValor: z.number().min(0).max(100000).optional(),
   bookingFormFields: z.array(z.object({
     label: z.string().trim().min(1).max(60),
     obrigatorio: z.boolean(),

@@ -653,6 +653,8 @@ model AgentConfig {
   schedulingViaLink            Boolean @default(false) // true = a IA envia o link da página pública (/agendar) em vez de marcar por mensagem
   agendarAteEncerramento       Boolean @default(false) // aceita horário que começa dentro do funcionamento mesmo terminando após o fechamento
   vagasSimultaneas             Int     @default(1) // atendimentos simultâneos sem profissional (ex: lava-jato com 3 vagas)
+  agendamentoCobrancaEnabled   Boolean @default(false) // cobra sinal via Pix pra confirmar agendamento na página pública
+  agendamentoSinalValor        Float   @default(0) // valor do sinal em reais
   bookingFormFields            Json    @default("[]") // campos extras do agendamento pelo link: [{ label, obrigatorio }] — nome e WhatsApp são sempre pedidos
   agendaAccessToken            String? @unique // link da agenda geral da empresa (/agenda/[token], PWA)
 
@@ -1138,12 +1140,18 @@ model Appointment {
   status          AppointmentStatus @default(CONFIRMADO)
 
   reminderSentAt DateTime? // quando o lembrete de confirmação foi enviado (evita reenvio)
+
+  // Sinal via Asaas (página pública com cobrança pra confirmar)
+  asaasPaymentId  String?
+  asaasPixPayload String? @db.Text
+  asaasInvoiceUrl String?
 }
 
 enum AppointmentStatus {
   CONFIRMADO
   CANCELADO
   CONCLUIDO
+  AGUARDANDO_PAGAMENTO // reserva aguardando o Pix do sinal (expira em 30 min — ver PENDING_HOLD_MS)
 }
 
 // Uma empresa pode ter vários pipelines (ex: Vendas, Suporte). Cada conversa fica em uma

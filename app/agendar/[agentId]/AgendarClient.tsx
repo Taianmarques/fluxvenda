@@ -1,14 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Calendar, CalendarCheck, ChevronLeft, Clock, Loader2, MessageCircle, Scissors, User } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Calendar, CalendarCheck, ChevronLeft, Clock, Copy, Check, Loader2, MessageCircle, QrCode, Scissors, User } from "lucide-react";
 
 type Service = { id: string; name: string; durationMinutes: number };
 type Professional = { id: string; name: string };
 type SlotDay = { date: string; weekday: string; slots: string[] };
 type Confirmado = { scheduledAt: string; durationMinutes: number; serviceName: string | null; professionalName: string | null };
+type Pagamento = { pixPayload: string; pixQrBase64: string; invoiceUrl: string | null; valor: number; expiraEm: string };
 
-type Step = "servico" | "profissional" | "horario" | "dados" | "confirmado";
+type Step = "servico" | "profissional" | "horario" | "dados" | "pagamento" | "confirmado";
 
 function formatDuration(min: number): string {
   const h = Math.floor(min / 60);
@@ -22,7 +23,7 @@ function formatDateLong(iso: string): string {
   return new Date(y, m - 1, d).toLocaleDateString("pt-BR", { day: "2-digit", month: "long" });
 }
 
-export function AgendarClient({ agentId, businessName, whatsappNumber, logo, services, professionals, askProfessionalEnabled, defaultDurationMinutes, formFields }: {
+export function AgendarClient({ agentId, businessName, whatsappNumber, logo, services, professionals, askProfessionalEnabled, defaultDurationMinutes, formFields, sinalValor }: {
   agentId: string;
   businessName: string;
   whatsappNumber: string | null;
@@ -32,6 +33,7 @@ export function AgendarClient({ agentId, businessName, whatsappNumber, logo, ser
   askProfessionalEnabled: boolean;
   defaultDurationMinutes: number;
   formFields: { label: string; obrigatorio: boolean }[];
+  sinalValor: number | null;
 }) {
   const temServicos = services.length > 0;
   const pedeProfissional = professionals.length > 1 && askProfessionalEnabled;
@@ -51,6 +53,10 @@ export function AgendarClient({ agentId, businessName, whatsappNumber, logo, ser
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [confirmado, setConfirmado] = useState<Confirmado | null>(null);
+  const [pagamento, setPagamento] = useState<Pagamento | null>(null);
+  const [appointmentId, setAppointmentId] = useState<string | null>(null);
+  const [pixCopiado, setPixCopiado] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const carregarSlots = useCallback(async () => {
     setLoadingSlots(true);
@@ -98,7 +104,13 @@ export function AgendarClient({ agentId, businessName, whatsappNumber, logo, ser
         }),
       });
       const data = await res.json();
-      if (res.ok) {
+      if (res.ok && data.aguardandoPagamento) {
+        // Sinal ativo: mostra o Pix e espera o pagamento confirmar (polling)
+        setConfirmado(data.appointment);
+        setPagamento(data.pagamento);
+        setAppointmentId(data.appointmentId);
+        setStep("pagamento");
+      } else if (res.ok) {
         setConfirmado(data.appointment);
         setStep("confirmado");
         // Igual ao catálogo: já cai na conversa do WhatsApp da empresa com a confirmação.
@@ -123,6 +135,39 @@ export function AgendarClient({ agentId, businessName, whatsappNumber, logo, ser
     if (!whatsappNumber) return;
     window.open(`https://wa.me/${whatsappNumber}`, "_blank");
   }
+
+  function copiarPix() {
+    if (!pagamento) return;
+    navigator.clipboard.writeText(pagamento.pixPayload).then(() => {
+      setPixCopiado(true);
+      setTimeout(() => setPixCopiado(false), 2000);
+    }).catch(() => {});
+  }
+
+  // Enquanto o Pix não cai, consulta o status a cada 5s — o webhook do Asaas confirma
+  // a reserva no servidor, e aqui a tela troca sozinha pra confirmação
+  useEffect(() => {
+    if (step !== "pagamento" || !appointmentId) return;
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/agendar/${agentId}/status?appointmentId=${appointmentId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.status === "CONFIRMADO") {
+          if (pollRef.current) clearInterval(pollRef.current);
+          setStep("confirmado");
+          abrirWhatsApp();
+        } else if (data.status === "CANCELADO") {
+          if (pollRef.current) clearInterval(pollRef.current);
+          setPagamento(null);
+          setErro("Reserva expirada — o pagamento não foi identificado a tempo. Escolha outro horário.");
+          setStep("horario");
+        }
+      } catch {}
+    }, 5000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, appointmentId]);
 
   function voltar() {
     setErro(null);
@@ -305,6 +350,42 @@ export function AgendarClient({ agentId, businessName, whatsappNumber, logo, ser
           </>
         )}
 
+        {/* Passo: pagamento do sinal (Pix) */}
+        {step === "pagamento" && pagamento && (
+          <div className="space-y-4">
+            <div className="text-center space-y-1">
+              <span className="inline-flex p-3 rounded-full bg-blue-50 text-blue-600"><QrCode size={28} /></span>
+              <h1 className="text-lg font-bold">Pague o sinal pra confirmar</h1>
+              <p className="text-2xl font-bold text-blue-600">{pagamento.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</p>
+              <p className="text-xs text-gray-500">
+                Você tem <span className="font-semibold">30 minutos</span> pra pagar — depois disso o horário é liberado pra outras pessoas.
+              </p>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-col items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={`data:image/png;base64,${pagamento.pixQrBase64}`} alt="QR Code Pix" className="w-52 h-52" />
+              <button
+                onClick={copiarPix}
+                className="w-full flex items-center justify-center gap-2 border border-gray-200 hover:border-blue-400 rounded-xl py-2.5 text-sm font-medium transition-colors"
+              >
+                {pixCopiado ? <Check size={15} className="text-green-600" /> : <Copy size={15} />}
+                {pixCopiado ? "Código copiado!" : "Copiar código Pix (copia e cola)"}
+              </button>
+              {pagamento.invoiceUrl && (
+                <a href={pagamento.invoiceUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 underline">
+                  Outras formas de pagamento
+                </a>
+              )}
+            </div>
+
+            <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
+              <Loader2 size={13} className="animate-spin" />
+              Aguardando o pagamento — a confirmação aparece aqui sozinha.
+            </div>
+          </div>
+        )}
+
         {/* Confirmado */}
         {step === "confirmado" && confirmado && (
           <div className="text-center pt-10 space-y-4">
@@ -347,6 +428,11 @@ export function AgendarClient({ agentId, businessName, whatsappNumber, logo, ser
               {service ? `${service.name} · ` : ""}
               {professional ? `${professional.name} · ` : ""}
               {selectedDate ? formatDateLong(selectedDate) : ""} às {selectedTime} · {formatDuration(duracao)}
+              {sinalValor != null && (
+                <span className="block mt-0.5 font-medium text-blue-600">
+                  Sinal de {sinalValor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} via Pix pra confirmar
+                </span>
+              )}
             </p>
             <button
               onClick={confirmar}
@@ -354,7 +440,7 @@ export function AgendarClient({ agentId, businessName, whatsappNumber, logo, ser
               className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold rounded-2xl py-3.5 text-sm transition-colors"
             >
               {enviando ? <Loader2 size={16} className="animate-spin" /> : <CalendarCheck size={16} />}
-              {enviando ? "Confirmando..." : "Confirmar agendamento"}
+              {enviando ? "Confirmando..." : sinalValor != null ? "Confirmar e pagar sinal" : "Confirmar agendamento"}
             </button>
           </div>
         </div>

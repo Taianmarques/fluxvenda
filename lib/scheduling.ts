@@ -1,5 +1,20 @@
 export type AvailabilityRule = { dayOfWeek: number; start: string; end: string }; // start/end "HH:mm"
 
+// Reserva aguardando pagamento do sinal segura o horário por esse tempo; depois expira
+// (lazy — ver updateMany nas rotas públicas) e o slot volta pra grade.
+export const PENDING_HOLD_MS = 30 * 60_000;
+
+// Fragmento de where pra listar agendamentos que OCUPAM um horário: confirmados +
+// reservas aguardando pagamento ainda dentro da janela de 30 min.
+export function busyStatusWhere() {
+  return {
+    OR: [
+      { status: "CONFIRMADO" as const },
+      { status: "AGUARDANDO_PAGAMENTO" as const, createdAt: { gte: new Date(Date.now() - PENDING_HOLD_MS) } },
+    ],
+  };
+}
+
 const DIAS_SEMANA = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
 
 function parseTime(hhmm: string): number {
