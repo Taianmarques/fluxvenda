@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { PlatformWhatsappCard } from "./PlatformWhatsappCard";
 
 function daysAgo(n: number) {
   const d = new Date();
@@ -43,6 +44,9 @@ export default async function AdminDashboardPage() {
           <p className="text-gray-400 text-sm">Visão geral</p>
           <h1 className="text-3xl font-bold mt-1">Dashboard</h1>
         </div>
+
+        {/* Saúde do WhatsApp global (boas-vindas do cadastro) */}
+        <PlatformWhatsappCard />
 
         {/* Métricas principais */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
