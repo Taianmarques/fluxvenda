@@ -825,6 +825,12 @@ export function WhatsappInbox({
                       ) : null}
                     </div>
                     <p className={`text-xs truncate mt-0.5 ${t.listSecondary}`}>{c.lastMessage || "—"}</p>
+                    {c.assignedToId && (
+                      <p className={`text-[10px] mt-0.5 flex items-center gap-1 truncate ${t.listTertiary}`}>
+                        <User size={9} className="flex-shrink-0" />
+                        {attendants.find(a => a.id === c.assignedToId)?.name ?? "Atendente"}
+                      </p>
+                    )}
                     {c.opportunities.length > 0 && (
                       <p className={`text-xs font-semibold mt-1 flex items-center gap-1 ${c.opportunities.some(o => o.wonAt) ? "text-green-500" : "text-gray-400"}`}>
                         {c.opportunities.some(o => o.wonAt) && <Trophy size={11} />}
