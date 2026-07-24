@@ -1004,18 +1004,26 @@ export function WhatsappInbox({
                           {c.etiquetas.length > 3 && <span className="text-[9px] text-gray-500">+{c.etiquetas.length - 3}</span>}
                         </div>
                       )}
-                      {c.assignedToId && (
-                        <p className={`text-[10px] mt-0.5 flex items-center gap-1 truncate ${t.listTertiary}`}>
-                          <User size={9} className="flex-shrink-0" />
-                          {attendants.find(a => a.id === c.assignedToId)?.name ?? "Atendente"}
-                        </p>
-                      )}
-                      {c.opportunities.length > 0 && (
-                        <p className={`text-xs font-semibold mt-1 flex items-center gap-1 ${c.opportunities.some(o => o.wonAt) ? "text-green-500" : "text-gray-400"}`}>
-                          {c.opportunities.some(o => o.wonAt) && <Trophy size={11} />}
-                          {formatBRL(c.opportunities.reduce((sum, o) => sum + o.dealValue, 0))}
-                          {c.opportunities.length > 1 && ` (${c.opportunities.length})`}
-                        </p>
+                      {(c.assignedToId || c.opportunities.length > 0) && (
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                          {c.assignedToId && (
+                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-700/50 text-gray-300 border border-gray-600 flex items-center gap-1 flex-shrink-0">
+                              <User size={9} className="flex-shrink-0" />
+                              {attendants.find(a => a.id === c.assignedToId)?.name ?? "Atendente"}
+                            </span>
+                          )}
+                          {c.opportunities.length > 0 && (
+                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 flex-shrink-0 ${
+                              c.opportunities.some(o => o.wonAt)
+                                ? "bg-green-900/40 text-green-300 border border-green-800/50"
+                                : "bg-blue-900/40 text-blue-300 border border-blue-800/50"
+                            }`}>
+                              {c.opportunities.some(o => o.wonAt) && <Trophy size={9} />}
+                              {formatBRL(c.opportunities.reduce((sum, o) => sum + o.dealValue, 0))}
+                              {c.opportunities.length > 1 && ` (${c.opportunities.length})`}
+                            </span>
+                          )}
+                        </div>
                       )}
                       <div className="flex items-center justify-between mt-1.5">
                         <div className="flex items-center gap-1.5">
