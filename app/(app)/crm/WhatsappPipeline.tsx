@@ -252,42 +252,54 @@ function Column({
       ref={setNodeRef}
       className={`w-72 flex-shrink-0 flex flex-col rounded-2xl border overflow-hidden ${isOver ? "border-blue-500" : t.column}`}
     >
-      <div className={`p-3 border-b ${t.columnHeaderBorder}`}>
-        <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: stage.color }} />
-          {editing ? (
-            <input
-              autoFocus
-              value={name}
-              onChange={e => setName(e.target.value)}
-              onBlur={() => { setEditing(false); if (name.trim() && name !== stage.name) onRename(stage.id, name.trim()); }}
-              onKeyDown={e => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
-              className={`flex-1 border rounded px-2 py-0.5 text-sm ${t.nameInput}`}
-            />
-          ) : (
-            <p
-              className="flex-1 font-bold text-[12.5px] uppercase tracking-wide truncate cursor-text"
-              onClick={() => setEditing(true)}
+      <div className="h-[3px] flex-shrink-0" style={{ backgroundColor: stage.color }} />
+      <div className={`group p-3 border-b ${t.columnHeaderBorder}`}>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            {editing ? (
+              <input
+                autoFocus
+                value={name}
+                onChange={e => setName(e.target.value)}
+                onBlur={() => { setEditing(false); if (name.trim() && name !== stage.name) onRename(stage.id, name.trim()); }}
+                onKeyDown={e => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
+                className={`border rounded px-2 py-0.5 text-sm ${t.nameInput}`}
+              />
+            ) : (
+              <p
+                className="font-bold text-[12.5px] uppercase tracking-wide truncate cursor-text"
+                onClick={() => setEditing(true)}
+              >
+                {stage.name}
+              </p>
+            )}
+            <span
+              className="text-[11px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+              style={{ backgroundColor: `${stage.color}33`, color: stage.color }}
             >
-              {stage.name}
-            </p>
-          )}
-          <button
-            onClick={() => { setInstrucoes(stage.agenteInstrucoes ?? ""); setShowAgente(s => !s); }}
-            title={temAgente ? "Agente da etapa configurado — clique para editar" : "Configurar agente responsável por esta etapa"}
-            className={`flex-shrink-0 ${temAgente ? "text-blue-400 hover:text-blue-300" : "text-gray-600 hover:text-gray-400"}`}
-          >
-            <Bot size={14} />
-          </button>
-          <span
-            className="text-[11px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
-            style={{ backgroundColor: `${stage.color}33`, color: stage.color }}
-          >
-            {opportunities.length}
-          </span>
-          <button onClick={() => onDelete(stage.id)} className="text-gray-500 hover:text-red-400 text-xs">✕</button>
+              {opportunities.length}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <button
+              onClick={() => { setInstrucoes(stage.agenteInstrucoes ?? ""); setShowAgente(s => !s); }}
+              title={temAgente ? "Agente da etapa configurado — clique para editar" : "Configurar agente responsável por esta etapa"}
+              className={`flex-shrink-0 transition-opacity ${
+                temAgente ? "text-blue-400 hover:text-blue-300" : "text-gray-600 hover:text-gray-400 md:opacity-0 md:group-hover:opacity-100"
+              }`}
+            >
+              <Bot size={14} />
+            </button>
+            <button
+              onClick={() => onDelete(stage.id)}
+              title="Excluir etapa"
+              className="flex-shrink-0 text-gray-500 hover:text-red-400 transition-opacity md:opacity-0 md:group-hover:opacity-100"
+            >
+              <X size={14} />
+            </button>
+            {total > 0 && <p className="text-[15px] font-bold leading-none text-green-500">{formatBRL(total)}</p>}
+          </div>
         </div>
-        {total > 0 && <p className="text-[15px] font-bold leading-none text-green-500 mt-2">{formatBRL(total)}</p>}
 
         {showAgente && (
           <div className={`mt-2 rounded-xl border p-2.5 space-y-2 ${dark ? "bg-gray-950 border-gray-700" : "bg-white border-gray-300"}`}>
