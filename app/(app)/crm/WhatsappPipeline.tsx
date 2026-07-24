@@ -130,8 +130,8 @@ function Card({
       {...listeners}
       {...attributes}
       onClick={onClick}
-      className={`border rounded-xl p-3 cursor-pointer transition-colors ${t.card} ${isDragging ? "opacity-30" : ""}`}
-      style={stageColor ? { backgroundColor: `${stageColor}17` } : undefined}
+      className={`border rounded-xl p-3 cursor-pointer transition-colors shadow-sm ${t.card} ${isDragging ? "opacity-30" : ""} ${stageColor ? "border-l-4" : ""}`}
+      style={stageColor ? { borderLeftColor: stageColor } : undefined}
     >
       <div className="flex items-center gap-2">
         <CardAvatar agentId={agentId} conversationId={opp.conversationId} seed={opp.contactName || opp.contactNumber} />
