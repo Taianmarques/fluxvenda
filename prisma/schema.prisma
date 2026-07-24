@@ -626,6 +626,13 @@ model AgentConfig {
   systemPrompt String?
   active       Boolean @default(false)
 
+  // Pausa só a resposta automática da IA nesse canal — mensagens continuam chegando e sendo
+  // salvas normalmente, só não geram resposta automática (diferente de "active", que
+  // desliga o canal inteiro). Independentes: um time pode ter WhatsApp e Instagram na mesma
+  // AgentConfig e pausar só um dos dois.
+  whatsappAiPaused  Boolean @default(false)
+  instagramAiPaused Boolean @default(false)
+
   uazapiInstance String?
   uazapiToken    String?
 

@@ -183,8 +183,6 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
     }
   }
 
-  if (conversation.humanTakeover) return;
-
   // Histórico antes de salvar a mensagem atual (mesmo padrão do webhook WhatsApp)
   const recentMessages = await prisma.message.findMany({
     where: { conversationId: conversation.id, role: { not: "note" } },
@@ -196,6 +194,11 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
     data: { conversationId: conversation.id, role: "user", content: text },
   });
   emitChatEvent(config.id, conversation.id); // push em tempo real pro CRM
+
+  // Atendente assumiu a conversa OU o canal está pausado só pra IA — em ambos os casos a
+  // mensagem já foi salva acima (aparece no chat normalmente), só não gera resposta automática
+  if (conversation.humanTakeover) return;
+  if (config.instagramAiPaused) return;
 
   // Debounce: aguarda mensagens em partes antes de responder
   const debounceMs = Number(process.env.MESSAGE_DEBOUNCE_MS ?? "8000");
@@ -402,8 +405,9 @@ async function processComment(igBusinessAccountId: string, comment: {
     // Fallback: mensagem fixa configurada (nenhum fluxo bateu)
     dmMessage = config.igCommentDmMessage;
   } else {
-    // Fallback: IA responde
-    if (!config.systemPrompt) return;
+    // Fallback: IA responde — não entra se a IA estiver pausada nesse canal (funil e
+    // mensagem fixa acima continuam funcionando normalmente, só o fallback de IA é afetado)
+    if (!config.systemPrompt || config.instagramAiPaused) return;
     if (await isOverQuota(config.teamId)) return;
 
     const result = await runAgent(

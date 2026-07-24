@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   Wifi, Pause, Play, Plus, RefreshCw, X,
   CheckCircle2, Smartphone, Instagram, Link2Off,
-  ChevronDown, ChevronUp, GripVertical, Trash2, ToggleLeft, ToggleRight,
+  ChevronDown, ChevronUp, GripVertical, Trash2, ToggleLeft, ToggleRight, BotOff, Bot,
 } from "lucide-react";
 
 type WhatsAppStatus = {
@@ -35,6 +35,8 @@ type Channel = {
   segmento: string;
   subsegmento: string;
   active: boolean;
+  whatsappAiPaused: boolean;
+  instagramAiPaused: boolean;
   uazapiToken: string | null;
   whatsapp: WhatsAppStatus | null;
   instagram: InstagramStatus;
@@ -424,6 +426,19 @@ export function CanaisClient({
     } finally { setLoadingId(null); }
   }
 
+  // Pausa só a resposta automática da IA num canal — mensagens continuam chegando normalmente
+  async function handleToggleAiPause(channelId: string, field: "whatsappAiPaused" | "instagramAiPaused", current: boolean) {
+    setLoadingId(channelId + ":" + field);
+    setChannels((prev) => prev.map((c) => (c.id === channelId ? { ...c, [field]: !current } : c)));
+    try {
+      await fetch(`/api/agentes/${channelId}/pausar-ia`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: !current }),
+      });
+    } finally { setLoadingId(null); }
+  }
+
   async function handleCreate(connect: "whatsapp" | "instagram" | "none") {
     if (!newName.trim()) return;
     setLoadingId("new");
@@ -679,6 +694,19 @@ export function CanaisClient({
                         <RefreshCw size={12} className={connectingId === ch.id ? "animate-spin" : ""} />
                         Reconectar
                       </button>
+                      <button
+                        onClick={() => handleToggleAiPause(ch.id, "whatsappAiPaused", ch.whatsappAiPaused)}
+                        disabled={loadingId === ch.id + ":whatsappAiPaused"}
+                        title="Pausa só a resposta automática da IA — mensagens continuam chegando normalmente"
+                        className={`flex items-center gap-1.5 text-xs border rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50 ${
+                          ch.whatsappAiPaused
+                            ? "text-amber-300 border-amber-700 bg-amber-900/20"
+                            : "text-gray-400 hover:text-white border-gray-700 hover:border-gray-500"
+                        }`}
+                      >
+                        {ch.whatsappAiPaused ? <BotOff size={12} /> : <Bot size={12} />}
+                        {ch.whatsappAiPaused ? "IA pausada" : "Pausar IA"}
+                      </button>
                     </div>
                   )}
                 </div>
@@ -720,6 +748,19 @@ export function CanaisClient({
                           >
                             Condições
                             {flowsOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                          </button>
+                          <button
+                            onClick={() => handleToggleAiPause(ch.id, "instagramAiPaused", ch.instagramAiPaused)}
+                            disabled={loadingId === ch.id + ":instagramAiPaused"}
+                            title="Pausa só a resposta automática da IA — mensagens continuam chegando normalmente"
+                            className={`flex items-center gap-1.5 text-xs border rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50 ${
+                              ch.instagramAiPaused
+                                ? "text-amber-300 border-amber-700 bg-amber-900/20"
+                                : "text-gray-400 hover:text-white border-gray-700 hover:border-gray-500"
+                            }`}
+                          >
+                            {ch.instagramAiPaused ? <BotOff size={12} /> : <Bot size={12} />}
+                            {ch.instagramAiPaused ? "IA pausada" : "Pausar IA"}
                           </button>
                           <button
                             onClick={() => handleDisconnectInstagram(ch.id)}
