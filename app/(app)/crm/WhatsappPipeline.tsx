@@ -297,7 +297,7 @@ function Column({
             >
               <X size={14} />
             </button>
-            {total > 0 && <p className="text-[15px] font-bold leading-none text-green-500">{formatBRL(total)}</p>}
+            {total > 0 && <p className="text-[12px] font-bold leading-none text-green-500 whitespace-nowrap">{formatBRL(total)}</p>}
           </div>
         </div>
 
