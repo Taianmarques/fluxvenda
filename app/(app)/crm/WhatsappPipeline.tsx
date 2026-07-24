@@ -130,12 +130,12 @@ function Card({
       {...listeners}
       {...attributes}
       onClick={onClick}
-      className={`border rounded-xl p-3 cursor-pointer transition-colors shadow-sm ${t.card} ${isDragging ? "opacity-30" : ""} ${stageColor ? "border-l-4" : ""}`}
+      className={`border rounded-xl p-3 cursor-pointer transition-colors shadow-sm flex flex-col min-h-[152px] ${t.card} ${isDragging ? "opacity-30" : ""} ${stageColor ? "border-l-4" : ""}`}
       style={stageColor ? { borderLeftColor: stageColor } : undefined}
     >
       <div className="flex items-center gap-2">
         <CardAvatar agentId={agentId} conversationId={opp.conversationId} seed={opp.contactName || opp.contactNumber} />
-        <p className="font-medium text-sm truncate flex-1">{opp.contactName || opp.contactNumber}</p>
+        <p className="font-semibold text-[13.5px] leading-tight truncate flex-1">{opp.contactName || opp.contactNumber}</p>
         <button
           onClick={e => { e.stopPropagation(); onOpenChat(opp.conversationId); }}
           onPointerDown={e => e.stopPropagation()}
@@ -153,15 +153,15 @@ function Card({
           dark={dark}
         />
       </div>
-      <p className={`text-xs truncate mt-1 ${t.cardSecondary}`}>{opp.title || opp.lastMessage || "—"}</p>
-      <div className={`flex items-center justify-between gap-2 mt-1.5 text-[10px] ${t.cardSecondary}`}>
-        <span>Aberta em {formatDate(opp.createdAt)}</span>
-        <span className={daysSince(opp.stageEnteredAt) >= 7 ? "text-amber-500 font-medium" : ""}>
-          {daysSince(opp.stageEnteredAt)}d nessa etapa
+      <p className={`text-[11.5px] truncate mt-1 ${t.cardSecondary}`}>{opp.title || opp.lastMessage || "—"}</p>
+      <div className={`flex items-center justify-between gap-2 mt-2 text-[9.5px] font-medium uppercase tracking-wide ${t.cardSecondary}`}>
+        <span>Aberta {formatDate(opp.createdAt)}</span>
+        <span className={daysSince(opp.stageEnteredAt) >= 7 ? "text-amber-500" : ""}>
+          {daysSince(opp.stageEnteredAt)}d na etapa
         </span>
       </div>
       {opp.assignedToName && (
-        <p className={`text-[10px] mt-0.5 truncate ${t.cardSecondary}`}>Vendedor: {opp.assignedToName}</p>
+        <p className={`text-[9.5px] font-medium uppercase tracking-wide mt-1 truncate ${t.cardSecondary}`}>Vendedor · {opp.assignedToName}</p>
       )}
       {editingValue ? (
         <input
@@ -176,9 +176,9 @@ function Card({
           className={`w-full mt-2 border rounded px-2 py-1 text-xs ${t.input}`}
         />
       ) : (
-        <div className="flex items-center justify-between gap-2 mt-2">
+        <div className="flex items-center justify-between gap-2 mt-auto pt-2">
           <p
-            className="text-xs font-semibold cursor-text text-green-500"
+            className="text-[15px] font-bold leading-none cursor-text text-green-500"
             onClick={e => { e.stopPropagation(); setEditingValue(true); }}
             onPointerDown={e => e.stopPropagation()}
           >
