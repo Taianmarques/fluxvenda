@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   MessageCircle, Search, X, Trophy, Lock, Unlock, Bot, User, UserPlus,
   FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap, StickyNote, ArrowRightLeft, HandCoins, CalendarClock, ListFilter, Instagram, ArrowLeft,
-  Reply, Forward, ChevronDown,
+  Reply, Forward, ChevronDown, Package, ImageOff,
 } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { EmojiPicker } from "./EmojiPicker";
@@ -63,6 +63,62 @@ function detectMediaKind(mime: string): MediaKind {
   if (mime.startsWith("video/")) return "video";
   if (mime.startsWith("audio/")) return "audio";
   return "document";
+}
+
+// Item do catálogo pra envio manual pelo atendente — mesmo shape retornado por
+// GET /api/agentes/[agentId]/produtos, sem "placa" (nunca é enviada pro cliente)
+type CatalogProduct = {
+  id: string; name: string; price: number; precoPromocional: number | null; active: boolean;
+  imagemBase64: string | null; imagemMimeType: string | null;
+  marca: string | null; modelo: string | null; anoFabricacao: number | null; anoModelo: number | null;
+  km: number | null; cor: string | null; cambio: string | null; combustivel: string | null; condicaoVeiculo: string | null;
+  tipoNegocio: string | null; tipoImovel: string | null; areaM2: number | null; quartos: number | null;
+  banheiros: number | null; vagasGaragem: number | null; bairro: string | null; cidade: string | null;
+};
+
+const CAMBIO_LABEL: Record<string, string> = { MANUAL: "Manual", AUTOMATICO: "Automático" };
+const COMBUSTIVEL_LABEL: Record<string, string> = { FLEX: "Flex", GASOLINA: "Gasolina", ETANOL: "Etanol", DIESEL: "Diesel", ELETRICO: "Elétrico", HIBRIDO: "Híbrido", GNV: "GNV" };
+const CONDICAO_LABEL: Record<string, string> = { NOVO: "Novo", SEMINOVO: "Seminovo", USADO: "Usado" };
+const TIPO_NEGOCIO_LABEL: Record<string, string> = { VENDA: "Venda", ALUGUEL: "Aluguel" };
+const TIPO_IMOVEL_LABEL: Record<string, string> = { CASA: "Casa", APARTAMENTO: "Apartamento", COMERCIAL: "Comercial", TERRENO: "Terreno" };
+
+// Detecta o tipo do item pelos campos preenchidos (o formulário só popula um conjunto por vez)
+// e monta a linha de especificações — usada tanto na lista do seletor quanto na legenda enviada.
+function productSpecsLine(p: CatalogProduct): string {
+  if (p.marca || p.modelo || p.anoFabricacao || p.anoModelo || p.km != null || p.condicaoVeiculo) {
+    return [
+      (p.anoFabricacao || p.anoModelo) ? `${p.anoFabricacao ?? "?"}/${p.anoModelo ?? "?"}` : "",
+      p.km != null ? `${p.km.toLocaleString("pt-BR")} km` : "",
+      p.cor ?? "",
+      p.cambio ? CAMBIO_LABEL[p.cambio] ?? p.cambio : "",
+      p.combustivel ? COMBUSTIVEL_LABEL[p.combustivel] ?? p.combustivel : "",
+      p.condicaoVeiculo ? CONDICAO_LABEL[p.condicaoVeiculo] ?? p.condicaoVeiculo : "",
+    ].filter(Boolean).join(" · ");
+  }
+  if (p.tipoImovel || p.tipoNegocio || p.bairro || p.areaM2 != null) {
+    return [
+      p.areaM2 != null ? `${p.areaM2} m²` : "",
+      p.quartos != null ? `${p.quartos} quarto(s)` : "",
+      p.banheiros != null ? `${p.banheiros} banheiro(s)` : "",
+      [p.bairro, p.cidade].filter(Boolean).join(", "),
+    ].filter(Boolean).join(" · ");
+  }
+  return "";
+}
+
+function productDisplayTitle(p: CatalogProduct): string {
+  if (p.marca || p.modelo) return [p.marca, p.modelo].filter(Boolean).join(" ");
+  return p.name;
+}
+
+function buildProductCaption(p: CatalogProduct): string {
+  const price = p.precoPromocional != null ? p.precoPromocional : p.price;
+  const tipo = p.tipoImovel || p.tipoNegocio
+    ? [p.tipoImovel ? TIPO_IMOVEL_LABEL[p.tipoImovel] ?? p.tipoImovel : "", p.tipoNegocio ? `para ${TIPO_NEGOCIO_LABEL[p.tipoNegocio] ?? p.tipoNegocio}` : ""].filter(Boolean).join(" ")
+    : "";
+  const title = p.marca || p.modelo ? productDisplayTitle(p) : `${p.name}${tipo ? ` (${tipo})` : ""}`;
+  const specs = productSpecsLine(p);
+  return `${title} — ${formatBRL(price)}${specs ? `\n${specs}` : ""}`;
 }
 
 type ConversationDetail = {
@@ -210,6 +266,11 @@ export function WhatsappInbox({
   const [forwardTargets, setForwardTargets] = useState<string[]>([]);
   const [forwardSearch, setForwardSearch] = useState("");
   const [forwarding, setForwarding] = useState(false);
+  // Enviar item do catálogo manualmente (foto + legenda) na conversa
+  const [pickingProduct, setPickingProduct] = useState(false);
+  const [catalogProducts, setCatalogProducts] = useState<CatalogProduct[] | null>(null);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [productSearch, setProductSearch] = useState("");
   const [showOpportunities, setShowOpportunities] = useState(false);
   const [showScheduled, setShowScheduled] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -472,6 +533,32 @@ export function WhatsappInbox({
     };
     reader.onerror = () => setAttachError("Não foi possível ler o arquivo.");
     reader.readAsDataURL(file);
+  }
+
+  async function openProductPicker() {
+    setPickingProduct(true);
+    if (catalogProducts !== null) return;
+    setProductsLoading(true);
+    try {
+      const res = await fetch(`/api/agentes/${agentId}/produtos`);
+      const data = await res.json();
+      setCatalogProducts((data.products ?? []).filter((p: CatalogProduct) => p.active));
+    } catch {
+      setCatalogProducts([]);
+    } finally {
+      setProductsLoading(false);
+    }
+  }
+
+  function handlePickProduct(p: CatalogProduct) {
+    setInput(buildProductCaption(p));
+    setAttachment(
+      p.imagemBase64
+        ? { base64: p.imagemBase64, type: "image", fileName: `produto-${p.id}.jpg`, previewUrl: `data:${p.imagemMimeType ?? "image/jpeg"};base64,${p.imagemBase64}` }
+        : null
+    );
+    setPickingProduct(false);
+    setProductSearch("");
   }
 
   async function startRecording() {
@@ -1159,6 +1246,15 @@ export function WhatsappInbox({
                             <Paperclip size={18} />
                           </button>
                           )}
+                          {!isIgContact(detail.contactNumber) && (
+                          <button
+                            onClick={openProductPicker}
+                            title="Enviar item do catálogo"
+                            className="p-1.5 rounded-lg opacity-70 hover:opacity-100 hover:bg-black/10"
+                          >
+                            <Package size={18} />
+                          </button>
+                          )}
                           <button
                             onClick={handleToggleSignature}
                             disabled={!isManager || signatureSaving}
@@ -1314,6 +1410,60 @@ export function WhatsappInbox({
               >
                 {forwarding ? "Encaminhando..." : `Encaminhar (${forwardTargets.length})`}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de enviar item do catálogo */}
+      {pickingProduct && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className={`w-full max-w-sm rounded-2xl border p-5 space-y-3 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}>
+            <div className="flex items-center justify-between">
+              <p className="font-semibold flex items-center gap-2"><Package size={16} /> Enviar item do catálogo</p>
+              <button onClick={() => setPickingProduct(false)} className="text-gray-500 hover:text-gray-300"><X size={16} /></button>
+            </div>
+            <input
+              value={productSearch}
+              onChange={e => setProductSearch(e.target.value)}
+              placeholder="Buscar produto..."
+              className={`w-full rounded-xl border px-3 py-2 text-sm focus:outline-none ${theme === "dark" ? "bg-gray-950 border-gray-800" : "bg-gray-50 border-gray-200"}`}
+            />
+            <div className="max-h-72 overflow-y-auto space-y-1">
+              {productsLoading ? (
+                <p className="text-sm text-gray-500 text-center py-6">Carregando...</p>
+              ) : (catalogProducts ?? []).length === 0 ? (
+                <p className="text-sm text-gray-500 text-center py-6">Nenhum produto ativo no catálogo.</p>
+              ) : (catalogProducts ?? [])
+                .filter(p => {
+                  const q = productSearch.trim().toLowerCase();
+                  if (!q) return true;
+                  return [p.name, p.marca, p.modelo, p.bairro, p.cidade].some(v => v?.toLowerCase().includes(q));
+                })
+                .slice(0, 50)
+                .map(p => {
+                  const price = p.precoPromocional != null ? p.precoPromocional : p.price;
+                  const specs = productSpecsLine(p);
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => handlePickProduct(p)}
+                      className={`w-full flex items-center gap-3 rounded-xl border px-3 py-2 text-left transition-colors ${
+                        theme === "dark" ? "border-gray-800 hover:border-gray-600" : "border-gray-200 hover:border-gray-400"
+                      }`}
+                    >
+                      {p.imagemBase64 ? (
+                        <img src={`data:${p.imagemMimeType ?? "image/jpeg"};base64,${p.imagemBase64}`} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+                      ) : (
+                        <span className="w-10 h-10 rounded-lg bg-gray-800 flex items-center justify-center text-gray-500 flex-shrink-0"><ImageOff size={16} /></span>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{productDisplayTitle(p)}</p>
+                        <p className="text-xs text-gray-500 truncate">{formatBRL(price)}{specs ? ` · ${specs}` : ""}</p>
+                      </div>
+                    </button>
+                  );
+                })}
             </div>
           </div>
         </div>
