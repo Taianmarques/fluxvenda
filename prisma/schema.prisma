@@ -745,6 +745,7 @@ model AgentConfig {
   pipelines            Pipeline[]
   leadStatuses         LeadStatus[]
   etiquetas            Etiqueta[]
+  conhecimentoItens    ConhecimentoItem[]
   appointments         Appointment[]
   professionals        Professional[]
   services             Service[]
@@ -1220,6 +1221,23 @@ model Etiqueta {
   cor  String @default("#6b7280")
 
   conversations Conversation[]
+
+  @@index([agentConfigId])
+}
+
+// Base de conhecimento do agente — conteúdos (FAQs, regras, infos da empresa) que a IA
+// injeta no prompt de toda resposta pra atender com precisão
+model ConhecimentoItem {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agentConfigId String
+  agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id], onDelete: Cascade)
+
+  titulo   String
+  conteudo String  @db.Text
+  active   Boolean @default(true)
 
   @@index([agentConfigId])
 }

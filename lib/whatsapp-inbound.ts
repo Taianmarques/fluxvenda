@@ -120,6 +120,31 @@ Você também pode receber, no meio da conversa, um lembrete automático pergunt
 - Se ele disser que não pode ir ou quer cancelar, use cancelar_agendamento e, na mesma resposta, envie o link acima pra ele remarcar.`;
 }
 
+// Base de conhecimento do agente — injetada no system prompt de toda resposta (os três
+// caminhos: texto com tools, texto puro e imagem). Orçamento de caracteres evita inflar
+// o custo de token por mensagem; itens mais antigos têm prioridade (ordem de criação).
+async function buildConhecimentoContext(agentConfigId: string): Promise<string> {
+  const itens = await prisma.conhecimentoItem.findMany({
+    where: { agentConfigId, active: true },
+    orderBy: { createdAt: "asc" },
+    select: { titulo: true, conteudo: true },
+  });
+  if (itens.length === 0) return "";
+
+  const BUDGET = 12000;
+  let total = 0;
+  const blocks: string[] = [];
+  for (const item of itens) {
+    const block = `--- ${item.titulo} ---\n${item.conteudo}`;
+    if (total + block.length > BUDGET) break;
+    blocks.push(block);
+    total += block.length;
+  }
+  if (blocks.length === 0) return "";
+
+  return `\n\nBASE DE CONHECIMENTO DA EMPRESA (use estas informações para responder com precisão; se a resposta estiver aqui, prefira ela a inventar):\n${blocks.join("\n")}`;
+}
+
 // Lista os departamentos humanos e ensina o agente a transferir quando o assunto exigir
 function buildDepartamentosContext(departamentos: { nome: string; descricao: string }[]): string {
   const lista = departamentos
@@ -1111,7 +1136,10 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
     }
   }
 
-  const activeSystemPrompt = config.systemPrompt + emojiInstruction + stageInstruction;
+  // Conhecimento entra no activeSystemPrompt (e não no extraContext) porque os três
+  // caminhos de resposta (tools, texto puro e imagem) consomem o system prompt
+  const conhecimentoContext = await buildConhecimentoContext(config.id);
+  const activeSystemPrompt = config.systemPrompt + emojiInstruction + stageInstruction + conhecimentoContext;
 
   if (await isOverQuota(config.teamId)) {
     await adapter.sendText(contactNumber, "Serviço de IA temporariamente indisponível. Por favor, aguarde ou entre em contato com nossa equipe.");
