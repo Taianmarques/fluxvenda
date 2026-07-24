@@ -669,6 +669,7 @@ model AgentConfig {
   // Catálogo/pedidos via WhatsApp com pagamento Pix/cartão (Asaas) — cada equipe usa a própria conta
   commerceEnabled  Boolean @default(false)
   catalogOnly      Boolean @default(false) // true = só catálogo/pedidos, sem gerar cobrança online
+  catalogType      CatalogType @default(GENERICO) // define os campos do produto e o comportamento do catálogo/IA
   asaasApiKey      String? // colada pelo gestor, nunca exibida de volta na UI
   asaasSandbox     Boolean @default(true)
   asaasWebhookToken String? // gerado ao ativar; valida o webhook de confirmação de pagamento
@@ -1024,7 +1025,85 @@ model Product {
   imagemBase64   String? @db.Text
   imagemMimeType String?
 
+  // Campos de Veículos — só usados quando AgentConfig.catalogType = VEICULOS
+  marca           String?
+  modelo          String?
+  anoFabricacao   Int?
+  anoModelo       Int?
+  km              Int?
+  cor             String?
+  cambio          Cambio?
+  combustivel     Combustivel?
+  placa           String? // uso interno — nunca exposto na loja pública nem enviado pra IA/cliente
+  condicaoVeiculo CondicaoVeiculo?
+
+  // Campos de Imóveis — só usados quando AgentConfig.catalogType = IMOVEIS
+  tipoNegocio  TipoNegocioImovel?
+  tipoImovel   TipoImovel?
+  areaM2       Float?
+  quartos      Int?
+  banheiros    Int?
+  vagasGaragem Int?
+  bairro       String?
+  cidade       String?
+
+  // Fotos extras (galeria) — Veículos/Imóveis costumam ter várias fotos; a foto de capa
+  // continua em imagemBase64 acima (usada nas miniaturas do CRM e por enviar_foto_produto)
+  images ProductImage[]
+
   orderItems OrderItem[]
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  imagemBase64   String @db.Text
+  imagemMimeType String
+  order          Int    @default(0)
+
+  @@index([productId])
+}
+
+enum CatalogType {
+  GENERICO
+  VEICULOS
+  IMOVEIS
+}
+
+enum Cambio {
+  MANUAL
+  AUTOMATICO
+}
+
+enum Combustivel {
+  FLEX
+  GASOLINA
+  ETANOL
+  DIESEL
+  ELETRICO
+  HIBRIDO
+  GNV
+}
+
+enum CondicaoVeiculo {
+  NOVO
+  SEMINOVO
+  USADO
+}
+
+enum TipoNegocioImovel {
+  VENDA
+  ALUGUEL
+}
+
+enum TipoImovel {
+  CASA
+  APARTAMENTO
+  COMERCIAL
+  TERRENO
 }
 
 enum OrderStatus {

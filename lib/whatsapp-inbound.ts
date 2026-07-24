@@ -191,6 +191,12 @@ function buildPosVendaContext(reviewLink: string): string {
 - Se o cliente relatar problema com o pedido (defeito, atraso, item errado), demonstre empatia, colete os detalhes e registre a avaliação com nota baixa e o problema no comentário — a equipe é avisada automaticamente.${reviewLink ? `\n- Link público de avaliação da empresa: ${reviewLink} — só envie quando a ferramenta orientar (nota alta).` : ""}`;
 }
 
+const CAMBIO_LABEL: Record<string, string> = { MANUAL: "Manual", AUTOMATICO: "Automático" };
+const COMBUSTIVEL_LABEL: Record<string, string> = { FLEX: "Flex", GASOLINA: "Gasolina", ETANOL: "Etanol", DIESEL: "Diesel", ELETRICO: "Elétrico", HIBRIDO: "Híbrido", GNV: "GNV" };
+const CONDICAO_VEICULO_LABEL: Record<string, string> = { NOVO: "Novo", SEMINOVO: "Seminovo", USADO: "Usado" };
+const TIPO_NEGOCIO_LABEL: Record<string, string> = { VENDA: "Venda", ALUGUEL: "Aluguel" };
+const TIPO_IMOVEL_LABEL: Record<string, string> = { CASA: "Casa", APARTAMENTO: "Apartamento", COMERCIAL: "Comercial", TERRENO: "Terreno" };
+
 function buildInstallmentNote(config: {
   installmentsEnabled: boolean; maxInstallments: number; interestFreeInstallments: number; installmentInterestRate: number;
 }): string {
@@ -206,6 +212,38 @@ function buildInstallmentNote(config: {
 }
 
 async function buildCommerceContext(agentConfigId: string, config: {
+  catalogType: string; catalogOnly: boolean; installmentsEnabled: boolean; maxInstallments: number; interestFreeInstallments: number; installmentInterestRate: number;
+  deliveryEnabled: boolean; pickupEnabled: boolean; deliveryFee: number; deliveryFreeAbove: number | null; deliveryArea: string;
+}): Promise<string> {
+  return config.catalogType !== "GENERICO"
+    ? buildBrowseOnlyCommerceContext(agentConfigId, config.catalogType)
+    : buildGenericCommerceContext(agentConfigId, config);
+}
+
+// Catálogo de Veículos/Imóveis: não usa carrinho/pedido/pagamento — a IA só mostra itens
+// e encaminha o interessado pra um consultor humano fechar a negociação
+async function buildBrowseOnlyCommerceContext(agentConfigId: string, catalogType: string): Promise<string> {
+  const products = await prisma.product.findMany({ where: { agentConfigId, active: true }, select: { name: true, price: true } });
+  const catalogo = products.length > 0
+    ? products.map(p => `- ${p.name}: R$ ${p.price.toFixed(2)}`).join("\n")
+    : (catalogType === "VEICULOS" ? "Nenhum veículo cadastrado ainda." : "Nenhum imóvel cadastrado ainda.");
+
+  const catalogUrl = `${process.env.NEXT_PUBLIC_APP_URL}/loja/${await ensureStoreSlug(agentConfigId)}`;
+  const item = catalogType === "VEICULOS" ? "veículo" : "imóvel";
+
+  return `\n\nFERRAMENTAS DE CATÁLOGO:
+Catálogo disponível (use consultar_produtos pra confirmar — esse resumo pode estar desatualizado):
+${catalogo}
+
+Catálogo online (link público): ${catalogUrl}
+- Se o cliente pedir pra ver o catálogo, o que tem disponível ou algo parecido, envie o link acima.
+- Envie o link puro, sem colchetes nem parênteses em volta, pra ficar clicável.
+- Use consultar_produtos pra responder sobre ${item}s disponíveis — nunca invente item, preço ou característica fora dessa lista.
+- Se o cliente pedir pra ver fotos, use enviar_foto_produto.
+- Esse tipo de negócio não usa carrinho/pedido pelo WhatsApp: quando o cliente demonstrar interesse real em um ${item} específico, colete nome e contato dele e avise que um consultor vai dar continuidade — não tente "fechar pedido" nem gerar cobrança.`;
+}
+
+async function buildGenericCommerceContext(agentConfigId: string, config: {
   catalogOnly: boolean; installmentsEnabled: boolean; maxInstallments: number; interestFreeInstallments: number; installmentInterestRate: number;
   deliveryEnabled: boolean; pickupEnabled: boolean; deliveryFee: number; deliveryFreeAbove: number | null; deliveryArea: string;
 }): Promise<string> {
@@ -503,12 +541,35 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
           const preco = p.precoPromocional != null
             ? `R$ ${p.precoPromocional.toFixed(2)} (PROMOÇÃO, de R$ ${p.price.toFixed(2)})`
             : `R$ ${p.price.toFixed(2)}`;
+          if (config.catalogType === "VEICULOS") {
+            const attrs = [
+              (p.anoFabricacao || p.anoModelo) ? `${p.anoFabricacao ?? "?"}/${p.anoModelo ?? "?"}` : "",
+              p.km != null ? `${p.km} km` : "",
+              p.cor ?? "",
+              p.cambio ? CAMBIO_LABEL[p.cambio] ?? p.cambio : "",
+              p.combustivel ? COMBUSTIVEL_LABEL[p.combustivel] ?? p.combustivel : "",
+              p.condicaoVeiculo ? CONDICAO_VEICULO_LABEL[p.condicaoVeiculo] ?? p.condicaoVeiculo : "",
+            ].filter(Boolean).join(", ");
+            return `${[p.marca, p.modelo].filter(Boolean).join(" ") || p.name} — ${preco}${attrs ? ` — ${attrs}` : ""}`;
+          }
+          if (config.catalogType === "IMOVEIS") {
+            const attrs = [
+              p.areaM2 != null ? `${p.areaM2} m²` : "",
+              p.quartos != null ? `${p.quartos} quarto(s)` : "",
+              p.banheiros != null ? `${p.banheiros} banheiro(s)` : "",
+              p.vagasGaragem != null ? `${p.vagasGaragem} vaga(s)` : "",
+            ].filter(Boolean).join(", ");
+            const local = [p.bairro, p.cidade].filter(Boolean).join(", ");
+            const tipo = [p.tipoImovel ? TIPO_IMOVEL_LABEL[p.tipoImovel] ?? p.tipoImovel : "", p.tipoNegocio ? `para ${TIPO_NEGOCIO_LABEL[p.tipoNegocio] ?? p.tipoNegocio}` : ""].filter(Boolean).join(" ");
+            return `${p.name}${tipo ? ` (${tipo})` : ""} — ${preco}${local ? ` — ${local}` : ""}${attrs ? ` — ${attrs}` : ""}`;
+          }
           return `${p.name} — ${preco}${p.stock !== null ? ` (estoque: ${p.stock})` : ""}${p.description ? ` — ${p.description}` : ""}`;
         })
         .join("\n");
     }
 
     if (name === "montar_pedido") {
+      if (config.catalogType !== "GENERICO") return "Esse catálogo não usa carrinho de pedidos — colete o interesse do cliente e informe que um consultor vai continuar o atendimento.";
       const itensArg = Array.isArray(args?.itens) ? args.itens : [];
       if (itensArg.length === 0) return "Erro: nenhum item informado.";
 
@@ -812,13 +873,20 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
 
     if (name === "enviar_foto_produto") {
       const nomeBuscado = String(args?.produto ?? "");
-      const product = await prisma.product.findFirst({ where: { agentConfigId, active: true, name: { equals: nomeBuscado, mode: "insensitive" } } });
+      const product = await prisma.product.findFirst({
+        where: { agentConfigId, active: true, name: { equals: nomeBuscado, mode: "insensitive" } },
+        include: { images: { orderBy: { order: "asc" }, take: 5 } },
+      });
       if (!product) return `Não encontrei o produto "${nomeBuscado}" no catálogo.`;
       if (!product.imagemBase64) return `Esse produto ainda não tem foto cadastrada.`;
 
+      // Com galeria (Veículos/Imóveis), manda todas as fotos cadastradas (máx. 5); sem galeria, só a capa
+      const fotos = product.images.length > 0 ? product.images : [{ imagemBase64: product.imagemBase64 }];
       try {
-        await adapter.sendMedia(contactNumber, "image", product.imagemBase64, { caption: product.name });
-        return `Foto de "${product.name}" enviada.`;
+        for (const foto of fotos) {
+          await adapter.sendMedia(contactNumber, "image", foto.imagemBase64, { caption: product.name });
+        }
+        return `${fotos.length > 1 ? `${fotos.length} fotos` : "Foto"} de "${product.name}" enviada(s).`;
       } catch (err) {
         console.error("[whatsapp-inbound] erro ao enviar foto do produto:", err);
         return "Não foi possível enviar a foto agora.";
@@ -1084,8 +1152,14 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
   // de tudo que já foi dito pela empresa, mesmo no período em que esteve em atendimento manual.
   const historyForAgent = history.map(m => ({ role: m.role === "user" ? "user" as const : "assistant" as const, content: m.content }));
 
+  // Veículos/Imóveis: catálogo sem carrinho — a IA só consulta/mostra fotos, nunca monta pedido/cobrança
+  const CART_TOOL_NAMES = ["montar_pedido", "definir_entrega", "gerar_cobranca", "consultar_status_pedido"];
   const commerceTools = config.commerceEnabled
-    ? (config.catalogOnly ? COMMERCE_TOOLS.filter(t => t.function.name !== "gerar_cobranca") : COMMERCE_TOOLS)
+    ? COMMERCE_TOOLS.filter(t => {
+        if (config.catalogType !== "GENERICO" && CART_TOOL_NAMES.includes(t.function.name)) return false;
+        if (config.catalogOnly && t.function.name === "gerar_cobranca") return false;
+        return true;
+      })
     : [];
   // Prospecção: inclui as ferramentas se o agente tem prospecção ativa E o contato é um prospect
   const isProspect = config.prospeccaoEnabled

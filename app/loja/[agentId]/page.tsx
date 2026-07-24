@@ -24,6 +24,7 @@ async function findStore(idOrSlug: string) {
       deliveryFee: true,
       deliveryFreeAbove: true,
       deliveryArea: true,
+      catalogType: true,
       team: { select: { name: true } },
     },
   });
@@ -75,6 +76,12 @@ export default async function LojaPage({ params }: { params: Promise<{ agentId: 
       select: {
         id: true, name: true, description: true, category: true, price: true, precoPromocional: true,
         stock: true, imagemBase64: true, imagemMimeType: true,
+        // Veículos e Imóveis — "placa" nunca é selecionada aqui: não pode vazar pro catálogo público
+        marca: true, modelo: true, anoFabricacao: true, anoModelo: true, km: true, cor: true,
+        cambio: true, combustivel: true, condicaoVeiculo: true,
+        tipoNegocio: true, tipoImovel: true, areaM2: true, quartos: true, banheiros: true, vagasGaragem: true,
+        bairro: true, cidade: true,
+        images: { orderBy: { order: "asc" }, select: { imagemBase64: true, imagemMimeType: true } },
       },
     }),
     prisma.storeBanner.findMany({
@@ -98,6 +105,7 @@ export default async function LojaPage({ params }: { params: Promise<{ agentId: 
     <LojaClient
       agentId={config.id}
       storeName={config.team?.name || "Catálogo"}
+      catalogType={config.catalogType}
       whatsappNumber={whatsappNumber}
       logo={config.storeLogoBase64 ? `data:${config.storeLogoMimeType ?? "image/png"};base64,${config.storeLogoBase64}` : null}
       banners={banners.map((b) => `data:${b.imagemMimeType};base64,${b.imagemBase64}`)}
@@ -118,6 +126,13 @@ export default async function LojaPage({ params }: { params: Promise<{ agentId: 
         precoPromocional: p.precoPromocional,
         stock: p.stock,
         image: p.imagemBase64 ? `data:${p.imagemMimeType ?? "image/jpeg"};base64,${p.imagemBase64}` : null,
+        images: p.images.length > 0
+          ? p.images.map((img) => `data:${img.imagemMimeType};base64,${img.imagemBase64}`)
+          : (p.imagemBase64 ? [`data:${p.imagemMimeType ?? "image/jpeg"};base64,${p.imagemBase64}`] : []),
+        marca: p.marca, modelo: p.modelo, anoFabricacao: p.anoFabricacao, anoModelo: p.anoModelo, km: p.km, cor: p.cor,
+        cambio: p.cambio, combustivel: p.combustivel, condicaoVeiculo: p.condicaoVeiculo,
+        tipoNegocio: p.tipoNegocio, tipoImovel: p.tipoImovel, areaM2: p.areaM2, quartos: p.quartos, banheiros: p.banheiros,
+        vagasGaragem: p.vagasGaragem, bairro: p.bairro, cidade: p.cidade,
       }))}
     />
   );

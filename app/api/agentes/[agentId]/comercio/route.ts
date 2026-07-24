@@ -16,6 +16,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ age
   return NextResponse.json({
     commerceEnabled: config.commerceEnabled,
     catalogOnly: config.catalogOnly,
+    catalogType: config.catalogType,
     asaasSandbox: config.asaasSandbox,
     hasAsaasApiKey: Boolean(config.asaasApiKey),
     asaasWebhookToken: config.asaasWebhookToken,
@@ -42,6 +43,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ age
 const schema = z.object({
   commerceEnabled: z.boolean().optional(),
   catalogOnly: z.boolean().optional(),
+  catalogType: z.enum(["GENERICO", "VEICULOS", "IMOVEIS"]).optional(),
   cobrancaEnabled: z.boolean().optional(),
   asaasApiKey: z.string().min(1).optional(),
   asaasSandbox: z.boolean().optional(),
@@ -100,6 +102,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
 
   return NextResponse.json({
     commerceEnabled: updated.commerceEnabled,
+    catalogOnly: updated.catalogOnly,
+    catalogType: updated.catalogType,
     asaasSandbox: updated.asaasSandbox,
     hasAsaasApiKey: Boolean(updated.asaasApiKey),
     asaasWebhookToken: updated.asaasWebhookToken,

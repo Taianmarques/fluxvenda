@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, ShoppingCart, Plus, Minus, Trash2, X, ShoppingBag, Store, MessageCircle } from "lucide-react";
 
+type CatalogType = "GENERICO" | "VEICULOS" | "IMOVEIS";
+
 type StoreProduct = {
   id: string;
   name: string;
@@ -12,12 +14,71 @@ type StoreProduct = {
   precoPromocional: number | null;
   stock: number | null;
   image: string | null;
+  images: string[]; // galeria (Veículos/Imóveis) — a 1ª é a capa, igual "image"
+  // Veículos — "placa" nunca trafega até aqui, nem no select do servidor
+  marca?: string | null;
+  modelo?: string | null;
+  anoFabricacao?: number | null;
+  anoModelo?: number | null;
+  km?: number | null;
+  cor?: string | null;
+  cambio?: string | null;
+  combustivel?: string | null;
+  condicaoVeiculo?: string | null;
+  // Imóveis
+  tipoNegocio?: string | null;
+  tipoImovel?: string | null;
+  areaM2?: number | null;
+  quartos?: number | null;
+  banheiros?: number | null;
+  vagasGaragem?: number | null;
+  bairro?: string | null;
+  cidade?: string | null;
 };
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
 function effectivePrice(p: StoreProduct) {
   return p.precoPromocional ?? p.price;
+}
+
+const CONDICAO_LABEL: Record<string, string> = { NOVO: "Novo", SEMINOVO: "Seminovo", USADO: "Usado" };
+const TIPO_NEGOCIO_LABEL: Record<string, string> = { VENDA: "Venda", ALUGUEL: "Aluguel" };
+const TIPO_IMOVEL_LABEL: Record<string, string> = { CASA: "Casa", APARTAMENTO: "Apartamento", COMERCIAL: "Comercial", TERRENO: "Terreno" };
+
+// Linha de destaque do card — troca a descrição genérica pelos atributos do tipo do catálogo
+function storeItemSubtitle(p: StoreProduct, catalogType: CatalogType): string {
+  if (catalogType === "VEICULOS") {
+    return [
+      (p.anoFabricacao || p.anoModelo) ? `${p.anoFabricacao ?? "?"}/${p.anoModelo ?? "?"}` : "",
+      p.km != null ? `${p.km.toLocaleString("pt-BR")} km` : "",
+      p.cor ?? "",
+      p.condicaoVeiculo ? CONDICAO_LABEL[p.condicaoVeiculo] : "",
+    ].filter(Boolean).join(" · ");
+  }
+  if (catalogType === "IMOVEIS") {
+    return [
+      p.areaM2 != null ? `${p.areaM2} m²` : "",
+      p.quartos != null ? `${p.quartos} quarto(s)` : "",
+      p.banheiros != null ? `${p.banheiros} banheiro(s)` : "",
+      [p.bairro, p.cidade].filter(Boolean).join(", "),
+    ].filter(Boolean).join(" · ");
+  }
+  return p.description;
+}
+
+function storeItemTitle(p: StoreProduct, catalogType: CatalogType): string {
+  if (catalogType === "VEICULOS" && (p.marca || p.modelo)) return [p.marca, p.modelo].filter(Boolean).join(" ");
+  return p.name;
+}
+
+function whatsappInquiryMessage(p: StoreProduct, catalogType: CatalogType): string {
+  const title = storeItemTitle(p, catalogType);
+  if (catalogType === "IMOVEIS") {
+    const local = [p.bairro, p.cidade].filter(Boolean).join(", ");
+    return `Olá! Tenho interesse no imóvel: ${title}${local ? ` — ${local}` : ""} (${brl.format(effectivePrice(p))}). Pode me dar mais informações?`;
+  }
+  return `Olá! Tenho interesse em: ${title} (${brl.format(effectivePrice(p))}). Pode me dar mais informações?`;
 }
 
 type DeliveryConfig = {
@@ -32,6 +93,7 @@ type DeliveryConfig = {
 export function LojaClient({
   agentId,
   storeName,
+  catalogType,
   whatsappNumber,
   logo,
   banners,
@@ -40,6 +102,7 @@ export function LojaClient({
 }: {
   agentId: string;
   storeName: string;
+  catalogType: CatalogType;
   whatsappNumber: string | null;
   logo: string | null;
   banners: string[];
@@ -54,6 +117,22 @@ export function LojaClient({
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [bannerIndex, setBannerIndex] = useState(0);
   const bannerRef = useRef<HTMLDivElement>(null);
+
+  // Modal de fotos (Veículos/Imóveis) — carrossel com todas as fotos do item
+  const [detailProduct, setDetailProduct] = useState<StoreProduct | null>(null);
+  const [detailIndex, setDetailIndex] = useState(0);
+  const detailRef = useRef<HTMLDivElement>(null);
+
+  function openDetail(p: StoreProduct) {
+    setDetailProduct(p);
+    setDetailIndex(0);
+  }
+
+  function onDetailScroll() {
+    const el = detailRef.current;
+    if (!el || el.clientWidth === 0) return;
+    setDetailIndex(Math.round(el.scrollLeft / el.clientWidth));
+  }
 
   const categories = useMemo(() => {
     const set = new Set<string>();
@@ -122,12 +201,19 @@ export function LojaClient({
     let base = products;
     if (activeCategory !== null) base = base.filter((p) => p.category === activeCategory);
     if (q) {
-      base = base.filter(
-        (p) => p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q)
-      );
+      base = base.filter((p) => {
+        if (p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q)) return true;
+        if (catalogType === "VEICULOS") {
+          return [p.marca, p.modelo, p.cor].some((v) => v?.toLowerCase().includes(q));
+        }
+        if (catalogType === "IMOVEIS") {
+          return [p.bairro, p.cidade].some((v) => v?.toLowerCase().includes(q));
+        }
+        return false;
+      });
     }
     return base;
-  }, [products, search, activeCategory]);
+  }, [products, search, activeCategory, catalogType]);
 
   // Sem filtro ativo, agrupa por categoria (produtos sem categoria vão para o final)
   const sections = useMemo((): { title: string | null; items: StoreProduct[] }[] => {
@@ -208,7 +294,7 @@ export function LojaClient({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 pb-28">
+    <div className={`min-h-screen bg-gray-50 text-gray-900 ${catalogType === "GENERICO" ? "pb-28" : "pb-6"}`}>
       {/* Header */}
       <header className="sticky top-0 z-30 bg-white border-b border-gray-200">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
@@ -221,18 +307,20 @@ export function LojaClient({
             </div>
           )}
           <p className="font-bold text-lg flex-1 truncate">{storeName}</p>
-          <button
-            onClick={() => setCartOpen(true)}
-            className="relative p-2 text-gray-700 hover:text-blue-600 transition-colors"
-            aria-label="Abrir carrinho"
-          >
-            <ShoppingCart size={22} />
-            {totalQty > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 bg-blue-600 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center">
-                {totalQty}
-              </span>
-            )}
-          </button>
+          {catalogType === "GENERICO" && (
+            <button
+              onClick={() => setCartOpen(true)}
+              className="relative p-2 text-gray-700 hover:text-blue-600 transition-colors"
+              aria-label="Abrir carrinho"
+            >
+              <ShoppingCart size={22} />
+              {totalQty > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 bg-blue-600 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center">
+                  {totalQty}
+                </span>
+              )}
+            </button>
+          )}
         </div>
         <div className="max-w-2xl mx-auto px-4 pb-3">
           <div className="relative">
@@ -282,7 +370,7 @@ export function LojaClient({
         )}
 
         {/* Chips de categoria */}
-        {categories.length > 0 && (
+        {catalogType === "GENERICO" && categories.length > 0 && (
           <div className="flex gap-2 overflow-x-auto px-4 pt-4 pb-1" style={{ scrollbarWidth: "none" }}>
             <button
               onClick={() => setActiveCategory(null)}
@@ -333,7 +421,10 @@ export function LojaClient({
             const hasPromo = p.precoPromocional !== null && p.precoPromocional < p.price;
             return (
               <div key={p.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden flex flex-col">
-                <div className="aspect-square bg-gray-100 relative">
+                <div
+                  className={`aspect-square bg-gray-100 relative ${catalogType !== "GENERICO" && p.images.length > 0 ? "cursor-pointer" : ""}`}
+                  onClick={() => catalogType !== "GENERICO" && p.images.length > 0 && openDetail(p)}
+                >
                   {p.image ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={p.image} alt={p.name} className="w-full h-full object-cover" loading="lazy" />
@@ -342,9 +433,19 @@ export function LojaClient({
                       <ShoppingBag size={36} />
                     </div>
                   )}
+                  {catalogType !== "GENERICO" && p.images.length > 1 && (
+                    <span className="absolute bottom-2 right-2 bg-black/60 text-white text-[10px] font-semibold rounded-full px-2 py-0.5">
+                      +{p.images.length} fotos
+                    </span>
+                  )}
                   {hasPromo && !soldOut && (
                     <span className="absolute top-2 left-2 bg-red-600 text-white text-[10px] font-bold rounded-full px-2 py-0.5">
                       OFERTA
+                    </span>
+                  )}
+                  {catalogType === "IMOVEIS" && p.tipoNegocio && (
+                    <span className="absolute top-2 right-2 bg-gray-900/80 text-white text-[10px] font-bold rounded-full px-2 py-0.5">
+                      {TIPO_NEGOCIO_LABEL[p.tipoNegocio] ?? p.tipoNegocio}
                     </span>
                   )}
                   {soldOut && (
@@ -355,9 +456,9 @@ export function LojaClient({
                 </div>
 
                 <div className="p-3 flex flex-col flex-1 gap-1">
-                  <p className="text-sm font-medium leading-snug line-clamp-2">{p.name}</p>
-                  {p.description && (
-                    <p className="text-xs text-gray-500 line-clamp-2">{p.description}</p>
+                  <p className="text-sm font-medium leading-snug line-clamp-2">{storeItemTitle(p, catalogType)}</p>
+                  {storeItemSubtitle(p, catalogType) && (
+                    <p className="text-xs text-gray-500 line-clamp-2">{storeItemSubtitle(p, catalogType)}</p>
                   )}
                   <div className="mt-auto pt-1.5">
                     {hasPromo && (
@@ -366,7 +467,15 @@ export function LojaClient({
                     <p className="text-lg font-bold text-blue-700">{brl.format(effectivePrice(p))}</p>
                   </div>
 
-                  {soldOut ? (
+                  {catalogType !== "GENERICO" ? (
+                    <button
+                      onClick={() => whatsappNumber && window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappInquiryMessage(p, catalogType))}`, "_blank")}
+                      disabled={!whatsappNumber}
+                      className="mt-2 w-full bg-green-600 hover:bg-green-500 active:bg-green-700 disabled:bg-gray-200 disabled:text-gray-400 text-white text-sm font-medium rounded-xl py-2 flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <MessageCircle size={14} /> Tenho interesse
+                    </button>
+                  ) : soldOut ? (
                     <button disabled className="mt-2 w-full bg-gray-200 text-gray-400 text-sm font-medium rounded-xl py-2 cursor-not-allowed">
                       Indisponível
                     </button>
@@ -404,7 +513,7 @@ export function LojaClient({
       </main>
 
       {/* Barra fixa de checkout */}
-      {totalQty > 0 && (
+      {catalogType === "GENERICO" && totalQty > 0 && (
         <div className="fixed bottom-0 inset-x-0 z-30 bg-white border-t border-gray-200 p-3 pb-[max(12px,env(safe-area-inset-bottom))]">
           <div className="max-w-2xl mx-auto flex items-center gap-3">
             <button
@@ -430,7 +539,7 @@ export function LojaClient({
       )}
 
       {/* Drawer do carrinho */}
-      {cartOpen && (
+      {catalogType === "GENERICO" && cartOpen && (
         <div className="fixed inset-0 z-40">
           <div className="absolute inset-0 bg-black/40" onClick={() => setCartOpen(false)} />
           <div className="absolute bottom-0 inset-x-0 bg-white rounded-t-3xl max-h-[80vh] flex flex-col">
@@ -573,6 +682,62 @@ export function LojaClient({
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal de fotos (Veículos/Imóveis) */}
+      {detailProduct && (
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setDetailProduct(null)} />
+          <div className="absolute inset-x-0 bottom-0 sm:inset-0 sm:m-auto sm:max-w-md sm:h-fit bg-white rounded-t-3xl sm:rounded-3xl max-h-[90vh] flex flex-col overflow-hidden">
+            <button
+              onClick={() => setDetailProduct(null)}
+              className="absolute top-3 right-3 z-10 bg-black/50 text-white rounded-full p-1.5"
+              aria-label="Fechar"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="overflow-y-auto">
+              <div
+                ref={detailRef}
+                onScroll={onDetailScroll}
+                className="flex overflow-x-auto snap-x snap-mandatory scrollbar-none"
+                style={{ scrollbarWidth: "none" }}
+              >
+                {detailProduct.images.map((src, i) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={i} src={src} alt={`Foto ${i + 1}`} className="w-full flex-shrink-0 snap-center object-cover aspect-square bg-gray-100" />
+                ))}
+              </div>
+              {detailProduct.images.length > 1 && (
+                <div className="flex justify-center gap-1.5 py-2">
+                  {detailProduct.images.map((_, i) => (
+                    <span key={i} className={`h-1.5 rounded-full transition-all ${i === detailIndex ? "w-5 bg-blue-600" : "w-1.5 bg-gray-300"}`} />
+                  ))}
+                </div>
+              )}
+
+              <div className="p-4 space-y-2 pb-[max(16px,env(safe-area-inset-bottom))]">
+                <p className="font-bold text-lg leading-snug">{storeItemTitle(detailProduct, catalogType)}</p>
+                {storeItemSubtitle(detailProduct, catalogType) && (
+                  <p className="text-sm text-gray-500">{storeItemSubtitle(detailProduct, catalogType)}</p>
+                )}
+                {detailProduct.description && (
+                  <p className="text-sm text-gray-600">{detailProduct.description}</p>
+                )}
+                <p className="text-xl font-bold text-blue-700">{brl.format(effectivePrice(detailProduct))}</p>
+                <button
+                  onClick={() => whatsappNumber && window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappInquiryMessage(detailProduct, catalogType))}`, "_blank")}
+                  disabled={!whatsappNumber}
+                  className="w-full bg-green-600 hover:bg-green-500 active:bg-green-700 disabled:bg-gray-300 text-white font-semibold rounded-xl py-3 flex items-center justify-center gap-2 transition-colors"
+                >
+                  <MessageCircle size={18} />
+                  Tenho interesse
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

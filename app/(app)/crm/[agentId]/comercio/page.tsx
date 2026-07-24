@@ -64,6 +64,7 @@ async function ComercioPageContent({ params }: { params: Promise<{ agentId: stri
       agentId={config.id}
       initialCommerceEnabled={config.commerceEnabled}
       initialCatalogOnly={config.catalogOnly}
+      initialCatalogType={config.catalogType}
       initialAsaasSandbox={config.asaasSandbox}
       initialHasAsaasApiKey={Boolean(config.asaasApiKey)}
       initialAsaasWebhookToken={config.asaasWebhookToken}
@@ -89,6 +90,10 @@ async function ComercioPageContent({ params }: { params: Promise<{ agentId: stri
       initialProducts={products.map(p => ({
         id: p.id, name: p.name, description: p.description, category: p.category, price: p.price, precoPromocional: p.precoPromocional,
         stock: p.stock, active: p.active, imagemBase64: p.imagemBase64, imagemMimeType: p.imagemMimeType,
+        marca: p.marca, modelo: p.modelo, anoFabricacao: p.anoFabricacao, anoModelo: p.anoModelo, km: p.km, cor: p.cor,
+        cambio: p.cambio, combustivel: p.combustivel, placa: p.placa, condicaoVeiculo: p.condicaoVeiculo,
+        tipoNegocio: p.tipoNegocio, tipoImovel: p.tipoImovel, areaM2: p.areaM2, quartos: p.quartos, banheiros: p.banheiros,
+        vagasGaragem: p.vagasGaragem, bairro: p.bairro, cidade: p.cidade,
       }))}
       initialOrders={orders.map(o => ({
         id: o.id,
