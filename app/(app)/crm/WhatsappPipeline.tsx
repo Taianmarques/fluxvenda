@@ -250,9 +250,8 @@ function Column({
     <div
       ref={setNodeRef}
       className={`w-72 flex-shrink-0 flex flex-col rounded-2xl border overflow-hidden ${isOver ? "border-blue-500" : t.column}`}
-      style={{ backgroundColor: `${stage.color}0D` }}
     >
-      <div className={`p-3 border-b ${t.columnHeaderBorder}`} style={{ backgroundColor: `${stage.color}1F` }}>
+      <div className={`p-3 border-b ${t.columnHeaderBorder}`}>
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: stage.color }} />
           {editing ? (
