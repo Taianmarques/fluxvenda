@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ArrowLeft, ChevronDown, LayoutGrid, Megaphone, TrendingUp, Zap, Settings, type LucideIcon } from "lucide-react";
+import { ArrowLeft, ChevronDown, LayoutGrid, Megaphone, TrendingUp, Zap, Settings, Headset, ShoppingBag, PanelLeftClose, PanelLeftOpen, Building2, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { CRM_CATEGORIES, type CrmPageDef, type CrmPageKey } from "@/lib/crm-nav-config";
 import { NotificationsButton } from "./NotificationsButton";
@@ -10,13 +10,18 @@ import { NotificationsButton } from "./NotificationsButton";
 type NavItem = { href: string; label: string; icon: LucideIcon; isHub?: boolean };
 type NavCategory = { key: string; label: string; variant: "accordion" | "flyout"; items: NavItem[] };
 
-// Ícone de cada categoria flyout — CRM_CATEGORIES só define ícone por página, não por categoria
+// Ícone de cada categoria — CRM_CATEGORIES só define ícone por página, não por categoria.
+// atendimento/vendas só usam o ícone no modo recolhido (viram flyout também nesse modo).
 const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  atendimento: Headset,
+  vendas: ShoppingBag,
   marketing: Megaphone,
   gestao: TrendingUp,
   automacao: Zap,
   configuracoes: Settings,
 };
+
+const SIDEBAR_COLLAPSED_KEY = "crm_sidebar_collapsed";
 
 // Categoria que expande pra baixo (accordion) — usado pela maioria; Marketing e Automação
 // usam CategoryFlyout (submenu flutuante pro lado) em vez desse.
@@ -65,13 +70,14 @@ function CategoryAccordion({ cat, isOpen, onToggle, isActive, pathname, onNaviga
 // Usa position:fixed com coordenadas calculadas via getBoundingClientRect() do botão — o
 // <nav> pai tem overflow-y-auto, e por regra do CSS isso também clipa o eixo horizontal
 // (overflow-x vira "auto" junto), então position:absolute ficaria preso dentro do menu.
-function CategoryFlyout({ label, icon: Icon, items, isActive, pathname, onNavigate }: {
+function CategoryFlyout({ label, icon: Icon, items, isActive, pathname, onNavigate, collapsed = false }: {
   label: string;
   icon: LucideIcon;
   items: NavItem[];
   isActive: (item: NavItem) => boolean;
   pathname: string;
   onNavigate: (href: string) => void;
+  collapsed?: boolean;
 }) {
   const btnRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
@@ -91,15 +97,16 @@ function CategoryFlyout({ label, icon: Icon, items, isActive, pathname, onNaviga
       <button
         ref={btnRef}
         onClick={toggle}
-        className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-          active ? "text-white bg-blue-500/10" : "text-gray-400 hover:text-white hover:bg-white/5"
-        }`}
+        title={collapsed ? label : undefined}
+        className={`w-full flex items-center gap-2 rounded-xl text-sm font-medium transition-colors ${
+          collapsed ? "justify-center px-0 py-2.5" : "justify-between px-3 py-2"
+        } ${active ? "text-white bg-blue-500/10" : "text-gray-400 hover:text-white hover:bg-white/5"}`}
       >
         <span className="flex items-center gap-3">
           <Icon size={17} className={active ? "text-blue-400" : ""} />
-          {label}
+          {!collapsed && label}
         </span>
-        <ChevronDown size={13} className={`-rotate-90 transition-transform ${open ? "rotate-0" : ""}`} />
+        {!collapsed && <ChevronDown size={13} className={`-rotate-90 transition-transform ${open ? "rotate-0" : ""}`} />}
       </button>
       {open && (
         <>
@@ -142,6 +149,18 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager }: {
   const pathname = usePathname();
   const router = useRouter();
   const [showSwitcher, setShowSwitcher] = useState(false);
+
+  // Menu recolhido (só ícones) — desktop apenas, preferência lembrada por navegador
+  const [collapsed, setCollapsed] = useState(
+    () => typeof window !== "undefined" && localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1"
+  );
+  function toggleCollapsed() {
+    setCollapsed(prev => {
+      const next = !prev;
+      try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0"); } catch {}
+      return next;
+    });
+  }
 
   // Navegação otimista: marca o item clicado e mostra a barra de progresso na hora,
   // mantendo a página atual visível até a próxima terminar de carregar
@@ -260,26 +279,44 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager }: {
     </div>
 
     {/* Sidebar vertical — desktop, itens agrupados por categoria com dropdown */}
-    <aside className="hidden md:flex w-56 flex-shrink-0 border-r border-gray-800 bg-black flex-col">
-      <div className="px-5 py-5 border-b border-gray-800">
-        <p className="font-bold text-lg">
-          <span className="text-blue-400">CRM</span>
-        </p>
+    <aside className={`hidden md:flex flex-shrink-0 border-r border-gray-800 bg-black flex-col transition-[width] duration-150 ${collapsed ? "w-16" : "w-56"}`}>
+      <div className={`py-5 border-b border-gray-800 flex items-center ${collapsed ? "justify-center px-2" : "justify-between px-5"}`}>
+        {!collapsed && (
+          <p className="font-bold text-lg">
+            <span className="text-blue-400">CRM</span>
+          </p>
+        )}
+        <button
+          onClick={toggleCollapsed}
+          title={collapsed ? "Expandir menu" : "Recolher menu"}
+          className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors flex-shrink-0"
+        >
+          {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+        </button>
       </div>
 
       {agents.length > 1 && (
-        <div className="relative px-3 py-3 border-b border-gray-800">
+        <div className={`relative border-b border-gray-800 ${collapsed ? "px-2 py-2" : "px-3 py-3"}`}>
           <button
             onClick={() => setShowSwitcher(s => !s)}
-            className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-gray-900 hover:bg-gray-800 text-sm text-left transition-colors"
+            title={collapsed ? (currentAgent?.nome ?? "Agente") : undefined}
+            className={`w-full flex items-center gap-2 rounded-xl bg-gray-900 hover:bg-gray-800 text-sm text-left transition-colors ${
+              collapsed ? "justify-center px-0 py-2.5" : "justify-between px-3 py-2"
+            }`}
           >
-            <span className="truncate">{currentAgent?.nome ?? "Agente"}</span>
-            <ChevronDown size={15} className="text-gray-500 flex-shrink-0" />
+            {collapsed ? <Building2 size={16} className="text-gray-400" /> : (
+              <>
+                <span className="truncate">{currentAgent?.nome ?? "Agente"}</span>
+                <ChevronDown size={15} className="text-gray-500 flex-shrink-0" />
+              </>
+            )}
           </button>
           {showSwitcher && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setShowSwitcher(false)} />
-              <div className="absolute z-20 left-3 right-3 top-full mt-1 bg-gray-900 border border-gray-800 rounded-xl shadow-xl p-1 space-y-0.5">
+              <div className={`absolute z-20 top-full mt-1 bg-gray-900 border border-gray-800 rounded-xl shadow-xl p-1 space-y-0.5 ${
+                collapsed ? "left-2 w-52" : "left-3 right-3"
+              }`}>
                 {agents.map(a => (
                   <button
                     key={a.id}
@@ -295,7 +332,7 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager }: {
         </div>
       )}
 
-      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">
+      <nav className={`flex-1 overflow-y-auto py-4 space-y-0.5 ${collapsed ? "px-2" : "px-3"}`}>
         {/* Hub fica fixo no topo, fora de qualquer categoria — só pro gestor */}
         {isManager && (() => {
           const active = isActive(HUB_ITEM);
@@ -304,35 +341,47 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager }: {
               <Link
                 href={HUB_ITEM.href}
                 onClick={() => { if (pathname !== HUB_ITEM.href) setNavigatingTo(HUB_ITEM.href); }}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium border-l-2 transition-colors ${
-                  active ? "text-white bg-blue-500/10 border-blue-500" : "text-gray-400 border-transparent hover:text-white hover:bg-white/5"
-                }`}
+                title={collapsed ? HUB_ITEM.label : undefined}
+                className={`flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium border-l-2 transition-colors ${
+                  collapsed ? "justify-center px-0" : "px-3"
+                } ${active ? "text-white bg-blue-500/10 border-blue-500" : "text-gray-400 border-transparent hover:text-white hover:bg-white/5"}`}
               >
                 <HUB_ITEM.icon size={17} className={active ? "text-blue-400" : ""} />
-                {HUB_ITEM.label}
+                {!collapsed && HUB_ITEM.label}
               </Link>
               <div className="border-t border-gray-800 my-2" />
             </>
           );
         })()}
 
-        {ACCORDION_CATEGORIES.map(cat => (
-          <CategoryAccordion key={cat.key} cat={cat} isOpen={openCategories.has(cat.key)} onToggle={toggleCategory} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} />
-        ))}
+        {collapsed
+          ? CATEGORIES.map(cat => (
+              <CategoryFlyout key={cat.key} label={cat.label} icon={CATEGORY_ICONS[cat.key]} items={cat.items} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} collapsed />
+            ))
+          : (
+            <>
+              {ACCORDION_CATEGORIES.map(cat => (
+                <CategoryAccordion key={cat.key} cat={cat} isOpen={openCategories.has(cat.key)} onToggle={toggleCategory} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} />
+              ))}
 
-        {FLYOUT_CATEGORIES.map(cat => (
-          <CategoryFlyout key={cat.key} label={cat.label} icon={CATEGORY_ICONS[cat.key]} items={cat.items} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} />
-        ))}
+              {FLYOUT_CATEGORIES.map(cat => (
+                <CategoryFlyout key={cat.key} label={cat.label} icon={CATEGORY_ICONS[cat.key]} items={cat.items} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} />
+              ))}
+            </>
+          )}
       </nav>
 
-      <div className="px-3 py-4 border-t border-gray-800 space-y-0.5">
-        <NotificationsButton />
+      <div className={`py-4 border-t border-gray-800 space-y-0.5 ${collapsed ? "px-2" : "px-3"}`}>
+        <NotificationsButton compact={collapsed} />
         <Link
           href="/dashboard"
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+          title={collapsed ? "Plataforma B2B" : undefined}
+          className={`flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-colors ${
+            collapsed ? "justify-center px-0" : "px-3"
+          }`}
         >
           <ArrowLeft size={17} />
-          Plataforma B2B
+          {!collapsed && "Plataforma B2B"}
         </Link>
       </div>
     </aside>
