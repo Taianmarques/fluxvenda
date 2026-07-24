@@ -41,7 +41,7 @@ type PipelineTheme = "dark" | "light";
 const PIPELINE_THEMES = {
   dark: {
     card: "bg-gray-900 border-gray-800 hover:border-gray-600",
-    cardSecondary: "text-gray-500",
+    cardSecondary: "text-gray-400",
     column: "bg-gray-950/50 border-gray-800",
     columnHeaderBorder: "border-gray-800",
     columnCount: "text-gray-500",
@@ -52,7 +52,7 @@ const PIPELINE_THEMES = {
   },
   light: {
     card: "bg-white border-gray-200 hover:border-gray-400",
-    cardSecondary: "text-gray-500",
+    cardSecondary: "text-[#4B5563]",
     column: "bg-gray-100 border-gray-200",
     columnHeaderBorder: "border-gray-200",
     columnCount: "text-gray-500",
