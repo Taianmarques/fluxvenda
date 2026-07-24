@@ -139,6 +139,25 @@ export async function downloadMessageMedia(token: string, messageId: string): Pr
   return res.json();
 }
 
+// Busca a foto de perfil de um contato/chat (URL assinada da CDN do WhatsApp — expira depois
+// de um tempo, nunca deve ser guardada permanentemente, só usada na hora). `chatId` é o
+// número com "@s.whatsapp.net" (contato individual) ou "@g.us" (grupo).
+export async function getChatProfilePicture(token: string, chatId: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${UAZAPI_URL}/chat/find`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", token },
+      body: JSON.stringify({ wa_chatid: chatId }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    const chat = data?.chats?.[0];
+    return chat?.imagePreview || chat?.image || null;
+  } catch {
+    return null;
+  }
+}
+
 // Desconecta (logout) o WhatsApp da instância, sem excluir a instância — pode reconectar depois via QR code
 export async function disconnectInstance(token: string): Promise<void> {
   const res = await fetch(`${UAZAPI_URL}/instance/disconnect`, {

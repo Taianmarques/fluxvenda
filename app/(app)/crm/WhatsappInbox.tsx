@@ -212,6 +212,33 @@ function avatarColor(seed: string): string {
   return AVATAR_COLORS[hash];
 }
 
+// Foto real do WhatsApp (proxy server-side) sobre o círculo de iniciais — cai pras iniciais
+// se não tiver foto (Instagram, contato sem foto, ou erro ao buscar)
+function ContactAvatar({ agentId, conversationId, seed, isIg, statusColor }: {
+  agentId: string; conversationId: string; seed: string; isIg: boolean; statusColor?: string;
+}) {
+  const [imgFailed, setImgFailed] = useState(false);
+  return (
+    <div
+      className="relative w-9 h-9 rounded-full flex-shrink-0"
+      style={statusColor ? { boxShadow: `0 0 0 2px ${statusColor}` } : undefined}
+    >
+      <div className={`absolute inset-0 rounded-full ${avatarColor(seed)} text-white text-xs font-bold flex items-center justify-center`}>
+        {(seed || "?").charAt(0).toUpperCase()}
+      </div>
+      {!isIg && !imgFailed && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={`/api/agentes/${agentId}/conversas/${conversationId}/foto`}
+          alt=""
+          className="absolute inset-0 w-9 h-9 rounded-full object-cover"
+          onError={() => setImgFailed(true)}
+        />
+      )}
+    </div>
+  );
+}
+
 function MediaContent({ mediaUrl, mediaType, content }: { mediaUrl: string; mediaType: string; content: string }) {
   const isPlaceholder = !content || content.startsWith("[");
   return (
@@ -937,12 +964,7 @@ export function WhatsappInbox({
                     style={statusColor ? { borderLeftColor: statusColor } : undefined}
                   >
                     <div className="relative flex-shrink-0 mt-0.5">
-                      <div
-                        className={`w-9 h-9 rounded-full ${avatarColor(seed)} text-white text-xs font-bold flex items-center justify-center`}
-                        style={statusColor ? { boxShadow: `0 0 0 2px ${statusColor}` } : undefined}
-                      >
-                        {(seed || "?").charAt(0).toUpperCase()}
-                      </div>
+                      <ContactAvatar agentId={agentId} conversationId={c.id} seed={seed} isIg={isIg} statusColor={statusColor} />
                       <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-gray-950 flex items-center justify-center border border-gray-800">
                         {isIg ? <Instagram size={8} className="text-pink-400" /> : <WhatsAppIcon size={8} />}
                       </span>
