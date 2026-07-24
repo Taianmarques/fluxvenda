@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { runAgent } from "@/lib/agent-engine";
-import { sendInstagramDM, sendInstagramPrivateReply } from "@/lib/instagram";
+import { sendInstagramDM, sendInstagramPrivateReply, getInstagramUserProfile } from "@/lib/instagram";
 import { logTokenUsage, isOverQuota } from "@/lib/token-usage";
 import { startFunnelExecution, handleFunnelReply } from "@/lib/instagram-funnel";
 import { emitChatEvent } from "@/lib/realtime";
@@ -168,6 +168,20 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
     update: { status: "ATIVO", followupCount: 0 },
     create: { agentConfigId: config.id, contactNumber, status: "ATIVO" },
   });
+
+  // Nome do lead ainda não resolvido (1ª mensagem dele) — busca na API do Instagram, só uma vez
+  if (!conversation.contactName) {
+    try {
+      const profile = await getInstagramUserProfile(connection.pageAccessToken, senderIgsid);
+      const name = profile.name || profile.username;
+      if (name) {
+        await prisma.conversation.update({ where: { id: conversation.id }, data: { contactName: name } });
+        conversation.contactName = name;
+      }
+    } catch (err) {
+      console.error("[ig-msg] erro ao buscar nome do lead:", err);
+    }
+  }
 
   if (conversation.humanTakeover) return;
 

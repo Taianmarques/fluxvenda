@@ -53,6 +53,15 @@ export async function getInstagramUserInfo(accessToken: string, userId: string):
   );
 }
 
+// Nome/username do contato a partir do IGSID — só funciona dentro da janela de mensageria
+// (quem já mandou DM pra conta), igual a User Profile API do Messenger.
+export async function getInstagramUserProfile(accessToken: string, igsid: string): Promise<{ name: string | null; username: string | null }> {
+  const res = await fetch(`${IG_GRAPH}/${igsid}?fields=name,username&access_token=${accessToken}`);
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data || data.error) return { name: null, username: null };
+  return { name: data.name ?? null, username: data.username ?? null };
+}
+
 // ─── Webhook ──────────────────────────────────────────────────────────────────
 
 export async function subscribeInstagramWebhook(igUserId: string, accessToken: string): Promise<void> {
