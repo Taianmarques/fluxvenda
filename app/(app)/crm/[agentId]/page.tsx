@@ -1,5 +1,6 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@/app/generated/prisma/client";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { MessageCircle } from "lucide-react";
@@ -59,14 +60,31 @@ async function WhatsappInboxPageContent({
       include: {
         messages: { where: { role: { not: "note" } }, orderBy: { createdAt: "desc" }, take: 1 },
         opportunities: { orderBy: { createdAt: "asc" } },
+        etiquetas: { select: { id: true, nome: true, cor: true } },
       },
     }),
     prisma.leadStatus.findMany({ where: { agentConfigId: config.id }, orderBy: { order: "asc" } }),
   ]);
 
+  // Mesma query do polling (ver app/api/agentes/[agentId]/conversas/route.ts) — contador
+  // exato de mensagens do cliente ainda não lidas, numa query só.
+  const convIds = conversations.map(c => c.id);
+  const unreadRows = convIds.length > 0 ? await prisma.$queryRaw<{ conversationId: string; count: bigint }[]>(Prisma.sql`
+    SELECT m."conversationId" as "conversationId", COUNT(*) as count
+    FROM "Message" m
+    JOIN "Conversation" c ON c.id = m."conversationId"
+    WHERE m."conversationId" IN (${Prisma.join(convIds)})
+      AND m.role = 'user'
+      AND (c."lastReadAt" IS NULL OR m."createdAt" > c."lastReadAt")
+    GROUP BY m."conversationId"
+  `) : [];
+  const unreadMap = new Map(unreadRows.map(r => [r.conversationId, Number(r.count)]));
+
   // Mesma lógica do WhatsApp: ordena pela hora da última mensagem (ver
-  // app/api/agentes/[agentId]/conversas/route.ts, que o polling da lista usa)
+  // app/api/agentes/[agentId]/conversas/route.ts, que o polling da lista usa). Fixadas
+  // sempre primeiro.
   conversations.sort((a, b) => {
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
     const ta = a.messages[0]?.createdAt.getTime() ?? a.updatedAt.getTime();
     const tb = b.messages[0]?.createdAt.getTime() ?? b.updatedAt.getTime();
     return tb - ta;
@@ -95,6 +113,9 @@ async function WhatsappInboxPageContent({
         lastMessage: c.messages[0]?.content ?? null,
         lastMessageRole: c.messages[0]?.role ?? null,
         lastMessageAt: c.messages[0]?.createdAt.toISOString() ?? null,
+        etiquetas: c.etiquetas,
+        unreadCount: unreadMap.get(c.id) ?? 0,
+        pinned: c.pinned,
       }))}
     />
   );

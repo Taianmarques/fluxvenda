@@ -1364,6 +1364,9 @@ model Conversation {
   // É global (não por usuário): se alguém já leu, conta como lida pra todo mundo.
   lastReadAt DateTime?
 
+  // Fixa a conversa no topo da lista, manualmente
+  pinned Boolean @default(false)
+
   // Memoriza o último serviço/profissional que a IA resolveu nessa conversa, pra usar como
   // fallback em agendar_horario caso o modelo não repita o parâmetro na chamada de confirmação.
   pendingProfessionalId String?

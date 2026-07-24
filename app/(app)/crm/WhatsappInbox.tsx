@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   MessageCircle, Search, X, Trophy, Lock, Unlock, Bot, User, UserPlus,
   FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap, StickyNote, ArrowRightLeft, HandCoins, CalendarClock, ListFilter, Instagram, ArrowLeft,
-  Reply, Forward, ChevronDown, Package, ImageOff,
+  Reply, Forward, ChevronDown, Package, ImageOff, Pin,
 } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { EmojiPicker } from "./EmojiPicker";
@@ -27,6 +27,9 @@ type ConversationSummary = {
   lastMessage: string | null;
   lastMessageRole: string | null;
   lastMessageAt: string | null;
+  etiquetas: { id: string; nome: string; cor: string }[];
+  unreadCount: number;
+  pinned: boolean;
 };
 
 type Attendant = { id: string; name: string; isManager: boolean };
@@ -197,6 +200,14 @@ function timeAgo(iso: string) {
   return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
+// Cor consistente por contato (mesma paleta usada no Ao vivo) — hash simples do nome/número
+const AVATAR_COLORS = ["bg-blue-600", "bg-purple-600", "bg-emerald-600", "bg-amber-600", "bg-pink-600", "bg-cyan-600", "bg-indigo-600", "bg-rose-600"];
+function avatarColor(seed: string): string {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[hash];
+}
+
 function MediaContent({ mediaUrl, mediaType, content }: { mediaUrl: string; mediaType: string; content: string }) {
   const isPlaceholder = !content || content.startsWith("[");
   return (
@@ -330,9 +341,15 @@ export function WhatsappInbox({
           lastMessage: c.messages[0]?.content ?? null,
           lastMessageRole: c.messages[0]?.role ?? null,
           lastMessageAt: c.messages[0]?.createdAt ?? null,
+          etiquetas: c.etiquetas ?? [],
+          unreadCount: c.unreadCount ?? 0,
+          pinned: Boolean(c.pinned),
         }));
         // Só re-renderiza a lista se algo realmente mudou
-        const fp = JSON.stringify(next.map((c: any) => [c.id, c.updatedAt, c.lastMessageAt, c.status, c.humanTakeover, c.leadStatusId, c.assignedToId, c.lastReadAt]));
+        const fp = JSON.stringify(next.map((c: any) => [
+          c.id, c.updatedAt, c.lastMessageAt, c.status, c.humanTakeover, c.leadStatusId, c.assignedToId, c.lastReadAt,
+          c.unreadCount, c.pinned, c.etiquetas.map((e: any) => e.id).join(","),
+        ]));
         if (fp !== listFingerprintRef.current) {
           listFingerprintRef.current = fp;
           setConversations(next);
@@ -381,6 +398,17 @@ export function WhatsappInbox({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ leadStatusId }),
     });
+  }
+
+  async function handleTogglePin(conversationId: string, pinned: boolean, e: React.MouseEvent) {
+    e.stopPropagation();
+    setConversations(prev => prev.map(c => c.id === conversationId ? { ...c, pinned: !pinned } : c));
+    await fetch(`/api/ferramentas/whatsapp/conversas/${conversationId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pinned: !pinned }),
+    });
+    refreshList();
   }
 
   async function refreshDetail(id: string, isPoll = false) {
@@ -889,55 +917,104 @@ export function WhatsappInbox({
               {filteredConversations.length === 0 ? (
                 <p className={`text-sm p-4 ${t.listSecondary}`}>{search ? "Nenhuma conversa encontrada." : "Nenhuma conversa nessa aba."}</p>
               ) : (
-                filteredConversations.map(c => (
+                filteredConversations.map(c => {
+                  const seed = c.contactName || c.contactNumber;
+                  const isIg = isIgContact(c.contactNumber);
+                  const statusColor = leadStatuses.find(s => s.id === c.leadStatusId)?.color;
+                  const unread = c.unreadCount > 0;
+                  return (
                   <div
                     key={c.id}
                     role="button"
                     tabIndex={0}
                     onClick={() => { setSelectedId(c.id); setMobileChatOpen(true); }}
                     onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { setSelectedId(c.id); setMobileChatOpen(true); } }}
-                    className={`w-full text-left px-4 py-3 border-b transition-colors cursor-pointer ${t.listItemBorder} ${selectedId === c.id ? t.listItemSelected : ""}`}
+                    className={`w-full text-left px-4 py-3 border-b transition-colors cursor-pointer flex items-start gap-2.5 ${t.listItemBorder} ${selectedId === c.id ? t.listItemSelected : ""} ${statusColor ? "border-l-4" : ""}`}
+                    style={statusColor ? { borderLeftColor: statusColor } : undefined}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="font-medium truncate flex items-center gap-1.5">
-                        {isIgContact(c.contactNumber)
-                          ? <Instagram size={12} className="text-pink-400 flex-shrink-0" />
-                          : <WhatsAppIcon size={12} />}
-                        {c.contactName || c.contactNumber}
-                      </p>
-                      {c.status === "FINALIZADO" ? (
-                        <span className="text-[10px] flex-shrink-0 px-1.5 py-0.5 rounded-full bg-gray-700/50 text-gray-300 border border-gray-600">encerrado</span>
-                      ) : c.humanTakeover ? (
-                        <span className="text-[10px] flex-shrink-0 px-1.5 py-0.5 rounded-full bg-orange-900/50 text-orange-300 border border-orange-700">manual</span>
-                      ) : null}
+                    <div className="relative flex-shrink-0 mt-0.5">
+                      <div className={`w-9 h-9 rounded-full ${avatarColor(seed)} text-white text-xs font-bold flex items-center justify-center`}>
+                        {(seed || "?").charAt(0).toUpperCase()}
+                      </div>
+                      <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-gray-950 flex items-center justify-center border border-gray-800">
+                        {isIg ? <Instagram size={8} className="text-pink-400" /> : <WhatsAppIcon size={8} />}
+                      </span>
                     </div>
-                    <p className={`text-xs truncate mt-0.5 ${t.listSecondary}`}>{c.lastMessage || "—"}</p>
-                    {c.assignedToId && (
-                      <p className={`text-[10px] mt-0.5 flex items-center gap-1 truncate ${t.listTertiary}`}>
-                        <User size={9} className="flex-shrink-0" />
-                        {attendants.find(a => a.id === c.assignedToId)?.name ?? "Atendente"}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-medium truncate">{c.contactName || c.contactNumber}</p>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          {c.status === "FINALIZADO" ? (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-700/50 text-gray-300 border border-gray-600">encerrado</span>
+                          ) : c.humanTakeover ? (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-orange-900/50 text-orange-300 border border-orange-700">manual</span>
+                          ) : null}
+                          <button
+                            onClick={e => handleTogglePin(c.id, c.pinned, e)}
+                            title={c.pinned ? "Desafixar conversa" : "Fixar conversa"}
+                            className={c.pinned ? "text-amber-400" : "text-gray-600 hover:text-gray-400"}
+                          >
+                            <Pin size={12} className={c.pinned ? "fill-current" : ""} />
+                          </button>
+                        </div>
+                      </div>
+                      <p className={`text-xs truncate mt-0.5 ${t.listSecondary}`}>
+                        {c.lastMessageRole === "assistant" && <span className="font-semibold">IA: </span>}
+                        {c.lastMessageRole === "human" && <span className="font-semibold">Você: </span>}
+                        {c.lastMessage || "—"}
                       </p>
-                    )}
-                    {c.opportunities.length > 0 && (
-                      <p className={`text-xs font-semibold mt-1 flex items-center gap-1 ${c.opportunities.some(o => o.wonAt) ? "text-green-500" : "text-gray-400"}`}>
-                        {c.opportunities.some(o => o.wonAt) && <Trophy size={11} />}
-                        {formatBRL(c.opportunities.reduce((sum, o) => sum + o.dealValue, 0))}
-                        {c.opportunities.length > 1 && ` (${c.opportunities.length})`}
-                      </p>
-                    )}
-                    <div className="flex items-center justify-between mt-1.5">
-                      <p className={`text-[10px] ${t.listTertiary}`}>{timeAgo(c.updatedAt)}</p>
-                      <LeadStatusBadge
-                        agentId={agentId}
-                        leadStatusId={c.leadStatusId}
-                        statuses={leadStatuses}
-                        onChange={id => handleLeadStatusChange(c.id, id)}
-                        onStatusesChange={refreshLeadStatuses}
-                        dark={theme === "dark"}
-                      />
+                      {c.etiquetas.length > 0 && (
+                        <div className="flex items-center gap-1 mt-1 flex-wrap">
+                          {c.etiquetas.slice(0, 3).map(et => (
+                            <span
+                              key={et.id}
+                              className="text-[9px] font-medium px-1.5 py-0.5 rounded-full border"
+                              style={{ backgroundColor: `${et.cor}22`, color: et.cor, borderColor: `${et.cor}66` }}
+                            >
+                              {et.nome}
+                            </span>
+                          ))}
+                          {c.etiquetas.length > 3 && <span className="text-[9px] text-gray-500">+{c.etiquetas.length - 3}</span>}
+                        </div>
+                      )}
+                      {c.assignedToId && (
+                        <p className={`text-[10px] mt-0.5 flex items-center gap-1 truncate ${t.listTertiary}`}>
+                          <User size={9} className="flex-shrink-0" />
+                          {attendants.find(a => a.id === c.assignedToId)?.name ?? "Atendente"}
+                        </p>
+                      )}
+                      {c.opportunities.length > 0 && (
+                        <p className={`text-xs font-semibold mt-1 flex items-center gap-1 ${c.opportunities.some(o => o.wonAt) ? "text-green-500" : "text-gray-400"}`}>
+                          {c.opportunities.some(o => o.wonAt) && <Trophy size={11} />}
+                          {formatBRL(c.opportunities.reduce((sum, o) => sum + o.dealValue, 0))}
+                          {c.opportunities.length > 1 && ` (${c.opportunities.length})`}
+                        </p>
+                      )}
+                      <div className="flex items-center justify-between mt-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <p className={`text-[10px] ${t.listTertiary}`}>{timeAgo(c.updatedAt)}</p>
+                          {unread && <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse flex-shrink-0" />}
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <LeadStatusBadge
+                            agentId={agentId}
+                            leadStatusId={c.leadStatusId}
+                            statuses={leadStatuses}
+                            onChange={id => handleLeadStatusChange(c.id, id)}
+                            onStatusesChange={refreshLeadStatuses}
+                            dark={theme === "dark"}
+                          />
+                          {unread && (
+                            <span className="text-[10px] font-bold bg-blue-600 text-white rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center">
+                              {c.unreadCount}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
           </aside>

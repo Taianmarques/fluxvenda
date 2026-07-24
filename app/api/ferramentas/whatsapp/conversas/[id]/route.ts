@@ -50,6 +50,7 @@ const patchSchema = z.object({
   status: z.enum(["ATIVO", "AGUARDANDO", "FINALIZADO"]).optional(),
   motivoEncerramento: z.string().max(200).optional(), // enviado junto com status FINALIZADO
   contactName: z.string().trim().min(1).max(80).optional(), // salvar/renomear o contato
+  pinned: z.boolean().optional(),
 });
 
 // Muda o status do lead, o status da conversa e/ou o atendente responsável.
@@ -98,6 +99,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       ...(body.data.assignedToId !== undefined && { assignedToId: body.data.assignedToId }),
       ...(body.data.status !== undefined && { status: body.data.status }),
       ...(body.data.contactName !== undefined && { contactName: body.data.contactName }),
+      ...(body.data.pinned !== undefined && { pinned: body.data.pinned }),
       ...(encerrando && { motivoEncerramento: body.data.motivoEncerramento ?? null, encerradaEm: new Date() }),
       ...(reabrindo && { motivoEncerramento: null, encerradaEm: null }),
     },
