@@ -160,11 +160,13 @@ export function CrmSidebar({ agentId, agents, allowedPages }: {
 
   const HUB_ITEM: NavItem = { href: "/crm/hub", label: "Hub de IA", icon: LayoutGrid, isHub: true };
 
-  // managerOnly (aovivo/campanhas/auditoria) continua sempre visível no menu — o bloqueio
-  // delas é feito pela própria página, não pelo perfil de acesso; as demais somem do menu
-  // quando o perfil atribuído ao usuário não inclui aquela página.
+  // Com perfil de acesso atribuído (allowedPages != null), só aparece o que está marcado —
+  // inclusive as páginas managerOnly (aovivo/campanhas/auditoria) somem, já que nem são
+  // marcáveis no perfil. Sem perfil (gestor ou membro com acesso total), aparece tudo.
   function isPageVisible(page: CrmPageDef) {
-    return Boolean(page.managerOnly) || allowedPages === null || allowedPages.includes(page.key);
+    if (allowedPages === null) return true;
+    if (page.managerOnly) return false;
+    return allowedPages.includes(page.key);
   }
 
   const CATEGORIES: NavCategory[] = CRM_CATEGORIES
