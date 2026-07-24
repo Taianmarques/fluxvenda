@@ -1007,13 +1007,13 @@ export function WhatsappInbox({
                       {(c.assignedToId || c.opportunities.length > 0) && (
                         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                           {c.assignedToId && (
-                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-700/50 text-gray-300 border border-gray-600 flex items-center gap-1 flex-shrink-0">
+                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-300 text-black flex items-center gap-1 flex-shrink-0">
                               <User size={9} className="flex-shrink-0" />
                               {attendants.find(a => a.id === c.assignedToId)?.name ?? "Atendente"}
                             </span>
                           )}
                           {c.opportunities.length > 0 && (
-                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 flex-shrink-0 bg-green-900/40 text-green-300 border border-green-800/50">
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 flex-shrink-0 bg-green-400 text-black">
                               {c.opportunities.some(o => o.wonAt) && <Trophy size={9} />}
                               {formatBRL(c.opportunities.reduce((sum, o) => sum + o.dealValue, 0))}
                               {c.opportunities.length > 1 && ` (${c.opportunities.length})`}
