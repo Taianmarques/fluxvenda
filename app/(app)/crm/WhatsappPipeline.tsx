@@ -17,6 +17,7 @@ export type PipelineOpportunity = {
   contactName: string | null;
   contactNumber: string;
   leadStatusId: string | null;
+  assignedToId: string | null;
   assignedToName: string | null;
   title: string | null;
   stageId: string | null;

@@ -74,6 +74,7 @@ export default async function PipelinePage({ params }: { params: Promise<{ agent
         contactName: o.conversation.contactName,
         contactNumber: o.conversation.contactNumber,
         leadStatusId: o.conversation.leadStatusId,
+        assignedToId: o.conversation.assignedToId,
         assignedToName: o.conversation.assignedTo?.name ?? null,
         title: o.title,
         stageId: o.stageId,

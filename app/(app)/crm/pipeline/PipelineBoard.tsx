@@ -2,9 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bot, X } from "lucide-react";
+import { Bot, X, ListFilter } from "lucide-react";
 import { WhatsappPipeline, type Stage, type PipelineOpportunity } from "../WhatsappPipeline";
 import { type LeadStatus } from "../LeadStatusBadge";
+import {
+  PipelineFiltersPanel, EMPTY_PIPELINE_FILTERS, hasActivePipelineFilters, applyPipelineFilters,
+  type PipelineFilters, type Attendant,
+} from "../PipelineFiltersPanel";
 
 type PipelineSummary = { id: string; name: string; order: number; agenteInstrucoes?: string; stages: Stage[] };
 type ChatTheme = "dark" | "light";
@@ -30,6 +34,24 @@ export function PipelineBoard({
   const [showNewPipeline, setShowNewPipeline] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+
+  const [attendants, setAttendants] = useState<Attendant[]>([]);
+  const [filters, setFilters] = useState<PipelineFilters>(EMPTY_PIPELINE_FILTERS);
+  const [showFilters, setShowFilters] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/agentes/${agentId}/atendentes`)
+      .then(res => res.json())
+      .then(data => { if (data.attendants) setAttendants(data.attendants); })
+      .catch(() => {});
+  }, [agentId]);
+
+  // Etapas são específicas de cada pipeline — trocar de aba com etapas selecionadas no filtro
+  // faria o board parecer vazio (nenhuma oportunidade do pipeline novo bate com IDs do antigo).
+  // Os outros filtros (atendente, status, valor, período, busca) continuam valendo pra qualquer aba.
+  useEffect(() => {
+    setFilters(prev => prev.stageIds.length > 0 ? { ...prev, stageIds: [] } : prev);
+  }, [activeId]);
 
   // Avanço automático: a IA move o lead pelas etapas conforme a conversa evolui
   const [autoAvancar, setAutoAvancar] = useState(initialAutoAvancar ?? false);
@@ -138,7 +160,7 @@ export function PipelineBoard({
   // Uma oportunidade só aparece em "Sem etapa" se realmente não tiver etapa, ou se a etapa dela
   // for desse pipeline — sem isso, oportunidades de OUTROS pipelines vazavam pra "Sem etapa" aqui.
   const relevantOpportunities = active
-    ? opportunities.filter(o => !o.stageId || active.stages.some(s => s.id === o.stageId))
+    ? applyPipelineFilters(opportunities.filter(o => !o.stageId || active.stages.some(s => s.id === o.stageId)), filters)
     : [];
 
   return (
@@ -220,6 +242,31 @@ export function PipelineBoard({
             <Bot size={13} />
             {(active.agenteInstrucoes ?? "").trim() ? "Agente do pipeline" : "Definir agente do pipeline"}
           </button>
+          <div className="relative">
+            <button
+              onClick={() => setShowFilters(s => !s)}
+              title="Filtros"
+              className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${
+                hasActivePipelineFilters(filters)
+                  ? "bg-blue-600 border-blue-600 text-white"
+                  : theme === "dark" ? "text-gray-500 border-gray-800 hover:text-gray-300" : "text-gray-500 border-gray-300 hover:text-gray-700"
+              }`}
+            >
+              <ListFilter size={13} />
+              Filtros
+            </button>
+            {showFilters && (
+              <PipelineFiltersPanel
+                filters={filters}
+                onChange={setFilters}
+                attendants={attendants}
+                leadStatuses={leadStatuses}
+                stages={active.stages}
+                onClose={() => setShowFilters(false)}
+                dark={theme === "dark"}
+              />
+            )}
+          </div>
           </div>
         )}
       </div>
