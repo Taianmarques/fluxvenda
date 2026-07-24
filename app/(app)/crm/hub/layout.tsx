@@ -24,7 +24,7 @@ export default async function CrmHubLayout({ children }: { children: React.React
     <div className="h-full flex flex-col bg-gray-950">
       <TrialBanner />
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-        <CrmSidebar agentId={result.configs[0]?.id ?? ""} agents={result.configs.map(c => ({ id: c.id, nome: c.nome }))} allowedPages={allowedPages} />
+        <CrmSidebar agentId={result.configs[0]?.id ?? ""} agents={result.configs.map(c => ({ id: c.id, nome: c.nome }))} allowedPages={allowedPages} isManager={result.isManager} />
         <div className="flex-1 overflow-hidden">{children}</div>
       </div>
     </div>

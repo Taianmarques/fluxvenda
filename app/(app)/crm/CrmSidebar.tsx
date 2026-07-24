@@ -131,11 +131,13 @@ function CategoryFlyout({ label, icon: Icon, items, isActive, pathname, onNaviga
   );
 }
 
-export function CrmSidebar({ agentId, agents, allowedPages }: {
+export function CrmSidebar({ agentId, agents, allowedPages, isManager }: {
   agentId: string;
   agents: { id: string; nome: string }[];
   // null = acesso total (gestor, ou membro sem perfil atribuído)
   allowedPages: CrmPageKey[] | null;
+  // Hub de IA (criação/gestão de agentes) é só do gestor — atendentes não veem
+  isManager: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -181,7 +183,7 @@ export function CrmSidebar({ agentId, agents, allowedPages }: {
   const ACCORDION_CATEGORIES = CATEGORIES.filter(c => c.variant === "accordion");
   const FLYOUT_CATEGORIES = CATEGORIES.filter(c => c.variant === "flyout");
 
-  const FLAT_NAV: NavItem[] = [HUB_ITEM, ...CATEGORIES.flatMap(c => c.items)];
+  const FLAT_NAV: NavItem[] = [...(isManager ? [HUB_ITEM] : []), ...CATEGORIES.flatMap(c => c.items)];
 
   // Categorias abertas no menu desktop — a que contém a página atual abre sozinha; as demais
   // o usuário abre/fecha manualmente, e várias podem ficar abertas ao mesmo tempo.
@@ -294,24 +296,25 @@ export function CrmSidebar({ agentId, agents, allowedPages }: {
       )}
 
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">
-        {/* Hub fica fixo no topo, fora de qualquer categoria */}
-        {(() => {
+        {/* Hub fica fixo no topo, fora de qualquer categoria — só pro gestor */}
+        {isManager && (() => {
           const active = isActive(HUB_ITEM);
           return (
-            <Link
-              href={HUB_ITEM.href}
-              onClick={() => { if (pathname !== HUB_ITEM.href) setNavigatingTo(HUB_ITEM.href); }}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium border-l-2 transition-colors ${
-                active ? "text-white bg-blue-500/10 border-blue-500" : "text-gray-400 border-transparent hover:text-white hover:bg-white/5"
-              }`}
-            >
-              <HUB_ITEM.icon size={17} className={active ? "text-blue-400" : ""} />
-              {HUB_ITEM.label}
-            </Link>
+            <>
+              <Link
+                href={HUB_ITEM.href}
+                onClick={() => { if (pathname !== HUB_ITEM.href) setNavigatingTo(HUB_ITEM.href); }}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium border-l-2 transition-colors ${
+                  active ? "text-white bg-blue-500/10 border-blue-500" : "text-gray-400 border-transparent hover:text-white hover:bg-white/5"
+                }`}
+              >
+                <HUB_ITEM.icon size={17} className={active ? "text-blue-400" : ""} />
+                {HUB_ITEM.label}
+              </Link>
+              <div className="border-t border-gray-800 my-2" />
+            </>
           );
         })()}
-
-        <div className="border-t border-gray-800 my-2" />
 
         {ACCORDION_CATEGORIES.map(cat => (
           <CategoryAccordion key={cat.key} cat={cat} isOpen={openCategories.has(cat.key)} onToggle={toggleCategory} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} />
