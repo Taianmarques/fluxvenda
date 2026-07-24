@@ -21,7 +21,10 @@ export type Contato = {
 
 type Attendant = { id: string; name: string; isManager: boolean };
 
-const CORES_ETIQUETA = ["#25D366", "#34B7F1", "#FFA838", "#FF5C93", "#8B5CF6", "#EF4444", "#6b7280"];
+// Saturação mais forte que a paleta antiga (que tinha verde/azul claros demais, texto
+// branco ficava com pouco contraste) — essas mantêm boa leitura em qualquer badge.
+// Sem verde de propósito — reservado pro badge de valor de oportunidade no chat.
+const CORES_ETIQUETA = ["#3B82F6", "#F97316", "#EF4444", "#8B5CF6", "#EC4899", "#0891B2", "#6b7280"];
 
 function formatBRL(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });

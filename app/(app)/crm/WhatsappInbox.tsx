@@ -1013,11 +1013,7 @@ export function WhatsappInbox({
                             </span>
                           )}
                           {c.opportunities.length > 0 && (
-                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 flex-shrink-0 ${
-                              c.opportunities.some(o => o.wonAt)
-                                ? "bg-green-900/40 text-green-300 border border-green-800/50"
-                                : "bg-blue-900/40 text-blue-300 border border-blue-800/50"
-                            }`}>
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 flex-shrink-0 bg-green-900/40 text-green-300 border border-green-800/50">
                               {c.opportunities.some(o => o.wonAt) && <Trophy size={9} />}
                               {formatBRL(c.opportunities.reduce((sum, o) => sum + o.dealValue, 0))}
                               {c.opportunities.length > 1 && ` (${c.opportunities.length})`}
@@ -1092,7 +1088,7 @@ export function WhatsappInbox({
                       {isIgContact(detail.contactNumber) ? `ID: ${detail.contactNumber.replace("ig_", "")}` : detail.contactNumber}
                     </p>
                     {detail.opportunities.length > 0 && (
-                      <p className={`text-xs font-semibold mt-1 flex items-center gap-1 ${detail.opportunities.some(o => o.wonAt) ? "text-green-500" : "text-gray-400"}`}>
+                      <p className="text-xs font-semibold mt-1 flex items-center gap-1 text-green-500">
                         {detail.opportunities.some(o => o.wonAt) && <Trophy size={12} />}
                         {formatBRL(detail.opportunities.reduce((sum, o) => sum + o.dealValue, 0))}
                         {detail.opportunities.length > 1 && ` (${detail.opportunities.length})`}
