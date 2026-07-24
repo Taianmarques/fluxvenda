@@ -1374,6 +1374,10 @@ model Conversation {
   // Cacheia o customer já criado no Asaas pra esse contato, evita recriar a cada pedido
   asaasCustomerId String?
 
+  // Preenchido quando detectamos um número de WhatsApp na conversa do Instagram — trava o
+  // gatilho pra não reprocessar a cada mensagem nova (só a 1ª detecção dispara o contato)
+  extractedWhatsappNumber String?
+
   messages          Message[]
   appointments      Appointment[]
   opportunities     Opportunity[]

@@ -6,6 +6,8 @@ import { logTokenUsage, isOverQuota } from "@/lib/token-usage";
 import { startFunnelExecution, handleFunnelReply } from "@/lib/instagram-funnel";
 import { emitChatEvent } from "@/lib/realtime";
 import { verifyMetaHandshake, verifyMetaSignature } from "@/lib/meta-webhook";
+import { sendWhatsAppTextAsTeam } from "@/lib/whatsapp";
+import { extractBrazilianPhoneFromText } from "@/lib/phone-extract";
 
 // GET: verificação de webhook pela Meta (hub challenge)
 export async function GET(req: NextRequest) {
@@ -215,14 +217,95 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
 
   if (await isOverQuota(config.teamId)) return;
 
+  const emojiInstruction = config.emojiEnabled
+    ? "\n\nEmojis: você PODE e DEVE usar emojis nas respostas."
+    : "\n\nEmojis: NUNCA use emojis nas respostas.";
+
+  // Contato automático no WhatsApp quando a pessoa manda o número dela na DM — efeito colateral,
+  // não substitui a resposta normal da IA aqui no Instagram (que segue abaixo). Isolado em
+  // try/catch pra nunca derrubar o fluxo normal se o handoff falhar.
+  if (!conversation.extractedWhatsappNumber) {
+    handleInstagramWhatsappHandoff().catch((err) => console.error("[ig-whatsapp-handoff]", err));
+  }
+
+  async function handleInstagramWhatsappHandoff() {
+    if (!config) return;
+    const detectedPhone = extractBrazilianPhoneFromText(text);
+    if (!detectedPhone) return;
+
+    // Trava atômica: só segue quem conseguir "reservar" a detecção nessa conversa
+    const claimed = await prisma.conversation.updateMany({
+      where: { id: conversation.id, extractedWhatsappNumber: null },
+      data: { extractedWhatsappNumber: detectedPhone },
+    });
+    if (claimed.count === 0) return;
+
+    // Envio a frio só é confiável via UazAPI — a Cloud API oficial exige template aprovado
+    // fora da janela de 24h (mesma regra já usada no cron de prospecção)
+    const podeEnviar = config.whatsappProvider === "UAZAPI" && Boolean(config.uazapiToken) && Boolean(config.systemPrompt);
+    if (!podeEnviar) {
+      await prisma.message.create({
+        data: {
+          conversationId: conversation.id,
+          role: "note",
+          content: `Número de WhatsApp detectado (${detectedPhone}) nessa conversa do Instagram, mas esse agente não tem WhatsApp (UazAPI) conectado — não foi possível contatar automaticamente.`,
+        },
+      });
+      return;
+    }
+
+    const whatsappConversation = await prisma.conversation.upsert({
+      where: { agentConfigId_contactNumber: { agentConfigId: config.id, contactNumber: detectedPhone } },
+      update: {},
+      create: { agentConfigId: config.id, contactNumber: detectedPhone, status: "ATIVO" },
+    });
+
+    const jaTemConversa = await prisma.message.count({ where: { conversationId: whatsappConversation.id } });
+    if (jaTemConversa > 0) {
+      await prisma.message.create({
+        data: {
+          conversationId: conversation.id,
+          role: "note",
+          content: `Número de WhatsApp detectado (${detectedPhone}), mas já existe uma conversa de WhatsApp com esse contato — não iniciamos automaticamente pra não interromper um atendimento em andamento.`,
+        },
+      });
+      return;
+    }
+
+    const historico = [...recentMessages, { role: "user", content: text }]
+      .slice(-10)
+      .map((m) => `${m.role === "user" ? "Cliente" : "Você"}: ${m.content}`)
+      .join("\n");
+
+    const gancho = `Você está começando uma conversa pelo WhatsApp com uma pessoa que te procurou primeiro no Instagram Direct e passou esse número de WhatsApp lá. Veja o que ela disse até agora na conversa do Instagram:\n\n${historico}\n\nMande a primeira mensagem dessa conversa de WhatsApp retomando o assunto de onde ela parou, se apresentando e perguntando como pode ajudar — sem mencionar que isso é uma mensagem automática.`;
+
+    const handoffResult = await runAgent(config.systemPrompt! + emojiInstruction, [], gancho);
+
+    await sendWhatsAppTextAsTeam(config.uazapiToken!, detectedPhone, handoffResult.reply);
+    await prisma.message.create({ data: { conversationId: whatsappConversation.id, role: "assistant", content: handoffResult.reply } });
+    emitChatEvent(config.id, whatsappConversation.id);
+
+    logTokenUsage({
+      teamId: config.teamId,
+      provider: "openai",
+      model: "gpt-4o-mini",
+      feature: "ig_whatsapp_handoff",
+      ...handoffResult.usage,
+    });
+
+    await prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        role: "note",
+        content: `Número de WhatsApp detectado (${detectedPhone}) — contato iniciado automaticamente por lá.`,
+      },
+    });
+  }
+
   const history = recentMessages.map((m) => ({
     role: m.role === "user" ? ("user" as const) : ("assistant" as const),
     content: m.content,
   }));
-
-  const emojiInstruction = config.emojiEnabled
-    ? "\n\nEmojis: você PODE e DEVE usar emojis nas respostas."
-    : "\n\nEmojis: NUNCA use emojis nas respostas.";
 
   const result = await runAgent(config.systemPrompt + emojiInstruction, history, text);
 

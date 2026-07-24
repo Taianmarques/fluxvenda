@@ -2,7 +2,7 @@ const UAZAPI_URL = process.env.UAZAPI_URL ?? "";
 const UAZAPI_TOKEN = process.env.UAZAPI_TOKEN ?? "";
 const UAZAPI_ADMIN_TOKEN = process.env.UAZAPI_ADMIN_TOKEN ?? "";
 
-function formatPhone(phone: string): string {
+export function formatPhone(phone: string): string {
   const digits = phone.replace(/\D/g, "");
   return digits.startsWith("55") ? digits : `55${digits}`;
 }
