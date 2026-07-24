@@ -151,6 +151,8 @@ const THEMES = {
     sidebar: "border-gray-800",
     listItemBorder: "border-gray-900 hover:bg-gray-900",
     listItemSelected: "bg-gray-900",
+    cardBg: "bg-gray-900/40 border-gray-800/80 hover:border-gray-700 hover:bg-gray-900/70",
+    cardBgSelected: "bg-gray-900 border-blue-600/70",
     listSecondary: "text-gray-500",
     listTertiary: "text-gray-600",
     chatHeaderBorder: "border-gray-800",
@@ -172,6 +174,8 @@ const THEMES = {
     sidebar: "border-gray-200 bg-white",
     listItemBorder: "border-gray-100 hover:bg-gray-100",
     listItemSelected: "bg-gray-100",
+    cardBg: "bg-white border-gray-200 hover:border-gray-300 shadow-sm",
+    cardBgSelected: "bg-blue-50 border-blue-400",
     listSecondary: "text-gray-500",
     listTertiary: "text-gray-400",
     chatHeaderBorder: "border-gray-200",
@@ -913,7 +917,7 @@ export function WhatsappInbox({
                 </div>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1.5">
               {filteredConversations.length === 0 ? (
                 <p className={`text-sm p-4 ${t.listSecondary}`}>{search ? "Nenhuma conversa encontrada." : "Nenhuma conversa nessa aba."}</p>
               ) : (
@@ -929,11 +933,14 @@ export function WhatsappInbox({
                     tabIndex={0}
                     onClick={() => { setSelectedId(c.id); setMobileChatOpen(true); }}
                     onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { setSelectedId(c.id); setMobileChatOpen(true); } }}
-                    className={`w-full text-left px-4 py-3 border-b transition-colors cursor-pointer flex items-start gap-2.5 ${t.listItemBorder} ${selectedId === c.id ? t.listItemSelected : ""} ${statusColor ? "border-l-4" : ""}`}
+                    className={`w-full text-left px-3.5 py-3 rounded-xl border transition-colors cursor-pointer flex items-start gap-2.5 ${selectedId === c.id ? t.cardBgSelected : t.cardBg} ${statusColor ? "border-l-4" : ""}`}
                     style={statusColor ? { borderLeftColor: statusColor } : undefined}
                   >
                     <div className="relative flex-shrink-0 mt-0.5">
-                      <div className={`w-9 h-9 rounded-full ${avatarColor(seed)} text-white text-xs font-bold flex items-center justify-center`}>
+                      <div
+                        className={`w-9 h-9 rounded-full ${avatarColor(seed)} text-white text-xs font-bold flex items-center justify-center`}
+                        style={statusColor ? { boxShadow: `0 0 0 2px ${statusColor}` } : undefined}
+                      >
                         {(seed || "?").charAt(0).toUpperCase()}
                       </div>
                       <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-gray-950 flex items-center justify-center border border-gray-800">
@@ -944,17 +951,15 @@ export function WhatsappInbox({
                       <div className="flex items-center justify-between gap-2">
                         <p className="font-medium truncate">{c.contactName || c.contactNumber}</p>
                         <div className="flex items-center gap-1 flex-shrink-0">
-                          {c.status === "FINALIZADO" ? (
+                          {c.status === "FINALIZADO" && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-700/50 text-gray-300 border border-gray-600">encerrado</span>
-                          ) : c.humanTakeover ? (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-orange-900/50 text-orange-300 border border-orange-700">manual</span>
-                          ) : null}
+                          )}
                           <button
                             onClick={e => handleTogglePin(c.id, c.pinned, e)}
                             title={c.pinned ? "Desafixar conversa" : "Fixar conversa"}
-                            className={c.pinned ? "text-amber-400" : "text-gray-600 hover:text-gray-400"}
+                            className={`p-0.5 rounded transition-colors ${c.pinned ? "text-blue-400" : "text-gray-600 hover:text-blue-400"}`}
                           >
-                            <Pin size={12} className={c.pinned ? "fill-current" : ""} />
+                            <Pin size={13} className={c.pinned ? "fill-current" : ""} />
                           </button>
                         </div>
                       </div>
@@ -968,8 +973,8 @@ export function WhatsappInbox({
                           {c.etiquetas.slice(0, 3).map(et => (
                             <span
                               key={et.id}
-                              className="text-[9px] font-medium px-1.5 py-0.5 rounded-full border"
-                              style={{ backgroundColor: `${et.cor}22`, color: et.cor, borderColor: `${et.cor}66` }}
+                              className="text-[9px] font-semibold px-2 py-0.5 rounded-full text-white"
+                              style={{ backgroundColor: et.cor }}
                             >
                               {et.nome}
                             </span>
@@ -996,6 +1001,7 @@ export function WhatsappInbox({
                           {unread && <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse flex-shrink-0" />}
                         </div>
                         <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <span className={`text-[9px] font-mono ${t.listTertiary}`}>#{c.id.slice(-6).toUpperCase()}</span>
                           <LeadStatusBadge
                             agentId={agentId}
                             leadStatusId={c.leadStatusId}
