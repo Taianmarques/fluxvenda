@@ -264,7 +264,12 @@ function Column({
               className={`flex-1 border rounded px-2 py-0.5 text-sm ${t.nameInput}`}
             />
           ) : (
-            <p className="flex-1 font-medium text-sm truncate cursor-text" onClick={() => setEditing(true)}>{stage.name}</p>
+            <p
+              className="flex-1 font-bold text-[12.5px] uppercase tracking-wide truncate cursor-text"
+              onClick={() => setEditing(true)}
+            >
+              {stage.name}
+            </p>
           )}
           <button
             onClick={() => { setInstrucoes(stage.agenteInstrucoes ?? ""); setShowAgente(s => !s); }}
@@ -274,14 +279,14 @@ function Column({
             <Bot size={14} />
           </button>
           <span
-            className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+            className="text-[11px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
             style={{ backgroundColor: `${stage.color}33`, color: stage.color }}
           >
             {opportunities.length}
           </span>
           <button onClick={() => onDelete(stage.id)} className="text-gray-500 hover:text-red-400 text-xs">✕</button>
         </div>
-        {total > 0 && <p className="text-xs font-semibold text-green-500 mt-1.5">{formatBRL(total)}</p>}
+        {total > 0 && <p className="text-[15px] font-bold leading-none text-green-500 mt-2">{formatBRL(total)}</p>}
 
         {showAgente && (
           <div className={`mt-2 rounded-xl border p-2.5 space-y-2 ${dark ? "bg-gray-950 border-gray-700" : "bg-white border-gray-300"}`}>
