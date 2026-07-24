@@ -426,6 +426,18 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       // Avisa o profissional no WhatsApp (fire-and-forget)
       notifyProfessionalOfAppointment(appointment.id, "novo");
 
+      // Push no app pro gestor — mesmo padrão do agendamento pela página pública
+      const quandoPush = scheduledAt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) +
+        " às " + scheduledAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      prisma.team.findUnique({ where: { id: config.teamId }, select: { managerId: true } })
+        .then(team => team && notifyUsers(
+          [team.managerId],
+          "Novo agendamento pelo WhatsApp",
+          `${contactName || contactNumber} — ${service ? `${service.name} ` : ""}em ${quandoPush}${professional ? ` com ${professional.name}` : ""}`,
+          `${process.env.NEXT_PUBLIC_APP_URL}/crm/${config.id}/agenda`,
+        ))
+        .catch(() => {});
+
       return `Agendamento confirmado para ${date} às ${time}.`;
     }
 
@@ -438,6 +450,19 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
 
       await prisma.appointment.update({ where: { id: next.id }, data: { status: "CANCELADO" } });
       notifyProfessionalOfAppointment(next.id, "cancelado");
+
+      // Push no app pro gestor sobre o cancelamento
+      const quandoCancel = next.scheduledAt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) +
+        " às " + next.scheduledAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      prisma.team.findUnique({ where: { id: config.teamId }, select: { managerId: true } })
+        .then(team => team && notifyUsers(
+          [team.managerId],
+          "Agendamento cancelado",
+          `${contactName || contactNumber} cancelou o horário de ${quandoCancel}.`,
+          `${process.env.NEXT_PUBLIC_APP_URL}/crm/${config.id}/agenda`,
+        ))
+        .catch(() => {});
+
       return "Agendamento cancelado com sucesso.";
     }
 
