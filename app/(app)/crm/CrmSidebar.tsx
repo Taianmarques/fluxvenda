@@ -280,19 +280,10 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager }: {
 
     {/* Sidebar vertical — desktop, itens agrupados por categoria com dropdown */}
     <aside className={`hidden md:flex flex-shrink-0 border-r border-gray-800 bg-black flex-col transition-[width] duration-150 ${collapsed ? "w-16" : "w-56"}`}>
-      <div className={`py-5 border-b border-gray-800 flex items-center ${collapsed ? "justify-center px-2" : "justify-between px-5"}`}>
-        {!collapsed && (
-          <p className="font-bold text-lg">
-            <span className="text-blue-400">CRM</span>
-          </p>
-        )}
-        <button
-          onClick={toggleCollapsed}
-          title={collapsed ? "Expandir menu" : "Recolher menu"}
-          className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors flex-shrink-0"
-        >
-          {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
-        </button>
+      <div className={`py-5 border-b border-gray-800 flex items-center justify-center ${collapsed ? "px-2" : "px-5"}`}>
+        <p className="font-bold text-lg">
+          <span className="text-blue-400">CRM</span>
+        </p>
       </div>
 
       {agents.length > 1 && (
@@ -373,6 +364,16 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager }: {
 
       <div className={`py-4 border-t border-gray-800 space-y-0.5 ${collapsed ? "px-2" : "px-3"}`}>
         <NotificationsButton compact={collapsed} />
+        <button
+          onClick={toggleCollapsed}
+          title={collapsed ? "Expandir menu" : "Recolher menu"}
+          className={`flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-colors w-full ${
+            collapsed ? "justify-center px-0" : "px-3"
+          }`}
+        >
+          {collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
+          {!collapsed && "Recolher menu"}
+        </button>
         <Link
           href="/dashboard"
           title={collapsed ? "Plataforma B2B" : undefined}
