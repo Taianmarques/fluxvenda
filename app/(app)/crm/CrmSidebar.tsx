@@ -363,7 +363,9 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager }: {
       </nav>
 
       <div className={`py-4 border-t border-gray-800 space-y-0.5 ${collapsed ? "px-2" : "px-3"}`}>
-        <NotificationsButton compact={collapsed} />
+        <div className={collapsed ? "flex justify-center" : ""}>
+          <NotificationsButton compact={collapsed} />
+        </div>
         <button
           onClick={toggleCollapsed}
           title={collapsed ? "Expandir menu" : "Recolher menu"}
