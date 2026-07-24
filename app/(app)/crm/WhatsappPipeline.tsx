@@ -67,11 +67,42 @@ function formatBRL(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+// Cor consistente por contato (mesma paleta usada no chat/Ao vivo) — hash simples do nome/número
+const AVATAR_COLORS = ["bg-blue-600", "bg-purple-600", "bg-emerald-600", "bg-amber-600", "bg-pink-600", "bg-cyan-600", "bg-indigo-600", "bg-rose-600"];
+function avatarColor(seed: string): string {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[hash];
+}
+
+// Foto real do WhatsApp (mesmo proxy usado no chat) sobre o círculo de iniciais — cai pras
+// iniciais se não tiver foto (Instagram, contato sem foto, ou erro ao buscar)
+function CardAvatar({ agentId, conversationId, seed }: { agentId: string; conversationId: string; seed: string }) {
+  const [imgFailed, setImgFailed] = useState(false);
+  return (
+    <div className="relative w-8 h-8 rounded-full flex-shrink-0">
+      <div className={`absolute inset-0 rounded-full ${avatarColor(seed)} text-white text-[11px] font-bold flex items-center justify-center`}>
+        {(seed || "?").charAt(0).toUpperCase()}
+      </div>
+      {!imgFailed && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={`/api/agentes/${agentId}/conversas/${conversationId}/foto`}
+          alt=""
+          className="absolute inset-0 w-8 h-8 rounded-full object-cover"
+          onError={() => setImgFailed(true)}
+        />
+      )}
+    </div>
+  );
+}
+
 function Card({
-  agentId, opp, onClick, onValueChange, onLeadStatusChange, onMarcarGanho, onOpenChat, leadStatuses, onLeadStatusesChange, dark, t,
+  agentId, opp, stageColor, onClick, onValueChange, onLeadStatusChange, onMarcarGanho, onOpenChat, leadStatuses, onLeadStatusesChange, dark, t,
 }: {
   agentId: string;
   opp: PipelineOpportunity;
+  stageColor?: string;
   onClick: () => void;
   onValueChange: (id: string, value: number) => void;
   onLeadStatusChange: (conversationId: string, leadStatusId: string | null) => void;
@@ -100,8 +131,10 @@ function Card({
       {...attributes}
       onClick={onClick}
       className={`border rounded-xl p-3 cursor-pointer transition-colors ${t.card} ${isDragging ? "opacity-30" : ""}`}
+      style={stageColor ? { backgroundColor: `${stageColor}17` } : undefined}
     >
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center gap-2">
+        <CardAvatar agentId={agentId} conversationId={opp.conversationId} seed={opp.contactName || opp.contactNumber} />
         <p className="font-medium text-sm truncate flex-1">{opp.contactName || opp.contactNumber}</p>
         <button
           onClick={e => { e.stopPropagation(); onOpenChat(opp.conversationId); }}
@@ -214,8 +247,12 @@ function Column({
   const total = opportunities.reduce((sum, o) => sum + o.dealValue, 0);
 
   return (
-    <div ref={setNodeRef} className={`w-72 flex-shrink-0 flex flex-col rounded-2xl border ${isOver ? "border-blue-500" : t.column}`}>
-      <div className={`p-3 border-b ${t.columnHeaderBorder}`}>
+    <div
+      ref={setNodeRef}
+      className={`w-72 flex-shrink-0 flex flex-col rounded-2xl border overflow-hidden ${isOver ? "border-blue-500" : t.column}`}
+      style={{ backgroundColor: `${stage.color}0D` }}
+    >
+      <div className={`p-3 border-b ${t.columnHeaderBorder}`} style={{ backgroundColor: `${stage.color}1F` }}>
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: stage.color }} />
           {editing ? (
@@ -237,7 +274,12 @@ function Column({
           >
             <Bot size={14} />
           </button>
-          <span className={`text-xs ${t.columnCount}`}>{opportunities.length}</span>
+          <span
+            className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+            style={{ backgroundColor: `${stage.color}33`, color: stage.color }}
+          >
+            {opportunities.length}
+          </span>
           <button onClick={() => onDelete(stage.id)} className="text-gray-500 hover:text-red-400 text-xs">✕</button>
         </div>
         {total > 0 && <p className="text-xs font-semibold text-green-500 mt-1.5">{formatBRL(total)}</p>}
@@ -272,7 +314,7 @@ function Column({
       <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[120px]">
         {opportunities.map(o => (
           <Card
-            key={o.id} agentId={agentId} opp={o} onClick={() => onClickCard(o.conversationId)} onValueChange={onValueChange}
+            key={o.id} agentId={agentId} opp={o} stageColor={stage.color} onClick={() => onClickCard(o.conversationId)} onValueChange={onValueChange}
             onLeadStatusChange={onLeadStatusChange} onMarcarGanho={onMarcarGanho} onOpenChat={onOpenChat} leadStatuses={leadStatuses} onLeadStatusesChange={onLeadStatusesChange}
             dark={dark} t={t}
           />
