@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, Plus, Pencil, Trash2 } from "lucide-react";
+import { BookOpen, Plus, Pencil, Trash2, Upload, Loader2 } from "lucide-react";
 
 type Item = { id: string; titulo: string; conteudo: string; active: boolean };
 
@@ -21,6 +21,53 @@ export function ConhecimentoClient({ agentId, isManager, itens }: { agentId: str
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [editTitulo, setEditTitulo] = useState("");
   const [editConteudo, setEditConteudo] = useState("");
+
+  // Importar de arquivo: txt/md lidos no navegador; pdf/docx extraídos no servidor.
+  // O texto cai no campo do form que estiver aberto (novo ou edição) pra revisão.
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [importando, setImportando] = useState(false);
+
+  function aplicarTextoImportado(texto: string, fileName: string) {
+    const cortado = texto.length > MAX_CONTEUDO;
+    const conteudo = texto.slice(0, MAX_CONTEUDO);
+    const tituloDoArquivo = fileName.replace(/\.[^.]+$/, "").slice(0, 80);
+    if (editandoId) {
+      setEditConteudo(conteudo);
+      if (!editTitulo.trim()) setEditTitulo(tituloDoArquivo);
+    } else {
+      setNovoConteudo(conteudo);
+      if (!novoTitulo.trim()) setNovoTitulo(tituloDoArquivo);
+      setShowNovo(true);
+    }
+    setErro(cortado ? `O texto do arquivo passou de ${MAX_CONTEUDO.toLocaleString("pt-BR")} caracteres e foi cortado — revise e, se precisar, divida o restante em outros conteúdos.` : "");
+  }
+
+  async function handleImportarArquivo(file: File) {
+    setImportando(true);
+    setErro("");
+    try {
+      const nome = file.name.toLowerCase();
+      if (nome.endsWith(".txt") || nome.endsWith(".md")) {
+        const texto = (await file.text()).trim();
+        if (!texto) { setErro("O arquivo está vazio."); return; }
+        aplicarTextoImportado(texto, file.name);
+        return;
+      }
+      if (nome.endsWith(".pdf") || nome.endsWith(".docx")) {
+        const form = new FormData();
+        form.append("file", file);
+        const res = await fetch(`/api/agentes/${agentId}/conhecimento/extrair`, { method: "POST", body: form });
+        const data = await res.json().catch(() => ({} as { texto?: string; error?: string }));
+        if (!res.ok || !data.texto) { setErro(data.error ?? "Não foi possível extrair o texto do arquivo."); return; }
+        aplicarTextoImportado(data.texto, file.name);
+        return;
+      }
+      setErro("Formato não suportado — use .txt, .md, .pdf ou .docx.");
+    } finally {
+      setImportando(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
 
   async function handleCriar() {
     if (!novoTitulo.trim() || !novoConteudo.trim()) return;
@@ -97,18 +144,36 @@ export function ConhecimentoClient({ agentId, isManager, itens }: { agentId: str
             </p>
           </div>
           {isManager && itens.length < MAX_ITENS && (
-            <button
-              onClick={() => setShowNovo(s => !s)}
-              className="flex items-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-2 transition-colors"
-            >
-              <Plus size={14} /> Novo conteúdo
-            </button>
+            <div className="flex gap-2 flex-wrap">
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".txt,.md,.pdf,.docx"
+                className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleImportarArquivo(f); }}
+              />
+              <button
+                onClick={() => setShowNovo(s => !s)}
+                className="flex items-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-2 transition-colors"
+              >
+                <Plus size={14} /> Novo conteúdo
+              </button>
+              <button
+                onClick={() => fileRef.current?.click()}
+                disabled={importando}
+                title="Importa o texto de um arquivo .txt, .md, .pdf ou .docx pro conteúdo (você revisa antes de salvar)"
+                className="flex items-center gap-1.5 text-sm font-medium text-blue-400 hover:text-blue-300 border border-blue-800/50 hover:border-blue-600/50 disabled:opacity-50 rounded-xl px-4 py-2 transition-colors"
+              >
+                {importando ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                {importando ? "Extraindo..." : "Importar de arquivo"}
+              </button>
+            </div>
           )}
         </div>
 
         <p className="text-xs text-gray-600">
           {itens.length} de {MAX_ITENS} conteúdos · até {MAX_CONTEUDO.toLocaleString("pt-BR")} caracteres cada ·
-          conteúdos inativos não são usados pela IA.
+          conteúdos inativos não são usados pela IA · importa .txt, .md, .pdf e .docx (PDF escaneado não é suportado).
         </p>
 
         {erro && <p className="text-sm text-red-400">{erro}</p>}
