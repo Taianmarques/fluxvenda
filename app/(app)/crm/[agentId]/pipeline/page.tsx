@@ -93,6 +93,7 @@ export default async function PipelinePage({ params }: { params: Promise<{ agent
         stageId: o.stageId,
         dealValue: o.dealValue,
         wonAt: o.wonAt?.toISOString() ?? null,
+        lostAt: o.lostAt?.toISOString() ?? null,
         createdAt: o.createdAt.toISOString(),
         stageEnteredAt: o.stageEnteredAt.toISOString(),
         updatedAt: o.updatedAt.toISOString(),

@@ -6,10 +6,11 @@ import {
   type DragEndEvent, type DragStartEvent,
 } from "@dnd-kit/core";
 import { useDroppable, useDraggable } from "@dnd-kit/core";
-import { ThumbsUp, MessageCircle, Bot, X, ListChecks } from "lucide-react";
+import { ThumbsUp, ThumbsDown, MessageCircle, Bot, X, ListChecks, MoreVertical, ArrowRightLeft, Pencil, Trash2 } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { ConversationPopup } from "./ConversationPopup";
 import { PipelineTaskPanel } from "./PipelineTaskPanel";
+import type { Attendant } from "./PipelineFiltersPanel";
 
 export type Stage = { id: string; name: string; color: string; order: number; agenteInstrucoes?: string };
 export type PipelineOpportunity = {
@@ -24,6 +25,7 @@ export type PipelineOpportunity = {
   stageId: string | null;
   dealValue: number;
   wonAt: string | null;
+  lostAt: string | null;
   createdAt: string;
   stageEnteredAt: string;
   lastMessage: string | null;
@@ -102,15 +104,19 @@ function CardAvatar({ agentId, conversationId, seed }: { agentId: string; conver
 }
 
 function Card({
-  agentId, opp, stageColor, onClick, onValueChange, onLeadStatusChange, onMarcarGanho, onOpenChat, onOpportunitiesChange, leadStatuses, onLeadStatusesChange, dark, t,
+  agentId, opp, stageColor, attendants, onClick, onValueChange, onLeadStatusChange, onMarcarGanho, onMarcarPerda, onTransfer, onDeleteOpportunity, onOpenChat, onOpportunitiesChange, leadStatuses, onLeadStatusesChange, dark, t,
 }: {
   agentId: string;
   opp: PipelineOpportunity;
   stageColor?: string;
+  attendants: { id: string; name: string; isManager: boolean }[];
   onClick: () => void;
   onValueChange: (id: string, value: number) => void;
   onLeadStatusChange: (conversationId: string, leadStatusId: string | null) => void;
   onMarcarGanho: (id: string) => void;
+  onMarcarPerda: (id: string) => void;
+  onTransfer: (conversationId: string, attendantId: string) => void;
+  onDeleteOpportunity: (id: string) => void;
   onOpenChat: (conversationId: string) => void;
   onOpportunitiesChange: () => void;
   leadStatuses: LeadStatus[];
@@ -121,13 +127,23 @@ function Card({
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: opp.id });
   const [editingValue, setEditingValue] = useState(false);
   const [valueInput, setValueInput] = useState(String(opp.dealValue));
-  const taskBtnRef = useRef<HTMLButtonElement>(null);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const [menuView, setMenuView] = useState<"main" | "transfer">("main");
   const [taskPanelPos, setTaskPanelPos] = useState<{ top: number; left: number } | null>(null);
+  const closed = Boolean(opp.wonAt || opp.lostAt);
 
-  function toggleTaskPanel(e: React.MouseEvent) {
+  function toggleMenu(e: React.MouseEvent) {
     e.stopPropagation();
-    if (taskPanelPos) { setTaskPanelPos(null); return; }
-    const rect = taskBtnRef.current?.getBoundingClientRect();
+    if (menuPos) { closeMenu(); return; }
+    const rect = menuBtnRef.current?.getBoundingClientRect();
+    if (rect) setMenuPos({ top: rect.bottom + 4, left: Math.min(rect.left, window.innerWidth - 200) });
+    setMenuView("main");
+  }
+  function closeMenu() { setMenuPos(null); setMenuView("main"); }
+
+  function openTaskPanel() {
+    const rect = menuBtnRef.current?.getBoundingClientRect();
     if (rect) setTaskPanelPos({ top: rect.bottom + 4, left: Math.min(rect.left, window.innerWidth - 300) });
   }
 
@@ -137,6 +153,8 @@ function Card({
     if (Number.isFinite(parsed) && parsed > 0 && parsed !== opp.dealValue) onValueChange(opp.id, parsed);
     else setValueInput(String(opp.dealValue));
   }
+
+  const menuItemClass = `w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs ${dark ? "hover:bg-gray-800" : "hover:bg-gray-100"}`;
 
   return (
     <div
@@ -166,6 +184,15 @@ function Card({
           onStatusesChange={onLeadStatusesChange}
           dark={dark}
         />
+        <button
+          ref={menuBtnRef}
+          onClick={toggleMenu}
+          onPointerDown={e => e.stopPropagation()}
+          title="Mais opções"
+          className={`p-1 rounded flex-shrink-0 ${dark ? "text-gray-400 hover:text-white hover:bg-gray-800" : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"}`}
+        >
+          <MoreVertical size={14} />
+        </button>
       </div>
       <p className={`text-[11.5px] truncate mt-1 ${t.cardSecondary}`}>{opp.title || opp.lastMessage || "—"}</p>
       <div className={`flex items-center justify-between gap-2 mt-2 text-[9.5px] font-medium uppercase tracking-wide ${t.cardSecondary}`}>
@@ -174,20 +201,72 @@ function Card({
           {daysSince(opp.stageEnteredAt)}d na etapa
         </span>
       </div>
-      <button
-        ref={taskBtnRef}
-        onClick={toggleTaskPanel}
-        onPointerDown={e => e.stopPropagation()}
-        title="Tarefas"
-        className={`mt-1.5 self-start flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md ${
-          opp.tasksTotal > 0 && opp.tasksDone === opp.tasksTotal
-            ? "text-green-500"
-            : dark ? "text-gray-400 hover:text-white hover:bg-gray-800" : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
-        }`}
-      >
-        <ListChecks size={11} />
-        {opp.tasksTotal > 0 ? `${opp.tasksDone}/${opp.tasksTotal} tarefas` : "Tarefas"}
-      </button>
+      <div className="flex items-center justify-between gap-2 mt-1">
+        {opp.assignedToName ? (
+          <p className={`text-[9.5px] font-medium uppercase tracking-wide truncate ${t.cardSecondary}`}>Vendedor · {opp.assignedToName}</p>
+        ) : <span />}
+        {opp.lostAt && (
+          <span className="text-[9px] font-bold uppercase tracking-wide text-red-400 flex-shrink-0">Perdida</span>
+        )}
+      </div>
+
+      {menuPos && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={e => { e.stopPropagation(); closeMenu(); }} onPointerDown={e => e.stopPropagation()} />
+          <div
+            className={`fixed z-50 w-48 rounded-xl border shadow-xl py-1 ${dark ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}
+            style={{ top: menuPos.top, left: menuPos.left }}
+            onClick={e => e.stopPropagation()}
+            onPointerDown={e => e.stopPropagation()}
+          >
+            {menuView === "main" ? (
+              <>
+                <button onClick={() => { closeMenu(); openTaskPanel(); }} className={menuItemClass}>
+                  <ListChecks size={13} /> {opp.tasksTotal > 0 ? `Tarefas (${opp.tasksDone}/${opp.tasksTotal})` : "Nova tarefa"}
+                </button>
+                {!closed && (
+                  <button onClick={() => { closeMenu(); setEditingValue(true); }} className={menuItemClass}>
+                    <Pencil size={13} /> Editar valor
+                  </button>
+                )}
+                <button onClick={e => { e.stopPropagation(); setMenuView("transfer"); }} className={menuItemClass}>
+                  <ArrowRightLeft size={13} /> Transferir
+                </button>
+                <button onClick={() => { closeMenu(); onOpenChat(opp.conversationId); }} className={menuItemClass}>
+                  <MessageCircle size={13} /> Abrir conversa
+                </button>
+                {!closed && (
+                  <>
+                    <button onClick={() => { closeMenu(); onMarcarGanho(opp.id); }} className={`${menuItemClass} text-green-500`}>
+                      <ThumbsUp size={13} /> Ganho
+                    </button>
+                    <button onClick={() => { closeMenu(); onMarcarPerda(opp.id); }} className={`${menuItemClass} text-red-400`}>
+                      <ThumbsDown size={13} /> Perda
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={() => { closeMenu(); if (confirm(`Excluir a oportunidade de ${opp.contactName || opp.contactNumber}?`)) onDeleteOpportunity(opp.id); }}
+                  className={`${menuItemClass} text-red-400`}
+                >
+                  <Trash2 size={13} /> Excluir
+                </button>
+              </>
+            ) : (
+              <>
+                <div className={`px-3 py-1.5 text-[10px] uppercase tracking-wide font-medium ${t.cardSecondary}`}>Transferir para</div>
+                {attendants.length === 0 && <p className="px-3 py-1.5 text-xs text-gray-500">Nenhum atendente</p>}
+                {attendants.map(a => (
+                  <button key={a.id} onClick={() => { closeMenu(); onTransfer(opp.conversationId, a.id); }} className={menuItemClass}>
+                    {a.name}
+                  </button>
+                ))}
+              </>
+            )}
+          </div>
+        </>
+      )}
+
       {taskPanelPos && (
         <PipelineTaskPanel
           agentId={agentId}
@@ -199,9 +278,7 @@ function Card({
           dark={dark}
         />
       )}
-      {opp.assignedToName && (
-        <p className={`text-[9.5px] font-medium uppercase tracking-wide mt-1 truncate ${t.cardSecondary}`}>Vendedor · {opp.assignedToName}</p>
-      )}
+
       {editingValue ? (
         <input
           autoFocus
@@ -212,39 +289,30 @@ function Card({
           onKeyDown={e => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
           onPointerDown={e => e.stopPropagation()}
           placeholder="0,00"
-          className={`w-full mt-2 border rounded px-2 py-1 text-xs ${t.input}`}
+          className={`w-full mt-auto border rounded px-2 py-1 text-xs ${t.input}`}
         />
       ) : (
-        <div className="flex items-center justify-between gap-2 mt-auto pt-2">
-          <p
-            className="text-[15px] font-bold leading-none cursor-text text-green-500"
-            onClick={e => { e.stopPropagation(); setEditingValue(true); }}
-            onPointerDown={e => e.stopPropagation()}
-          >
-            {opp.wonAt ? `🏆 ${formatBRL(opp.dealValue)}` : formatBRL(opp.dealValue)}
-          </p>
-          {!opp.wonAt && (
-            <button
-              onClick={e => { e.stopPropagation(); onMarcarGanho(opp.id); }}
-              onPointerDown={e => e.stopPropagation()}
-              title="Marcar como ganho"
-              className="p-1 rounded bg-green-900/40 text-green-300 border border-green-800/50 hover:bg-green-900/70 flex-shrink-0"
-            >
-              <ThumbsUp size={11} />
-            </button>
-          )}
-        </div>
+        <p
+          className={`mt-auto pt-2 text-[15px] font-bold leading-none ${
+            opp.lostAt ? "text-gray-500 line-through" : "text-green-500"
+          } ${!closed ? "cursor-text" : ""}`}
+          onClick={e => { if (!closed) { e.stopPropagation(); setEditingValue(true); } }}
+          onPointerDown={e => e.stopPropagation()}
+        >
+          {opp.wonAt ? `🏆 ${formatBRL(opp.dealValue)}` : formatBRL(opp.dealValue)}
+        </p>
       )}
     </div>
   );
 }
 
 function Column({
-  agentId, stage, opportunities, onClickCard, onRename, onDelete, onStagesChange, onValueChange, onLeadStatusChange, onMarcarGanho, onOpenChat, onOpportunitiesChange, leadStatuses, onLeadStatusesChange, dark, t,
+  agentId, stage, opportunities, attendants, onClickCard, onRename, onDelete, onStagesChange, onValueChange, onLeadStatusChange, onMarcarGanho, onMarcarPerda, onTransfer, onDeleteOpportunity, onOpenChat, onOpportunitiesChange, leadStatuses, onLeadStatusesChange, dark, t,
 }: {
   agentId: string;
   stage: Stage;
   opportunities: PipelineOpportunity[];
+  attendants: Attendant[];
   onClickCard: (conversationId: string) => void;
   onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
@@ -252,6 +320,9 @@ function Column({
   onValueChange: (id: string, value: number) => void;
   onLeadStatusChange: (conversationId: string, leadStatusId: string | null) => void;
   onMarcarGanho: (id: string) => void;
+  onMarcarPerda: (id: string) => void;
+  onTransfer: (conversationId: string, attendantId: string) => void;
+  onDeleteOpportunity: (id: string) => void;
   onOpenChat: (conversationId: string) => void;
   onOpportunitiesChange: () => void;
   leadStatuses: LeadStatus[];
@@ -370,8 +441,9 @@ function Column({
       <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[120px]">
         {opportunities.map(o => (
           <Card
-            key={o.id} agentId={agentId} opp={o} stageColor={stage.color} onClick={() => onClickCard(o.conversationId)} onValueChange={onValueChange}
-            onLeadStatusChange={onLeadStatusChange} onMarcarGanho={onMarcarGanho} onOpenChat={onOpenChat} onOpportunitiesChange={onOpportunitiesChange}
+            key={o.id} agentId={agentId} opp={o} stageColor={stage.color} attendants={attendants} onClick={() => onClickCard(o.conversationId)} onValueChange={onValueChange}
+            onLeadStatusChange={onLeadStatusChange} onMarcarGanho={onMarcarGanho} onMarcarPerda={onMarcarPerda} onTransfer={onTransfer} onDeleteOpportunity={onDeleteOpportunity}
+            onOpenChat={onOpenChat} onOpportunitiesChange={onOpportunitiesChange}
             leadStatuses={leadStatuses} onLeadStatusesChange={onLeadStatusesChange}
             dark={dark} t={t}
           />
@@ -382,7 +454,7 @@ function Column({
 }
 
 export function WhatsappPipeline({
-  agentId, pipelineId, stages, leadStatuses, opportunities, theme, onSelectConversation, onStagesChange, onLeadStatusesChange, onOpportunitiesChange,
+  agentId, pipelineId, stages, leadStatuses, opportunities, theme, attendants, onSelectConversation, onStagesChange, onLeadStatusesChange, onOpportunitiesChange,
 }: {
   agentId: string;
   pipelineId: string;
@@ -390,6 +462,7 @@ export function WhatsappPipeline({
   leadStatuses: LeadStatus[];
   opportunities: PipelineOpportunity[];
   theme: PipelineTheme;
+  attendants: Attendant[];
   onSelectConversation: (id: string) => void;
   onStagesChange: () => void;
   onLeadStatusesChange: () => void;
@@ -457,6 +530,32 @@ export function WhatsappPipeline({
     setLocalOpportunities(prev => prev.map(o => o.id === oppId ? { ...o, wonAt: data.opportunity.wonAt, stageId: data.opportunity.stageId } : o));
   }
 
+  async function handleMarcarPerda(oppId: string) {
+    const opp = localOpportunities.find(o => o.id === oppId);
+    if (!opp) return;
+    const res = await fetch(`/api/ferramentas/whatsapp/conversas/${opp.conversationId}/oportunidades/${oppId}/perda`, { method: "POST" });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error ?? "Não foi possível marcar como perda."); return; }
+    setLocalOpportunities(prev => prev.map(o => o.id === oppId ? { ...o, lostAt: data.opportunity.lostAt, stageId: data.opportunity.stageId } : o));
+  }
+
+  async function handleTransfer(conversationId: string, attendantId: string) {
+    await fetch(`/api/ferramentas/whatsapp/conversas/${conversationId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ assignedToId: attendantId }),
+    });
+    onOpportunitiesChange();
+  }
+
+  async function handleDeleteOpportunity(oppId: string) {
+    const opp = localOpportunities.find(o => o.id === oppId);
+    if (!opp) return;
+    setLocalOpportunities(prev => prev.filter(o => o.id !== oppId));
+    await fetch(`/api/ferramentas/whatsapp/conversas/${opp.conversationId}/oportunidades/${oppId}`, { method: "DELETE" });
+    onOpportunitiesChange();
+  }
+
   async function handleAddStage() {
     if (!newStageName.trim()) return;
     await fetch("/api/ferramentas/whatsapp/etapas", {
@@ -495,6 +594,7 @@ export function WhatsappPipeline({
               agentId={agentId}
               stage={{ id: "__sem_etapa__", name: "Sem etapa", color: "#6b7280", order: -1 }}
               opportunities={semEtapa}
+              attendants={attendants}
               onClickCard={onSelectConversation}
               onRename={() => {}}
               onDelete={() => {}}
@@ -502,6 +602,9 @@ export function WhatsappPipeline({
               onValueChange={handleValueChange}
               onLeadStatusChange={handleLeadStatusChange}
               onMarcarGanho={handleMarcarGanho}
+              onMarcarPerda={handleMarcarPerda}
+              onTransfer={handleTransfer}
+              onDeleteOpportunity={handleDeleteOpportunity}
               onOpenChat={setChatConversationId}
               onOpportunitiesChange={onOpportunitiesChange}
               leadStatuses={leadStatuses}
@@ -516,6 +619,7 @@ export function WhatsappPipeline({
               agentId={agentId}
               stage={stage}
               opportunities={localOpportunities.filter(o => o.stageId === stage.id)}
+              attendants={attendants}
               onClickCard={onSelectConversation}
               onRename={handleRename}
               onDelete={handleDelete}
@@ -523,6 +627,9 @@ export function WhatsappPipeline({
               onValueChange={handleValueChange}
               onLeadStatusChange={handleLeadStatusChange}
               onMarcarGanho={handleMarcarGanho}
+              onMarcarPerda={handleMarcarPerda}
+              onTransfer={handleTransfer}
+              onDeleteOpportunity={handleDeleteOpportunity}
               onOpenChat={setChatConversationId}
               onOpportunitiesChange={onOpportunitiesChange}
               leadStatuses={leadStatuses}

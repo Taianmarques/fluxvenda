@@ -1416,6 +1416,7 @@ model Opportunity {
   title     String? // nome opcional pra diferenciar quando há mais de uma, ex: "Plano anual"
   dealValue Float
   wonAt     DateTime? // quando foi marcada como ganha (null = ainda em negociação)
+  lostAt    DateTime? // quando foi marcada como perdida
 
   tasks OpportunityTask[]
 }

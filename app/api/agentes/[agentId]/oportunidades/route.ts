@@ -58,6 +58,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ agentId
       stageId: o.stageId,
       dealValue: o.dealValue,
       wonAt: o.wonAt,
+      lostAt: o.lostAt,
       createdAt: o.createdAt,
       stageEnteredAt: o.stageEnteredAt,
       updatedAt: o.updatedAt,

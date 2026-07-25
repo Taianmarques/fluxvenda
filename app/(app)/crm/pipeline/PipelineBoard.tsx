@@ -315,6 +315,7 @@ export function PipelineBoard({
           onStagesChange={refreshPipelines}
           onLeadStatusesChange={refreshLeadStatuses}
           onOpportunitiesChange={refreshOpportunities}
+          attendants={attendants}
         />
       )}
     </div>
