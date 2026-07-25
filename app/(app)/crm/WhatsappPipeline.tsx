@@ -284,8 +284,8 @@ function Column({
             <button
               onClick={() => { setInstrucoes(stage.agenteInstrucoes ?? ""); setShowAgente(s => !s); }}
               title={temAgente ? "Agente da etapa configurado — clique para editar" : "Configurar agente responsável por esta etapa"}
-              className={`flex-shrink-0 transition-opacity ${
-                temAgente ? "text-blue-400 hover:text-blue-300" : "text-gray-600 hover:text-gray-400 md:opacity-0 md:group-hover:opacity-100"
+              className={`flex-shrink-0 flex ${
+                temAgente ? "text-blue-400 hover:text-blue-300" : "md:hidden md:group-hover:flex text-gray-600 hover:text-gray-400"
               }`}
             >
               <Bot size={14} />
@@ -293,7 +293,7 @@ function Column({
             <button
               onClick={() => onDelete(stage.id)}
               title="Excluir etapa"
-              className="flex-shrink-0 text-gray-500 hover:text-red-400 transition-opacity md:opacity-0 md:group-hover:opacity-100"
+              className="flex-shrink-0 flex md:hidden md:group-hover:flex text-gray-500 hover:text-red-400"
             >
               <X size={14} />
             </button>
