@@ -314,6 +314,7 @@ export function PipelineBoard({
           onSelectConversation={id => router.push(`/crm/${agentId}?c=${id}`)}
           onStagesChange={refreshPipelines}
           onLeadStatusesChange={refreshLeadStatuses}
+          onOpportunitiesChange={refreshOpportunities}
         />
       )}
     </div>

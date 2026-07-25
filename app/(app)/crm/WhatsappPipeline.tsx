@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
   type DragEndEvent, type DragStartEvent,
 } from "@dnd-kit/core";
 import { useDroppable, useDraggable } from "@dnd-kit/core";
-import { ThumbsUp, MessageCircle, Bot, X } from "lucide-react";
+import { ThumbsUp, MessageCircle, Bot, X, ListChecks } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { ConversationPopup } from "./ConversationPopup";
+import { PipelineTaskPanel } from "./PipelineTaskPanel";
 
 export type Stage = { id: string; name: string; color: string; order: number; agenteInstrucoes?: string };
 export type PipelineOpportunity = {
@@ -27,6 +28,8 @@ export type PipelineOpportunity = {
   stageEnteredAt: string;
   lastMessage: string | null;
   updatedAt: string;
+  tasksTotal: number;
+  tasksDone: number;
 };
 
 function formatDate(iso: string): string {
@@ -99,7 +102,7 @@ function CardAvatar({ agentId, conversationId, seed }: { agentId: string; conver
 }
 
 function Card({
-  agentId, opp, stageColor, onClick, onValueChange, onLeadStatusChange, onMarcarGanho, onOpenChat, leadStatuses, onLeadStatusesChange, dark, t,
+  agentId, opp, stageColor, onClick, onValueChange, onLeadStatusChange, onMarcarGanho, onOpenChat, onOpportunitiesChange, leadStatuses, onLeadStatusesChange, dark, t,
 }: {
   agentId: string;
   opp: PipelineOpportunity;
@@ -109,6 +112,7 @@ function Card({
   onLeadStatusChange: (conversationId: string, leadStatusId: string | null) => void;
   onMarcarGanho: (id: string) => void;
   onOpenChat: (conversationId: string) => void;
+  onOpportunitiesChange: () => void;
   leadStatuses: LeadStatus[];
   onLeadStatusesChange: () => void;
   dark: boolean;
@@ -117,6 +121,15 @@ function Card({
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: opp.id });
   const [editingValue, setEditingValue] = useState(false);
   const [valueInput, setValueInput] = useState(String(opp.dealValue));
+  const taskBtnRef = useRef<HTMLButtonElement>(null);
+  const [taskPanelPos, setTaskPanelPos] = useState<{ top: number; left: number } | null>(null);
+
+  function toggleTaskPanel(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (taskPanelPos) { setTaskPanelPos(null); return; }
+    const rect = taskBtnRef.current?.getBoundingClientRect();
+    if (rect) setTaskPanelPos({ top: rect.bottom + 4, left: Math.min(rect.left, window.innerWidth - 300) });
+  }
 
   function commitValue() {
     setEditingValue(false);
@@ -161,6 +174,31 @@ function Card({
           {daysSince(opp.stageEnteredAt)}d na etapa
         </span>
       </div>
+      <button
+        ref={taskBtnRef}
+        onClick={toggleTaskPanel}
+        onPointerDown={e => e.stopPropagation()}
+        title="Tarefas"
+        className={`mt-1.5 self-start flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md ${
+          opp.tasksTotal > 0 && opp.tasksDone === opp.tasksTotal
+            ? "text-green-500"
+            : dark ? "text-gray-400 hover:text-white hover:bg-gray-800" : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+        }`}
+      >
+        <ListChecks size={11} />
+        {opp.tasksTotal > 0 ? `${opp.tasksDone}/${opp.tasksTotal} tarefas` : "Tarefas"}
+      </button>
+      {taskPanelPos && (
+        <PipelineTaskPanel
+          agentId={agentId}
+          conversationId={opp.conversationId}
+          oppId={opp.id}
+          pos={taskPanelPos}
+          onClose={() => setTaskPanelPos(null)}
+          onTasksChange={onOpportunitiesChange}
+          dark={dark}
+        />
+      )}
       {opp.assignedToName && (
         <p className={`text-[9.5px] font-medium uppercase tracking-wide mt-1 truncate ${t.cardSecondary}`}>Vendedor · {opp.assignedToName}</p>
       )}
@@ -202,7 +240,7 @@ function Card({
 }
 
 function Column({
-  agentId, stage, opportunities, onClickCard, onRename, onDelete, onStagesChange, onValueChange, onLeadStatusChange, onMarcarGanho, onOpenChat, leadStatuses, onLeadStatusesChange, dark, t,
+  agentId, stage, opportunities, onClickCard, onRename, onDelete, onStagesChange, onValueChange, onLeadStatusChange, onMarcarGanho, onOpenChat, onOpportunitiesChange, leadStatuses, onLeadStatusesChange, dark, t,
 }: {
   agentId: string;
   stage: Stage;
@@ -215,6 +253,7 @@ function Column({
   onLeadStatusChange: (conversationId: string, leadStatusId: string | null) => void;
   onMarcarGanho: (id: string) => void;
   onOpenChat: (conversationId: string) => void;
+  onOpportunitiesChange: () => void;
   leadStatuses: LeadStatus[];
   onLeadStatusesChange: () => void;
   dark: boolean;
@@ -332,7 +371,8 @@ function Column({
         {opportunities.map(o => (
           <Card
             key={o.id} agentId={agentId} opp={o} stageColor={stage.color} onClick={() => onClickCard(o.conversationId)} onValueChange={onValueChange}
-            onLeadStatusChange={onLeadStatusChange} onMarcarGanho={onMarcarGanho} onOpenChat={onOpenChat} leadStatuses={leadStatuses} onLeadStatusesChange={onLeadStatusesChange}
+            onLeadStatusChange={onLeadStatusChange} onMarcarGanho={onMarcarGanho} onOpenChat={onOpenChat} onOpportunitiesChange={onOpportunitiesChange}
+            leadStatuses={leadStatuses} onLeadStatusesChange={onLeadStatusesChange}
             dark={dark} t={t}
           />
         ))}
@@ -342,7 +382,7 @@ function Column({
 }
 
 export function WhatsappPipeline({
-  agentId, pipelineId, stages, leadStatuses, opportunities, theme, onSelectConversation, onStagesChange, onLeadStatusesChange,
+  agentId, pipelineId, stages, leadStatuses, opportunities, theme, onSelectConversation, onStagesChange, onLeadStatusesChange, onOpportunitiesChange,
 }: {
   agentId: string;
   pipelineId: string;
@@ -353,6 +393,7 @@ export function WhatsappPipeline({
   onSelectConversation: (id: string) => void;
   onStagesChange: () => void;
   onLeadStatusesChange: () => void;
+  onOpportunitiesChange: () => void;
 }) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [chatConversationId, setChatConversationId] = useState<string | null>(null);
@@ -462,6 +503,7 @@ export function WhatsappPipeline({
               onLeadStatusChange={handleLeadStatusChange}
               onMarcarGanho={handleMarcarGanho}
               onOpenChat={setChatConversationId}
+              onOpportunitiesChange={onOpportunitiesChange}
               leadStatuses={leadStatuses}
               onLeadStatusesChange={onLeadStatusesChange}
               dark={theme === "dark"}
@@ -482,6 +524,7 @@ export function WhatsappPipeline({
               onLeadStatusChange={handleLeadStatusChange}
               onMarcarGanho={handleMarcarGanho}
               onOpenChat={setChatConversationId}
+              onOpportunitiesChange={onOpportunitiesChange}
               leadStatuses={leadStatuses}
               onLeadStatusesChange={onLeadStatusesChange}
               dark={theme === "dark"}

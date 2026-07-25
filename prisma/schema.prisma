@@ -54,6 +54,7 @@ model Profile {
   sentMessages      Message[]
   assignedConversations Conversation[] @relation("AssignedConversations")
   scheduledMessages ScheduledMessage[]
+  opportunityTasks OpportunityTask[]
 }
 
 enum Role {
@@ -1415,6 +1416,26 @@ model Opportunity {
   title     String? // nome opcional pra diferenciar quando há mais de uma, ex: "Plano anual"
   dealValue Float
   wonAt     DateTime? // quando foi marcada como ganha (null = ainda em negociação)
+
+  tasks OpportunityTask[]
+}
+
+// Tarefa/checklist de uma oportunidade — ex: "ligar até sexta", "enviar proposta"
+model OpportunityTask {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  opportunityId String
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  title   String
+  done    Boolean   @default(false)
+  dueDate DateTime?
+
+  assignedToId String?
+  assignedTo   Profile? @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  @@index([opportunityId])
 }
 
 // Mensagem de texto programada pra ser enviada automaticamente numa data/hora futura —
