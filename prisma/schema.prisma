@@ -710,6 +710,11 @@ model AgentConfig {
   metaGeralMensal   Float @default(0) // 0 = sem meta geral definida
   metasPorVendedor  Json  @default("{}") // { [profileId]: valorMensal }
 
+  // Investimento mensal em marketing/vendas — usado só pra calcular CAC no dashboard
+  // (custo por cliente adquirido = investimento do mês ÷ clientes novos no mês). Também
+  // reinicia todo mês, sem histórico, igual às metas.
+  investimentoMensal Float @default(0)
+
   // Agente de ligação via Twilio + ElevenLabs
   phoneEnabled         Boolean @default(false)
   twilioAccountSid     String?

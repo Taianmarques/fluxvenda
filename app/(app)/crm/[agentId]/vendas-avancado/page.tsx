@@ -2,10 +2,10 @@ import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { BarChart3, Wallet, TrendingUp, TrendingDown, Handshake, Users, KanbanSquare } from "lucide-react";
+import { BarChart3, Wallet, TrendingUp, TrendingDown, Handshake, Users, KanbanSquare, DollarSign, Repeat, Percent } from "lucide-react";
 import { getAgentConfigWithRole } from "@/lib/team";
 import { CrmPageGate } from "@/app/(app)/crm/CrmPageGate";
-import { DailyWonLostChart, AttendantDonutChart } from "../../dashboards/DashboardCharts";
+import { DailyWonLostChart, AttendantDonutChart, GaugeChart } from "../../dashboards/DashboardCharts";
 import { DateRangePicker } from "../../dashboards/DateRangePicker";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -72,14 +72,18 @@ async function VendasAvancadoPageContent({ params, searchParams }: {
   const prevTo = new Date(from.getTime() - DAY_MS);
   const prevFrom = new Date(prevTo.getTime() - (periodDays - 1) * DAY_MS);
 
-  const [opportunities, team] = await Promise.all([
+  const [opportunities, conversations, team] = await Promise.all([
     prisma.opportunity.findMany({
       where: { conversation: { agentConfigId: config.id } },
       select: {
-        id: true, dealValue: true, wonAt: true, lostAt: true, createdAt: true, stageId: true, stageEnteredAt: true,
+        id: true, conversationId: true, dealValue: true, wonAt: true, lostAt: true, createdAt: true, stageId: true, stageEnteredAt: true,
         stage: { select: { name: true, color: true, order: true, pipeline: { select: { name: true } } } },
         conversation: { select: { assignedToId: true, contactName: true, contactNumber: true } },
       },
+    }),
+    prisma.conversation.findMany({
+      where: { agentConfigId: config.id },
+      select: { id: true, createdAt: true, assignedToId: true },
     }),
     prisma.team.findUnique({
       where: { id: config.teamId },
@@ -178,6 +182,65 @@ async function VendasAvancadoPageContent({ params, searchParams }: {
   const multiplePipelines = new Set(openByStage.map(s => s.pipelineName)).size > 1;
   const openByStageMax = Math.max(1, ...openByStage.map(s => s.total));
 
+  // Meta geral do mês — sempre pelo mês calendário corrente, independente do período selecionado
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const wonThisMonth = opportunities.filter(o => o.wonAt && o.wonAt >= startOfMonth);
+  const wonThisMonthTotal = wonThisMonth.reduce((s, o) => s + o.dealValue, 0);
+  const metaPct = config.metaGeralMensal > 0 ? (wonThisMonthTotal / config.metaGeralMensal) * 100 : null;
+
+  // CAC (mês corrente, só geral — não há investimento configurável por vendedor)
+  const clientesNovosMes = new Set(wonThisMonth.map(o => o.conversation.contactNumber)).size;
+  const cac = config.investimentoMensal > 0 && clientesNovosMes > 0 ? config.investimentoMensal / clientesNovosMes : null;
+
+  // LTV: valor total ganho por cliente (todo o histórico, não depende do período selecionado)
+  const wonAllTime = opportunities.filter(o => o.wonAt);
+  const ltvByClient = new Map<string, number>();
+  for (const o of wonAllTime) {
+    ltvByClient.set(o.conversation.contactNumber, (ltvByClient.get(o.conversation.contactNumber) ?? 0) + o.dealValue);
+  }
+  const ltvGeral = ltvByClient.size > 0 ? Array.from(ltvByClient.values()).reduce((s, v) => s + v, 0) / ltvByClient.size : null;
+
+  const ltvPorVendedorAcc = new Map<string, Map<string, number>>(); // vendedorId -> (contactNumber -> total)
+  for (const o of wonAllTime) {
+    const vendedorId = o.conversation.assignedToId ?? "__sem__";
+    const clientMap = ltvPorVendedorAcc.get(vendedorId) ?? new Map<string, number>();
+    clientMap.set(o.conversation.contactNumber, (clientMap.get(o.conversation.contactNumber) ?? 0) + o.dealValue);
+    ltvPorVendedorAcc.set(vendedorId, clientMap);
+  }
+  const ltvPorVendedor = Array.from(ltvPorVendedorAcc.entries())
+    .map(([id, clientMap]) => ({
+      id,
+      name: id === "__sem__" ? "Sem atendente" : (nameById.get(id) ?? "Ex-membro"),
+      ltv: Array.from(clientMap.values()).reduce((s, v) => s + v, 0) / clientMap.size,
+      clientes: clientMap.size,
+    }))
+    .sort((a, b) => b.ltv - a.ltv);
+
+  // Taxa de conversão (leads → clientes): dos leads que entraram no período selecionado,
+  // quantos já viraram cliente (têm ao menos 1 negócio ganho), até hoje
+  const wonConversationIds = new Set(wonAllTime.map(o => o.conversationId));
+  const leadsNoPeriodo = conversations.filter(c => inRange(c.createdAt, from, to));
+  const convertidosNoPeriodo = leadsNoPeriodo.filter(c => wonConversationIds.has(c.id));
+  const taxaConversaoGeral = leadsNoPeriodo.length > 0 ? (convertidosNoPeriodo.length / leadsNoPeriodo.length) * 100 : null;
+
+  const conversaoPorVendedorMap = new Map<string, { leads: number; convertidos: number }>();
+  for (const c of leadsNoPeriodo) {
+    const id = c.assignedToId ?? "__sem__";
+    const entry = conversaoPorVendedorMap.get(id) ?? { leads: 0, convertidos: 0 };
+    entry.leads += 1;
+    if (wonConversationIds.has(c.id)) entry.convertidos += 1;
+    conversaoPorVendedorMap.set(id, entry);
+  }
+  const conversaoPorVendedor = Array.from(conversaoPorVendedorMap.entries())
+    .map(([id, v]) => ({
+      id,
+      name: id === "__sem__" ? "Sem atendente" : (nameById.get(id) ?? "Ex-membro"),
+      pct: (v.convertidos / v.leads) * 100,
+      leads: v.leads,
+      convertidos: v.convertidos,
+    }))
+    .sort((a, b) => b.pct - a.pct);
+
   return (
     <div className="h-full overflow-y-auto bg-gray-950 text-white p-6">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -203,13 +266,90 @@ async function VendasAvancadoPageContent({ params, searchParams }: {
           ))}
         </div>
 
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
-          <p className="font-semibold mb-3">Dados diários — ganhos x perdidos</p>
-          {dayBuckets.every(d => d.ganho === 0 && d.perdido === 0) ? (
-            <p className="text-sm text-gray-600">Nenhuma negociação ganha ou perdida nesse período.</p>
-          ) : (
-            <DailyWonLostChart data={dayBuckets.map(b => ({ dia: b.dia, ganho: b.ganho, perdido: b.perdido }))} tickInterval={tickInterval} />
-          )}
+        <div className="grid md:grid-cols-3 gap-6">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 flex flex-col items-center justify-center text-center">
+            <p className="font-semibold self-start mb-1">Meta geral do mês</p>
+            {metaPct === null ? (
+              <div className="py-8">
+                <p className="text-sm text-gray-600">Nenhuma meta configurada.</p>
+                <Link href={`/crm/${agentId}/metas`} className="text-xs text-blue-400 hover:text-blue-300">Configurar meta →</Link>
+              </div>
+            ) : (
+              <>
+                <GaugeChart pct={metaPct} />
+                <p className="text-xs text-gray-500 -mt-2">{formatBRL(wonThisMonthTotal)} de {formatBRL(config.metaGeralMensal)}</p>
+              </>
+            )}
+          </div>
+
+          <div className="md:col-span-2 bg-gray-900 border border-gray-800 rounded-2xl p-5">
+            <p className="font-semibold mb-3">Dados diários — ganhos x perdidos</p>
+            {dayBuckets.every(d => d.ganho === 0 && d.perdido === 0) ? (
+              <p className="text-sm text-gray-600">Nenhuma negociação ganha ou perdida nesse período.</p>
+            ) : (
+              <DailyWonLostChart data={dayBuckets.map(b => ({ dia: b.dia, ganho: b.ganho, perdido: b.perdido }))} tickInterval={tickInterval} />
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-2">
+              <span className="inline-flex p-2 rounded-xl bg-red-500/10 text-red-400"><DollarSign size={18} /></span>
+            </div>
+            <p className="text-2xl font-bold text-red-400">{cac === null ? "—" : formatBRL(cac)}</p>
+            <p className="text-xs text-gray-500 mt-1">CAC (mês atual) · {clientesNovosMes} {clientesNovosMes === 1 ? "cliente novo" : "clientes novos"}</p>
+          </div>
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-2">
+              <span className="inline-flex p-2 rounded-xl bg-green-500/10 text-green-400"><Repeat size={18} /></span>
+            </div>
+            <p className="text-2xl font-bold text-green-400">{ltvGeral === null ? "—" : formatBRL(ltvGeral)}</p>
+            <p className="text-xs text-gray-500 mt-1">LTV médio · {ltvByClient.size} {ltvByClient.size === 1 ? "cliente" : "clientes"}</p>
+          </div>
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-2">
+              <span className="inline-flex p-2 rounded-xl bg-blue-500/10 text-blue-400"><Percent size={18} /></span>
+            </div>
+            <p className="text-2xl font-bold text-blue-400">{taxaConversaoGeral === null ? "—" : `${taxaConversaoGeral.toFixed(1)}%`}</p>
+            <p className="text-xs text-gray-500 mt-1">Taxa de conversão · {convertidosNoPeriodo.length} de {leadsNoPeriodo.length} leads</p>
+          </div>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-6">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+            <p className="font-semibold mb-1">LTV por vendedor</p>
+            <p className="text-xs text-gray-500 mb-3">Valor médio ganho por cliente (histórico completo).</p>
+            {ltvPorVendedor.length === 0 ? (
+              <p className="text-sm text-gray-600">Nenhum negócio ganho ainda.</p>
+            ) : (
+              <div className="space-y-2">
+                {ltvPorVendedor.map(v => (
+                  <div key={v.id} className="flex items-center justify-between text-sm">
+                    <p className="text-gray-300 truncate">{v.name}</p>
+                    <p className="font-semibold text-green-400 flex-shrink-0">{formatBRL(v.ltv)} <span className="text-xs text-gray-500 font-normal">({v.clientes} {v.clientes === 1 ? "cliente" : "clientes"})</span></p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+            <p className="font-semibold mb-1">Taxa de conversão por vendedor</p>
+            <p className="text-xs text-gray-500 mb-3">Leads do período selecionado que já viraram cliente.</p>
+            {conversaoPorVendedor.length === 0 ? (
+              <p className="text-sm text-gray-600">Nenhum lead no período.</p>
+            ) : (
+              <div className="space-y-2">
+                {conversaoPorVendedor.map(v => (
+                  <div key={v.id} className="flex items-center justify-between text-sm">
+                    <p className="text-gray-300 truncate">{v.name}</p>
+                    <p className="font-semibold text-blue-400 flex-shrink-0">{v.pct.toFixed(1)}% <span className="text-xs text-gray-500 font-normal">({v.convertidos}/{v.leads})</span></p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">

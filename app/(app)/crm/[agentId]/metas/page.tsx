@@ -42,6 +42,7 @@ async function MetasPageContent({ params }: { params: Promise<{ agentId: string 
       agentId={config.id}
       initialMetaGeralMensal={config.metaGeralMensal}
       initialMetasPorVendedor={config.metasPorVendedor as Record<string, number>}
+      initialInvestimentoMensal={config.investimentoMensal}
       attendants={attendants}
     />
   );

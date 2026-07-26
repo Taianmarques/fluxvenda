@@ -5,16 +5,18 @@ import { Goal, Save, Check } from "lucide-react";
 
 type Attendant = { id: string; name: string };
 
-export function MetasClient({ agentId, initialMetaGeralMensal, initialMetasPorVendedor, attendants }: {
+export function MetasClient({ agentId, initialMetaGeralMensal, initialMetasPorVendedor, initialInvestimentoMensal, attendants }: {
   agentId: string;
   initialMetaGeralMensal: number;
   initialMetasPorVendedor: Record<string, number>;
+  initialInvestimentoMensal: number;
   attendants: Attendant[];
 }) {
   const [metaGeral, setMetaGeral] = useState(String(initialMetaGeralMensal || ""));
   const [metasPorVendedor, setMetasPorVendedor] = useState<Record<string, string>>(
     Object.fromEntries(attendants.map(a => [a.id, String(initialMetasPorVendedor?.[a.id] || "")]))
   );
+  const [investimento, setInvestimento] = useState(String(initialInvestimentoMensal || ""));
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -36,6 +38,7 @@ export function MetasClient({ agentId, initialMetaGeralMensal, initialMetasPorVe
         body: JSON.stringify({
           metaGeralMensal: Math.max(0, Number(metaGeral.replace(",", ".")) || 0),
           metasPorVendedor: parsedPorVendedor,
+          investimentoMensal: Math.max(0, Number(investimento.replace(",", ".")) || 0),
         }),
       });
       setSaved(true);
@@ -91,6 +94,23 @@ export function MetasClient({ agentId, initialMetaGeralMensal, initialMetasPorVe
               ))}
             </div>
           )}
+        </div>
+
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
+          <p className="font-semibold">Investimento mensal em marketing/vendas</p>
+          <p className="text-xs text-gray-500 -mt-2">Usado só pra calcular o CAC (custo por cliente adquirido) nos dashboards.</p>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500">R$</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={investimento}
+              onChange={e => { setInvestimento(e.target.value); setSaved(false); }}
+              placeholder="0,00"
+              className="w-40 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+            />
+            <span className="text-xs text-gray-500">por mês</span>
+          </div>
         </div>
 
         <div className="flex items-center gap-3">

@@ -1,6 +1,9 @@
 "use client";
 
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, Legend, PieChart, Pie, Cell } from "recharts";
+import {
+  BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, Legend, PieChart, Pie, Cell,
+  RadialBarChart, RadialBar, PolarAngleAxis,
+} from "recharts";
 
 export function WeeklyBarChart({ data, color = "#3b82f6" }: { data: { semana: string; total: number }[]; color?: string }) {
   return (
@@ -37,6 +40,34 @@ export function DailyWonLostChart({ data, tickInterval = 0 }: { data: { dia: str
 }
 
 const DONUT_COLORS = ["#3b82f6", "#22c55e", "#f59e0b", "#a855f7", "#ec4899", "#06b6d4", "#f97316", "#6b7280"];
+
+// Gauge circular estilo "% Meta" — anel azul preenchido conforme o percentual atingido,
+// com o valor no centro (pode passar de 100%, o anel visual satura em 100).
+export function GaugeChart({ pct, label = "% Meta" }: { pct: number; label?: string }) {
+  const visual = Math.min(100, Math.max(0, pct));
+  const data = [{ name: "meta", value: visual, fill: pct >= 100 ? "#22c55e" : "#3b82f6" }];
+  return (
+    <div className="relative w-full flex items-center justify-center">
+      <ResponsiveContainer width="100%" height={220}>
+        <RadialBarChart
+          data={data}
+          startAngle={90}
+          endAngle={-270}
+          innerRadius="75%"
+          outerRadius="100%"
+          barSize={18}
+        >
+          <PolarAngleAxis type="number" domain={[0, 100]} angleAxisId={0} tick={false} />
+          <RadialBar dataKey="value" cornerRadius={9} background={{ fill: "#1f2937" }} />
+        </RadialBarChart>
+      </ResponsiveContainer>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <p className="text-3xl font-bold">{pct.toFixed(1)}%</p>
+        <p className="text-xs text-blue-400 mt-1">{label}</p>
+      </div>
+    </div>
+  );
+}
 
 export function AttendantDonutChart({ data }: { data: { name: string; value: number }[] }) {
   const total = data.reduce((s, d) => s + d.value, 0);

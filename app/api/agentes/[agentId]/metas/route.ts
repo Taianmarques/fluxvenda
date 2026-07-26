@@ -15,16 +15,18 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ age
   return NextResponse.json({
     metaGeralMensal: config.metaGeralMensal,
     metasPorVendedor: config.metasPorVendedor,
+    investimentoMensal: config.investimentoMensal,
   });
 }
 
 const schema = z.object({
   metaGeralMensal: z.number().min(0),
   metasPorVendedor: z.record(z.string(), z.number().min(0)),
+  investimentoMensal: z.number().min(0),
 });
 
-// Metas mensais (geral + por vendedor) — reiniciam todo mês, comparadas ao valor ganho no mês
-// corrente nos dashboards. Não têm histórico: o mesmo valor vale até o gestor mudar de novo.
+// Metas mensais (geral + por vendedor) e investimento mensal — reiniciam todo mês, comparados
+// ao mês corrente nos dashboards. Não têm histórico: o mesmo valor vale até o gestor mudar de novo.
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -38,8 +40,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
 
   const updated = await prisma.agentConfig.update({
     where: { id: config.id },
-    data: { metaGeralMensal: body.data.metaGeralMensal, metasPorVendedor: body.data.metasPorVendedor },
+    data: {
+      metaGeralMensal: body.data.metaGeralMensal,
+      metasPorVendedor: body.data.metasPorVendedor,
+      investimentoMensal: body.data.investimentoMensal,
+    },
   });
 
-  return NextResponse.json({ metaGeralMensal: updated.metaGeralMensal, metasPorVendedor: updated.metasPorVendedor });
+  return NextResponse.json({
+    metaGeralMensal: updated.metaGeralMensal,
+    metasPorVendedor: updated.metasPorVendedor,
+    investimentoMensal: updated.investimentoMensal,
+  });
 }
