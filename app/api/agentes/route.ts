@@ -30,7 +30,12 @@ export async function POST(req: NextRequest) {
   if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
 
   const config = await prisma.agentConfig.create({
-    data: { teamId: team.id, nome: body.data.nome, segmento: body.data.segmento, subsegmento: body.data.subsegmento, active: false },
+    data: {
+      teamId: team.id, nome: body.data.nome, segmento: body.data.segmento, subsegmento: body.data.subsegmento, active: false,
+      // Todo agente nasce em modo aprendizado: mensagens são salvas normalmente mas a IA não
+      // responde em nenhum canal, até o gestor revisar e clicar em "Ativar IA".
+      learningMode: true, whatsappAiPaused: true, instagramAiPaused: true,
+    },
   });
 
   // Nome da instância só pode ser gerado depois que o AgentConfig já existe (precisa do id)

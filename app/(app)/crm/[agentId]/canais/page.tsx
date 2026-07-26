@@ -61,6 +61,7 @@ async function CanaisPageContent({
     active: c.active,
     whatsappAiPaused: c.whatsappAiPaused,
     instagramAiPaused: c.instagramAiPaused,
+    learningMode: c.learningMode,
     uazapiToken: c.uazapiToken,
     igCommentAutoDm: c.igCommentAutoDm,
     igCommentDmMessage: c.igCommentDmMessage,

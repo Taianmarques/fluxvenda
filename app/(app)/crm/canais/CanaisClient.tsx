@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   Wifi, Pause, Play, Plus, RefreshCw, X,
   CheckCircle2, Smartphone, Instagram, Link2Off,
-  ChevronDown, ChevronUp, GripVertical, Trash2, ToggleLeft, ToggleRight, BotOff, Bot,
+  ChevronDown, ChevronUp, GripVertical, Trash2, ToggleLeft, ToggleRight, BotOff, Bot, GraduationCap, Rocket,
 } from "lucide-react";
 
 type WhatsAppStatus = {
@@ -37,6 +37,7 @@ type Channel = {
   active: boolean;
   whatsappAiPaused: boolean;
   instagramAiPaused: boolean;
+  learningMode: boolean;
   uazapiToken: string | null;
   whatsapp: WhatsAppStatus | null;
   instagram: InstagramStatus;
@@ -439,6 +440,19 @@ export function CanaisClient({
     } finally { setLoadingId(null); }
   }
 
+  // Sai do modo aprendizado: liga a IA nos dois canais de uma vez
+  async function handleAtivarIA(channelId: string) {
+    setLoadingId(channelId + ":ativarIA");
+    setChannels((prev) => prev.map((c) => (c.id === channelId ? { ...c, learningMode: false, whatsappAiPaused: false, instagramAiPaused: false } : c)));
+    try {
+      await fetch(`/api/agentes/${channelId}/pausar-ia`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ learningMode: false, whatsappAiPaused: false, instagramAiPaused: false }),
+      });
+    } finally { setLoadingId(null); }
+  }
+
   async function handleCreate(connect: "whatsapp" | "instagram" | "none") {
     if (!newName.trim()) return;
     setLoadingId("new");
@@ -646,6 +660,31 @@ export function CanaisClient({
                     </button>
                   )}
                 </div>
+
+                {/* Modo aprendizado: estado inicial, IA não responde em nenhum canal ainda */}
+                {ch.learningMode && (
+                  <div className="px-5 py-3 flex items-center justify-between gap-3 flex-wrap bg-blue-950/30 border-b border-blue-900/40">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <GraduationCap size={15} className="text-blue-400 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-blue-300">Modo aprendizado</p>
+                        <p className="text-xs text-gray-400">
+                          As conversas chegam e são salvas normalmente, mas a IA ainda não responde em nenhum canal.
+                        </p>
+                      </div>
+                    </div>
+                    {isManager && (
+                      <button
+                        onClick={() => handleAtivarIA(ch.id)}
+                        disabled={loadingId === ch.id + ":ativarIA"}
+                        className="flex items-center gap-1.5 text-xs text-blue-300 hover:text-white border border-blue-700 hover:border-blue-500 bg-blue-900/30 hover:bg-blue-900/60 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50 flex-shrink-0"
+                      >
+                        <Rocket size={12} />
+                        {loadingId === ch.id + ":ativarIA" ? "..." : "Ativar IA"}
+                      </button>
+                    )}
+                  </div>
+                )}
 
                 {/* WhatsApp */}
                 <div className="px-5 py-3 flex items-center justify-between gap-3 flex-wrap border-b border-gray-800/40">

@@ -634,6 +634,10 @@ model AgentConfig {
   whatsappAiPaused  Boolean @default(false)
   instagramAiPaused Boolean @default(false)
 
+  // Estado inicial de todo agente novo: mensagens são salvas normalmente mas a IA não
+  // responde em nenhum canal, até o gestor clicar em "Ativar IA" (vê/valida antes de ir ao ar).
+  learningMode Boolean @default(false)
+
   uazapiInstance String?
   uazapiToken    String?
 
