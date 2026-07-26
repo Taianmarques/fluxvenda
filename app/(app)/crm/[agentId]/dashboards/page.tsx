@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { getAgentConfigWithRole } from "@/lib/team";
 import { CrmPageGate } from "@/app/(app)/crm/CrmPageGate";
-import { NewLeadsChart } from "../../dashboards/DashboardCharts";
+import { WeeklyBarChart } from "../../dashboards/DashboardCharts";
 
 function formatBRL(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -276,7 +276,7 @@ async function DashboardsPageContent({ params }: { params: Promise<{ agentId: st
           <p className="font-semibold flex items-center gap-2"><Filter size={17} className="text-purple-400" /> Leads</p>
           <div>
             <p className="text-xs text-gray-500 mb-2">Novos leads por semana</p>
-            <NewLeadsChart data={weekBuckets.map(w => ({ semana: w.semana, total: w.total }))} />
+            <WeeklyBarChart data={weekBuckets.map(w => ({ semana: w.semana, total: w.total }))} />
           </div>
           <div className="pt-2 border-t border-gray-800">
             <p className="text-xs text-gray-500 mb-2">Leads por status</p>
