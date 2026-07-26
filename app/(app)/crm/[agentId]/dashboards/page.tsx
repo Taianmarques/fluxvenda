@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
   LayoutDashboard, Wallet, Trophy, UserPlus, MessageCircle,
-  Headset, Bot, UserCheck, Users2, ListTodo, Filter, KanbanSquare,
+  Headset, Bot, UserCheck, Users2, ListTodo, Filter, KanbanSquare, Goal,
 } from "lucide-react";
 import { getAgentConfigWithRole } from "@/lib/team";
 import { CrmPageGate } from "@/app/(app)/crm/CrmPageGate";
@@ -112,6 +112,29 @@ async function DashboardsPageContent({ params }: { params: Promise<{ agentId: st
     .slice(0, 8);
   const rankingMaxTotal = Math.max(1, ...ranking.map(r => r.total));
 
+  // Meta do mês: valor ganho no mês corrente, geral e por vendedor, comparado à meta configurada
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const wonThisMonth = opportunities.filter(o => o.wonAt && o.wonAt >= startOfMonth);
+  const wonThisMonthTotal = wonThisMonth.reduce((s, o) => s + o.dealValue, 0);
+  const metaGeralPct = config.metaGeralMensal > 0 ? Math.min(100, (wonThisMonthTotal / config.metaGeralMensal) * 100) : null;
+
+  const metasPorVendedor = config.metasPorVendedor as Record<string, number>;
+  const wonThisMonthByAttendant = new Map<string, number>();
+  for (const o of wonThisMonth) {
+    const id = o.conversation.assignedToId ?? "__sem__";
+    wonThisMonthByAttendant.set(id, (wonThisMonthByAttendant.get(id) ?? 0) + o.dealValue);
+  }
+  const metasComVendedor = Object.entries(metasPorVendedor ?? {})
+    .filter(([, valor]) => valor > 0)
+    .map(([id, valor]) => ({
+      id,
+      name: nameById.get(id) ?? "Ex-membro",
+      meta: valor,
+      atingido: wonThisMonthByAttendant.get(id) ?? 0,
+      pct: Math.min(100, ((wonThisMonthByAttendant.get(id) ?? 0) / valor) * 100),
+    }))
+    .sort((a, b) => b.pct - a.pct);
+
   const taskCountMap = new Map<string, number>();
   for (const t of pendingTasks) {
     const id = t.assignedToId ?? "__sem__";
@@ -180,6 +203,43 @@ async function DashboardsPageContent({ params }: { params: Promise<{ agentId: st
             <p className="text-3xl font-bold text-green-400">{winRate30d === null ? "—" : `${(winRate30d * 100).toFixed(0)}%`}</p>
             <p className="text-xs text-gray-500 mt-1">Taxa de vitória (30d)</p>
           </div>
+        </div>
+
+        {/* Meta do mês */}
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="font-semibold flex items-center gap-2"><Goal size={17} className="text-blue-400" /> Meta do mês</p>
+            <Link href={`/crm/${agentId}/metas`} className="text-xs text-blue-400 hover:text-blue-300">Configurar metas →</Link>
+          </div>
+
+          {metaGeralPct === null && metasComVendedor.length === 0 ? (
+            <p className="text-sm text-gray-600">Nenhuma meta configurada ainda. Defina uma em &quot;Configurar metas&quot;.</p>
+          ) : (
+            <div className="space-y-3">
+              {metaGeralPct !== null && (
+                <div>
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <p className="text-gray-300">Meta geral</p>
+                    <p className="text-gray-400">{formatBRL(wonThisMonthTotal)} / {formatBRL(config.metaGeralMensal)}</p>
+                  </div>
+                  <div className="h-3 bg-gray-950 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full ${metaGeralPct >= 100 ? "bg-green-500" : "bg-blue-500"}`} style={{ width: `${Math.max(4, metaGeralPct)}%` }} />
+                  </div>
+                </div>
+              )}
+              {metasComVendedor.map(m => (
+                <div key={m.id}>
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <p className="text-gray-300">{m.name}</p>
+                    <p className="text-gray-400">{formatBRL(m.atingido)} / {formatBRL(m.meta)}</p>
+                  </div>
+                  <div className="h-2.5 bg-gray-950 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full ${m.pct >= 100 ? "bg-green-500" : "bg-blue-500/70"}`} style={{ width: `${Math.max(4, m.pct)}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">

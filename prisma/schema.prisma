@@ -705,6 +705,11 @@ model AgentConfig {
   // O agente de IA move leads pelas etapas do pipeline conforme a conversa evolui
   pipelineAutoAvancar Boolean @default(false)
 
+  // Metas de vendas mensais (reiniciam todo mês, comparadas ao valor ganho no mês corrente
+  // nos dashboards) — configuradas em Configurações > Metas.
+  metaGeralMensal   Float @default(0) // 0 = sem meta geral definida
+  metasPorVendedor  Json  @default("{}") // { [profileId]: valorMensal }
+
   // Agente de ligação via Twilio + ElevenLabs
   phoneEnabled         Boolean @default(false)
   twilioAccountSid     String?

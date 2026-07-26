@@ -1,7 +1,7 @@
 import {
   MessageCircle, KanbanSquare, Calendar, Wallet, ShoppingCart, Landmark, Target,
   Wifi, GitBranch, Briefcase, Zap, Filter, UserPlus, ClipboardCheck, Radio,
-  Megaphone, Phone, Coins, BookUser, BookOpen, LayoutDashboard, CalendarCheck, BarChart3, type LucideIcon,
+  Megaphone, Phone, Coins, BookUser, BookOpen, LayoutDashboard, CalendarCheck, BarChart3, Goal, type LucideIcon,
 } from "lucide-react";
 
 // Fonte única das páginas do CRM — usada pelo CrmSidebar (menu), CrmPageGate (bloqueio
@@ -14,7 +14,7 @@ export type CrmPageKey =
   | "campanhas" | "ligacoes" | "prospeccao"
   | "cobranca" | "funil" | "carteira" | "contatos"
   | "automacao" | "condicoes"
-  | "canais" | "equipe" | "auditoria" | "creditos" | "conhecimento";
+  | "canais" | "equipe" | "auditoria" | "creditos" | "conhecimento" | "metas";
 
 export type CrmPageDef = {
   key: CrmPageKey;
@@ -70,6 +70,7 @@ export const CRM_CATEGORIES: CrmCategoryDef[] = [
     { key: "equipe", label: "Equipe", suffix: "/equipe", icon: UserPlus },
     { key: "conhecimento", label: "Conhecimento", suffix: "/conhecimento", icon: BookOpen },
     { key: "creditos", label: "Créditos de IA", suffix: "/creditos", icon: Coins },
+    { key: "metas", label: "Metas", suffix: "/metas", icon: Goal, managerOnly: true },
   ] },
 ];
 
