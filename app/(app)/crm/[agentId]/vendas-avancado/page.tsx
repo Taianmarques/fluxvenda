@@ -292,7 +292,14 @@ async function VendasAvancadoPageContent({ params, searchParams }: {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-2">
+              <span className="inline-flex p-2 rounded-xl bg-amber-500/10 text-amber-400"><KanbanSquare size={18} /></span>
+            </div>
+            <p className="text-2xl font-bold text-amber-400">{openNow.length}</p>
+            <p className="text-xs text-gray-500 mt-1">Oportunidades abertas · situação atual</p>
+          </div>
           <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
             <div className="flex items-center justify-between mb-2">
               <span className="inline-flex p-2 rounded-xl bg-red-500/10 text-red-400"><DollarSign size={18} /></span>
