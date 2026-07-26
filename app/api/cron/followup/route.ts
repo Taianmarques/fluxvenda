@@ -73,6 +73,78 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Follow-up por etapa do pipeline: cutuca oportunidades paradas há muito tempo na mesma
+  // etapa, independente de quem mandou a última mensagem (diferente do follow-up de conversa
+  // acima, que só dispara enquanto espera resposta do cliente).
+  let stageFollowupChecked = 0;
+  let stageFollowupSent = 0;
+
+  const stages = await prisma.pipelineStage.findMany({
+    where: { pipeline: { agentConfig: { active: true, uazapiToken: { not: null } } } },
+    include: { pipeline: { include: { agentConfig: true } } },
+  });
+
+  for (const stage of stages) {
+    const delays = stage.followupDelaysMinutes as unknown as number[];
+    if (!Array.isArray(delays) || delays.length === 0) continue;
+
+    const config = stage.pipeline.agentConfig;
+    if (!config.systemPrompt || !config.uazapiToken) continue;
+
+    const pipelineInstr = stage.pipeline.agenteInstrucoes?.trim();
+    const stageInstr = stage.agenteInstrucoes?.trim();
+    let stageInstruction = "";
+    if (pipelineInstr || stageInstr) {
+      stageInstruction = `\n\nAGENTE RESPONSÁVEL PELO FUNIL:
+O lead está na etapa "${stage.name}" do funil "${stage.pipeline.name}". Siga estas orientações com PRIORIDADE sobre o comportamento geral:`;
+      if (pipelineInstr) stageInstruction += `\n\nOrientações do funil "${stage.pipeline.name}" (valem em todas as etapas):\n${pipelineInstr}`;
+      if (stageInstr) stageInstruction += `\n\nOrientações específicas da etapa "${stage.name}" (prioridade máxima):\n${stageInstr}`;
+    }
+
+    const candidates = await prisma.opportunity.findMany({
+      where: {
+        stageId: stage.id,
+        wonAt: null,
+        lostAt: null,
+        stageFollowupCount: { lt: delays.length },
+        conversation: { humanTakeover: false, status: { not: "FINALIZADO" } },
+      },
+      include: { conversation: { include: { messages: { where: { role: { not: "note" } }, orderBy: { createdAt: "desc" }, take: 20 } } } },
+    });
+
+    for (const opp of candidates) {
+      const referenceTime = opp.stageFollowupCount === 0 ? opp.stageEnteredAt : (opp.lastStageFollowupAt ?? opp.stageEnteredAt);
+      const delayMinutes = delays[opp.stageFollowupCount];
+      const dueAt = new Date(referenceTime.getTime() + delayMinutes * 60000);
+      if (dueAt > new Date()) continue;
+
+      stageFollowupChecked++;
+      const conversation = opp.conversation;
+
+      const lastMessage = conversation.messages[0];
+      // Só faz follow-up se a última mensagem foi nossa — se o cliente já respondeu, mesmo
+      // sem a oportunidade ter avançado de etapa, não faz sentido mandar mensagem por cima.
+      if (!lastMessage || lastMessage.role === "user") continue;
+
+      const history = conversation.messages
+        .slice()
+        .reverse()
+        .map(m => ({ role: m.role === "user" ? ("user" as const) : ("assistant" as const), content: m.content }));
+
+      const { reply: followup, usage } = await generateFollowupMessage(config.systemPrompt + stageInstruction, history, opp.stageFollowupCount + 1);
+      if (!followup) continue;
+      logTokenUsage({ teamId: config.teamId, provider: "openai", model: "gpt-4o-mini", feature: "followup", ...usage });
+
+      await prisma.message.create({ data: { conversationId: conversation.id, role: "assistant", content: followup } });
+      await prisma.opportunity.update({
+        where: { id: opp.id },
+        data: { stageFollowupCount: { increment: 1 }, lastStageFollowupAt: new Date() },
+      });
+      await sendWhatsAppTextAsTeam(config.uazapiToken, conversation.contactNumber, followup);
+      stageFollowupSent++;
+    }
+  }
+
   // Lembretes de confirmação de agendamento
   let remindersChecked = 0;
   let remindersSent = 0;
@@ -145,5 +217,8 @@ export async function POST(req: NextRequest) {
     scheduledSent++;
   }
 
-  return NextResponse.json({ ok: true, checked, sent, remindersChecked, remindersSent, scheduledChecked, scheduledSent });
+  return NextResponse.json({
+    ok: true, checked, sent, stageFollowupChecked, stageFollowupSent,
+    remindersChecked, remindersSent, scheduledChecked, scheduledSent,
+  });
 }

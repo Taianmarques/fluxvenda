@@ -78,7 +78,10 @@ export default async function PipelinePage({ params }: { params: Promise<{ agent
         name: p.name,
         order: p.order,
         agenteInstrucoes: p.agenteInstrucoes,
-        stages: p.stages.map(s => ({ id: s.id, name: s.name, color: s.color, order: s.order, agenteInstrucoes: s.agenteInstrucoes })),
+        stages: p.stages.map(s => ({
+          id: s.id, name: s.name, color: s.color, order: s.order, agenteInstrucoes: s.agenteInstrucoes,
+          followupDelaysMinutes: s.followupDelaysMinutes as unknown as number[],
+        })),
       }))}
       initialLeadStatuses={leadStatuses.map(s => ({ id: s.id, name: s.name, color: s.color, order: s.order }))}
       initialOpportunities={opportunities.map(o => ({

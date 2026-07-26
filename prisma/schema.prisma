@@ -1281,6 +1281,11 @@ model PipelineStage {
   // enquanto o lead estiver nesta etapa do funil (prioridade sobre o prompt geral)
   agenteInstrucoes String @default("")
 
+  // Follow-up automático por tempo parado na etapa (independe de quem mandou a última
+  // mensagem — diferente do follow-up global do agente). [] = desativado nesta etapa.
+  // Minutos por tentativa, ex: [1440, 2880] = 1ª após 24h parado, 2ª +48h depois.
+  followupDelaysMinutes Json @default("[]")
+
   opportunities Opportunity[]
   automacoes    Automacao[]
 }
@@ -1416,6 +1421,11 @@ model Opportunity {
   stageId        String?
   stage          PipelineStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
   stageEnteredAt DateTime       @default(now()) // atualizado sempre que stageId muda, pra calcular "dias parado nessa etapa"
+
+  // Contagem do follow-up automático da etapa atual — zerada sempre que stageId muda
+  // (junto com stageEnteredAt), já que as tentativas são por tempo parado NESSA etapa.
+  stageFollowupCount  Int       @default(0)
+  lastStageFollowupAt DateTime?
 
   title     String? // nome opcional pra diferenciar quando há mais de uma, ex: "Plano anual"
   dealValue Float

@@ -6,13 +6,23 @@ import {
   type DragEndEvent, type DragStartEvent,
 } from "@dnd-kit/core";
 import { useDroppable, useDraggable } from "@dnd-kit/core";
-import { ThumbsUp, ThumbsDown, MessageCircle, Bot, X, ListChecks, MoreVertical, ArrowRightLeft, Pencil, Trash2 } from "lucide-react";
+import { ThumbsUp, ThumbsDown, MessageCircle, Bot, X, ListChecks, MoreVertical, ArrowRightLeft, Pencil, Trash2, Clock } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { ConversationPopup } from "./ConversationPopup";
 import { PipelineTaskPanel } from "./PipelineTaskPanel";
 import type { Attendant } from "./PipelineFiltersPanel";
 
-export type Stage = { id: string; name: string; color: string; order: number; agenteInstrucoes?: string };
+export type Stage = { id: string; name: string; color: string; order: number; agenteInstrucoes?: string; followupDelaysMinutes?: number[] };
+
+// Follow-up por etapa: cada tentativa é um tempo (parado na etapa) + unidade, convertido pra minutos ao salvar
+type DelayUnit = "horas" | "minutos";
+type DelayRow = { value: number; unit: DelayUnit };
+function minutesToRow(minutes: number): DelayRow {
+  return minutes % 60 === 0 ? { value: minutes / 60, unit: "horas" } : { value: minutes, unit: "minutos" };
+}
+function rowToMinutes(row: DelayRow): number {
+  return row.unit === "horas" ? row.value * 60 : row.value;
+}
 export type PipelineOpportunity = {
   id: string;
   conversationId: string;
@@ -342,13 +352,28 @@ function Column({
   const [salvandoAgente, setSalvandoAgente] = useState(false);
   const temAgente = (stage.agenteInstrucoes ?? "").trim().length > 0;
 
+  // Follow-up automático: dispara sozinho se o lead ficar parado demais nesta etapa
+  const [followupRows, setFollowupRows] = useState<DelayRow[]>((stage.followupDelaysMinutes ?? []).map(minutesToRow));
+  const temFollowup = (stage.followupDelaysMinutes ?? []).length > 0;
+
+  function addFollowupRow() {
+    const last = followupRows[followupRows.length - 1] ?? { value: 24, unit: "horas" as DelayUnit };
+    setFollowupRows([...followupRows, { ...last }]);
+  }
+  function removeFollowupRow(i: number) {
+    setFollowupRows(followupRows.filter((_, idx) => idx !== i));
+  }
+  function updateFollowupRow(i: number, row: Partial<DelayRow>) {
+    setFollowupRows(followupRows.map((r, idx) => (idx === i ? { ...r, ...row } : r)));
+  }
+
   async function salvarAgente() {
     setSalvandoAgente(true);
     try {
       await fetch(`/api/ferramentas/whatsapp/etapas/${stage.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agenteInstrucoes: instrucoes.trim() }),
+        body: JSON.stringify({ agenteInstrucoes: instrucoes.trim(), followupDelaysMinutes: followupRows.map(rowToMinutes) }),
       });
       setShowAgente(false);
       onStagesChange();
@@ -394,10 +419,14 @@ function Column({
           </div>
           <div className="flex items-center gap-1.5 flex-shrink-0">
             <button
-              onClick={() => { setInstrucoes(stage.agenteInstrucoes ?? ""); setShowAgente(s => !s); }}
-              title={temAgente ? "Agente da etapa configurado — clique para editar" : "Configurar agente responsável por esta etapa"}
+              onClick={() => {
+                setInstrucoes(stage.agenteInstrucoes ?? "");
+                setFollowupRows((stage.followupDelaysMinutes ?? []).map(minutesToRow));
+                setShowAgente(s => !s);
+              }}
+              title={temAgente || temFollowup ? "Agente da etapa configurado — clique para editar" : "Configurar agente responsável por esta etapa"}
               className={`flex-shrink-0 flex ${
-                temAgente ? "text-blue-400 hover:text-blue-300" : "md:hidden md:group-hover:flex text-gray-600 hover:text-gray-400"
+                temAgente || temFollowup ? "text-blue-400 hover:text-blue-300" : "md:hidden md:group-hover:flex text-gray-600 hover:text-gray-400"
               }`}
             >
               <Bot size={14} />
@@ -427,6 +456,33 @@ function Column({
               placeholder={`Como a IA deve agir com leads na etapa "${stage.name}"?\nEx: foque em entender a necessidade e agendar uma demonstração; não fale de preço ainda.`}
               className={`w-full rounded-lg px-2 py-1.5 text-xs resize-none focus:outline-none border ${dark ? "bg-gray-900 border-gray-800 text-white" : "bg-gray-50 border-gray-200"}`}
             />
+
+            <div className={`pt-2 border-t space-y-1.5 ${dark ? "border-gray-800" : "border-gray-200"}`}>
+              <p className="text-xs font-semibold flex items-center gap-1"><Clock size={11} /> Follow-up automático</p>
+              <p className="text-[10px] text-gray-500">Se o lead ficar parado nesta etapa sem avançar (e a última mensagem foi nossa), a IA manda uma mensagem sozinha.</p>
+              {followupRows.map((row, i) => (
+                <div key={i} className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-gray-500 w-16 flex-shrink-0">{i === 0 ? "1ª após" : `${i + 1}ª, +`}</span>
+                  <input
+                    type="number" min={1} value={row.value}
+                    onChange={e => updateFollowupRow(i, { value: Math.max(1, Number(e.target.value)) })}
+                    className={`w-14 rounded px-1.5 py-1 text-xs border focus:outline-none ${dark ? "bg-gray-900 border-gray-800 text-white" : "bg-gray-50 border-gray-200"}`}
+                  />
+                  <select
+                    value={row.unit} onChange={e => updateFollowupRow(i, { unit: e.target.value as DelayUnit })}
+                    className={`rounded px-1.5 py-1 text-xs border focus:outline-none ${dark ? "bg-gray-900 border-gray-800 text-white" : "bg-gray-50 border-gray-200"}`}
+                  >
+                    <option value="horas">horas</option>
+                    <option value="minutos">min</option>
+                  </select>
+                  <button onClick={() => removeFollowupRow(i)} className="text-gray-500 hover:text-red-400 ml-auto"><X size={12} /></button>
+                </div>
+              ))}
+              {followupRows.length < 5 && (
+                <button onClick={addFollowupRow} className="text-[11px] text-blue-400 hover:text-blue-300">+ Adicionar tentativa</button>
+              )}
+            </div>
+
             <div className="flex items-center justify-between gap-2">
               <p className="text-[10px] text-gray-500">Vazio = comportamento padrão do agente.</p>
               <button

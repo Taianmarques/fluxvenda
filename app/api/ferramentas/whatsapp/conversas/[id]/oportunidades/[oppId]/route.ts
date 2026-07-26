@@ -46,7 +46,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       ...(body.data.title !== undefined && { title: body.data.title }),
       ...(body.data.dealValue !== undefined && { dealValue: body.data.dealValue }),
       ...(body.data.stageId !== undefined && { stageId: body.data.stageId }),
-      ...(stageChanged && { stageEnteredAt: new Date() }),
+      ...(stageChanged && { stageEnteredAt: new Date(), stageFollowupCount: 0, lastStageFollowupAt: null }),
     },
   });
 
