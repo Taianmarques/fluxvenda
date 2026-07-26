@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ArrowLeft, ChevronDown, LayoutGrid, Megaphone, TrendingUp, Zap, Settings, Headset, ShoppingBag, PanelLeftClose, PanelLeftOpen, Building2, type LucideIcon } from "lucide-react";
+import { ArrowLeft, ChevronDown, LayoutGrid, Megaphone, TrendingUp, Zap, Settings, Headset, ShoppingBag, PanelLeftClose, PanelLeftOpen, Building2, LayoutDashboard, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { CRM_CATEGORIES, type CrmPageDef, type CrmPageKey } from "@/lib/crm-nav-config";
 import { NotificationsButton } from "./NotificationsButton";
@@ -13,6 +13,7 @@ type NavCategory = { key: string; label: string; variant: "accordion" | "flyout"
 // Ícone de cada categoria — CRM_CATEGORIES só define ícone por página, não por categoria.
 // atendimento/vendas só usam o ícone no modo recolhido (viram flyout também nesse modo).
 const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  dashboards: LayoutDashboard,
   atendimento: Headset,
   vendas: ShoppingBag,
   marketing: Megaphone,
