@@ -176,14 +176,6 @@ function Card({
         >
           <MessageCircle size={14} />
         </button>
-        <LeadStatusBadge
-          agentId={agentId}
-          leadStatusId={opp.leadStatusId}
-          statuses={leadStatuses}
-          onChange={id => onLeadStatusChange(opp.conversationId, id)}
-          onStatusesChange={onLeadStatusesChange}
-          dark={dark}
-        />
         <button
           ref={menuBtnRef}
           onClick={toggleMenu}
@@ -292,15 +284,25 @@ function Card({
           className={`w-full mt-auto border rounded px-2 py-1 text-xs ${t.input}`}
         />
       ) : (
-        <p
-          className={`mt-auto pt-2 text-[15px] font-bold leading-none ${
-            opp.lostAt ? "text-gray-500 line-through" : "text-green-500"
-          } ${!closed ? "cursor-text" : ""}`}
-          onClick={e => { if (!closed) { e.stopPropagation(); setEditingValue(true); } }}
-          onPointerDown={e => e.stopPropagation()}
-        >
-          {opp.wonAt ? `🏆 ${formatBRL(opp.dealValue)}` : formatBRL(opp.dealValue)}
-        </p>
+        <div className="flex items-center justify-between gap-2 mt-auto pt-2">
+          <p
+            className={`text-[15px] font-bold leading-none ${
+              opp.lostAt ? "text-gray-500 line-through" : "text-green-500"
+            } ${!closed ? "cursor-text" : ""}`}
+            onClick={e => { if (!closed) { e.stopPropagation(); setEditingValue(true); } }}
+            onPointerDown={e => e.stopPropagation()}
+          >
+            {opp.wonAt ? `🏆 ${formatBRL(opp.dealValue)}` : formatBRL(opp.dealValue)}
+          </p>
+          <LeadStatusBadge
+            agentId={agentId}
+            leadStatusId={opp.leadStatusId}
+            statuses={leadStatuses}
+            onChange={id => onLeadStatusChange(opp.conversationId, id)}
+            onStatusesChange={onLeadStatusesChange}
+            dark={dark}
+          />
+        </div>
       )}
     </div>
   );
