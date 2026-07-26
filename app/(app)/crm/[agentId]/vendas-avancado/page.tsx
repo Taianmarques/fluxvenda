@@ -2,7 +2,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { BarChart3, Wallet, TrendingUp, TrendingDown, Handshake, Users } from "lucide-react";
+import { BarChart3, Wallet, TrendingUp, TrendingDown, Handshake, Users, KanbanSquare } from "lucide-react";
 import { getAgentConfigWithRole } from "@/lib/team";
 import { CrmPageGate } from "@/app/(app)/crm/CrmPageGate";
 import { DailyWonLostChart, AttendantDonutChart } from "../../dashboards/DashboardCharts";
@@ -76,7 +76,8 @@ async function VendasAvancadoPageContent({ params, searchParams }: {
     prisma.opportunity.findMany({
       where: { conversation: { agentConfigId: config.id } },
       select: {
-        id: true, dealValue: true, wonAt: true, lostAt: true, createdAt: true,
+        id: true, dealValue: true, wonAt: true, lostAt: true, createdAt: true, stageId: true, stageEnteredAt: true,
+        stage: { select: { name: true, color: true, order: true, pipeline: { select: { name: true } } } },
         conversation: { select: { assignedToId: true, contactName: true, contactNumber: true } },
       },
     }),
@@ -157,6 +158,26 @@ async function VendasAvancadoPageContent({ params, searchParams }: {
   const topClientes = Array.from(clientMap.values()).sort((a, b) => b.total - a.total).slice(0, 8);
   const topClientesMax = Math.max(1, ...topClientes.map(c => c.total));
 
+  // Negócios por etapa do funil — situação atual (aberto agora), não depende do período selecionado
+  const stageGroups = new Map<string, { name: string; color: string; order: number; pipelineName: string; count: number; total: number; daysSum: number }>();
+  for (const o of openNow) {
+    const key = o.stageId ?? "__sem_etapa__";
+    const group = stageGroups.get(key) ?? {
+      name: o.stage?.name ?? "Sem etapa",
+      color: o.stage?.color ?? "#6b7280",
+      order: o.stage?.order ?? Number.MAX_SAFE_INTEGER,
+      pipelineName: o.stage?.pipeline.name ?? "",
+      count: 0, total: 0, daysSum: 0,
+    };
+    group.count += 1;
+    group.total += o.dealValue;
+    group.daysSum += Math.max(0, Math.floor((now.getTime() - o.stageEnteredAt.getTime()) / DAY_MS));
+    stageGroups.set(key, group);
+  }
+  const openByStage = Array.from(stageGroups.values()).sort((a, b) => a.order - b.order);
+  const multiplePipelines = new Set(openByStage.map(s => s.pipelineName)).size > 1;
+  const openByStageMax = Math.max(1, ...openByStage.map(s => s.total));
+
   return (
     <div className="h-full overflow-y-auto bg-gray-950 text-white p-6">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -223,6 +244,35 @@ async function VendasAvancadoPageContent({ params, searchParams }: {
               </div>
             )}
           </div>
+        </div>
+
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+          <div className="flex items-center justify-between p-5 pb-3">
+            <p className="font-semibold flex items-center gap-2"><KanbanSquare size={17} className="text-amber-400" /> Negócios por etapa do funil</p>
+            <span className="text-[10px] text-gray-500">Situação atual — não depende do período selecionado</span>
+          </div>
+          {openByStage.length === 0 ? (
+            <p className="text-sm text-gray-500 px-5 pb-5">Nenhuma negociação em aberto no momento.</p>
+          ) : (
+            <div className="divide-y divide-gray-800">
+              {openByStage.map(s => (
+                <div key={`${s.pipelineName}-${s.name}`} className="flex items-center justify-between gap-3 px-5 py-3 flex-wrap">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
+                    <p className="text-sm font-medium truncate">{s.name}{multiplePipelines && s.pipelineName && ` (${s.pipelineName})`}</p>
+                    <span className="text-xs text-gray-500 flex-shrink-0">{s.count} {s.count === 1 ? "negócio" : "negócios"}</span>
+                  </div>
+                  <div className="flex items-center gap-4 flex-shrink-0">
+                    <span className="text-xs text-gray-500">{Math.round(s.daysSum / s.count)}d média na etapa</span>
+                    <div className="w-32 h-5 bg-gray-950 rounded-lg overflow-hidden hidden sm:block">
+                      <div className="h-full rounded-lg bg-amber-600/50" style={{ width: `${Math.max(10, (s.total / openByStageMax) * 100)}%` }} />
+                    </div>
+                    <p className="text-sm font-semibold text-amber-400 w-24 text-right">{formatBRL(s.total)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
