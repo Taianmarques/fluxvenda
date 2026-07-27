@@ -124,24 +124,24 @@ async function AgendamentosPageContent({ params }: { params: Promise<{ agentId: 
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 min-w-0">
             <span className="inline-flex p-2 rounded-xl bg-blue-500/10 text-blue-400 mb-2"><CalendarCheck size={18} /></span>
-            <p className="text-3xl font-bold text-blue-400">{proximos.length}</p>
+            <p className="text-xl sm:text-2xl md:text-3xl font-bold text-blue-400 break-words">{proximos.length}</p>
             <p className="text-xs text-gray-500 mt-1">Próximos confirmados</p>
           </div>
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 min-w-0">
             <span className="inline-flex p-2 rounded-xl bg-green-500/10 text-green-400 mb-2"><CheckCircle2 size={18} /></span>
-            <p className="text-3xl font-bold text-green-400">{concluidos.length}</p>
+            <p className="text-xl sm:text-2xl md:text-3xl font-bold text-green-400 break-words">{concluidos.length}</p>
             <p className="text-xs text-gray-500 mt-1">Concluídos</p>
           </div>
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 min-w-0">
             <span className="inline-flex p-2 rounded-xl bg-red-500/10 text-red-400 mb-2"><XCircle size={18} /></span>
-            <p className="text-3xl font-bold text-red-400">{cancelados.length}</p>
+            <p className="text-xl sm:text-2xl md:text-3xl font-bold text-red-400 break-words">{cancelados.length}</p>
             <p className="text-xs text-gray-500 mt-1">Cancelados</p>
           </div>
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 min-w-0">
             <span className="inline-flex p-2 rounded-xl bg-amber-500/10 text-amber-400 mb-2"><Percent size={18} /></span>
-            <p className="text-3xl font-bold text-amber-400">{taxaCancelamento === null ? "—" : `${(taxaCancelamento * 100).toFixed(0)}%`}</p>
+            <p className="text-xl sm:text-2xl md:text-3xl font-bold text-amber-400 break-words">{taxaCancelamento === null ? "—" : `${(taxaCancelamento * 100).toFixed(0)}%`}</p>
             <p className="text-xs text-gray-500 mt-1">Taxa de cancelamento</p>
           </div>
         </div>

@@ -183,24 +183,24 @@ async function DashboardsPageContent({ params }: { params: Promise<{ agentId: st
 
         {/* KPIs gerais */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 min-w-0">
             <span className="inline-flex p-2 rounded-xl bg-blue-500/10 text-blue-400 mb-2"><MessageCircle size={18} /></span>
-            <p className="text-3xl font-bold text-blue-400">{activeConversations.length}</p>
+            <p className="text-xl sm:text-2xl md:text-3xl font-bold text-blue-400 break-words">{activeConversations.length}</p>
             <p className="text-xs text-gray-500 mt-1">Conversas ativas</p>
           </div>
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 min-w-0">
             <span className="inline-flex p-2 rounded-xl bg-purple-500/10 text-purple-400 mb-2"><UserPlus size={18} /></span>
-            <p className="text-3xl font-bold text-purple-400">{newLeads30d}</p>
+            <p className="text-xl sm:text-2xl md:text-3xl font-bold text-purple-400 break-words">{newLeads30d}</p>
             <p className="text-xs text-gray-500 mt-1">Novos leads (30d)</p>
           </div>
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 min-w-0">
             <span className="inline-flex p-2 rounded-xl bg-amber-500/10 text-amber-400 mb-2"><Wallet size={18} /></span>
-            <p className="text-3xl font-bold text-amber-400">{formatBRL(openValue)}</p>
+            <p className="text-xl sm:text-2xl md:text-3xl font-bold text-amber-400 break-words">{formatBRL(openValue)}</p>
             <p className="text-xs text-gray-500 mt-1">Em negociação</p>
           </div>
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 min-w-0">
             <span className="inline-flex p-2 rounded-xl bg-green-500/10 text-green-400 mb-2"><Trophy size={18} /></span>
-            <p className="text-3xl font-bold text-green-400">{winRate30d === null ? "—" : `${(winRate30d * 100).toFixed(0)}%`}</p>
+            <p className="text-xl sm:text-2xl md:text-3xl font-bold text-green-400 break-words">{winRate30d === null ? "—" : `${(winRate30d * 100).toFixed(0)}%`}</p>
             <p className="text-xs text-gray-500 mt-1">Taxa de vitória (30d)</p>
           </div>
         </div>
@@ -218,23 +218,23 @@ async function DashboardsPageContent({ params }: { params: Promise<{ agentId: st
             <div className="space-y-3">
               {metaGeralPct !== null && (
                 <div>
-                  <div className="flex items-center justify-between text-sm mb-1">
-                    <p className="text-gray-300">Meta geral</p>
-                    <p className="text-gray-400">{formatBRL(wonThisMonthTotal)} / {formatBRL(config.metaGeralMensal)}</p>
+                  <div className="flex items-center justify-between text-sm mb-1 gap-2">
+                    <p className="text-gray-300 flex-shrink-0">Meta geral</p>
+                    <p className="text-gray-400 text-right break-words">{formatBRL(wonThisMonthTotal)} / {formatBRL(config.metaGeralMensal)}</p>
                   </div>
-                  <div className="h-3 bg-gray-950 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full ${metaGeralPct >= 100 ? "bg-green-500" : "bg-blue-500"}`} style={{ width: `${Math.max(4, metaGeralPct)}%` }} />
+                  <div className="h-3 bg-gray-800 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full ${metaGeralPct >= 100 ? "bg-green-500" : "bg-blue-500"}`} style={{ width: `${metaGeralPct}%` }} />
                   </div>
                 </div>
               )}
               {metasComVendedor.map(m => (
                 <div key={m.id}>
-                  <div className="flex items-center justify-between text-sm mb-1">
-                    <p className="text-gray-300">{m.name}</p>
-                    <p className="text-gray-400">{formatBRL(m.atingido)} / {formatBRL(m.meta)}</p>
+                  <div className="flex items-center justify-between text-sm mb-1 gap-2">
+                    <p className="text-gray-300 truncate flex-shrink-0">{m.name}</p>
+                    <p className="text-gray-400 text-right break-words">{formatBRL(m.atingido)} / {formatBRL(m.meta)}</p>
                   </div>
-                  <div className="h-2.5 bg-gray-950 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full ${m.pct >= 100 ? "bg-green-500" : "bg-blue-500/70"}`} style={{ width: `${Math.max(4, m.pct)}%` }} />
+                  <div className="h-2.5 bg-gray-800 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full ${m.pct >= 100 ? "bg-green-500" : "bg-blue-500/70"}`} style={{ width: `${m.pct}%` }} />
                   </div>
                 </div>
               ))}
@@ -369,8 +369,8 @@ async function DashboardsPageContent({ params }: { params: Promise<{ agentId: st
             <Link href={`/crm/${agentId}/vendas`} className="text-xs text-blue-400 hover:text-blue-300">Ver detalhes completos →</Link>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="min-w-0">
               <p className="text-xs text-gray-500 mb-2">Ganhos x perdidos (30d)</p>
               <div className="space-y-2">
                 <div className="flex items-center gap-3">
@@ -393,8 +393,8 @@ async function DashboardsPageContent({ params }: { params: Promise<{ agentId: st
                 </div>
               </div>
             </div>
-            <div className="flex flex-col justify-center items-start bg-gray-950 rounded-xl p-4">
-              <p className="text-2xl font-bold text-purple-400">{formatBRL(ticketMedio)}</p>
+            <div className="flex flex-col justify-center items-start bg-gray-950 rounded-xl p-4 min-w-0">
+              <p className="text-lg sm:text-xl md:text-2xl font-bold text-purple-400 break-words">{formatBRL(ticketMedio)}</p>
               <p className="text-xs text-gray-500 mt-1">Ticket médio (todas as vendas)</p>
             </div>
           </div>

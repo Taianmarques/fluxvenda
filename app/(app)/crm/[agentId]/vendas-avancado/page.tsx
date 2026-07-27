@@ -259,12 +259,12 @@ async function VendasAvancadoPageContent({ params, searchParams }: {
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {kpis.map(k => (
-            <div key={k.label} className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+            <div key={k.label} className="bg-gray-900 border border-gray-800 rounded-2xl p-5 min-w-0">
               <div className="flex items-center justify-between mb-2">
                 <span className={`inline-flex p-2 rounded-xl ${COLOR_CLASSES[k.color]}`}><k.icon size={18} /></span>
                 <ChangeBadge pct={k.pct} />
               </div>
-              <p className={`text-2xl font-bold ${TEXT_CLASSES[k.color]}`}>{formatBRL(k.total)}</p>
+              <p className={`text-lg sm:text-xl md:text-2xl font-bold break-words ${TEXT_CLASSES[k.color]}`}>{formatBRL(k.total)}</p>
               <p className="text-xs text-gray-500 mt-1">{k.label} · {k.count} {k.count === 1 ? "negócio" : "negócios"}</p>
             </div>
           ))}
@@ -281,7 +281,7 @@ async function VendasAvancadoPageContent({ params, searchParams }: {
             ) : (
               <>
                 <GaugeChart pct={metaPct} />
-                <p className="text-xs text-gray-500 -mt-2">{formatBRL(wonThisMonthTotal)} de {formatBRL(config.metaGeralMensal)}</p>
+                <p className="text-xs text-gray-500 -mt-2 break-words text-center">{formatBRL(wonThisMonthTotal)} de {formatBRL(config.metaGeralMensal)}</p>
               </>
             )}
           </div>
@@ -297,38 +297,38 @@ async function VendasAvancadoPageContent({ params, searchParams }: {
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 min-w-0">
             <div className="flex items-center justify-between mb-2">
               <span className="inline-flex p-2 rounded-xl bg-amber-500/10 text-amber-400"><KanbanSquare size={18} /></span>
             </div>
-            <p className="text-2xl font-bold text-amber-400">{openNow.length}</p>
+            <p className="text-lg sm:text-xl md:text-2xl font-bold text-amber-400 break-words">{openNow.length}</p>
             <p className="text-xs text-gray-500 mt-1">Oportunidades abertas · situação atual</p>
           </div>
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 min-w-0">
             <div className="flex items-center justify-between mb-2">
               <span className="inline-flex p-2 rounded-xl bg-red-500/10 text-red-400"><DollarSign size={18} /></span>
             </div>
-            <p className="text-2xl font-bold text-red-400">{cac === null ? "—" : formatBRL(cac)}</p>
+            <p className="text-lg sm:text-xl md:text-2xl font-bold text-red-400 break-words">{cac === null ? "—" : formatBRL(cac)}</p>
             <p className="text-xs text-gray-500 mt-1">CAC (mês atual) · {clientesNovosMes} {clientesNovosMes === 1 ? "cliente novo" : "clientes novos"}</p>
           </div>
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 min-w-0">
             <div className="flex items-center justify-between mb-2">
               <span className="inline-flex p-2 rounded-xl bg-green-500/10 text-green-400"><Repeat size={18} /></span>
             </div>
-            <p className="text-2xl font-bold text-green-400">{ltvGeral === null ? "—" : formatBRL(ltvGeral)}</p>
+            <p className="text-lg sm:text-xl md:text-2xl font-bold text-green-400 break-words">{ltvGeral === null ? "—" : formatBRL(ltvGeral)}</p>
             <p className="text-xs text-gray-500 mt-1">LTV médio · {ltvByClient.size} {ltvByClient.size === 1 ? "cliente" : "clientes"}</p>
           </div>
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 min-w-0">
             <div className="flex items-center justify-between mb-2">
               <span className="inline-flex p-2 rounded-xl bg-blue-500/10 text-blue-400"><Percent size={18} /></span>
             </div>
-            <p className="text-2xl font-bold text-blue-400">{taxaConversaoGeral === null ? "—" : `${taxaConversaoGeral.toFixed(1)}%`}</p>
+            <p className="text-lg sm:text-xl md:text-2xl font-bold text-blue-400 break-words">{taxaConversaoGeral === null ? "—" : `${taxaConversaoGeral.toFixed(1)}%`}</p>
             <p className="text-xs text-gray-500 mt-1">Taxa de conversão · {convertidosNoPeriodo.length} de {leadsNoPeriodo.length} leads</p>
           </div>
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 min-w-0">
             <p className="font-semibold mb-1">LTV por vendedor</p>
             <p className="text-xs text-gray-500 mb-3">Valor médio ganho por cliente (histórico completo).</p>
             {ltvPorVendedor.length === 0 ? (
@@ -345,7 +345,7 @@ async function VendasAvancadoPageContent({ params, searchParams }: {
             )}
           </div>
 
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 min-w-0">
             <p className="font-semibold mb-1">Taxa de conversão por vendedor</p>
             <p className="text-xs text-gray-500 mb-3">Leads do período selecionado que já viraram cliente.</p>
             {conversaoPorVendedor.length === 0 ? (
@@ -364,7 +364,7 @@ async function VendasAvancadoPageContent({ params, searchParams }: {
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 min-w-0">
             <p className="font-semibold mb-1">Percentual por atendente</p>
             <p className="text-xs text-gray-500 mb-2">Negócios ganhos no período, por quem estava atribuído.</p>
             {attendantData.length === 0 ? (
@@ -374,7 +374,7 @@ async function VendasAvancadoPageContent({ params, searchParams }: {
             )}
           </div>
 
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 min-w-0">
             <p className="font-semibold mb-1 flex items-center gap-2"><Users size={16} className="text-purple-400" /> Principais clientes</p>
             <p className="text-xs text-gray-500 mb-3">Maior valor ganho no período.</p>
             {topClientes.length === 0 ? (

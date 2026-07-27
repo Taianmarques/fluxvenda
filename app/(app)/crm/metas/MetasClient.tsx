@@ -56,60 +56,62 @@ export function MetasClient({ agentId, initialMetaGeralMensal, initialMetasPorVe
           <p className="text-gray-400 mt-1">Metas mensais de vendas — reiniciam todo mês, comparadas ao valor ganho no mês corrente nos dashboards.</p>
         </div>
 
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3 min-w-0">
           <p className="font-semibold">Meta geral da equipe</p>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500">R$</span>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm text-gray-500 flex-shrink-0">R$</span>
             <input
               type="text"
               inputMode="decimal"
               value={metaGeral}
               onChange={e => { setMetaGeral(e.target.value); setSaved(false); }}
               placeholder="0,00"
-              className="w-40 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+              className="flex-1 min-w-0 sm:flex-none sm:w-40 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
             />
-            <span className="text-xs text-gray-500">por mês</span>
+            <span className="text-xs text-gray-500 flex-shrink-0">por mês</span>
           </div>
         </div>
 
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3 min-w-0">
           <p className="font-semibold">Meta por vendedor</p>
           {attendants.length === 0 ? (
             <p className="text-sm text-gray-600">Nenhum membro na equipe ainda.</p>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {attendants.map(a => (
-                <div key={a.id} className="flex items-center gap-3">
-                  <p className="w-40 text-sm text-gray-300 truncate flex-shrink-0">{a.name}</p>
-                  <span className="text-sm text-gray-500">R$</span>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={metasPorVendedor[a.id] ?? ""}
-                    onChange={e => updateVendedor(a.id, e.target.value)}
-                    placeholder="0,00"
-                    className="w-40 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
-                  />
+                <div key={a.id} className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3 min-w-0">
+                  <p className="sm:w-40 text-sm text-gray-300 truncate flex-shrink-0">{a.name}</p>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-sm text-gray-500 flex-shrink-0">R$</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={metasPorVendedor[a.id] ?? ""}
+                      onChange={e => updateVendedor(a.id, e.target.value)}
+                      placeholder="0,00"
+                      className="flex-1 min-w-0 sm:flex-none sm:w-40 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+                    />
+                  </div>
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3 min-w-0">
           <p className="font-semibold">Investimento mensal em marketing/vendas</p>
           <p className="text-xs text-gray-500 -mt-2">Usado só pra calcular o CAC (custo por cliente adquirido) nos dashboards.</p>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500">R$</span>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm text-gray-500 flex-shrink-0">R$</span>
             <input
               type="text"
               inputMode="decimal"
               value={investimento}
               onChange={e => { setInvestimento(e.target.value); setSaved(false); }}
               placeholder="0,00"
-              className="w-40 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+              className="flex-1 min-w-0 sm:flex-none sm:w-40 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
             />
-            <span className="text-xs text-gray-500">por mês</span>
+            <span className="text-xs text-gray-500 flex-shrink-0">por mês</span>
           </div>
         </div>
 
