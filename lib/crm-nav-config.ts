@@ -1,7 +1,7 @@
 import {
   MessageCircle, KanbanSquare, Calendar, Wallet, ShoppingCart, Landmark, Target,
   Wifi, GitBranch, Briefcase, Zap, Filter, UserPlus, ClipboardCheck, Radio,
-  Megaphone, Phone, Coins, BookUser, BookOpen, LayoutDashboard, CalendarCheck, BarChart3, Goal, type LucideIcon,
+  Megaphone, Phone, Coins, BookUser, BookOpen, LayoutDashboard, CalendarCheck, BarChart3, Goal, User, type LucideIcon,
 } from "lucide-react";
 
 // Fonte única das páginas do CRM — usada pelo CrmSidebar (menu), CrmPageGate (bloqueio
@@ -9,7 +9,7 @@ import {
 // dessincronizada entre essas três coisas.
 export type CrmPageKey =
   | "mensagens" | "aovivo"
-  | "dashboards" | "agendamentos" | "vendasavancado"
+  | "dashboards" | "agendamentos" | "vendasavancado" | "meudesempenho"
   | "pipeline" | "agenda" | "vendas" | "comercio"
   | "campanhas" | "ligacoes" | "prospeccao"
   | "cobranca" | "funil" | "carteira" | "contatos"
@@ -38,6 +38,7 @@ export const CRM_CATEGORIES: CrmCategoryDef[] = [
     { key: "dashboards", label: "Visão Geral", suffix: "/dashboards", icon: LayoutDashboard },
     { key: "agendamentos", label: "Agendamentos", suffix: "/agendamentos", icon: CalendarCheck },
     { key: "vendasavancado", label: "Vendas", suffix: "/vendas-avancado", icon: BarChart3 },
+    { key: "meudesempenho", label: "Meu Desempenho", suffix: "/meu-desempenho", icon: User },
   ] },
   { key: "atendimento", label: "Atendimento", variant: "accordion", pages: [
     { key: "mensagens", label: "Mensagens", suffix: "", icon: MessageCircle },
