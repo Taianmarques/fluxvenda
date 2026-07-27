@@ -124,21 +124,25 @@ async function VendasAvancadoPageContent({ params, searchParams }: {
     blue: "text-blue-400", green: "text-green-400", red: "text-red-400", amber: "text-amber-400",
   };
 
-  // Dados diários: valor ganho/perdido por dia dentro do período selecionado
-  const dayBuckets = Array.from({ length: periodDays }, (_, i) => {
-    const day = new Date(from.getTime() + i * DAY_MS);
-    return { day, ganho: 0, perdido: 0, dia: day.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) };
+  // Dados diários: valor ganho/perdido por dia dentro do período selecionado. Períodos longos
+  // (>35 dias) agrupam por semana em vez de dia, senão o gráfico vira barras finas ilegíveis no celular.
+  const bucketDays = periodDays > 35 ? 7 : 1;
+  const bucketCount = Math.ceil(periodDays / bucketDays);
+  const dayBuckets = Array.from({ length: bucketCount }, (_, i) => {
+    const bucketStart = new Date(from.getTime() + i * bucketDays * DAY_MS);
+    const bucketEnd = new Date(Math.min(bucketStart.getTime() + bucketDays * DAY_MS, to.getTime() + DAY_MS));
+    const label = bucketStart.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+    return { start: bucketStart, end: bucketEnd, ganho: 0, perdido: 0, dia: label };
   });
-  const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
   for (const o of wonCur) {
-    const bucket = dayBuckets.find(b => o.wonAt && sameDay(b.day, o.wonAt));
+    const bucket = dayBuckets.find(b => o.wonAt && o.wonAt >= b.start && o.wonAt < b.end);
     if (bucket) bucket.ganho += o.dealValue;
   }
   for (const o of lostCur) {
-    const bucket = dayBuckets.find(b => o.lostAt && sameDay(b.day, o.lostAt));
+    const bucket = dayBuckets.find(b => o.lostAt && o.lostAt >= b.start && o.lostAt < b.end);
     if (bucket) bucket.perdido += o.dealValue;
   }
-  const tickInterval = periodDays > 20 ? Math.ceil(periodDays / 15) - 1 : 0;
+  const tickInterval = bucketCount > 20 ? Math.ceil(bucketCount / 15) - 1 : 0;
 
   // Percentual por atendente: negócios ganhos no período, por quem estava atribuído
   const attendantMap = new Map<string, number>();
@@ -283,7 +287,7 @@ async function VendasAvancadoPageContent({ params, searchParams }: {
           </div>
 
           <div className="md:col-span-2 bg-gray-900 border border-gray-800 rounded-2xl p-5">
-            <p className="font-semibold mb-3">Dados diários — ganhos x perdidos</p>
+            <p className="font-semibold mb-3">{bucketDays === 1 ? "Dados diários" : "Dados semanais"} — ganhos x perdidos</p>
             {dayBuckets.every(d => d.ganho === 0 && d.perdido === 0) ? (
               <p className="text-sm text-gray-600">Nenhuma negociação ganha ou perdida nesse período.</p>
             ) : (
@@ -292,7 +296,7 @@ async function VendasAvancadoPageContent({ params, searchParams }: {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
             <div className="flex items-center justify-between mb-2">
               <span className="inline-flex p-2 rounded-xl bg-amber-500/10 text-amber-400"><KanbanSquare size={18} /></span>
