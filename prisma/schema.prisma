@@ -1716,3 +1716,28 @@ model OAuthState {
   expiresAt     DateTime
   used          Boolean  @default(false)
 }
+
+// ===================================
+// BRANDING DA PLATAFORMA (Super Admin)
+// ===================================
+
+// Singleton — sempre uma única linha com id fixo "singleton" (nunca cuid()). Upsert
+// sempre usa where: { id: "singleton" }. Logo do menu do CRM (sem redimensionar) +
+// os 3 variants do ícone do PWA (gerados via sharp a partir de 1 upload — ver lib/branding.ts).
+model PlatformSettings {
+  id             String   @id @default("singleton")
+  updatedAt      DateTime @updatedAt
+  updatedByEmail String? // só pra exibir "atualizado por X" no admin, sem FK
+
+  // Logo do menu lateral do CRM (CrmSidebar) — exibido em 28x28, sem processamento server-side
+  menuLogoBase64   String? @db.Text
+  menuLogoMimeType String?
+
+  // Ícone do PWA (app/manifest.ts) — os 3 variants são gerados a partir de UM upload via sharp
+  pwaIcon192Base64           String? @db.Text
+  pwaIcon192MimeType         String?
+  pwaIcon512Base64           String? @db.Text
+  pwaIcon512MimeType         String?
+  pwaIcon512MaskableBase64   String? @db.Text
+  pwaIcon512MaskableMimeType String?
+}

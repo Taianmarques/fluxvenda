@@ -3,7 +3,7 @@ import { UserButton } from "@clerk/nextjs";
 import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { BarChart3, Building2, Search, Cpu, type LucideIcon } from "lucide-react";
+import { BarChart3, Building2, Search, Cpu, Palette, type LucideIcon } from "lucide-react";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await currentUser();
@@ -20,6 +20,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: "/admin/empresas",     label: "Empresas",     icon: Building2 },
     { href: "/admin/diagnosticos", label: "Diagnósticos", icon: Search    },
     { href: "/admin/tokens",       label: "Tokens",       icon: Cpu       },
+    { href: "/admin/branding",     label: "Marca",        icon: Palette   },
   ];
 
   return (

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { ArrowLeft, ChevronDown, LayoutGrid, Megaphone, TrendingUp, Zap, Settings, Headset, ShoppingBag, PanelLeftClose, PanelLeftOpen, Building2, LayoutDashboard, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -139,13 +140,15 @@ function CategoryFlyout({ label, icon: Icon, items, isActive, pathname, onNaviga
   );
 }
 
-export function CrmSidebar({ agentId, agents, allowedPages, isManager }: {
+export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo }: {
   agentId: string;
   agents: { id: string; nome: string }[];
   // null = acesso total (gestor, ou membro sem perfil atribuído)
   allowedPages: CrmPageKey[] | null;
   // Hub de IA (criação/gestão de agentes) é só do gestor — atendentes não veem
   isManager: boolean;
+  // Logo customizada pelo Super Admin (data URI) — null = usa o ícone padrão
+  menuLogo?: string | null;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -281,10 +284,13 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager }: {
 
     {/* Sidebar vertical — desktop, itens agrupados por categoria com dropdown */}
     <aside className={`hidden md:flex flex-shrink-0 border-r border-gray-800 bg-black flex-col transition-[width] duration-150 ${collapsed ? "w-16" : "w-56"}`}>
-      <div className={`py-5 border-b border-gray-800 flex items-center justify-center ${collapsed ? "px-2" : "px-5"}`}>
-        <p className="font-bold text-lg">
-          <span className="text-blue-400">CRM</span>
-        </p>
+      <div className={`py-5 border-b border-gray-800 flex items-center justify-center gap-2 ${collapsed ? "px-2" : "px-5"}`}>
+        {menuLogo ? (
+          <img src={menuLogo} alt="FluxVenda" width={28} height={28} className="flex-shrink-0 rounded" />
+        ) : (
+          <Image src="/iconefluxvenda.png" alt="FluxVenda" width={28} height={28} className="flex-shrink-0" />
+        )}
+        {!collapsed && <span className="font-bold text-lg text-white">FluxVenda</span>}
       </div>
 
       {agents.length > 1 && (

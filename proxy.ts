@@ -17,6 +17,7 @@ const isPublicRoute = createRouteMatcher([
   "/agenda(.*)",            // agenda do profissional (PWA) — acesso por token secreto, sem login
   "/agendar(.*)",           // página pública de auto-agendamento (PWA) — clientes finais, sem login
   "/api/agendar(.*)",       // horários livres + criação de agendamento da página pública
+  "/api/branding/icon(.*)", // ícones do manifest do PWA — navegador/instalador busca sem sessão
 ]);
 
 const isGestorRoute = createRouteMatcher(["/gestor(.*)", "/ferramentas(.*)"]);
