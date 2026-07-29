@@ -347,6 +347,84 @@ export const DEPARTAMENTO_TOOLS = [
   },
 ];
 
+// Pré-vendas de veículos (SDR): fluxo em etapas — identificar o veículo, qualificar
+// (pagamento/troca/urgência), coletar documentos de financiamento se for o caso, e
+// transferir pro vendedor. Cada etapa é uma ferramenta própria, que grava uma nota na
+// conversa — a transferência final não re-coleta nada, só fecha o atendimento pra um
+// humano. Só exposta quando AgentConfig.catalogType === "VEICULOS" E
+// prevendaVeiculoEnabled (ver whatsapp-inbound.ts).
+export const PREVENDA_VEICULO_TOOLS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "registrar_veiculo_interesse",
+      description: "Registra o que o cliente está procurando, assim que ele der detalhes suficientes (tipo de veículo e ao menos uma pista de modelo). Use consultar_produtos pra sugerir opções do estoque antes e depois de registrar.",
+      parameters: {
+        type: "object",
+        properties: {
+          tipo: { type: "string", enum: ["CARRO", "MOTO"], description: "Tipo de veículo procurado" },
+          modeloDesejado: { type: "string", description: "Modelo ou marca+modelo que o cliente procura (pode ser aproximado, ex: \"um SUV\" ou \"Onix\")" },
+          anoDesejado: { type: "string", description: "Ano ou faixa de ano desejada, se o cliente mencionou" },
+          faixaPrecoMin: { type: "number", description: "Valor mínimo que o cliente quer gastar, em reais, se mencionado" },
+          faixaPrecoMax: { type: "number", description: "Valor máximo que o cliente quer gastar, em reais, se mencionado" },
+        },
+        required: ["tipo", "modeloDesejado"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "registrar_qualificacao_veiculo",
+      description: "Registra a qualificação do cliente, depois que ele já respondeu se vai pagar à vista ou financiado, se tem veículo pra dar de entrada na troca, e quando pretende comprar. Chame só depois de coletar essas respostas na conversa.",
+      parameters: {
+        type: "object",
+        properties: {
+          formaPagamento: { type: "string", enum: ["A_VISTA", "FINANCIADO"], description: "Forma de pagamento que o cliente escolheu" },
+          temVeiculoTroca: { type: "boolean", description: "Se o cliente tem um veículo pra dar de entrada na troca" },
+          veiculoTrocaDescricao: { type: "string", description: "Descrição livre do veículo da troca (marca, modelo, ano, estado) — só se temVeiculoTroca for true" },
+          valorEntrada: { type: "number", description: "Valor de entrada em reais que o cliente pretende dar, além da troca se houver (0 se nenhum)" },
+          parcelaDesejada: { type: "number", description: "Valor de parcela mensal em reais que cabe no orçamento do cliente, se ele mencionou" },
+          urgenciaCompra: { type: "string", enum: ["HOJE", "ESTA_SEMANA", "ESTE_MES", "PESQUISANDO"], description: "Quando o cliente pretende comprar" },
+        },
+        required: ["formaPagamento", "temVeiculoTroca", "urgenciaCompra"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "registrar_documentos_financiamento",
+      description: "Registra os documentos do cliente pra simulação de financiamento — só chame depois de registrar a qualificação com formaPagamento FINANCIADO, e depois de coletar todos os dados abaixo na conversa.",
+      parameters: {
+        type: "object",
+        properties: {
+          nomeCompleto: { type: "string", description: "Nome completo do cliente" },
+          cpf: { type: "string", description: "CPF do cliente, só números" },
+          dataNascimento: { type: "string", description: "Data de nascimento do cliente, formato DD/MM/AAAA" },
+          possuiCnh: { type: "boolean", description: "Se o cliente possui CNH" },
+          estadoCivil: { type: "string", description: "Estado civil do cliente, se ele informou" },
+          profissao: { type: "string", description: "Profissão do cliente, se ele informou" },
+        },
+        required: ["nomeCompleto", "cpf", "dataNascimento", "possuiCnh"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "transferir_vendedor_veiculo",
+      description: "Encerra a pré-venda e transfere a conversa pro vendedor — use depois de já ter registrado o interesse no veículo e a qualificação (e os documentos, se for financiado), ou se o cliente pedir explicitamente pra falar com um vendedor. Depois de chamar essa função você para de responder — o vendedor assume a partir daí.",
+      parameters: {
+        type: "object",
+        properties: {
+          resumo: { type: "string", description: "Algo relevante que não coube nas ferramentas anteriores, se houver" },
+        },
+      },
+    },
+  },
+];
+
 export const PIPELINE_TOOLS = [
   {
     type: "function" as const,

@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ShoppingCart, Settings, Copy, Image as ImageIcon, ExternalLink, Check } from "lucide-react";
+import Link from "next/link";
+import { ShoppingCart, Settings, Copy, Image as ImageIcon, ExternalLink, Check, ArrowLeft } from "lucide-react";
 import { parseCsv, parseCsvPrice, downloadCsvTemplate } from "@/lib/csv-parser";
 
 const MAX_PHOTO_MB = 2;
@@ -191,8 +192,109 @@ function formatBRL(value: number): string {
 
 const CSV_TEMPLATE = "nome;descricao;categoria;preco;preco_promocional;estoque\nCamiseta Basica;100% algodao, varias cores;Vestuario;49,90;39,90;25\nBone Trucker;Ajustavel;Acessorios;35,00;;\n";
 
+// ─── Pré-vendas de veículos (SDR) — wizard por etapa ──────────────────────────
+
+const PREVENDA_WIZARD_STEPS = 4;
+
+function PrevendaVeiculoWizard({
+  etapaVeiculoEnabled, onChangeEtapaVeiculo,
+  etapaQualificacaoEnabled, onChangeEtapaQualificacao,
+  etapaDocumentosEnabled, onChangeEtapaDocumentos,
+  restricoes, onChangeRestricoes,
+}: {
+  etapaVeiculoEnabled: boolean; onChangeEtapaVeiculo: (v: boolean) => void;
+  etapaQualificacaoEnabled: boolean; onChangeEtapaQualificacao: (v: boolean) => void;
+  etapaDocumentosEnabled: boolean; onChangeEtapaDocumentos: (v: boolean) => void;
+  restricoes: string; onChangeRestricoes: (v: string) => void;
+}) {
+  const [step, setStep] = useState(1);
+
+  return (
+    <div className="bg-gray-950 border border-gray-800 rounded-2xl p-5 space-y-4">
+      <div className="flex gap-2 text-xs">
+        {Array.from({ length: PREVENDA_WIZARD_STEPS }, (_, i) => i + 1).map(n => (
+          <div key={n} className={`flex-1 h-1.5 rounded-full ${n <= step ? "bg-blue-500" : "bg-gray-800"}`} />
+        ))}
+      </div>
+
+      {step === 1 && (
+        <div className="space-y-3">
+          <p className="font-medium text-sm">1. Identificar veículo de interesse</p>
+          <p className="text-xs text-gray-500">
+            A IA pergunta o tipo (carro ou moto), modelo, ano desejado e faixa de preço, e usa o catálogo pra sugerir opções que combinem com o que o cliente procura.
+          </p>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={etapaVeiculoEnabled} onChange={e => onChangeEtapaVeiculo(e.target.checked)} className="w-4 h-4" />
+            <span className="text-sm">Ativar esta etapa</span>
+          </label>
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className="space-y-3">
+          <p className="font-medium text-sm">2. Qualificar cliente</p>
+          <p className="text-xs text-gray-500">
+            A IA pergunta se a compra é à vista ou financiada, se há veículo pra dar de troca, quanto pretende dar de entrada, qual parcela cabe no orçamento, e quando pretende comprar (hoje, esta semana, este mês ou só pesquisando).
+          </p>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={etapaQualificacaoEnabled} onChange={e => onChangeEtapaQualificacao(e.target.checked)} className="w-4 h-4" />
+            <span className="text-sm">Ativar esta etapa</span>
+          </label>
+        </div>
+      )}
+
+      {step === 3 && (
+        <div className="space-y-3">
+          <p className="font-medium text-sm">3. Documentos para financiamento</p>
+          <p className="text-xs text-gray-500">
+            Se o cliente escolher financiar, a IA coleta nome completo, CPF, data de nascimento, se possui CNH (e estado civil/profissão quando pertinente) — dados usados só pra iniciar a simulação de crédito, nunca pra aprovar ou calcular parcelas.
+          </p>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={etapaDocumentosEnabled} onChange={e => onChangeEtapaDocumentos(e.target.checked)} className="w-4 h-4" />
+            <span className="text-sm">Ativar esta etapa</span>
+          </label>
+        </div>
+      )}
+
+      {step === 4 && (
+        <div className="space-y-3">
+          <p className="font-medium text-sm">4. Restrições</p>
+          <p className="text-xs text-gray-500">O que a IA nunca deve fazer durante a pré-venda — regras de negócio livres, definidas por você.</p>
+          <textarea
+            value={restricoes}
+            onChange={e => onChangeRestricoes(e.target.value)}
+            rows={3}
+            maxLength={1000}
+            placeholder="Ex: nunca confirmar aprovação de crédito, nunca negociar valor de entrada final, nunca prometer valor de avaliação do veículo na troca..."
+            className="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-sm resize-none"
+          />
+        </div>
+      )}
+
+      <div className="flex justify-between pt-1">
+        <button
+          onClick={() => setStep(s => Math.max(1, s - 1))}
+          disabled={step === 1}
+          className="text-xs text-gray-400 hover:text-gray-200 disabled:opacity-0 disabled:pointer-events-none flex items-center gap-1"
+        >
+          <ArrowLeft size={12} /> Voltar
+        </button>
+        {step < PREVENDA_WIZARD_STEPS ? (
+          <button onClick={() => setStep(s => s + 1)} className="bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-1.5 text-xs font-medium">
+            Continuar
+          </button>
+        ) : (
+          <span className="text-xs text-gray-500">As alterações são salvas junto com as configurações de Comércio.</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function ComercioClient({
-  agentId, initialCommerceEnabled, initialCatalogOnly, initialCatalogType, initialAsaasSandbox, initialHasAsaasApiKey, initialAsaasWebhookToken,
+  agentId, initialCommerceEnabled, initialCatalogOnly, initialCatalogType, initialPrevendaVeiculoEnabled, initialPrevendaVeiculoRestricoes,
+  initialPrevendaEtapaVeiculoEnabled, initialPrevendaEtapaQualificacaoEnabled, initialPrevendaEtapaDocumentosEnabled,
+  initialAsaasSandbox, initialHasAsaasApiKey, initialAsaasWebhookToken,
   initialInstallmentsEnabled, initialMaxInstallments, initialInterestFreeInstallments, initialInstallmentInterestRate,
   initialProducts, initialOrders, initialStoreLogo, initialBanners, storeSlug,
   initialOrderWebhookUrl, initialHasOrderWebhookSecret, initialDelivery,
@@ -204,6 +306,11 @@ export function ComercioClient({
   initialAsaasWebhookToken: string | null;
   initialCatalogOnly: boolean;
   initialCatalogType: CatalogType;
+  initialPrevendaVeiculoEnabled: boolean;
+  initialPrevendaVeiculoRestricoes: string;
+  initialPrevendaEtapaVeiculoEnabled: boolean;
+  initialPrevendaEtapaQualificacaoEnabled: boolean;
+  initialPrevendaEtapaDocumentosEnabled: boolean;
   initialInstallmentsEnabled: boolean;
   initialMaxInstallments: number;
   initialInterestFreeInstallments: number;
@@ -228,6 +335,11 @@ export function ComercioClient({
   const [commerceEnabled, setCommerceEnabled] = useState(initialCommerceEnabled);
   const [catalogOnly, setCatalogOnly] = useState(initialCatalogOnly);
   const [catalogType, setCatalogType] = useState<CatalogType>(initialCatalogType);
+  const [prevendaVeiculoEnabled, setPrevendaVeiculoEnabled] = useState(initialPrevendaVeiculoEnabled);
+  const [prevendaVeiculoRestricoes, setPrevendaVeiculoRestricoes] = useState(initialPrevendaVeiculoRestricoes);
+  const [prevendaEtapaVeiculoEnabled, setPrevendaEtapaVeiculoEnabled] = useState(initialPrevendaEtapaVeiculoEnabled);
+  const [prevendaEtapaQualificacaoEnabled, setPrevendaEtapaQualificacaoEnabled] = useState(initialPrevendaEtapaQualificacaoEnabled);
+  const [prevendaEtapaDocumentosEnabled, setPrevendaEtapaDocumentosEnabled] = useState(initialPrevendaEtapaDocumentosEnabled);
   const [asaasSandbox, setAsaasSandbox] = useState(initialAsaasSandbox);
   const [hasAsaasApiKey, setHasAsaasApiKey] = useState(initialHasAsaasApiKey);
   const [asaasWebhookToken, setAsaasWebhookToken] = useState(initialAsaasWebhookToken);
@@ -387,7 +499,8 @@ export function ComercioClient({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          commerceEnabled, catalogOnly, catalogType, asaasSandbox,
+          commerceEnabled, catalogOnly, catalogType, prevendaVeiculoEnabled, prevendaVeiculoRestricoes,
+          prevendaEtapaVeiculoEnabled, prevendaEtapaQualificacaoEnabled, prevendaEtapaDocumentosEnabled, asaasSandbox,
           installmentsEnabled, maxInstallments, interestFreeInstallments, installmentInterestRate,
           ...(asaasApiKeyInput.trim() ? { asaasApiKey: asaasApiKeyInput.trim() } : {}),
           deliveryEnabled, pickupEnabled, deliveryFee,
@@ -858,6 +971,29 @@ export function ComercioClient({
                 Define os campos do formulário de produto e como o catálogo aparece pros clientes. Trocar depois não apaga produtos já cadastrados, mas o formulário passa a mostrar campos diferentes.
               </p>
             </div>
+
+            {catalogType === "VEICULOS" && (
+              <div className="border-t border-gray-800 pt-4 space-y-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={prevendaVeiculoEnabled} onChange={e => setPrevendaVeiculoEnabled(e.target.checked)} className="w-4 h-4" />
+                  <span className="text-sm font-medium">Ativar pré-vendas de veículos (SDR)</span>
+                </label>
+                <p className="text-xs text-gray-500">
+                  A IA identifica o veículo de interesse, qualifica o cliente (pagamento à vista/financiado, troca, urgência), coleta os documentos pra simulação de financiamento quando for o caso, e transfere pro vendedor.
+                  Quem recebe a conversa depende do modo de distribuição já configurado em{" "}
+                  <Link href={`/ferramentas/whatsapp/${agentId}`} className="text-blue-400 hover:text-blue-300 underline">Ferramentas → Distribuição</Link>.
+                  A etapa de agendar visita só aparece se o Agendamento também estiver ativado pro agente.
+                </p>
+                {prevendaVeiculoEnabled && (
+                  <PrevendaVeiculoWizard
+                    etapaVeiculoEnabled={prevendaEtapaVeiculoEnabled} onChangeEtapaVeiculo={setPrevendaEtapaVeiculoEnabled}
+                    etapaQualificacaoEnabled={prevendaEtapaQualificacaoEnabled} onChangeEtapaQualificacao={setPrevendaEtapaQualificacaoEnabled}
+                    etapaDocumentosEnabled={prevendaEtapaDocumentosEnabled} onChangeEtapaDocumentos={setPrevendaEtapaDocumentosEnabled}
+                    restricoes={prevendaVeiculoRestricoes} onChangeRestricoes={setPrevendaVeiculoRestricoes}
+                  />
+                )}
+              </div>
+            )}
 
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={commerceEnabled} onChange={e => setCommerceEnabled(e.target.checked)} className="w-4 h-4" />

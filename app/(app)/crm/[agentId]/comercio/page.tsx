@@ -65,6 +65,11 @@ async function ComercioPageContent({ params }: { params: Promise<{ agentId: stri
       initialCommerceEnabled={config.commerceEnabled}
       initialCatalogOnly={config.catalogOnly}
       initialCatalogType={config.catalogType}
+      initialPrevendaVeiculoEnabled={config.prevendaVeiculoEnabled}
+      initialPrevendaVeiculoRestricoes={config.prevendaVeiculoRestricoes}
+      initialPrevendaEtapaVeiculoEnabled={config.prevendaEtapaVeiculoEnabled}
+      initialPrevendaEtapaQualificacaoEnabled={config.prevendaEtapaQualificacaoEnabled}
+      initialPrevendaEtapaDocumentosEnabled={config.prevendaEtapaDocumentosEnabled}
       initialAsaasSandbox={config.asaasSandbox}
       initialHasAsaasApiKey={Boolean(config.asaasApiKey)}
       initialAsaasWebhookToken={config.asaasWebhookToken}

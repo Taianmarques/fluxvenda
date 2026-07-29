@@ -686,6 +686,17 @@ model AgentConfig {
   asaasSandbox     Boolean @default(true)
   asaasWebhookToken String? // gerado ao ativar; valida o webhook de confirmação de pagamento
 
+  // Pré-vendas de veículos (SDR) — fluxo estruturado opcional, só relevante quando
+  // catalogType = VEICULOS. A transferência final respeita leadDistributionMode (não força
+  // atribuição própria).
+  prevendaVeiculoEnabled    Boolean @default(false)
+  prevendaVeiculoRestricoes String  @default("") // texto livre do gestor, injetado no prompt como "NUNCA FAÇA"
+  // Cada etapa de coleta liga/desliga independente (a transferência final não é opcional —
+  // é o mecanismo de saída do fluxo, sempre ativa quando prevendaVeiculoEnabled é true).
+  prevendaEtapaVeiculoEnabled       Boolean @default(true) // identificar veículo de interesse
+  prevendaEtapaQualificacaoEnabled  Boolean @default(true) // pagamento/troca/entrada/parcela/urgência
+  prevendaEtapaDocumentosEnabled    Boolean @default(true) // documentos pra financiamento
+
   cobrancaEnabled Boolean @default(false) // agente dedicado a cobrança de dívidas/boletos
 
   // Prospecção ativa via Google Maps + WhatsApp

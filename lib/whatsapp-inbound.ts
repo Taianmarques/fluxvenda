@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import {
   runAgent, runAgentWithImage, runAgentWithTools, classifyLeadQualified,
   SCHEDULING_TOOLS, COMMERCE_TOOLS, BILLING_TOOLS, PROSPECTING_TOOLS, POSVENDA_TOOLS, PIPELINE_TOOLS, DEPARTAMENTO_TOOLS,
+  PREVENDA_VEICULO_TOOLS,
 } from "@/lib/agent-engine";
 import { textToSpeech } from "@/lib/elevenlabs";
 import { logTokenUsage, isOverQuota } from "@/lib/token-usage";
@@ -211,18 +212,29 @@ function buildInstallmentNote(config: {
       : ` Sem acréscimo em nenhuma quantidade de parcelas até o limite.`);
 }
 
+type PrevendaVeiculoConfig = {
+  enabled: boolean; restricoes: string; schedulingEnabled: boolean;
+  etapaVeiculo: boolean; etapaQualificacao: boolean; etapaDocumentos: boolean;
+};
+
 async function buildCommerceContext(agentConfigId: string, config: {
   catalogType: string; catalogOnly: boolean; installmentsEnabled: boolean; maxInstallments: number; interestFreeInstallments: number; installmentInterestRate: number;
   deliveryEnabled: boolean; pickupEnabled: boolean; deliveryFee: number; deliveryFreeAbove: number | null; deliveryArea: string;
+  prevendaVeiculoEnabled: boolean; prevendaVeiculoRestricoes: string; schedulingEnabled: boolean;
+  prevendaEtapaVeiculoEnabled: boolean; prevendaEtapaQualificacaoEnabled: boolean; prevendaEtapaDocumentosEnabled: boolean;
 }): Promise<string> {
+  const prevenda: PrevendaVeiculoConfig = {
+    enabled: config.prevendaVeiculoEnabled, restricoes: config.prevendaVeiculoRestricoes, schedulingEnabled: config.schedulingEnabled,
+    etapaVeiculo: config.prevendaEtapaVeiculoEnabled, etapaQualificacao: config.prevendaEtapaQualificacaoEnabled, etapaDocumentos: config.prevendaEtapaDocumentosEnabled,
+  };
   return config.catalogType !== "GENERICO"
-    ? buildBrowseOnlyCommerceContext(agentConfigId, config.catalogType)
+    ? buildBrowseOnlyCommerceContext(agentConfigId, config.catalogType, prevenda)
     : buildGenericCommerceContext(agentConfigId, config);
 }
 
 // Catálogo de Veículos/Imóveis: não usa carrinho/pedido/pagamento — a IA só mostra itens
 // e encaminha o interessado pra um consultor humano fechar a negociação
-async function buildBrowseOnlyCommerceContext(agentConfigId: string, catalogType: string): Promise<string> {
+async function buildBrowseOnlyCommerceContext(agentConfigId: string, catalogType: string, prevenda: PrevendaVeiculoConfig): Promise<string> {
   const products = await prisma.product.findMany({ where: { agentConfigId, active: true }, select: { name: true, price: true } });
   const catalogo = products.length > 0
     ? products.map(p => `- ${p.name}: R$ ${p.price.toFixed(2)}`).join("\n")
@@ -230,6 +242,36 @@ async function buildBrowseOnlyCommerceContext(agentConfigId: string, catalogType
 
   const catalogUrl = `${process.env.NEXT_PUBLIC_APP_URL}/loja/${await ensureStoreSlug(agentConfigId)}`;
   const item = catalogType === "VEICULOS" ? "veículo" : "imóvel";
+
+  // Pré-vendas: só veículos têm o fluxo estruturado (SDR em etapas), e só quando o gestor
+  // ativou prevendaVeiculoEnabled. Cada etapa de coleta liga/desliga independente — monta a
+  // lista numerada só com as etapas realmente ativas. Sem nenhuma ligada (ou pra imóveis),
+  // mantém o encaminhamento simples de sempre.
+  let prevendaBlock: string;
+  if (catalogType === "VEICULOS" && prevenda.enabled) {
+    const passos: string[] = [];
+    if (prevenda.etapaVeiculo) {
+      passos.push("Responda rápido e entenda o que o cliente procura (tipo, modelo, ano, faixa de preço); use consultar_produtos pra sugerir opções do estoque, e chame registrar_veiculo_interesse assim que tiver isso.");
+    }
+    if (prevenda.etapaQualificacao) {
+      passos.push("Pergunte forma de pagamento (à vista/financiado), se tem veículo pra dar de troca, quanto pretende dar de entrada, qual parcela cabe no orçamento, e quando pretende comprar (hoje/esta semana/este mês/só pesquisando). Chame registrar_qualificacao_veiculo.");
+    }
+    if (prevenda.etapaDocumentos) {
+      passos.push("Se for financiado, colete nome completo, CPF, data de nascimento, se possui CNH (e estado civil/profissão se perguntado) e chame registrar_documentos_financiamento — esses dados são só pra iniciar a simulação de crédito, você NUNCA calcula ou aprova financiamento.");
+    }
+    if (prevenda.schedulingEnabled) {
+      passos.push("Ofereça agendar uma visita à loja (use os horários disponíveis normalmente) antes de transferir, se o cliente topar.");
+    }
+    passos.push("Chame transferir_vendedor_veiculo pra encerrar — o vendedor recebe tudo que você já registrou nas etapas anteriores, não repita os dados no resumo.");
+
+    const restricoesBlock = prevenda.restricoes.trim()
+      ? `\n\nNUNCA FAÇA (regras definidas pela gestão):\n${prevenda.restricoes.trim()}`
+      : "";
+
+    prevendaBlock = `- Fluxo de pré-vendas (SDR), em etapas — vá conduzindo a conversa nessa ordem, sem pular etapas:\n${passos.map((p, i) => `  ${i + 1}. ${p}`).join("\n")}${restricoesBlock}`;
+  } else {
+    prevendaBlock = `- Esse tipo de negócio não usa carrinho/pedido pelo WhatsApp: quando o cliente demonstrar interesse real em um ${item} específico, colete nome e contato dele e avise que um consultor vai dar continuidade — não tente "fechar pedido" nem gerar cobrança.`;
+  }
 
   return `\n\nFERRAMENTAS DE CATÁLOGO:
 Catálogo disponível (use consultar_produtos pra confirmar — esse resumo pode estar desatualizado):
@@ -240,7 +282,7 @@ Catálogo online (link público): ${catalogUrl}
 - Envie o link puro, sem colchetes nem parênteses em volta, pra ficar clicável.
 - Use consultar_produtos pra responder sobre ${item}s disponíveis — nunca invente item, preço ou característica fora dessa lista.
 - Se o cliente pedir pra ver fotos, use enviar_foto_produto.
-- Esse tipo de negócio não usa carrinho/pedido pelo WhatsApp: quando o cliente demonstrar interesse real em um ${item} específico, colete nome e contato dele e avise que um consultor vai dar continuidade — não tente "fechar pedido" nem gerar cobrança.`;
+${prevendaBlock}`;
 }
 
 async function buildGenericCommerceContext(agentConfigId: string, config: {
@@ -666,6 +708,96 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       emitChatEvent(agentConfigId, conversationId);
 
       return `Conversa transferida para "${dep.nome}"${assignedName ? ` (atendente: ${assignedName})` : ""}. Na SUA RESPOSTA, avise o cliente com naturalidade que o setor vai atendê-lo em instantes. Depois desta mensagem você para de responder — o atendimento é humano a partir daqui.`;
+    }
+
+    if (name === "registrar_veiculo_interesse") {
+      const tipo = args?.tipo === "MOTO" ? "MOTO" : args?.tipo === "CARRO" ? "CARRO" : null;
+      const modeloDesejado = typeof args?.modeloDesejado === "string" ? args.modeloDesejado.trim() : "";
+      if (!tipo || !modeloDesejado) return "Erro: identifique ao menos o tipo (carro/moto) e o modelo desejado antes de registrar.";
+
+      const anoDesejado = typeof args?.anoDesejado === "string" ? args.anoDesejado.trim() : "";
+      const faixaPrecoMin = typeof args?.faixaPrecoMin === "number" ? args.faixaPrecoMin : null;
+      const faixaPrecoMax = typeof args?.faixaPrecoMax === "number" ? args.faixaPrecoMax : null;
+      const faixa = faixaPrecoMin != null || faixaPrecoMax != null
+        ? ` — faixa de preço: ${faixaPrecoMin != null ? `R$ ${faixaPrecoMin.toFixed(2)}` : "?"} a ${faixaPrecoMax != null ? `R$ ${faixaPrecoMax.toFixed(2)}` : "?"}`
+        : "";
+
+      await prisma.message.create({
+        data: {
+          conversationId,
+          role: "note",
+          content: `Pré-venda: cliente busca ${tipo === "CARRO" ? "carro" : "moto"} — ${modeloDesejado}${anoDesejado ? ` (${anoDesejado})` : ""}${faixa}.`,
+        },
+      });
+      emitChatEvent(agentConfigId, conversationId);
+      return "Interesse registrado. Use consultar_produtos pra sugerir opções do estoque que combinem, se ainda não sugeriu.";
+    }
+
+    if (name === "registrar_qualificacao_veiculo") {
+      const formaPagamento = args?.formaPagamento === "FINANCIADO" ? "FINANCIADO" : args?.formaPagamento === "A_VISTA" ? "A_VISTA" : null;
+      const urgenciaCompra = ["HOJE", "ESTA_SEMANA", "ESTE_MES", "PESQUISANDO"].includes(args?.urgenciaCompra) ? args.urgenciaCompra : null;
+      if (!formaPagamento || typeof args?.temVeiculoTroca !== "boolean" || !urgenciaCompra) {
+        return "Erro: pergunte forma de pagamento (à vista/financiado), se tem veículo pra dar de troca, e quando pretende comprar, antes de registrar.";
+      }
+
+      const temVeiculoTroca = args.temVeiculoTroca as boolean;
+      const veiculoTrocaDescricao = temVeiculoTroca && typeof args?.veiculoTrocaDescricao === "string" ? args.veiculoTrocaDescricao.trim() : "";
+      const valorEntrada = typeof args?.valorEntrada === "number" ? args.valorEntrada : null;
+      const parcelaDesejada = typeof args?.parcelaDesejada === "number" ? args.parcelaDesejada : null;
+      const urgenciaLabel = { HOJE: "hoje", ESTA_SEMANA: "esta semana", ESTE_MES: "este mês", PESQUISANDO: "só pesquisando" }[urgenciaCompra as string];
+
+      const linhas = [
+        `Pagamento: ${formaPagamento === "FINANCIADO" ? "Financiado" : "À vista"}.`,
+        `Veículo na troca: ${temVeiculoTroca ? (veiculoTrocaDescricao || "sim, sem detalhes") : "não"}.`,
+        valorEntrada != null ? `Entrada: R$ ${valorEntrada.toFixed(2)}.` : null,
+        parcelaDesejada != null ? `Parcela que cabe no orçamento: R$ ${parcelaDesejada.toFixed(2)}.` : null,
+        `Quando pretende comprar: ${urgenciaLabel}.`,
+      ].filter(Boolean).join(" ");
+
+      await prisma.message.create({ data: { conversationId, role: "note", content: `Pré-venda: qualificação — ${linhas}` } });
+      emitChatEvent(agentConfigId, conversationId);
+
+      return formaPagamento === "FINANCIADO"
+        ? "Qualificação registrada. Agora colete nome completo, CPF, data de nascimento e se possui CNH (estado civil e profissão se a financeira exigir) e chame registrar_documentos_financiamento."
+        : "Qualificação registrada. Se o agendamento estiver disponível, ofereça agendar uma visita; senão, chame transferir_vendedor_veiculo.";
+    }
+
+    if (name === "registrar_documentos_financiamento") {
+      const nomeCompleto = typeof args?.nomeCompleto === "string" ? args.nomeCompleto.trim() : "";
+      const cpf = typeof args?.cpf === "string" ? args.cpf.replace(/\D/g, "") : "";
+      const dataNascimento = typeof args?.dataNascimento === "string" ? args.dataNascimento.trim() : "";
+      if (!nomeCompleto || !cpf || !dataNascimento || typeof args?.possuiCnh !== "boolean") {
+        return "Erro: colete nome completo, CPF, data de nascimento e se possui CNH antes de registrar.";
+      }
+      const possuiCnh = args.possuiCnh as boolean;
+      const estadoCivil = typeof args?.estadoCivil === "string" ? args.estadoCivil.trim() : "";
+      const profissao = typeof args?.profissao === "string" ? args.profissao.trim() : "";
+
+      const linhas = [
+        `Nome: ${nomeCompleto}.`, `CPF: ${cpf}.`, `Nascimento: ${dataNascimento}.`, `CNH: ${possuiCnh ? "sim" : "não"}.`,
+        estadoCivil ? `Estado civil: ${estadoCivil}.` : null,
+        profissao ? `Profissão: ${profissao}.` : null,
+      ].filter(Boolean).join(" ");
+
+      await prisma.message.create({ data: { conversationId, role: "note", content: `Pré-venda: documentos pra financiamento — ${linhas}` } });
+      emitChatEvent(agentConfigId, conversationId);
+
+      return "Documentos registrados. Se o agendamento estiver disponível, ofereça agendar uma visita; senão, chame transferir_vendedor_veiculo pra encerrar e encaminhar o cliente pro vendedor rodar a simulação.";
+    }
+
+    if (name === "transferir_vendedor_veiculo") {
+      const resumo = typeof args?.resumo === "string" ? args.resumo.trim() : "";
+
+      // Não força atribuição — quem assume depende do leadDistributionMode já configurado
+      // (RODIZIO/IA_QUALIFICACAO já teriam atribuído antes; PRIMEIRO_A_ASSUMIR/MANUAL ficam
+      // pro primeiro humano que agir).
+      await prisma.conversation.update({ where: { id: conversationId }, data: { humanTakeover: true, status: "ATIVO" } });
+      await prisma.message.create({
+        data: { conversationId, role: "note", content: `Pré-venda concluída pela IA — cliente pronto pro vendedor.${resumo ? ` ${resumo}` : ""}` },
+      });
+      emitChatEvent(agentConfigId, conversationId);
+
+      return "Pré-venda transferida pro vendedor. Na SUA RESPOSTA, avise o cliente com naturalidade que um vendedor vai continuar o atendimento em instantes. Depois desta mensagem você para de responder — o atendimento é humano a partir daqui.";
     }
 
     if (name === "mover_etapa_funil") {
@@ -1187,6 +1319,16 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
     ...(config.pipelineAutoAvancar ? PIPELINE_TOOLS : []),
     ...(departamentos.length > 0 ? DEPARTAMENTO_TOOLS : []),
     ...(isProspect ? PROSPECTING_TOOLS : []),
+    // Pré-vendas de veículos: transferir_vendedor_veiculo não é opcional (é o mecanismo de
+    // saída do fluxo) — cada etapa de coleta liga/desliga independente.
+    ...(config.commerceEnabled && config.catalogType === "VEICULOS" && config.prevendaVeiculoEnabled
+      ? PREVENDA_VEICULO_TOOLS.filter(t => {
+          if (t.function.name === "registrar_veiculo_interesse") return config.prevendaEtapaVeiculoEnabled;
+          if (t.function.name === "registrar_qualificacao_veiculo") return config.prevendaEtapaQualificacaoEnabled;
+          if (t.function.name === "registrar_documentos_financiamento") return config.prevendaEtapaDocumentosEnabled;
+          return true; // transferir_vendedor_veiculo — sempre ativa
+        })
+      : []),
   ];
 
   // Instrução de emoji injetada em tempo de execução — não exige regenerar o systemPrompt
