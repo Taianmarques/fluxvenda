@@ -7,9 +7,9 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "Plataforma B2B",
-  description: "Plataforma educacional de vendas B2B",
-  appleWebApp: { capable: true, title: "FluxVenda", statusBarStyle: "black-translucent" },
+  title: "SF Madeiras",
+  description: "CRM e agente de IA da SF Madeiras",
+  appleWebApp: { capable: true, title: "SF Madeiras", statusBarStyle: "black-translucent" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

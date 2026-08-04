@@ -286,11 +286,11 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo 
     <aside className={`hidden md:flex flex-shrink-0 border-r border-gray-800 bg-black flex-col transition-[width] duration-150 ${collapsed ? "w-16" : "w-56"}`}>
       <div className={`py-5 border-b border-gray-800 flex items-center justify-center gap-2 ${collapsed ? "px-2" : "px-5"}`}>
         {menuLogo ? (
-          <img src={menuLogo} alt="FluxVenda" width={28} height={28} className="flex-shrink-0 rounded" />
+          <img src={menuLogo} alt="SF Madeiras" width={28} height={28} className="flex-shrink-0 rounded" />
         ) : (
-          <Image src="/iconefluxvenda.png" alt="FluxVenda" width={28} height={28} className="flex-shrink-0" />
+          <Image src="/iconefluxvenda.png" alt="SF Madeiras" width={28} height={28} className="flex-shrink-0" />
         )}
-        {!collapsed && <span className="font-bold text-lg text-white">FluxVenda</span>}
+        {!collapsed && <span className="font-bold text-lg text-white">SF Madeiras</span>}
       </div>
 
       {agents.length > 1 && (

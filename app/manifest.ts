@@ -8,8 +8,8 @@ import type { MetadataRoute } from "next";
 // usa o app/apple-icon.png (linkado sozinho pelo Next), não afetado por essa mudança.
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "FluxVenda",
-    short_name: "FluxVenda",
+    name: "SF Madeiras",
+    short_name: "SF Madeiras",
     description: "CRM e agente de IA para WhatsApp e Instagram",
     id: "/crm",
     start_url: "/crm",

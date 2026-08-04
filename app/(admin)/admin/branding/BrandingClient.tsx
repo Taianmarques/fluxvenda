@@ -118,7 +118,7 @@ export function BrandingClient({ initialMenuLogo, initialPwaIconPreview, updated
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4">
           <div>
             <p className="font-semibold">Logo do menu (CRM)</p>
-            <p className="text-xs text-gray-500 mt-1">Aparece no topo da barra lateral do CRM, ao lado do nome &quot;FluxVenda&quot;. Sem redimensionamento — envie já no tamanho certo.</p>
+            <p className="text-xs text-gray-500 mt-1">Aparece no topo da barra lateral do CRM, ao lado do nome &quot;SF Madeiras&quot;. Sem redimensionamento — envie já no tamanho certo.</p>
           </div>
 
           <div className="flex items-center gap-4">
@@ -130,7 +130,7 @@ export function BrandingClient({ initialMenuLogo, initialPwaIconPreview, updated
               )}
             </div>
             <div className="space-y-1">
-              <p className="text-xs text-gray-500">{menuLogo ? "Logo customizada" : "Usando o ícone padrão do FluxVenda"}</p>
+              <p className="text-xs text-gray-500">{menuLogo ? "Logo customizada" : "Usando o ícone padrão da SF Madeiras"}</p>
               {logoError && <p className="text-xs text-red-400">{logoError}</p>}
             </div>
           </div>
@@ -172,7 +172,7 @@ export function BrandingClient({ initialMenuLogo, initialPwaIconPreview, updated
               )}
             </div>
             <div className="space-y-1">
-              <p className="text-xs text-gray-500">{pwaIconPreview ? "Ícone customizado" : "Usando o ícone padrão do FluxVenda"}</p>
+              <p className="text-xs text-gray-500">{pwaIconPreview ? "Ícone customizado" : "Usando o ícone padrão da SF Madeiras"}</p>
               {iconError && <p className="text-xs text-red-400">{iconError}</p>}
             </div>
           </div>
