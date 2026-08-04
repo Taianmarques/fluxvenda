@@ -44,6 +44,7 @@ type Channel = {
   igCommentAutoDm: boolean;
   igCommentDmMessage: string | null;
   igColetaWhatsappEnabled: boolean;
+  igColetaWhatsappInstrucoes: string;
   igCommentFlows: CommentFlow[];
 };
 
@@ -216,6 +217,7 @@ export function CanaisClient({
     igCommentAutoDm: boolean;
     igCommentDmMessage: string;
     igColetaWhatsappEnabled: boolean;
+    igColetaWhatsappInstrucoes: string;
     flows: CommentFlow[];
   }>>({});
   const [savingFlows, setSavingFlows] = useState<string | null>(null);
@@ -225,6 +227,7 @@ export function CanaisClient({
       igCommentAutoDm: ch.igCommentAutoDm,
       igCommentDmMessage: ch.igCommentDmMessage ?? "",
       igColetaWhatsappEnabled: ch.igColetaWhatsappEnabled,
+      igColetaWhatsappInstrucoes: ch.igColetaWhatsappInstrucoes,
       flows: ch.igCommentFlows.map((f) => ({ ...f })),
     };
   }
@@ -306,6 +309,7 @@ export function CanaisClient({
           igCommentAutoDm: s.igCommentAutoDm,
           igCommentDmMessage: s.igCommentDmMessage || null,
           igColetaWhatsappEnabled: s.igColetaWhatsappEnabled,
+          igColetaWhatsappInstrucoes: s.igColetaWhatsappInstrucoes,
           flows: s.flows.map((f, i) => ({
             name: f.name,
             keywords: f.keywords,
@@ -318,7 +322,7 @@ export function CanaisClient({
       if (!res.ok) throw new Error();
       // Reflectir no estado do canal
       setChannels((prev) => prev.map((c) => c.id === channelId
-        ? { ...c, igCommentAutoDm: s.igCommentAutoDm, igCommentDmMessage: s.igCommentDmMessage || null, igColetaWhatsappEnabled: s.igColetaWhatsappEnabled, igCommentFlows: s.flows }
+        ? { ...c, igCommentAutoDm: s.igCommentAutoDm, igCommentDmMessage: s.igCommentDmMessage || null, igColetaWhatsappEnabled: s.igColetaWhatsappEnabled, igColetaWhatsappInstrucoes: s.igColetaWhatsappInstrucoes, igCommentFlows: s.flows }
         : c
       ));
     } catch {
@@ -639,6 +643,7 @@ export function CanaisClient({
               igCommentAutoDm: ch.igCommentAutoDm,
               igCommentDmMessage: ch.igCommentDmMessage ?? "",
               igColetaWhatsappEnabled: ch.igColetaWhatsappEnabled,
+              igColetaWhatsappInstrucoes: ch.igColetaWhatsappInstrucoes,
               flows: ch.igCommentFlows,
             };
             const flowsOpen = openFlowsId === ch.id;
@@ -911,6 +916,20 @@ export function CanaisClient({
                           <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${fs.igColetaWhatsappEnabled ? "translate-x-4" : "translate-x-0"}`} />
                         </button>
                       </div>
+
+                      {fs.igColetaWhatsappEnabled && (
+                        <div className="space-y-1.5">
+                          <p className="text-xs font-medium text-gray-400">Como e quando pedir o número (opcional)</p>
+                          <textarea
+                            value={fs.igColetaWhatsappInstrucoes}
+                            onChange={(e) => updateFlowsState(ch.id, { igColetaWhatsappInstrucoes: e.target.value })}
+                            rows={2}
+                            maxLength={1000}
+                            placeholder="Ex: só peça depois de entender o que o cliente procura, nunca logo na primeira mensagem; se ele perguntar preço, peça o WhatsApp antes de responder..."
+                            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-gray-500 resize-none"
+                          />
+                        </div>
+                      )}
 
                       {/* Salvar */}
                       <div className="flex justify-end pt-1">

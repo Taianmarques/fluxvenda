@@ -240,8 +240,12 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
 
   // Só entra no prompt quando o gestor ativa a coleta de WhatsApp — sem isso a IA não sabe que
   // esse comportamento existe e acaba recusando o número (ex: "não posso armazenar números").
+  // O "nunca recuse" é sempre fixo (é a correção do bug); o "como/quando pedir" é configurável
+  // pelo gestor — cai num texto padrão neutro quando ele não preenche nada.
+  const igColetaInstrucoes = config.igColetaWhatsappInstrucoes.trim()
+    || "Peça o número quando fizer sentido na conversa, com naturalidade — não precisa ser logo de cara.";
   const igColetaInstruction = config.igColetaWhatsappEnabled
-    ? "\n\nObjetivo de coleta de WhatsApp: quando fizer sentido na conversa (o cliente demonstrando interesse real), pergunte o número de WhatsApp dele pra continuar o atendimento por lá. Se ele mandar um número de telefone, mesmo sem você pedir, reaja com naturalidade confirmando que a equipe vai continuar o atendimento por WhatsApp em instantes — nunca diga que não pode 'salvar', 'armazenar' ou 'guardar' números, isso não se aplica aqui."
+    ? `\n\nObjetivo de coleta de WhatsApp: seu objetivo é conseguir o número de WhatsApp do lead pra continuar o atendimento por lá. Como e quando pedir: ${igColetaInstrucoes} Se o cliente mandar um número de telefone, mesmo sem você pedir, reaja com naturalidade confirmando que a equipe vai continuar o atendimento por WhatsApp em instantes — nunca diga que não pode 'salvar', 'armazenar' ou 'guardar' números, isso não se aplica aqui.`
     : "";
 
   // Contato automático no WhatsApp quando a pessoa manda o número dela na DM — efeito colateral,

@@ -744,7 +744,8 @@ model AgentConfig {
   // Coleta de WhatsApp via DM do Instagram — opcional. Quando ativo, a IA é instruída a buscar o
   // número de WhatsApp do lead como objetivo, e o número detectado dispara handoff automático
   // pro WhatsApp (ver app/api/webhooks/instagram/route.ts).
-  igColetaWhatsappEnabled Boolean @default(false)
+  igColetaWhatsappEnabled     Boolean @default(false)
+  igColetaWhatsappInstrucoes String  @default("") // texto livre do gestor: como/quando pedir o número
 
   // Agente de gestão de carteira: pós-venda e recompra automáticos (via cron /api/cron/carteira)
   carteiraEnabled    Boolean @default(false)
