@@ -48,8 +48,8 @@ async function getSession(): Promise<SessionPayload | null> {
   return verifySessionToken(token);
 }
 
-// ─── Shim compatível com @clerk/nextjs/server — mesma assinatura, mesmo formato de retorno
-// (só o subconjunto de campos realmente usado no restante do código) ──────────────────────
+// ─── Shim compatível com o antigo @clerk/nextjs/server — mesma assinatura, mesmo formato de
+// retorno (só o subconjunto de campos realmente usado no restante do código) ──────────────
 
 export async function auth(): Promise<{
   userId: string | null;

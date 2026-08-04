@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
+import { useUser } from "@/lib/auth-client";
 import { Link2, XCircle, Building2 } from "lucide-react";
 
 type TeamInfo = { name: string; segment: string; size: string; memberCount: number; managerName: string };

@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useClerk, useUser } from "@clerk/nextjs";
+import { useClerk, useUser } from "@/lib/auth-client";
 import { SEGMENTS, SUBSEGMENTS } from "@/lib/segments";
 
 const TEAM_SIZES = ["1-5", "6-15", "16-50", "51-200", "200+"];

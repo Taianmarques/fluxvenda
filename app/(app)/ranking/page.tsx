@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { currentUser } from "@clerk/nextjs/server";
+import { currentUser } from "@/lib/auth";
 import { ProductGate } from "../ProductGate";
 
 export default async function RankingPage() {

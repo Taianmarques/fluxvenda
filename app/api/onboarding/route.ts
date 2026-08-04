@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { auth, setSessionCookie } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { sendWhatsAppText, buildWelcomeMessage } from "@/lib/whatsapp";
@@ -88,8 +88,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Atualiza metadados do Clerk em background (não bloqueia)
-    updateClerkMetadata(userId, role).catch(() => {});
+    // Reemite o cookie de sessão com o papel/onboarded atualizados — sem isso o proxy.ts
+    // continuaria vendo os claims antigos até o usuário logar de novo.
+    await setSessionCookie({ userId, role, onboarded: true });
 
     // Dispara WhatsApp de boas-vindas em background
     if (phone) {
@@ -103,12 +104,4 @@ export async function POST(req: NextRequest) {
     console.error("[onboarding]", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
-}
-
-async function updateClerkMetadata(userId: string, role: string) {
-  const { clerkClient } = await import("@clerk/nextjs/server");
-  const client = await clerkClient();
-  await client.users.updateUserMetadata(userId, {
-    publicMetadata: { onboarded: true, role },
-  });
 }

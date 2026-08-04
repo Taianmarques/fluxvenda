@@ -1,5 +1,13 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { SESSION_COOKIE_NAME, verifySessionToken } from "@/lib/auth-shared";
+
+// Roteiro público/privado idêntico ao que já existia com Clerk — só a fonte da sessão mudou
+// (cookie JWT próprio em vez de sessionClaims do Clerk). Verificação 100% Edge-safe (jose):
+// NÃO importe Prisma/bcrypt aqui.
+function createRouteMatcher(patterns: string[]) {
+  const regexes = patterns.map((p) => new RegExp(`^${p}$`));
+  return (req: NextRequest) => regexes.some((r) => r.test(req.nextUrl.pathname));
+}
 
 const isPublicRoute = createRouteMatcher([
   "/",
@@ -8,12 +16,12 @@ const isPublicRoute = createRouteMatcher([
   "/sign-up(.*)",
   "/onboarding(.*)",
   "/entrar(.*)",           // página de convite — precisa estar autenticado mas não onboarded
-  "/api/auth(.*)",         // login/registro/logout/me do sistema de auth próprio — sem sessão ainda
+  "/api/auth(.*)",         // login/registro/logout/me do sistema de auth próprio
   "/api/webhooks(.*)",
   "/api/onboarding(.*)",
   "/api/equipe/convite(.*)", // info pública do time para a página de convite
   "/api/cron(.*)",          // protegido por CRON_SECRET, não por sessão de usuário
-  "/api/instagram/callback", // callback do OAuth — valida via OAuthState, sem sessão Clerk
+  "/api/instagram/callback", // callback do OAuth — valida via OAuthState, sem sessão própria
   "/loja(.*)",              // catálogo público (PWA) — clientes finais, sem login
   "/agenda(.*)",            // agenda do profissional (PWA) — acesso por token secreto, sem login
   "/agendar(.*)",           // página pública de auto-agendamento (PWA) — clientes finais, sem login
@@ -22,30 +30,28 @@ const isPublicRoute = createRouteMatcher([
 ]);
 
 const isGestorRoute = createRouteMatcher(["/gestor(.*)", "/ferramentas(.*)"]);
-const isVendedorRoute = createRouteMatcher(["/dashboard(.*)", "/scanner(.*)", "/simulacao(.*)", "/trilhas(.*)", "/objecoes(.*)", "/scripts(.*)"]);
 
-export default clerkMiddleware(async (auth, req) => {
-  const { userId, sessionClaims } = await auth();
+export default async function proxy(req: NextRequest) {
+  const token = req.cookies.get(SESSION_COOKIE_NAME)?.value;
+  const session = token ? await verifySessionToken(token) : null;
 
   // Rotas públicas
   if (isPublicRoute(req)) return NextResponse.next();
 
   // Não autenticado → login
-  if (!userId) {
+  if (!session) {
     const signInUrl = new URL("/sign-in", req.url);
     signInUrl.searchParams.set("redirect_url", req.url);
     return NextResponse.redirect(signInUrl);
   }
 
-  const role = (sessionClaims?.publicMetadata as any)?.role as string | undefined;
-
   // Vendedor tentando acessar área de gestor
-  if (isGestorRoute(req) && role === "VENDEDOR") {
+  if (isGestorRoute(req) && session.role === "VENDEDOR") {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
   return NextResponse.next();
-}, { clockSkewInMs: 180_000 });
+}
 
 export const config = {
   matcher: [

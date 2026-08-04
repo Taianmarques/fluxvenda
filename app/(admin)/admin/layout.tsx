@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { UserButton } from "@clerk/nextjs";
-import { currentUser } from "@clerk/nextjs/server";
+import { SignOutButton } from "@/components/SignOutButton";
+import { currentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { BarChart3, Building2, Search, Cpu, Palette, type LucideIcon } from "lucide-react";
@@ -49,7 +49,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             ← Voltar para a plataforma
           </Link>
           <div className="flex items-center gap-3">
-            <UserButton afterSignOutUrl="/" />
+            <SignOutButton />
             <div className="min-w-0">
               <p className="text-sm font-medium truncate">{profile?.name ?? user.firstName}</p>
               <p className="text-xs text-gray-500 truncate">{user.emailAddresses[0]?.emailAddress}</p>

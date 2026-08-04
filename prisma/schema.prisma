@@ -8,7 +8,7 @@ datasource db {
 }
 
 // ===================================
-// PERFIL E AUTH (Clerk gerencia auth)
+// PERFIL E AUTH (login próprio via lib/auth.ts — e-mail/senha)
 // ===================================
 
 model Profile {

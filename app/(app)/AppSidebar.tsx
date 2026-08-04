@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { UserButton } from "@clerk/nextjs";
+import { SignOutButton } from "@/components/SignOutButton";
 import { useState } from "react";
 import {
   LayoutDashboard, ScanSearch, Target, Gamepad2, BookOpen, MessageSquare,
@@ -84,7 +84,7 @@ export function AppSidebar({
             })}
           </nav>
           <div className="px-4 py-4 border-t border-gray-800 flex items-center gap-3">
-            <UserButton afterSignOutUrl="/" />
+            <SignOutButton />
             <div className="min-w-0">
               <p className="text-sm font-medium truncate">{profileName}</p>
               <p className="text-xs text-gray-500 truncate">{email}</p>
@@ -127,7 +127,7 @@ export function AppSidebar({
       </nav>
 
       <div className="px-4 py-4 border-t border-gray-800 flex items-center gap-3">
-        <UserButton afterSignOutUrl="/" />
+        <SignOutButton />
         <div className="min-w-0">
           <p className="text-sm font-medium truncate">{profileName}</p>
           <p className="text-xs text-gray-500 truncate">{email}</p>
