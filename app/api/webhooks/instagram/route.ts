@@ -247,8 +247,9 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
   // Contato automático no WhatsApp quando a pessoa manda o número dela na DM — efeito colateral,
   // não substitui a resposta normal da IA aqui no Instagram (que segue abaixo). Isolado em
   // try/catch pra nunca derrubar o fluxo normal se o handoff falhar. Só roda se o gestor ativou
-  // a coleta de WhatsApp pra esse agente.
-  if (config.igColetaWhatsappEnabled && !conversation.extractedWhatsappNumber) {
+  // a coleta de WhatsApp pra esse agente. Reavalia a cada mensagem — se o cliente mandar um
+  // número diferente do já contatado, tenta de novo com o número novo.
+  if (config.igColetaWhatsappEnabled) {
     handleInstagramWhatsappHandoff().catch((err) => console.error("[ig-whatsapp-handoff]", err));
   }
 
@@ -256,10 +257,12 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
     if (!config) return;
     const detectedPhone = extractBrazilianPhoneFromText(text);
     if (!detectedPhone) return;
+    if (detectedPhone === conversation.extractedWhatsappNumber) return; // já contatamos esse número
 
-    // Trava atômica: só segue quem conseguir "reservar" a detecção nessa conversa
+    // Trava atômica: só segue quem conseguir "reservar" esse número nessa conversa — cobre tanto
+    // a 1ª detecção (campo null) quanto a chegada de um número diferente do já registrado.
     const claimed = await prisma.conversation.updateMany({
-      where: { id: conversation.id, extractedWhatsappNumber: null },
+      where: { id: conversation.id, OR: [{ extractedWhatsappNumber: null }, { extractedWhatsappNumber: { not: detectedPhone } }] },
       data: { extractedWhatsappNumber: detectedPhone },
     });
     if (claimed.count === 0) return;
@@ -305,9 +308,10 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
 
     const handoffResult = await runAgent(config.systemPrompt! + emojiInstruction, [], gancho);
 
-    await sendWhatsAppTextAsTeam(config.uazapiToken!, detectedPhone, handoffResult.reply);
-    await prisma.message.create({ data: { conversationId: whatsappConversation.id, role: "assistant", content: handoffResult.reply } });
-    emitChatEvent(config.id, whatsappConversation.id);
+    // sendWhatsAppTextAsTeam nunca lança em erro de API (só loga e retorna null) — precisa
+    // checar o retorno, senão a nota de "sucesso" e a mensagem de assistente ficam mentindo
+    // sobre uma mensagem que na verdade não saiu.
+    const sentMessageId = await sendWhatsAppTextAsTeam(config.uazapiToken!, detectedPhone, handoffResult.reply);
 
     logTokenUsage({
       teamId: config.teamId,
@@ -316,6 +320,20 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
       feature: "ig_whatsapp_handoff",
       ...handoffResult.usage,
     });
+
+    if (!sentMessageId) {
+      await prisma.message.create({
+        data: {
+          conversationId: conversation.id,
+          role: "note",
+          content: `Número de WhatsApp detectado (${detectedPhone}), mas o envio automático falhou (erro na instância do WhatsApp) — contate manualmente.`,
+        },
+      });
+      return;
+    }
+
+    await prisma.message.create({ data: { conversationId: whatsappConversation.id, role: "assistant", content: handoffResult.reply } });
+    emitChatEvent(config.id, whatsappConversation.id);
 
     await prisma.message.create({
       data: {
