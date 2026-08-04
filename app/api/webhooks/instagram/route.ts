@@ -238,10 +238,17 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
     ? "\n\nEmojis: você PODE e DEVE usar emojis nas respostas."
     : "\n\nEmojis: NUNCA use emojis nas respostas.";
 
+  // Só entra no prompt quando o gestor ativa a coleta de WhatsApp — sem isso a IA não sabe que
+  // esse comportamento existe e acaba recusando o número (ex: "não posso armazenar números").
+  const igColetaInstruction = config.igColetaWhatsappEnabled
+    ? "\n\nObjetivo de coleta de WhatsApp: quando fizer sentido na conversa (o cliente demonstrando interesse real), pergunte o número de WhatsApp dele pra continuar o atendimento por lá. Se ele mandar um número de telefone, mesmo sem você pedir, reaja com naturalidade confirmando que a equipe vai continuar o atendimento por WhatsApp em instantes — nunca diga que não pode 'salvar', 'armazenar' ou 'guardar' números, isso não se aplica aqui."
+    : "";
+
   // Contato automático no WhatsApp quando a pessoa manda o número dela na DM — efeito colateral,
   // não substitui a resposta normal da IA aqui no Instagram (que segue abaixo). Isolado em
-  // try/catch pra nunca derrubar o fluxo normal se o handoff falhar.
-  if (!conversation.extractedWhatsappNumber) {
+  // try/catch pra nunca derrubar o fluxo normal se o handoff falhar. Só roda se o gestor ativou
+  // a coleta de WhatsApp pra esse agente.
+  if (config.igColetaWhatsappEnabled && !conversation.extractedWhatsappNumber) {
     handleInstagramWhatsappHandoff().catch((err) => console.error("[ig-whatsapp-handoff]", err));
   }
 
@@ -324,7 +331,7 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
     content: m.content,
   }));
 
-  const result = await runAgent(config.systemPrompt + emojiInstruction, history, text);
+  const result = await runAgent(config.systemPrompt + emojiInstruction + igColetaInstruction, history, text);
 
   await prisma.message.create({ data: { conversationId: conversation.id, role: "assistant", content: result.reply } });
   emitChatEvent(config.id, conversation.id);

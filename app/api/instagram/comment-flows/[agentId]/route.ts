@@ -14,9 +14,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ agen
   }
 
   const body = await req.json();
-  const { igCommentAutoDm, igCommentDmMessage, flows } = body as {
+  const { igCommentAutoDm, igCommentDmMessage, igColetaWhatsappEnabled, flows } = body as {
     igCommentAutoDm: boolean;
     igCommentDmMessage: string | null;
+    igColetaWhatsappEnabled: boolean;
     flows: Array<{
       name: string;
       keywords: string[];
@@ -34,6 +35,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ agen
       data: {
         igCommentAutoDm: Boolean(igCommentAutoDm),
         igCommentDmMessage: igCommentDmMessage?.trim() || null,
+        igColetaWhatsappEnabled: Boolean(igColetaWhatsappEnabled),
         igCommentFlows: {
           create: (flows ?? []).map((f, i) => ({
             name: f.name || `Condição ${i + 1}`,

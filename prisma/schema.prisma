@@ -741,6 +741,11 @@ model AgentConfig {
   igCommentAutoDm    Boolean @default(false)
   igCommentDmMessage String? // fallback quando nenhum fluxo bate — null = IA responde
 
+  // Coleta de WhatsApp via DM do Instagram — opcional. Quando ativo, a IA é instruída a buscar o
+  // número de WhatsApp do lead como objetivo, e o número detectado dispara handoff automático
+  // pro WhatsApp (ver app/api/webhooks/instagram/route.ts).
+  igColetaWhatsappEnabled Boolean @default(false)
+
   // Agente de gestão de carteira: pós-venda e recompra automáticos (via cron /api/cron/carteira)
   carteiraEnabled    Boolean @default(false)
   // Agente de Pós-venda (independente da carteira): mensagem pós-compra + pesquisa de satisfação

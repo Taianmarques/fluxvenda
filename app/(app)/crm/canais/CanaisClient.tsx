@@ -43,6 +43,7 @@ type Channel = {
   instagram: InstagramStatus;
   igCommentAutoDm: boolean;
   igCommentDmMessage: string | null;
+  igColetaWhatsappEnabled: boolean;
   igCommentFlows: CommentFlow[];
 };
 
@@ -214,6 +215,7 @@ export function CanaisClient({
   const [flowsState, setFlowsState] = useState<Record<string, {
     igCommentAutoDm: boolean;
     igCommentDmMessage: string;
+    igColetaWhatsappEnabled: boolean;
     flows: CommentFlow[];
   }>>({});
   const [savingFlows, setSavingFlows] = useState<string | null>(null);
@@ -222,6 +224,7 @@ export function CanaisClient({
     return flowsState[ch.id] ?? {
       igCommentAutoDm: ch.igCommentAutoDm,
       igCommentDmMessage: ch.igCommentDmMessage ?? "",
+      igColetaWhatsappEnabled: ch.igColetaWhatsappEnabled,
       flows: ch.igCommentFlows.map((f) => ({ ...f })),
     };
   }
@@ -302,6 +305,7 @@ export function CanaisClient({
         body: JSON.stringify({
           igCommentAutoDm: s.igCommentAutoDm,
           igCommentDmMessage: s.igCommentDmMessage || null,
+          igColetaWhatsappEnabled: s.igColetaWhatsappEnabled,
           flows: s.flows.map((f, i) => ({
             name: f.name,
             keywords: f.keywords,
@@ -314,7 +318,7 @@ export function CanaisClient({
       if (!res.ok) throw new Error();
       // Reflectir no estado do canal
       setChannels((prev) => prev.map((c) => c.id === channelId
-        ? { ...c, igCommentAutoDm: s.igCommentAutoDm, igCommentDmMessage: s.igCommentDmMessage || null, igCommentFlows: s.flows }
+        ? { ...c, igCommentAutoDm: s.igCommentAutoDm, igCommentDmMessage: s.igCommentDmMessage || null, igColetaWhatsappEnabled: s.igColetaWhatsappEnabled, igCommentFlows: s.flows }
         : c
       ));
     } catch {
@@ -634,6 +638,7 @@ export function CanaisClient({
             const fs = flowsState[ch.id] ?? {
               igCommentAutoDm: ch.igCommentAutoDm,
               igCommentDmMessage: ch.igCommentDmMessage ?? "",
+              igColetaWhatsappEnabled: ch.igColetaWhatsappEnabled,
               flows: ch.igCommentFlows,
             };
             const flowsOpen = openFlowsId === ch.id;
@@ -889,6 +894,22 @@ export function CanaisClient({
                           placeholder="Deixe vazio para o agente de IA responder automaticamente..."
                           className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-gray-500 resize-none"
                         />
+                      </div>
+
+                      {/* Coleta de WhatsApp */}
+                      <div className="border-t border-gray-800/40 pt-3 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-medium text-gray-400">Coletar WhatsApp na DM</p>
+                          <p className="text-xs text-gray-600">
+                            A IA passa a ter como objetivo pedir o WhatsApp do lead pra continuar o atendimento por lá. Quando o número aparecer na conversa, ela reage com naturalidade (em vez de recusar) e o sistema inicia automaticamente uma conversa de WhatsApp.
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => updateFlowsState(ch.id, { igColetaWhatsappEnabled: !fs.igColetaWhatsappEnabled })}
+                          className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${fs.igColetaWhatsappEnabled ? "bg-purple-600" : "bg-gray-700"}`}
+                        >
+                          <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${fs.igColetaWhatsappEnabled ? "translate-x-4" : "translate-x-0"}`} />
+                        </button>
                       </div>
 
                       {/* Salvar */}

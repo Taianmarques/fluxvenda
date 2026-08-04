@@ -65,6 +65,7 @@ async function CanaisPageContent({
     uazapiToken: c.uazapiToken,
     igCommentAutoDm: c.igCommentAutoDm,
     igCommentDmMessage: c.igCommentDmMessage,
+    igColetaWhatsappEnabled: c.igColetaWhatsappEnabled,
     igCommentFlows: flowsByAgent[c.id] ?? [],
     instagram: igByAgent[c.id] ?? null,
   }));
