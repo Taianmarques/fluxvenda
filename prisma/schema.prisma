@@ -12,17 +12,18 @@ datasource db {
 // ===================================
 
 model Profile {
-  id        String   @id // Clerk user ID
+  id        String   @id @default(cuid())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  email     String   @unique
-  name      String
-  avatarUrl String?
-  phone     String?
-  role      Role     @default(VENDEDOR)
-  segment   String?
-  onboarded Boolean  @default(false)
+  email        String  @unique
+  passwordHash String? // login próprio (e-mail/senha) — substitui o Clerk nessa instância
+  name         String
+  avatarUrl    String?
+  phone        String?
+  role         Role    @default(VENDEDOR)
+  segment      String?
+  onboarded    Boolean @default(false)
 
   // Assinatura Stripe
   stripeCustomerId     String? @unique
