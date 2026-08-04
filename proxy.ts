@@ -8,6 +8,7 @@ const isPublicRoute = createRouteMatcher([
   "/sign-up(.*)",
   "/onboarding(.*)",
   "/entrar(.*)",           // página de convite — precisa estar autenticado mas não onboarded
+  "/api/auth(.*)",         // login/registro/logout/me do sistema de auth próprio — sem sessão ainda
   "/api/webhooks(.*)",
   "/api/onboarding(.*)",
   "/api/equipe/convite(.*)", // info pública do time para a página de convite
