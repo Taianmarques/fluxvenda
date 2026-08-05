@@ -625,6 +625,12 @@ model AgentConfig {
   precos           String @default("") // valores, formas de pagamento, parcelamento, garantias
   enderecoContato  String @default("") // endereço, site, redes sociais, outros canais
 
+  // Objetivo, fluxo e regras de comportamento — instruções diretas pro agente, além dos fatos
+  // sobre a empresa acima. Opcionais; quando vazios, o system prompt segue só com o padrão.
+  objetivo         String @default("") // o que o agente deve buscar alcançar na conversa
+  fluxoAtendimento String @default("") // sequência de passos que o agente deve seguir
+  comportamento    String @default("") // regras de conduta que o agente deve sempre respeitar
+
   systemPrompt String?
   active       Boolean @default(false)
 

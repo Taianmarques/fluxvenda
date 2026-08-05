@@ -27,6 +27,9 @@ const schema = z.object({
   descricaoEmpresa: z.string().default(""),
   precos: z.string().default(""),
   enderecoContato: z.string().default(""),
+  objetivo: z.string().max(2000).default(""),
+  fluxoAtendimento: z.string().max(2000).default(""),
+  comportamento: z.string().max(2000).default(""),
   followupEnabled: z.boolean().default(true),
   followupDelaysMinutes: z.array(z.number().int().min(1).max(43200)).max(10).default([1440]),
   emojiEnabled: z.boolean().default(false),
@@ -45,6 +48,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
 
   const {
     nome, tom, servicos, objecoes, horario, descricaoEmpresa, precos, enderecoContato,
+    objetivo, fluxoAtendimento, comportamento,
     followupEnabled, followupDelaysMinutes, emojiEnabled,
   } = body.data;
 
@@ -53,12 +57,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
   // Só regenera o system prompt se a personalidade/informações da empresa realmente mudaram
   const personaChanged = existing.nome !== nome || existing.tom !== tom || existing.horario !== horario
     || existing.descricaoEmpresa !== descricaoEmpresa || existing.precos !== precos || existing.enderecoContato !== enderecoContato
+    || existing.objetivo !== objetivo || existing.fluxoAtendimento !== fluxoAtendimento || existing.comportamento !== comportamento
     || JSON.stringify(existing.servicos) !== JSON.stringify(servicos)
     || JSON.stringify(existing.objecoes) !== JSON.stringify(objecoes);
 
   const systemPrompt = personaChanged
     ? await generateSystemPrompt({
         nome, tom, servicos, objecoes, horario, descricaoEmpresa, precos, enderecoContato,
+        objetivo, fluxoAtendimento, comportamento,
         segmento: existing.segmento, subsegmento: existing.subsegmento, empresa: team?.name,
       })
     : existing.systemPrompt;
@@ -67,6 +73,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
     where: { id: agentId },
     data: {
       nome, tom, servicos, objecoes, horario, descricaoEmpresa, precos, enderecoContato,
+      objetivo, fluxoAtendimento, comportamento,
       systemPrompt, followupEnabled, followupDelaysMinutes, emojiEnabled,
     },
   });

@@ -16,6 +16,9 @@ type InitialConfig = {
   descricaoEmpresa: string;
   precos: string;
   enderecoContato: string;
+  objetivo: string;
+  fluxoAtendimento: string;
+  comportamento: string;
   followupEnabled: boolean;
   followupDelaysMinutes: number[];
   emojiEnabled: boolean;
@@ -86,7 +89,7 @@ const TOM_OPTIONS = [
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
 
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 5;
 
 export function WhatsappAgentClient({
   agentId, segmento, initialConfig,
@@ -114,6 +117,9 @@ export function WhatsappAgentClient({
   const [precos, setPrecos] = useState(initialConfig?.precos ?? "");
   const [objecoes, setObjecoes] = useState((initialConfig?.objecoes ?? []).join("\n"));
   const [horario, setHorario] = useState(initialConfig?.horario ?? q.horarioDefault);
+  const [objetivo, setObjetivo] = useState(initialConfig?.objetivo ?? "");
+  const [fluxoAtendimento, setFluxoAtendimento] = useState(initialConfig?.fluxoAtendimento ?? "");
+  const [comportamento, setComportamento] = useState(initialConfig?.comportamento ?? "");
   const [followupEnabled, setFollowupEnabled] = useState(initialConfig?.followupEnabled ?? true);
   const [emojiEnabled, setEmojiEnabled] = useState(initialConfig?.emojiEnabled ?? false);
   const [followupDelays, setFollowupDelays] = useState<DelayRow[]>(
@@ -150,6 +156,7 @@ export function WhatsappAgentClient({
         body: JSON.stringify({
           nome, tom,
           descricaoEmpresa, enderecoContato, precos,
+          objetivo, fluxoAtendimento, comportamento,
           servicos: splitLines(servicos),
           objecoes: splitLines(objecoes),
           horario,
@@ -215,6 +222,7 @@ export function WhatsappAgentClient({
         body: JSON.stringify({
           nome, tom,
           descricaoEmpresa, enderecoContato, precos,
+          objetivo, fluxoAtendimento, comportamento,
           servicos: splitLines(servicos),
           objecoes: splitLines(objecoes),
           horario,
@@ -469,7 +477,38 @@ export function WhatsappAgentClient({
 
       {step === 4 && (
         <div className="space-y-4">
-          <p className="font-semibold">4. Follow-up automático</p>
+          <p className="font-semibold">4. Objetivo e comportamento</p>
+          <p className="text-sm text-gray-400">Opcional — instruções diretas pro agente, além das informações da empresa. Deixe em branco pra usar só o padrão.</p>
+          <div>
+            <label className="text-sm text-gray-400 block mb-1">Objetivo principal</label>
+            <textarea
+              value={objetivo} onChange={e => setObjetivo(e.target.value)} rows={3}
+              placeholder="Ex: Qualificar o cliente e agendar uma visita à loja para orçamento presencial."
+              className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-600"
+            />
+          </div>
+          <div>
+            <label className="text-sm text-gray-400 block mb-1">Fluxo de atendimento</label>
+            <textarea
+              value={fluxoAtendimento} onChange={e => setFluxoAtendimento(e.target.value)} rows={4}
+              placeholder={"Ex:\n1. Cumprimentar e perguntar o que o cliente procura\n2. Entender medidas/quantidade necessárias\n3. Informar preço e prazo de entrega\n4. Perguntar se quer fechar o pedido ou agendar retirada"}
+              className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-600"
+            />
+          </div>
+          <div>
+            <label className="text-sm text-gray-400 block mb-1">Como se comportar</label>
+            <textarea
+              value={comportamento} onChange={e => setComportamento(e.target.value)} rows={3}
+              placeholder="Ex: Nunca prometa desconto sem confirmar com o gestor. Nunca fale mal da concorrência. Sempre confirme o endereço de entrega antes de fechar o pedido."
+              className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-600"
+            />
+          </div>
+        </div>
+      )}
+
+      {step === 5 && (
+        <div className="space-y-4">
+          <p className="font-semibold">5. Follow-up automático</p>
           <p className="text-sm text-gray-400">Se o contato não responder, o agente manda uma mensagem de retomada sozinho, usando o contexto da conversa.</p>
 
           <label className="flex items-center gap-2 cursor-pointer">

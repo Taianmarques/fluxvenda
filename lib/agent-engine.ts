@@ -32,6 +32,9 @@ export type AgentConfigInput = {
   segmento?: string;
   subsegmento?: string;
   empresa?: string;
+  objetivo?: string;
+  fluxoAtendimento?: string;
+  comportamento?: string;
 };
 
 const TOM_LABEL: Record<string, string> = {
@@ -53,8 +56,19 @@ function buildFatosEmpresa(config: AgentConfigInput): string {
   return blocos.join("\n\n");
 }
 
+// Instruções de objetivo/fluxo/comportamento, quando informadas — distintas dos fatos da
+// empresa: aqui é COMO o agente deve conduzir a conversa, não informação sobre a empresa.
+function buildInstrucoesComportamento(config: AgentConfigInput): string {
+  const blocos: string[] = [];
+  if (config.objetivo) blocos.push(`OBJETIVO PRINCIPAL DO AGENTE:\n${config.objetivo}`);
+  if (config.fluxoAtendimento) blocos.push(`FLUXO DE ATENDIMENTO A SEGUIR (adapte a linguagem, mas siga essa sequência):\n${config.fluxoAtendimento}`);
+  if (config.comportamento) blocos.push(`REGRAS DE COMPORTAMENTO QUE O AGENTE DEVE SEMPRE RESPEITAR:\n${config.comportamento}`);
+  return blocos.join("\n\n");
+}
+
 export async function generateSystemPrompt(config: AgentConfigInput): Promise<string> {
   const fatosEmpresa = buildFatosEmpresa(config);
+  const instrucoesComportamento = buildInstrucoesComportamento(config);
   const setor = [config.segmento, config.subsegmento].filter(Boolean).join(" > ");
 
   const prompt = `Crie um system prompt em português para um agente de IA chamado "${config.nome}" que atende clientes via WhatsApp em nome da empresa "${config.empresa ?? "a empresa"}" (segmento: ${setor || "não informado"}).
@@ -63,7 +77,7 @@ Tom de voz do agente: ${TOM_LABEL[config.tom] ?? config.tom}
 
 Fatos sobre a empresa (use exatamente estas informações, sem resumir, sem trocar números/valores/endereços por aproximações):
 ${fatosEmpresa || "Nenhuma informação adicional fornecida."}
-
+${instrucoesComportamento ? `\n${instrucoesComportamento}\n` : ""}
 O system prompt final deve:
 - abrir com a identidade do agente (nome, empresa, tom de voz)
 - incluir, em uma seção separada e claramente identificada, TODOS os fatos acima na íntegra (preços, horário, endereço, serviços, objeções) — não pode perder nenhum dado fornecido
@@ -73,7 +87,8 @@ O system prompt final deve:
 - instruir a ser direto e usar mensagens curtas, adequadas ao WhatsApp (poucas frases por resposta)
 - instruir a avisar quando estiver fora do horário de atendimento, se perguntado
 - instruir a NUNCA inventar preços, endereços, prazos ou qualquer informação que não esteja nos fatos acima — se perguntado algo fora disso, admitir que não tem essa informação e oferecer encaminhar para um humano${setor ? `
-- incluir uma seção com 2-4 boas práticas de condução de conversa e qualificação TÍPICAS do subsetor "${setor}" (ex: que perguntas fazer, que sinais de interesse buscar, que próximo passo sugerir) — isso é só sobre COMO conduzir a conversa, nunca para inventar fatos, preços ou políticas específicas dessa empresa que não foram informados acima` : ""}
+- incluir uma seção com 2-4 boas práticas de condução de conversa e qualificação TÍPICAS do subsetor "${setor}" (ex: que perguntas fazer, que sinais de interesse buscar, que próximo passo sugerir) — isso é só sobre COMO conduzir a conversa, nunca para inventar fatos, preços ou políticas específicas dessa empresa que não foram informados acima` : ""}${instrucoesComportamento ? `
+- incorporar o objetivo, o fluxo de atendimento e/ou as regras de comportamento informados acima como instruções centrais do agente, na ordem/prioridade indicada — essas instruções têm prioridade sobre as boas práticas genéricas do subsetor quando houver conflito` : ""}
 
 Responda APENAS com o texto final do system prompt, sem comentários adicionais.`;
 
