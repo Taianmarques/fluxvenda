@@ -871,6 +871,15 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
     if (name === "concluir_qualificacao_sdr") {
       const resumo = typeof args?.resumo === "string" ? args.resumo.trim() : "";
 
+      // Junta os dados já registrados nas etapas anteriores (perfil, material,
+      // especificações, serviços) numa nota interna única — o vendedor vê tudo de uma vez em
+      // vez de procurar espalhado nas notas individuais de cada etapa.
+      const sdrNotes = await prisma.message.findMany({
+        where: { conversationId, role: "note", content: { startsWith: "SDR:" } },
+        orderBy: { createdAt: "asc" },
+      });
+      const qualificacaoResumo = sdrNotes.map(n => `• ${n.content.replace(/^SDR:\s*/, "")}`).join("\n");
+
       // Cria/avança a oportunidade no funil — etapa seguinte à atual, ou a 2ª etapa do funil
       // padrão se a oportunidade ainda não existe (sinaliza "saiu de novo lead", sem depender
       // do nome exato de cada etapa, que varia por negócio).
@@ -902,11 +911,14 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       // pro primeiro humano que agir).
       await prisma.conversation.update({ where: { id: conversationId }, data: { humanTakeover: true, status: "ATIVO" } });
       await prisma.message.create({
-        data: { conversationId, role: "note", content: `SDR: qualificação concluída pela IA — cliente pronto pro vendedor.${resumo ? ` ${resumo}` : ""}` },
+        data: {
+          conversationId, role: "note",
+          content: `📋 Qualificação concluída pela IA — cliente pronto pro vendedor.\n${qualificacaoResumo || "(nenhum dado registrado antes de concluir)"}${resumo ? `\n• ${resumo}` : ""}`,
+        },
       });
       emitChatEvent(agentConfigId, conversationId);
 
-      return "Qualificação concluída e oportunidade criada/avançada no funil. Na SUA RESPOSTA, avise o cliente com naturalidade que um vendedor vai continuar o atendimento em instantes. Depois desta mensagem você para de responder — o atendimento é humano a partir daqui.";
+      return "Qualificação concluída, nota interna com o resumo criada e oportunidade criada/avançada no funil. Na SUA RESPOSTA, avise o cliente com naturalidade que um vendedor vai continuar o atendimento em instantes. Depois desta mensagem você para de responder — o atendimento é humano a partir daqui.";
     }
 
     if (name === "mover_etapa_funil") {
