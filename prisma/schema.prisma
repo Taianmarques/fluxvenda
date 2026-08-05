@@ -636,6 +636,11 @@ model AgentConfig {
   // de estados determinística).
   fluxoGatilhos Json @default("[]")
 
+  // SDR de qualificação (materiais/marcenaria) — fluxo estruturado opcional, via ferramentas
+  // (não só prompt): perfil do cliente, material, especificações técnicas, serviços
+  // adicionais, depois cria a Oportunidade no funil e transfere pro vendedor.
+  sdrMateriaisEnabled Boolean @default(false)
+
   systemPrompt String?
   active       Boolean @default(false)
 

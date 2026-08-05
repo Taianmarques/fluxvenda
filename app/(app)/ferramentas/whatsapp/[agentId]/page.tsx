@@ -43,6 +43,7 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
               descricaoEmpresa: config.descricaoEmpresa, precos: config.precos, enderecoContato: config.enderecoContato,
               objetivo: config.objetivo, fluxoAtendimento: config.fluxoAtendimento, comportamento: config.comportamento,
               fluxoGatilhos: config.fluxoGatilhos as unknown as { gatilho: string; resposta: string }[],
+              sdrMateriaisEnabled: config.sdrMateriaisEnabled,
               followupEnabled: config.followupEnabled, followupDelaysMinutes: config.followupDelaysMinutes as unknown as number[], emojiEnabled: config.emojiEnabled,
             }}
           />
@@ -101,6 +102,7 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
                 descricaoEmpresa: config.descricaoEmpresa, precos: config.precos, enderecoContato: config.enderecoContato,
                 objetivo: config.objetivo, fluxoAtendimento: config.fluxoAtendimento, comportamento: config.comportamento,
                 fluxoGatilhos: config.fluxoGatilhos as unknown as { gatilho: string; resposta: string }[],
+                sdrMateriaisEnabled: config.sdrMateriaisEnabled,
                 followupEnabled: config.followupEnabled, followupDelaysMinutes: config.followupDelaysMinutes as unknown as number[], emojiEnabled: config.emojiEnabled,
               }}
             />
@@ -198,6 +200,7 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
               descricaoEmpresa: config.descricaoEmpresa, precos: config.precos, enderecoContato: config.enderecoContato,
               objetivo: config.objetivo, fluxoAtendimento: config.fluxoAtendimento, comportamento: config.comportamento,
               fluxoGatilhos: config.fluxoGatilhos as unknown as { gatilho: string; resposta: string }[],
+              sdrMateriaisEnabled: config.sdrMateriaisEnabled,
               followupEnabled: config.followupEnabled, followupDelaysMinutes: config.followupDelaysMinutes as unknown as number[], emojiEnabled: config.emojiEnabled,
             }}
           />

@@ -20,6 +20,7 @@ type InitialConfig = {
   fluxoAtendimento: string;
   comportamento: string;
   fluxoGatilhos: { gatilho: string; resposta: string }[];
+  sdrMateriaisEnabled: boolean;
   followupEnabled: boolean;
   followupDelaysMinutes: number[];
   emojiEnabled: boolean;
@@ -169,6 +170,7 @@ export function WhatsappAgentClient({
   const [fluxoGatilhos, setFluxoGatilhos] = useState<GatilhoRow[]>(
     initialConfig?.fluxoGatilhos?.length ? initialConfig.fluxoGatilhos : [{ gatilho: "", resposta: "" }]
   );
+  const [sdrMateriaisEnabled, setSdrMateriaisEnabled] = useState(initialConfig?.sdrMateriaisEnabled ?? false);
   const [followupEnabled, setFollowupEnabled] = useState(initialConfig?.followupEnabled ?? true);
   const [emojiEnabled, setEmojiEnabled] = useState(initialConfig?.emojiEnabled ?? false);
   const [followupDelays, setFollowupDelays] = useState<DelayRow[]>(
@@ -217,6 +219,7 @@ export function WhatsappAgentClient({
           descricaoEmpresa, enderecoContato, precos,
           objetivo, fluxoAtendimento, comportamento,
           fluxoGatilhos: fluxoGatilhos.filter(r => r.gatilho.trim() && r.resposta.trim()),
+          sdrMateriaisEnabled,
           servicos: splitLines(servicos),
           objecoes: splitLines(objecoes),
           horario,
@@ -284,6 +287,7 @@ export function WhatsappAgentClient({
           descricaoEmpresa, enderecoContato, precos,
           objetivo, fluxoAtendimento, comportamento,
           fluxoGatilhos: fluxoGatilhos.filter(r => r.gatilho.trim() && r.resposta.trim()),
+          sdrMateriaisEnabled,
           servicos: splitLines(servicos),
           objecoes: splitLines(objecoes),
           horario,
@@ -540,6 +544,17 @@ export function WhatsappAgentClient({
         <div className="space-y-4">
           <p className="font-semibold">4. Objetivo e comportamento</p>
           <p className="text-sm text-gray-400">Opcional — instruções diretas pro agente, além das informações da empresa. Deixe em branco pra usar só o padrão.</p>
+
+          <div className="border border-gray-800 rounded-xl p-3 space-y-1.5">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={sdrMateriaisEnabled} onChange={e => setSdrMateriaisEnabled(e.target.checked)} className="w-4 h-4" />
+              <span className="text-sm font-medium">Ativar SDR de qualificação</span>
+            </label>
+            <p className="text-xs text-gray-500">
+              A IA identifica o perfil do cliente (marceneiro, arquiteto, empresa ou consumidor final), o material procurado, especificações técnicas (cor, espessura, medidas, quantidade) e serviços adicionais (corte, fitamento) — depois cria a oportunidade no funil e transfere pro vendedor. Etapas garantidas por ferramentas, não só instrução de texto.
+            </p>
+          </div>
+
           <div>
             <label className="text-sm text-gray-400 block mb-1">Objetivo principal</label>
             <textarea

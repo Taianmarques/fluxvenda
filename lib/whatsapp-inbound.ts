@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import {
   runAgent, runAgentWithImage, runAgentWithTools, classifyLeadQualified,
   SCHEDULING_TOOLS, COMMERCE_TOOLS, BILLING_TOOLS, PROSPECTING_TOOLS, POSVENDA_TOOLS, PIPELINE_TOOLS, DEPARTAMENTO_TOOLS,
-  PREVENDA_VEICULO_TOOLS,
+  PREVENDA_VEICULO_TOOLS, SDR_MATERIAIS_TOOLS,
 } from "@/lib/agent-engine";
 import { textToSpeech } from "@/lib/elevenlabs";
 import { logTokenUsage, isOverQuota } from "@/lib/token-usage";
@@ -190,6 +190,15 @@ function buildPosVendaContext(reviewLink: string): string {
 - Após uma compra, o cliente pode receber uma pesquisa de satisfação (nota de 0 a 5). Quando ele responder com uma nota ou der feedback claro sobre a experiência, chame registrar_avaliacao com a nota e o comentário dele.
 - Siga exatamente a orientação que a ferramenta retornar (agradecer, pedir desculpas ou enviar o link de avaliação).
 - Se o cliente relatar problema com o pedido (defeito, atraso, item errado), demonstre empatia, colete os detalhes e registre a avaliação com nota baixa e o problema no comentário — a equipe é avisada automaticamente.${reviewLink ? `\n- Link público de avaliação da empresa: ${reviewLink} — só envie quando a ferramenta orientar (nota alta).` : ""}`;
+}
+
+function buildSdrMateriaisContext(): string {
+  return `\n\nFLUXO DE PRÉ-VENDAS (SDR) — siga essa ordem, sem pular etapas:
+1. Identifique o perfil do cliente (marceneiro, arquiteto, empresa ou consumidor final) e chame registrar_perfil_lead.
+2. Descubra qual material ele procura e chame registrar_material_interesse.
+3. Colete especificações técnicas (cor, espessura, medidas, quantidade) — pode chamar registrar_especificacoes_tecnicas mais de uma vez, conforme as respostas forem chegando.
+4. Pergunte se precisa de corte e/ou fitamento de borda e chame registrar_servicos_adicionais.
+5. Chame concluir_qualificacao_sdr pra encerrar — isso cria a oportunidade no funil e transfere pro vendedor, que recebe tudo que você já registrou nas etapas anteriores (não repita os dados no resumo).`;
 }
 
 const CAMBIO_LABEL: Record<string, string> = { MANUAL: "Manual", AUTOMATICO: "Automático" };
@@ -800,6 +809,106 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       return "Pré-venda transferida pro vendedor. Na SUA RESPOSTA, avise o cliente com naturalidade que um vendedor vai continuar o atendimento em instantes. Depois desta mensagem você para de responder — o atendimento é humano a partir daqui.";
     }
 
+    if (name === "registrar_perfil_lead") {
+      const perfil = ["MARCENEIRO", "ARQUITETO", "EMPRESA", "CONSUMIDOR_FINAL"].includes(args?.perfil) ? args.perfil : null;
+      if (!perfil) return "Erro: informe o perfil do cliente (marceneiro, arquiteto, empresa ou consumidor final) antes de registrar.";
+
+      const perfilLabel = { MARCENEIRO: "Marceneiro", ARQUITETO: "Arquiteto", EMPRESA: "Empresa", CONSUMIDOR_FINAL: "Consumidor final" }[perfil as string];
+      await prisma.message.create({ data: { conversationId, role: "note", content: `SDR: perfil do cliente — ${perfilLabel}.` } });
+      emitChatEvent(agentConfigId, conversationId);
+      return "Perfil registrado. Continue entendendo o que o cliente procura.";
+    }
+
+    if (name === "registrar_material_interesse") {
+      const material = typeof args?.material === "string" ? args.material.trim() : "";
+      if (!material) return "Erro: identifique o material que o cliente procura antes de registrar.";
+      const observacoes = typeof args?.observacoes === "string" ? args.observacoes.trim() : "";
+
+      await prisma.message.create({
+        data: { conversationId, role: "note", content: `SDR: material de interesse — ${material}.${observacoes ? ` ${observacoes}` : ""}` },
+      });
+      emitChatEvent(agentConfigId, conversationId);
+      return "Material registrado. Colete as especificações técnicas (cor, espessura, medidas, quantidade).";
+    }
+
+    if (name === "registrar_especificacoes_tecnicas") {
+      const cor = typeof args?.cor === "string" ? args.cor.trim() : "";
+      const espessura = typeof args?.espessura === "string" ? args.espessura.trim() : "";
+      const medidas = typeof args?.medidas === "string" ? args.medidas.trim() : "";
+      const quantidade = typeof args?.quantidade === "string" ? args.quantidade.trim() : "";
+      if (!cor && !espessura && !medidas && !quantidade) return "Erro: informe ao menos uma especificação (cor, espessura, medidas ou quantidade) antes de registrar.";
+
+      const linhas = [
+        cor ? `Cor: ${cor}.` : null,
+        espessura ? `Espessura: ${espessura}.` : null,
+        medidas ? `Medidas: ${medidas}.` : null,
+        quantidade ? `Quantidade: ${quantidade}.` : null,
+      ].filter(Boolean).join(" ");
+
+      await prisma.message.create({ data: { conversationId, role: "note", content: `SDR: especificações técnicas — ${linhas}` } });
+      emitChatEvent(agentConfigId, conversationId);
+      return "Especificações registradas. Pergunte se o cliente precisa de corte ou fitamento de borda.";
+    }
+
+    if (name === "registrar_servicos_adicionais") {
+      if (typeof args?.corte !== "boolean" || typeof args?.fitamento !== "boolean") {
+        return "Erro: pergunte se o cliente precisa de corte e de fitamento de borda antes de registrar.";
+      }
+      const corte = args.corte as boolean;
+      const fitamento = args.fitamento as boolean;
+      const observacoes = typeof args?.observacoes === "string" ? args.observacoes.trim() : "";
+
+      await prisma.message.create({
+        data: {
+          conversationId, role: "note",
+          content: `SDR: serviços adicionais — Corte: ${corte ? "sim" : "não"}. Fitamento de borda: ${fitamento ? "sim" : "não"}.${observacoes ? ` ${observacoes}` : ""}`,
+        },
+      });
+      emitChatEvent(agentConfigId, conversationId);
+      return "Serviços registrados. Se já tiver perfil, material e especificações, chame concluir_qualificacao_sdr pra encerrar e transferir pro vendedor.";
+    }
+
+    if (name === "concluir_qualificacao_sdr") {
+      const resumo = typeof args?.resumo === "string" ? args.resumo.trim() : "";
+
+      // Cria/avança a oportunidade no funil — etapa seguinte à atual, ou a 2ª etapa do funil
+      // padrão se a oportunidade ainda não existe (sinaliza "saiu de novo lead", sem depender
+      // do nome exato de cada etapa, que varia por negócio).
+      const opp = await prisma.opportunity.findFirst({
+        where: { conversationId, wonAt: null },
+        orderBy: { createdAt: "desc" },
+        include: { stage: { select: { pipelineId: true, order: true } } },
+      });
+      const pipeline = opp?.stage
+        ? await prisma.pipeline.findUnique({ where: { id: opp.stage.pipelineId }, include: { stages: { orderBy: { order: "asc" } } } })
+        : await prisma.pipeline.findFirst({ where: { agentConfigId }, orderBy: { order: "asc" }, include: { stages: { orderBy: { order: "asc" } } } });
+
+      if (pipeline && pipeline.stages.length > 0) {
+        const targetStage = opp?.stage
+          ? (pipeline.stages.find(s => s.order > opp.stage!.order) ?? pipeline.stages[pipeline.stages.length - 1])
+          : (pipeline.stages[1] ?? pipeline.stages[0]);
+
+        if (opp) {
+          if (opp.stageId !== targetStage.id) {
+            await prisma.opportunity.update({ where: { id: opp.id }, data: { stageId: targetStage.id, stageEnteredAt: new Date() } });
+          }
+        } else {
+          await prisma.opportunity.create({ data: { conversationId, stageId: targetStage.id, stageEnteredAt: new Date(), dealValue: 0 } });
+        }
+      }
+
+      // Não força atribuição — quem assume depende do leadDistributionMode já configurado
+      // (RODIZIO/IA_QUALIFICACAO já teriam atribuído antes; PRIMEIRO_A_ASSUMIR/MANUAL ficam
+      // pro primeiro humano que agir).
+      await prisma.conversation.update({ where: { id: conversationId }, data: { humanTakeover: true, status: "ATIVO" } });
+      await prisma.message.create({
+        data: { conversationId, role: "note", content: `SDR: qualificação concluída pela IA — cliente pronto pro vendedor.${resumo ? ` ${resumo}` : ""}` },
+      });
+      emitChatEvent(agentConfigId, conversationId);
+
+      return "Qualificação concluída e oportunidade criada/avançada no funil. Na SUA RESPOSTA, avise o cliente com naturalidade que um vendedor vai continuar o atendimento em instantes. Depois desta mensagem você para de responder — o atendimento é humano a partir daqui.";
+    }
+
     if (name === "mover_etapa_funil") {
       const etapaNome = typeof args?.etapa === "string" ? args.etapa.trim() : "";
       if (!etapaNome) return "Erro: informe o nome da etapa de destino.";
@@ -1380,6 +1489,7 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
           return true; // transferir_vendedor_veiculo — sempre ativa
         })
       : []),
+    ...(config.sdrMateriaisEnabled ? SDR_MATERIAIS_TOOLS : []),
   ];
 
   // Instrução de emoji injetada em tempo de execução — não exige regenerar o systemPrompt
@@ -1439,7 +1549,8 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
       + (config.posVendaEnabled ? buildPosVendaContext(config.posVendaReviewLink) : "")
       + (config.pipelineAutoAvancar ? await buildPipelineContext(config.id, conversation.id) : "")
       + (departamentos.length > 0 ? buildDepartamentosContext(departamentos) : "")
-      + (isProspect ? (await buildProspeccaoContext(config.id, contactNumber) ?? "") : "");
+      + (isProspect ? (await buildProspeccaoContext(config.id, contactNumber) ?? "") : "")
+      + (config.sdrMateriaisEnabled ? buildSdrMateriaisContext() : "");
     const result = await runAgentWithTools(
       activeSystemPrompt + extraContext + brevityInstruction,
       historyForAgent,

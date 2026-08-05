@@ -448,6 +448,87 @@ export const PREVENDA_VEICULO_TOOLS = [
   },
 ];
 
+// SDR de qualificação (materiais/marcenaria): identifica o perfil do cliente, o material que
+// procura, especificações técnicas e serviços adicionais — cada etapa grava uma nota na
+// conversa — e ao final cria/move a Oportunidade no funil e transfere pro vendedor. Só
+// exposta quando AgentConfig.sdrMateriaisEnabled (ver whatsapp-inbound.ts).
+export const SDR_MATERIAIS_TOOLS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "registrar_perfil_lead",
+      description: "Registra o perfil do cliente, assim que ficar claro na conversa — geralmente uma das primeiras coisas a entender.",
+      parameters: {
+        type: "object",
+        properties: {
+          perfil: { type: "string", enum: ["MARCENEIRO", "ARQUITETO", "EMPRESA", "CONSUMIDOR_FINAL"], description: "Perfil do cliente" },
+        },
+        required: ["perfil"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "registrar_material_interesse",
+      description: "Registra o material que o cliente está procurando (MDF, compensado, ferragem, etc.), assim que ele der detalhes suficientes.",
+      parameters: {
+        type: "object",
+        properties: {
+          material: { type: "string", description: "Material ou produto que o cliente procura (ex: \"MDF Branco\", \"compensado naval\", \"dobradiças\")" },
+          observacoes: { type: "string", description: "Detalhes extras relevantes que não cabem nos outros campos, se houver" },
+        },
+        required: ["material"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "registrar_especificacoes_tecnicas",
+      description: "Registra as especificações técnicas do pedido, conforme o cliente for informando — pode chamar mais de uma vez se as informações chegarem aos poucos, sempre com os dados mais atualizados.",
+      parameters: {
+        type: "object",
+        properties: {
+          cor: { type: "string", description: "Cor ou acabamento desejado, se informado" },
+          espessura: { type: "string", description: "Espessura desejada (ex: 15mm, 18mm), se informado" },
+          medidas: { type: "string", description: "Medidas/dimensões necessárias, se informado" },
+          quantidade: { type: "string", description: "Quantidade desejada (chapas, unidades, etc.), se informado" },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "registrar_servicos_adicionais",
+      description: "Registra se o cliente precisa de corte e/ou fitamento de borda — pergunte isso explicitamente antes de chamar.",
+      parameters: {
+        type: "object",
+        properties: {
+          corte: { type: "boolean", description: "Se o cliente precisa de serviço de corte" },
+          fitamento: { type: "boolean", description: "Se o cliente precisa de fitamento de borda" },
+          observacoes: { type: "string", description: "Detalhes extras sobre os serviços, se houver" },
+        },
+        required: ["corte", "fitamento"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "concluir_qualificacao_sdr",
+      description: "Encerra a qualificação, cria a oportunidade no funil de vendas e transfere a conversa pro vendedor — use depois de já ter registrado perfil, material e especificações (serviços adicionais se relevante), ou se o cliente pedir explicitamente pra falar com um vendedor. Depois de chamar essa função você para de responder — o vendedor assume a partir daí.",
+      parameters: {
+        type: "object",
+        properties: {
+          resumo: { type: "string", description: "Algo relevante que não coube nas ferramentas anteriores, se houver" },
+        },
+      },
+    },
+  },
+];
+
 export const PIPELINE_TOOLS = [
   {
     type: "function" as const,

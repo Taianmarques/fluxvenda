@@ -34,6 +34,7 @@ const schema = z.object({
     gatilho: z.string().max(300),
     resposta: z.string().max(1000),
   })).max(30).default([]),
+  sdrMateriaisEnabled: z.boolean().default(false),
   followupEnabled: z.boolean().default(true),
   followupDelaysMinutes: z.array(z.number().int().min(1).max(43200)).max(10).default([1440]),
   emojiEnabled: z.boolean().default(false),
@@ -52,7 +53,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
 
   const {
     nome, tom, servicos, objecoes, horario, descricaoEmpresa, precos, enderecoContato,
-    objetivo, fluxoAtendimento, comportamento, fluxoGatilhos,
+    objetivo, fluxoAtendimento, comportamento, fluxoGatilhos, sdrMateriaisEnabled,
     followupEnabled, followupDelaysMinutes, emojiEnabled,
   } = body.data;
 
@@ -78,7 +79,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
     where: { id: agentId },
     data: {
       nome, tom, servicos, objecoes, horario, descricaoEmpresa, precos, enderecoContato,
-      objetivo, fluxoAtendimento, comportamento, fluxoGatilhos,
+      objetivo, fluxoAtendimento, comportamento, fluxoGatilhos, sdrMateriaisEnabled,
       systemPrompt, followupEnabled, followupDelaysMinutes, emojiEnabled,
     },
   });
