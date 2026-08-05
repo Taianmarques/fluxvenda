@@ -1360,6 +1360,12 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
   const conhecimentoContext = await buildConhecimentoContext(config.id);
   const activeSystemPrompt = config.systemPrompt + emojiInstruction + stageInstruction + conhecimentoContext;
 
+  // Reforço de formatação de mensagem — reafirmado SEMPRE por último (depois de todo o
+  // contexto extra de ferramentas/catálogo/agendamento), porque prompts longos diluem
+  // instruções de comportamento enterradas no meio do texto. A posição final aumenta a
+  // aderência do modelo a essa regra.
+  const brevityInstruction = "\n\nLEMBRETE FINAL, SEMPRE VÁLIDO: mensagens de no máximo 2-3 linhas curtas. NUNCA mais de uma pergunta por mensagem — pergunte uma coisa de cada vez e espere a resposta antes da próxima pergunta, mesmo que precise coletar várias informações.";
+
   if (await isOverQuota(config.teamId)) {
     await adapter.sendText(contactNumber, "Serviço de IA temporariamente indisponível. Por favor, aguarde ou entre em contato com nossa equipe.");
     return;
@@ -1367,7 +1373,7 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
 
   let reply: string;
   if (imageUrl) {
-    const result = await runAgentWithImage(activeSystemPrompt, historyForAgent, imageUrl, caption);
+    const result = await runAgentWithImage(activeSystemPrompt + brevityInstruction, historyForAgent, imageUrl, caption);
     reply = result.reply;
     logTokenUsage({ teamId: config.teamId, provider: "openai", model: "gpt-4o-mini", feature: "whatsapp_agent", ...result.usage });
   } else if (tools.length > 0) {
@@ -1384,7 +1390,7 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
       + (departamentos.length > 0 ? buildDepartamentosContext(departamentos) : "")
       + (isProspect ? (await buildProspeccaoContext(config.id, contactNumber) ?? "") : "");
     const result = await runAgentWithTools(
-      activeSystemPrompt + extraContext,
+      activeSystemPrompt + extraContext + brevityInstruction,
       historyForAgent,
       text,
       tools,
@@ -1393,7 +1399,7 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
     reply = result.reply;
     logTokenUsage({ teamId: config.teamId, provider: "openai", model: "gpt-4o-mini", feature: "whatsapp_agent", ...result.usage });
   } else {
-    const result = await runAgent(activeSystemPrompt, historyForAgent, text);
+    const result = await runAgent(activeSystemPrompt + brevityInstruction, historyForAgent, text);
     reply = result.reply;
     logTokenUsage({ teamId: config.teamId, provider: "openai", model: "gpt-4o-mini", feature: "whatsapp_agent", ...result.usage });
   }
