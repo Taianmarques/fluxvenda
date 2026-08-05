@@ -1164,6 +1164,28 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
   };
 }
 
+// Rede de segurança pra bolha com 2+ perguntas coladas na mesma frase/parágrafo (sem linha em
+// branco entre elas) — corta logo depois de cada "?", pra nunca sobrar mais de uma pergunta
+// por bolha mesmo quando a IA não separa como instruído.
+function splitQuestionsFurther(chunk: string): string[] {
+  if ((chunk.match(/\?/g) ?? []).length < 2) return [chunk];
+
+  const sentences = chunk.match(/[^.!?]+[.!?]+(?:\s+|$)|[^.!?]+$/g) ?? [chunk];
+  const bubbles: string[] = [];
+  let current = "";
+  for (const raw of sentences) {
+    const sentence = raw.trim();
+    if (!sentence) continue;
+    current = current ? `${current} ${sentence}` : sentence;
+    if (sentence.includes("?")) {
+      bubbles.push(current);
+      current = "";
+    }
+  }
+  if (current) bubbles.push(current);
+  return bubbles;
+}
+
 // Quebra a resposta da IA em várias mensagens do WhatsApp (cada bolha separada), em vez de um
 // texto único longo — a IA é instruída (ver brevityInstruction) a separar cada parte com uma
 // linha em branco. Sem isso, "mandar mensagens curtas" depende só da IA não escrever um
@@ -1172,7 +1194,8 @@ function splitReplyIntoChunks(reply: string): string[] {
   return reply
     .split(/\n\s*\n/)
     .map(p => p.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .flatMap(splitQuestionsFurther);
 }
 
 const SESSION_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -1375,7 +1398,7 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
   // contexto extra de ferramentas/catálogo/agendamento), porque prompts longos diluem
   // instruções de comportamento enterradas no meio do texto. A posição final aumenta a
   // aderência do modelo a essa regra.
-  const brevityInstruction = "\n\nLEMBRETE FINAL, SEMPRE VÁLIDO: cada mensagem que você escrever vira uma bolha separada no WhatsApp, exatamente como uma pessoa mandando várias mensagens seguidas. Formato obrigatório: cada bolha tem no máximo 2-3 linhas curtas, e bolhas diferentes são separadas por uma linha em branco (pulo de linha duplo) na sua resposta. NUNCA coloque mais de uma pergunta na mesma bolha — se precisar pedir várias informações, cada pergunta vira sua própria bolha (separada por linha em branco), nunca todas juntas numa bolha só.";
+  const brevityInstruction = "\n\nLEMBRETE FINAL, SEMPRE VÁLIDO: cada mensagem que você escrever vira uma bolha separada no WhatsApp, exatamente como uma pessoa mandando várias mensagens seguidas. Formato obrigatório: cada bolha tem no máximo 2-3 linhas curtas, e bolhas diferentes são separadas por uma linha em branco (pulo de linha duplo) na sua resposta. NUNCA coloque mais de uma pergunta na mesma bolha — se precisar pedir várias informações, cada pergunta vira sua própria bolha (separada por linha em branco), nunca todas juntas numa bolha só. Isso vale mesmo quando você não usa \"?\": frases como \"me informe a espessura e a quantidade\" ou \"preciso da medida e do prazo\" também são dois pedidos numa frase só — separe cada pedido em uma bolha, um de cada vez, mesmo em forma de afirmação.";
 
   if (await isOverQuota(config.teamId)) {
     await adapter.sendText(contactNumber, "Serviço de IA temporariamente indisponível. Por favor, aguarde ou entre em contato com nossa equipe.");
