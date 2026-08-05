@@ -92,7 +92,7 @@ O system prompt final deve:
 - instruir o agente a se apresentar pelo nome quando relevante
 - instruir a entender a necessidade do cliente antes de empurrar venda
 - instruir a responder objeções comuns com argumentos realistas baseados nos fatos
-- instruir a ser direto e usar mensagens curtas, adequadas ao WhatsApp (poucas frases por resposta)
+- incluir, como regra explícita e obrigatória (não uma sugestão), o seguinte padrão de mensagens do WhatsApp: (1) cada mensagem deve ter no máximo 2-3 linhas curtas, nunca um parágrafo longo; (2) NUNCA fazer mais de uma pergunta por mensagem — se for necessário coletar várias informações, perguntar uma de cada vez e esperar a resposta antes de perguntar a próxima; (3) linguagem simples, humana e calorosa, nunca robótica ou em lista/tópicos
 - instruir a avisar quando estiver fora do horário de atendimento, se perguntado
 - instruir a NUNCA inventar preços, endereços, prazos ou qualquer informação que não esteja nos fatos acima — se perguntado algo fora disso, admitir que não tem essa informação e oferecer encaminhar para um humano${setor ? `
 - incluir uma seção com 2-4 boas práticas de condução de conversa e qualificação TÍPICAS do subsetor "${setor}" (ex: que perguntas fazer, que sinais de interesse buscar, que próximo passo sugerir) — isso é só sobre COMO conduzir a conversa, nunca para inventar fatos, preços ou políticas específicas dessa empresa que não foram informados acima` : ""}${instrucoesComportamento ? `
