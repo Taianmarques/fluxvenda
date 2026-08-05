@@ -1165,8 +1165,8 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
 }
 
 // Rede de segurança pra bolha com 2+ perguntas coladas na mesma frase/parágrafo (sem linha em
-// branco entre elas) — corta logo depois de cada "?", pra nunca sobrar mais de uma pergunta
-// por bolha mesmo quando a IA não separa como instruído.
+// branco entre elas) — separa em uma sentença por "?", pra o corte de UMA pergunta por resposta
+// (ver enforceOneQuestion) funcionar mesmo quando a IA não separa como instruído.
 function splitQuestionsFurther(chunk: string): string[] {
   if ((chunk.match(/\?/g) ?? []).length < 2) return [chunk];
 
@@ -1186,16 +1186,33 @@ function splitQuestionsFurther(chunk: string): string[] {
   return bubbles;
 }
 
+// O pedido é literal: UMA pergunta por resposta, esperar o cliente responder antes de fazer a
+// próxima — não é só formatar em bolhas separadas, é não perguntar a segunda coisa nessa vez.
+// Depois da primeira bolha com "?", descarta qualquer bolha seguinte que também tenha "?"
+// (bolhas sem pergunta, tipo um fechamento, continuam passando).
+function enforceOneQuestion(chunks: string[]): string[] {
+  let askedAlready = false;
+  const result: string[] = [];
+  for (const chunk of chunks) {
+    const hasQuestion = chunk.includes("?");
+    if (askedAlready && hasQuestion) continue;
+    result.push(chunk);
+    if (hasQuestion) askedAlready = true;
+  }
+  return result;
+}
+
 // Quebra a resposta da IA em várias mensagens do WhatsApp (cada bolha separada), em vez de um
 // texto único longo — a IA é instruída (ver brevityInstruction) a separar cada parte com uma
 // linha em branco. Sem isso, "mandar mensagens curtas" depende só da IA não escrever um
 // parágrafo longo, o que ela nem sempre respeita; aqui o corte é garantido em código.
 function splitReplyIntoChunks(reply: string): string[] {
-  return reply
+  const chunks = reply
     .split(/\n\s*\n/)
     .map(p => p.trim())
     .filter(Boolean)
     .flatMap(splitQuestionsFurther);
+  return enforceOneQuestion(chunks);
 }
 
 const SESSION_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -1398,7 +1415,7 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
   // contexto extra de ferramentas/catálogo/agendamento), porque prompts longos diluem
   // instruções de comportamento enterradas no meio do texto. A posição final aumenta a
   // aderência do modelo a essa regra.
-  const brevityInstruction = "\n\nLEMBRETE FINAL, SEMPRE VÁLIDO: cada mensagem que você escrever vira uma bolha separada no WhatsApp, exatamente como uma pessoa mandando várias mensagens seguidas. Formato obrigatório: cada bolha tem no máximo 2-3 linhas curtas, e bolhas diferentes são separadas por uma linha em branco (pulo de linha duplo) na sua resposta. NUNCA coloque mais de uma pergunta na mesma bolha — se precisar pedir várias informações, cada pergunta vira sua própria bolha (separada por linha em branco), nunca todas juntas numa bolha só. Isso vale mesmo quando você não usa \"?\": frases como \"me informe a espessura e a quantidade\" ou \"preciso da medida e do prazo\" também são dois pedidos numa frase só — separe cada pedido em uma bolha, um de cada vez, mesmo em forma de afirmação.";
+  const brevityInstruction = "\n\nLEMBRETE FINAL, SEMPRE VÁLIDO: cada mensagem que você escrever vira uma bolha separada no WhatsApp, exatamente como uma pessoa mandando várias mensagens seguidas. Formato obrigatório: cada bolha tem no máximo 2-3 linhas curtas, e bolhas diferentes são separadas por uma linha em branco (pulo de linha duplo) na sua resposta. REGRA MAIS IMPORTANTE: você só pode fazer UMA pergunta por resposta, e ponto final — não é sobre formatar em bolhas diferentes, é sobre PARAR depois de fazer essa pergunta e esperar o cliente responder antes de perguntar a próxima coisa. Se precisar de várias informações (ex: espessura, medida, quantidade), pergunte só a primeira agora; as outras ficam pra depois que o cliente responder essa, uma de cada vez, mesmo que isso alongue a conversa em mais mensagens. Isso vale mesmo quando o pedido não usa \"?\": frases como \"me informe a espessura e a quantidade\" também são dois pedidos — se for perguntar, pergunte só o primeiro.";
 
   if (await isOverQuota(config.teamId)) {
     await adapter.sendText(contactNumber, "Serviço de IA temporariamente indisponível. Por favor, aguarde ou entre em contato com nossa equipe.");
