@@ -1164,6 +1164,17 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
   };
 }
 
+// Quebra a resposta da IA em várias mensagens do WhatsApp (cada bolha separada), em vez de um
+// texto único longo — a IA é instruída (ver brevityInstruction) a separar cada parte com uma
+// linha em branco. Sem isso, "mandar mensagens curtas" depende só da IA não escrever um
+// parágrafo longo, o que ela nem sempre respeita; aqui o corte é garantido em código.
+function splitReplyIntoChunks(reply: string): string[] {
+  return reply
+    .split(/\n\s*\n/)
+    .map(p => p.trim())
+    .filter(Boolean);
+}
+
 const SESSION_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export async function processIncomingMessage(config: AgentConfigFull, msg: IncomingMessage, adapter: ChannelAdapter, opts?: { enforceSessionWindow?: boolean }): Promise<void> {
@@ -1364,7 +1375,7 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
   // contexto extra de ferramentas/catálogo/agendamento), porque prompts longos diluem
   // instruções de comportamento enterradas no meio do texto. A posição final aumenta a
   // aderência do modelo a essa regra.
-  const brevityInstruction = "\n\nLEMBRETE FINAL, SEMPRE VÁLIDO: mensagens de no máximo 2-3 linhas curtas. NUNCA mais de uma pergunta por mensagem — pergunte uma coisa de cada vez e espere a resposta antes da próxima pergunta, mesmo que precise coletar várias informações.";
+  const brevityInstruction = "\n\nLEMBRETE FINAL, SEMPRE VÁLIDO: cada mensagem que você escrever vira uma bolha separada no WhatsApp, exatamente como uma pessoa mandando várias mensagens seguidas. Formato obrigatório: cada bolha tem no máximo 2-3 linhas curtas, e bolhas diferentes são separadas por uma linha em branco (pulo de linha duplo) na sua resposta. NUNCA coloque mais de uma pergunta na mesma bolha — se precisar pedir várias informações, cada pergunta vira sua própria bolha (separada por linha em branco), nunca todas juntas numa bolha só.";
 
   if (await isOverQuota(config.teamId)) {
     await adapter.sendText(contactNumber, "Serviço de IA temporariamente indisponível. Por favor, aguarde ou entre em contato com nossa equipe.");
@@ -1404,9 +1415,6 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
     logTokenUsage({ teamId: config.teamId, provider: "openai", model: "gpt-4o-mini", feature: "whatsapp_agent", ...result.usage });
   }
 
-  const assistantMsg = await prisma.message.create({ data: { conversationId: conversation.id, role: "assistant", content: reply } });
-  emitChatEvent(config.id, conversation.id);
-
   // IA decide quando o lead está qualificado e atribui a um atendente (rodízio), se ainda não tiver dono
   if (config.leadDistributionMode === "IA_QUALIFICACAO" && !conversation.assignedToId) {
     try {
@@ -1420,22 +1428,37 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
   // Com áudio ativado, cada resposta sai OU como voz OU como texto (nunca os dois) —
   // a porcentagem decide a chance de sair em áudio; se o TTS falhar, cai pro texto.
   const sendAsAudio = config.whatsappVoiceEnabled && config.elevenlabsApiKey && Math.random() * 100 < config.whatsappVoicePercent;
+  const chunks = splitReplyIntoChunks(reply);
 
-  let providerId: string | null = null;
   if (sendAsAudio) {
+    const assistantMsg = await prisma.message.create({ data: { conversationId: conversation.id, role: "assistant", content: reply } });
+    emitChatEvent(config.id, conversation.id);
+    let providerId: string | null = null;
     try {
-      const audioBuffer = await textToSpeech(reply, { apiKey: config.elevenlabsApiKey!, voiceId: config.elevenlabsVoiceId ?? undefined });
+      // Linhas em branco são só divisão de bolhas de texto, não pausas de fala — junta antes do TTS.
+      const audioBuffer = await textToSpeech(chunks.join(" "), { apiKey: config.elevenlabsApiKey!, voiceId: config.elevenlabsVoiceId ?? undefined });
       providerId = await adapter.sendMedia(contactNumber, "audio", audioBuffer.toString("base64"));
     } catch (err) {
       console.error("[whatsapp-inbound] erro ao enviar áudio ElevenLabs, caindo para texto:", err);
       providerId = await adapter.sendText(contactNumber, reply);
     }
+    if (providerId) {
+      await prisma.message.update({ where: { id: assistantMsg.id }, data: { waMessageId: providerId } }).catch(() => {});
+    }
   } else {
-    providerId = await adapter.sendText(contactNumber, reply);
-  }
-
-  // Guarda o id do provedor pra resposta da IA poder ser citada depois (pelo cliente ou pelo atendente)
-  if (providerId) {
-    await prisma.message.update({ where: { id: assistantMsg.id }, data: { waMessageId: providerId } }).catch(() => {});
+    // Cada bolha (separada por linha em branco na resposta da IA) vira sua própria mensagem no
+    // WhatsApp e no CRM, com uma pausa curta entre elas — como alguém digitando várias mensagens
+    // seguidas, não um bloco de texto único despejado de uma vez.
+    for (let i = 0; i < chunks.length; i++) {
+      const chunkMsg = await prisma.message.create({ data: { conversationId: conversation.id, role: "assistant", content: chunks[i] } });
+      emitChatEvent(config.id, conversation.id);
+      const providerId = await adapter.sendText(contactNumber, chunks[i]);
+      if (providerId) {
+        await prisma.message.update({ where: { id: chunkMsg.id }, data: { waMessageId: providerId } }).catch(() => {});
+      }
+      if (i < chunks.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1100));
+      }
+    }
   }
 }
