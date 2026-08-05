@@ -35,6 +35,7 @@ export type AgentConfigInput = {
   objetivo?: string;
   fluxoAtendimento?: string;
   comportamento?: string;
+  fluxoGatilhos?: { gatilho: string; resposta: string }[];
 };
 
 const TOM_LABEL: Record<string, string> = {
@@ -63,6 +64,13 @@ function buildInstrucoesComportamento(config: AgentConfigInput): string {
   if (config.objetivo) blocos.push(`OBJETIVO PRINCIPAL DO AGENTE:\n${config.objetivo}`);
   if (config.fluxoAtendimento) blocos.push(`FLUXO DE ATENDIMENTO A SEGUIR (adapte a linguagem, mas siga essa sequência):\n${config.fluxoAtendimento}`);
   if (config.comportamento) blocos.push(`REGRAS DE COMPORTAMENTO QUE O AGENTE DEVE SEMPRE RESPEITAR:\n${config.comportamento}`);
+  if (config.fluxoGatilhos?.length) {
+    const regras = config.fluxoGatilhos
+      .filter(r => r.gatilho.trim() && r.resposta.trim())
+      .map(r => `- Quando "${r.gatilho.trim()}" → ${r.resposta.trim()}`)
+      .join("\n");
+    if (regras) blocos.push(`REGRAS DE GATILHO (aplique quando o contexto da conversa indicar cada situação — use julgamento, não é correspondência exata de texto):\n${regras}`);
+  }
   return blocos.join("\n\n");
 }
 

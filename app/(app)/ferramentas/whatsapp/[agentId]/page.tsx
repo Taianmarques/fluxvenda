@@ -42,6 +42,7 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
               horario: config.horario, uazapiInstance: config.uazapiInstance, isConfigured: Boolean(config.systemPrompt),
               descricaoEmpresa: config.descricaoEmpresa, precos: config.precos, enderecoContato: config.enderecoContato,
               objetivo: config.objetivo, fluxoAtendimento: config.fluxoAtendimento, comportamento: config.comportamento,
+              fluxoGatilhos: config.fluxoGatilhos as unknown as { gatilho: string; resposta: string }[],
               followupEnabled: config.followupEnabled, followupDelaysMinutes: config.followupDelaysMinutes as unknown as number[], emojiEnabled: config.emojiEnabled,
             }}
           />
@@ -99,6 +100,7 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
                 horario: config.horario, uazapiInstance: config.uazapiInstance, isConfigured: Boolean(config.systemPrompt),
                 descricaoEmpresa: config.descricaoEmpresa, precos: config.precos, enderecoContato: config.enderecoContato,
                 objetivo: config.objetivo, fluxoAtendimento: config.fluxoAtendimento, comportamento: config.comportamento,
+                fluxoGatilhos: config.fluxoGatilhos as unknown as { gatilho: string; resposta: string }[],
                 followupEnabled: config.followupEnabled, followupDelaysMinutes: config.followupDelaysMinutes as unknown as number[], emojiEnabled: config.emojiEnabled,
               }}
             />
@@ -195,6 +197,7 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
               horario: config.horario, uazapiInstance: config.uazapiInstance, isConfigured: Boolean(config.systemPrompt),
               descricaoEmpresa: config.descricaoEmpresa, precos: config.precos, enderecoContato: config.enderecoContato,
               objetivo: config.objetivo, fluxoAtendimento: config.fluxoAtendimento, comportamento: config.comportamento,
+              fluxoGatilhos: config.fluxoGatilhos as unknown as { gatilho: string; resposta: string }[],
               followupEnabled: config.followupEnabled, followupDelaysMinutes: config.followupDelaysMinutes as unknown as number[], emojiEnabled: config.emojiEnabled,
             }}
           />

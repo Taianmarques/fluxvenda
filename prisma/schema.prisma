@@ -631,6 +631,11 @@ model AgentConfig {
   fluxoAtendimento String @default("") // sequência de passos que o agente deve seguir
   comportamento    String @default("") // regras de conduta que o agente deve sempre respeitar
 
+  // Fluxo de atendimento por gatilhos: lista de pares "quando X, aja Y" — [{gatilho, resposta}].
+  // A IA decide quando cada regra se aplica usando o contexto da conversa (não é uma máquina
+  // de estados determinística).
+  fluxoGatilhos Json @default("[]")
+
   systemPrompt String?
   active       Boolean @default(false)
 

@@ -19,6 +19,7 @@ type InitialConfig = {
   objetivo: string;
   fluxoAtendimento: string;
   comportamento: string;
+  fluxoGatilhos: { gatilho: string; resposta: string }[];
   followupEnabled: boolean;
   followupDelaysMinutes: number[];
   emojiEnabled: boolean;
@@ -81,6 +82,51 @@ function FollowupDelaysEditor({
   );
 }
 
+type GatilhoRow = { gatilho: string; resposta: string };
+
+function FluxoGatilhosEditor({
+  rows, onAdd, onRemove, onUpdate,
+}: {
+  rows: GatilhoRow[];
+  onAdd: () => void;
+  onRemove: (i: number) => void;
+  onUpdate: (i: number, row: Partial<GatilhoRow>) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      {rows.map((row, i) => (
+        <div key={i} className="border border-gray-800 rounded-xl p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-500">Regra {i + 1}</span>
+            {rows.length > 1 && (
+              <button onClick={() => onRemove(i)} className="text-xs text-red-400 hover:text-red-300">Remover</button>
+            )}
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Quando (gatilho)</label>
+            <input
+              value={row.gatilho} onChange={e => onUpdate(i, { gatilho: e.target.value })}
+              placeholder="Ex: cliente pergunta sobre prazo de entrega"
+              className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">A IA deve...</label>
+            <input
+              value={row.resposta} onChange={e => onUpdate(i, { resposta: e.target.value })}
+              placeholder="Ex: informar que o prazo médio é 3 dias úteis e perguntar o CEP para confirmar"
+              className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+            />
+          </div>
+        </div>
+      ))}
+      {rows.length < 30 && (
+        <button onClick={onAdd} className="text-sm text-blue-400 hover:text-blue-300">+ Adicionar regra</button>
+      )}
+    </div>
+  );
+}
+
 const TOM_OPTIONS = [
   { value: "FORMAL", label: "Formal", description: "Protocolar, direto ao ponto" },
   { value: "PROXIMO", label: "Próximo", description: "Descontraído e caloroso" },
@@ -120,6 +166,9 @@ export function WhatsappAgentClient({
   const [objetivo, setObjetivo] = useState(initialConfig?.objetivo ?? "");
   const [fluxoAtendimento, setFluxoAtendimento] = useState(initialConfig?.fluxoAtendimento ?? "");
   const [comportamento, setComportamento] = useState(initialConfig?.comportamento ?? "");
+  const [fluxoGatilhos, setFluxoGatilhos] = useState<GatilhoRow[]>(
+    initialConfig?.fluxoGatilhos?.length ? initialConfig.fluxoGatilhos : [{ gatilho: "", resposta: "" }]
+  );
   const [followupEnabled, setFollowupEnabled] = useState(initialConfig?.followupEnabled ?? true);
   const [emojiEnabled, setEmojiEnabled] = useState(initialConfig?.emojiEnabled ?? false);
   const [followupDelays, setFollowupDelays] = useState<DelayRow[]>(
@@ -135,6 +184,16 @@ export function WhatsappAgentClient({
   }
   function updateFollowupAttempt(i: number, row: Partial<DelayRow>) {
     setFollowupDelays(followupDelays.map((r, idx) => (idx === i ? { ...r, ...row } : r)));
+  }
+
+  function addGatilhoRow() {
+    setFluxoGatilhos([...fluxoGatilhos, { gatilho: "", resposta: "" }]);
+  }
+  function removeGatilhoRow(i: number) {
+    setFluxoGatilhos(fluxoGatilhos.filter((_, idx) => idx !== i));
+  }
+  function updateGatilhoRow(i: number, row: Partial<GatilhoRow>) {
+    setFluxoGatilhos(fluxoGatilhos.map((r, idx) => (idx === i ? { ...r, ...row } : r)));
   }
 
   const [showQuickFollowup, setShowQuickFollowup] = useState(false);
@@ -157,6 +216,7 @@ export function WhatsappAgentClient({
           nome, tom,
           descricaoEmpresa, enderecoContato, precos,
           objetivo, fluxoAtendimento, comportamento,
+          fluxoGatilhos: fluxoGatilhos.filter(r => r.gatilho.trim() && r.resposta.trim()),
           servicos: splitLines(servicos),
           objecoes: splitLines(objecoes),
           horario,
@@ -223,6 +283,7 @@ export function WhatsappAgentClient({
           nome, tom,
           descricaoEmpresa, enderecoContato, precos,
           objetivo, fluxoAtendimento, comportamento,
+          fluxoGatilhos: fluxoGatilhos.filter(r => r.gatilho.trim() && r.resposta.trim()),
           servicos: splitLines(servicos),
           objecoes: splitLines(objecoes),
           horario,
@@ -494,6 +555,11 @@ export function WhatsappAgentClient({
               placeholder={"Ex:\n1. Cumprimentar e perguntar o que o cliente procura\n2. Entender medidas/quantidade necessárias\n3. Informar preço e prazo de entrega\n4. Perguntar se quer fechar o pedido ou agendar retirada"}
               className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-600"
             />
+          </div>
+          <div>
+            <label className="text-sm text-gray-400 block mb-1">Fluxo por gatilhos (opcional)</label>
+            <p className="text-xs text-gray-500 mb-2">Regras específicas de “quando X acontece, aja assim” — a IA usa o contexto da conversa pra saber quando cada uma se aplica, não é busca exata de texto.</p>
+            <FluxoGatilhosEditor rows={fluxoGatilhos} onAdd={addGatilhoRow} onRemove={removeGatilhoRow} onUpdate={updateGatilhoRow} />
           </div>
           <div>
             <label className="text-sm text-gray-400 block mb-1">Como se comportar</label>
