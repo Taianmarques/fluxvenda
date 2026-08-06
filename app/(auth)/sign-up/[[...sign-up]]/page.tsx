@@ -55,38 +55,38 @@ function SignUpForm() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center px-4">
+    <div className="min-h-screen bg-[#1C140D] text-[#FDF9F2] flex items-center justify-center px-4">
       <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-6">
         <div className="text-center space-y-1">
-          <h1 className="text-2xl font-bold">SF Madeiras</h1>
-          <p className="text-gray-400 text-sm">Crie sua conta</p>
+          <h1 className="text-2xl font-bold text-[#FDF9F2]">SF Madeiras</h1>
+          <p className="text-[#E3D9C6] text-sm">Crie sua conta</p>
         </div>
 
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-sm text-gray-400">Nome completo</label>
+            <label className="text-sm text-[#E3D9C6]">Nome completo</label>
             <input
               required value={name} onChange={(e) => setName(e.target.value)}
               autoComplete="name"
-              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+              className="w-full px-4 py-3 bg-[#2A1D14] border border-[#3D2B1D] rounded-xl text-[#FDF9F2] placeholder-[#E3D9C6]/40 focus:outline-none focus:border-[#E8A93A] transition-colors"
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-sm text-gray-400">E-mail</label>
+            <label className="text-sm text-[#E3D9C6]">E-mail</label>
             <input
               type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
               autoComplete="email"
-              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+              className="w-full px-4 py-3 bg-[#2A1D14] border border-[#3D2B1D] rounded-xl text-[#FDF9F2] placeholder-[#E3D9C6]/40 focus:outline-none focus:border-[#E8A93A] transition-colors"
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-sm text-gray-400">Senha</label>
+            <label className="text-sm text-[#E3D9C6]">Senha</label>
             <input
               type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)}
               autoComplete="new-password"
-              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+              className="w-full px-4 py-3 bg-[#2A1D14] border border-[#3D2B1D] rounded-xl text-[#FDF9F2] placeholder-[#E3D9C6]/40 focus:outline-none focus:border-[#E8A93A] transition-colors"
             />
-            <p className="text-xs text-gray-500">Mínimo de 8 caracteres.</p>
+            <p className="text-xs text-[#E3D9C6]/70">Mínimo de 8 caracteres.</p>
           </div>
         </div>
 
@@ -94,13 +94,13 @@ function SignUpForm() {
 
         <button
           type="submit" disabled={loading}
-          className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl font-bold transition-colors"
+          className="w-full py-3.5 bg-[#E8A93A] hover:bg-[#dd9d2e] disabled:opacity-50 rounded-xl font-bold text-[#1C140D] transition-colors"
         >
           {loading ? "Criando conta..." : "Criar conta"}
         </button>
 
-        <p className="text-center text-sm text-gray-500">
-          Já tem conta? <Link href="/sign-in" className="text-blue-400 hover:text-blue-300 underline">Entrar</Link>
+        <p className="text-center text-sm text-[#E3D9C6]/70">
+          Já tem conta? <Link href="/sign-in" className="text-[#E8A93A] hover:text-[#dd9d2e] underline">Entrar</Link>
         </p>
       </form>
     </div>
