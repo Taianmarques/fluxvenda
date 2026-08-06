@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useClerk } from "@/lib/auth-client";
 
 // ?redirect_url= vem do fluxo de convite (/entrar) — tem prioridade. ?product=crm|plataforma
 // vem das landing pages dedicadas e manda pro onboarding específico de cada produto.
@@ -21,6 +22,7 @@ function SignUpForm() {
   const product = searchParams.get("product");
   const validProduct = product === "crm" || product === "plataforma" ? product : null;
   const redirectUrl = redirectUrlParam || (validProduct ? `/onboarding/${validProduct}` : "/onboarding");
+  const { session } = useClerk();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -40,6 +42,10 @@ function SignUpForm() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Erro ao criar conta");
+      // Sem isso, o AuthProvider (montado uma vez no layout raiz) continua achando que
+      // ninguém está logado até um reload de página inteira — quebra o auto-join do convite
+      // (/entrar/[code]?auto=1) e o onboarding, que lê nome/e-mail via useUser() logo em seguida.
+      await session.reload();
       router.push(redirectUrl);
       router.refresh();
     } catch (err) {

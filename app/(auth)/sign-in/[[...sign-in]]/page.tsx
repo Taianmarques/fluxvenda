@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useClerk } from "@/lib/auth-client";
 
 export default function SignInPage() {
   return (
@@ -16,6 +17,7 @@ function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectUrl = searchParams.get("redirect_url") || "/dashboard";
+  const { session } = useClerk();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,6 +36,10 @@ function SignInForm() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Erro ao entrar");
+      // Sem isso, o AuthProvider (montado uma vez no layout raiz) continua achando que
+      // ninguém está logado até um reload de página inteira — quebra o auto-join do convite
+      // e qualquer página que leia useUser() logo depois do login.
+      await session.reload();
       router.push(redirectUrl);
       router.refresh();
     } catch (err) {
