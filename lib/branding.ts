@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 // senão as bordas do logo somem no recorte. O resto até a borda vira fundo sólido, nunca
 // transparente (senão aparece um "buraco" na forma recortada).
 const MASKABLE_SAFE_ZONE_RATIO = 0.8;
-const BACKGROUND_COLOR = "#030712"; // igual ao background_color do manifest
+const BACKGROUND_COLOR = "#2A1D14"; // igual ao background_color do manifest
 
 export type PwaIconVariants = {
   icon192: Buffer;
