@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getEffectiveProducts, hasProduct } from "@/lib/products";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const { userId } = await auth();
     if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const products = await getEffectiveProducts(userId);
+    if (!hasProduct(products, "PLATAFORMA")) return NextResponse.json({ error: "Plataforma não contratada" }, { status: 403 });
 
     const diagnostic = await prisma.diagnostic.findUnique({
       where: { id },

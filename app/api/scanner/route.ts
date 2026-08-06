@@ -6,6 +6,7 @@ import { logTokenUsage, getTeamIdForUser } from "@/lib/token-usage";
 import { z } from "zod";
 import { generateMissionsFromDiagnostic } from "@/lib/missoes";
 import { levelFromXP } from "@/lib/utils";
+import { getEffectiveProducts, hasProduct } from "@/lib/products";
 
 const schema = z.object({
   companyName:    z.string().min(1),
@@ -46,6 +47,9 @@ export async function POST(req: NextRequest) {
   try {
     const { userId } = await auth();
     if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const products = await getEffectiveProducts(userId);
+    if (!hasProduct(products, "PLATAFORMA")) return NextResponse.json({ error: "Plataforma não contratada" }, { status: 403 });
 
     const body = schema.safeParse(await req.json());
     if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });

@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { openai } from "@/lib/openai";
 import { logTokenUsage, getTeamIdForUser } from "@/lib/token-usage";
+import { getEffectiveProducts, hasProduct } from "@/lib/products";
 
 type DecisionOption = { id: string; label: string; hint: string };
 type Category = { key: string; label: string; icon: string; options: DecisionOption[] };
@@ -12,6 +13,9 @@ export async function GET(req: NextRequest) {
   try {
     const { userId } = await auth();
     if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const products = await getEffectiveProducts(userId);
+    if (!hasProduct(products, "PLATAFORMA")) return NextResponse.json({ error: "Plataforma não contratada" }, { status: 403 });
 
     const [profile, teamId] = await Promise.all([
       prisma.profile.findUnique({
@@ -87,6 +91,9 @@ export async function POST(req: NextRequest) {
   try {
     const { userId } = await auth();
     if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const products = await getEffectiveProducts(userId);
+    if (!hasProduct(products, "PLATAFORMA")) return NextResponse.json({ error: "Plataforma não contratada" }, { status: 403 });
 
     const [profile, teamId] = await Promise.all([
       prisma.profile.findUnique({

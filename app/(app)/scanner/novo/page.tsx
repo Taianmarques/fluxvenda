@@ -1,8 +1,17 @@
 import { currentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { NovoScannerForm } from "./NovoScannerForm";
+import { ProductGate } from "../../ProductGate";
 
 export default async function NovoScannerPage() {
+  return (
+    <ProductGate product="PLATAFORMA">
+      <NovoScannerPageContent />
+    </ProductGate>
+  );
+}
+
+async function NovoScannerPageContent() {
   const user = await currentUser();
 
   const profile = await prisma.profile.findUnique({
