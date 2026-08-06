@@ -32,6 +32,14 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
   const [copied, setCopied] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
 
+  // Criar usuário direto (sem link de convite)
+  const [showCriarUsuario, setShowCriarUsuario] = useState(false);
+  const [criarNome, setCriarNome] = useState("");
+  const [criarEmail, setCriarEmail] = useState("");
+  const [criarSenha, setCriarSenha] = useState("");
+  const [criandoUsuario, setCriandoUsuario] = useState(false);
+  const [criarUsuarioError, setCriarUsuarioError] = useState("");
+
   // Departamentos
   const [showNovoDep, setShowNovoDep] = useState(false);
   const [depNome, setDepNome] = useState("");
@@ -127,6 +135,27 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
     router.refresh();
   }
 
+  async function handleCriarUsuario() {
+    if (!criarNome.trim() || !criarEmail.trim() || criarSenha.length < 8) return;
+    setCriandoUsuario(true);
+    setCriarUsuarioError("");
+    try {
+      const res = await fetch("/api/equipe/criar-usuario", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: criarNome.trim(), email: criarEmail.trim(), password: criarSenha }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Erro ao criar usuário");
+      setCriarNome(""); setCriarEmail(""); setCriarSenha(""); setShowCriarUsuario(false);
+      router.refresh();
+    } catch (err) {
+      setCriarUsuarioError(err instanceof Error ? err.message : "Erro ao criar usuário");
+    } finally {
+      setCriandoUsuario(false);
+    }
+  }
+
   function copyLink() {
     if (!inviteLink) return;
     navigator.clipboard.writeText(inviteLink).then(() => {
@@ -193,6 +222,63 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
                 Enviar pelo WhatsApp
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Criar usuário direto, sem link de convite (só gestor) */}
+        {isManager && (
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <p className="font-semibold text-sm">Ou crie o acesso direto</p>
+                <p className="text-xs text-gray-500 mt-0.5">Você define o e-mail e a senha na hora, sem precisar do link — a pessoa já entra como atendente.</p>
+              </div>
+              <button
+                onClick={() => setShowCriarUsuario(s => !s)}
+                className="flex items-center gap-1 text-xs font-medium text-blue-400 hover:text-blue-300 border border-blue-800/50 hover:border-blue-600/50 rounded-lg px-3 py-1.5 transition-colors flex-shrink-0"
+              >
+                <Plus size={12} /> Criar usuário
+              </button>
+            </div>
+
+            {showCriarUsuario && (
+              <div className="bg-gray-950 border border-gray-800 rounded-xl p-3 space-y-2">
+                <input
+                  value={criarNome}
+                  onChange={e => setCriarNome(e.target.value)}
+                  placeholder="Nome completo"
+                  className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm"
+                  maxLength={200}
+                />
+                <input
+                  type="email"
+                  value={criarEmail}
+                  onChange={e => setCriarEmail(e.target.value)}
+                  placeholder="E-mail"
+                  className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm"
+                  maxLength={200}
+                />
+                <input
+                  type="password"
+                  value={criarSenha}
+                  onChange={e => setCriarSenha(e.target.value)}
+                  placeholder="Senha (mínimo 8 caracteres)"
+                  className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm"
+                  maxLength={200}
+                />
+                {criarUsuarioError && <p className="text-xs text-red-400">{criarUsuarioError}</p>}
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleCriarUsuario}
+                    disabled={criandoUsuario || !criarNome.trim() || !criarEmail.trim() || criarSenha.length < 8}
+                    className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium"
+                  >
+                    {criandoUsuario ? "Criando..." : "Criar"}
+                  </button>
+                  <button onClick={() => { setShowCriarUsuario(false); setCriarUsuarioError(""); }} className="text-xs text-gray-400 hover:text-gray-200 px-2">Cancelar</button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
