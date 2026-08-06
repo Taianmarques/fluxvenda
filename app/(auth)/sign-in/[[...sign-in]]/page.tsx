@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { useClerk } from "@/lib/auth-client";
 
 export default function SignInPage() {
@@ -51,8 +52,8 @@ function SignInForm() {
   return (
     <div className="min-h-screen bg-[#1C140D] text-[#FDF9F2] flex items-center justify-center px-4">
       <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-6">
-        <div className="text-center space-y-1">
-          <h1 className="text-2xl font-bold text-[#FDF9F2]">SF Madeiras</h1>
+        <div className="text-center space-y-3">
+          <Image src="/logo-sfmadeiras.png" alt="SF Madeiras" width={220} height={88} className="mx-auto h-auto w-[220px]" priority />
           <p className="text-[#E3D9C6] text-sm">Entre com seu e-mail e senha</p>
         </div>
 
