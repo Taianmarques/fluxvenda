@@ -928,7 +928,7 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       });
       emitChatEvent(agentConfigId, conversationId);
 
-      return "Qualificação concluída, nota interna com o resumo criada e oportunidade criada/avançada no funil. Na SUA RESPOSTA, avise o cliente com naturalidade que um vendedor vai continuar o atendimento em instantes. Depois desta mensagem você para de responder — o atendimento é humano a partir daqui.";
+      return "Qualificação concluída, nota interna com o resumo criada e oportunidade criada/avançada no funil. Na SUA RESPOSTA, peça um momento ao cliente e avise que em instantes o orçamento vai ser encaminhado, com base no que foi conversado — não diga que vai \"encaminhar para um vendedor\" nem mencione um humano assumindo, o foco é o orçamento chegando. Depois desta mensagem você para de responder — o atendimento é humano a partir daqui.";
     }
 
     if (name === "mover_etapa_funil") {
