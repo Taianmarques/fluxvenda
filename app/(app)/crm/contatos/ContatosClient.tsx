@@ -86,6 +86,12 @@ export function ContatosClient({ agentId, contatos, etiquetas, leadStatuses }: {
   const [novoNumero, setNovoNumero] = useState("");
   const [criando, setCriando] = useState(false);
 
+  // Editar contato existente (nome e/ou número)
+  const [editingContato, setEditingContato] = useState<Contato | null>(null);
+  const [editNome, setEditNome] = useState("");
+  const [editNumero, setEditNumero] = useState("");
+  const [editError, setEditError] = useState("");
+
   // Seleção + ações em massa
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [attendants, setAttendants] = useState<Attendant[]>([]);
@@ -196,16 +202,31 @@ export function ContatosClient({ agentId, contatos, etiquetas, leadStatuses }: {
     router.refresh();
   }
 
-  async function handleRenomear(c: Contato) {
-    const nome = window.prompt("Nome do contato", c.contactName ?? "");
-    if (!nome || !nome.trim() || nome.trim() === c.contactName) return;
-    setSalvando(c.conversationId);
+  function handleAbrirEdicao(c: Contato) {
+    setEditingContato(c);
+    setEditNome(c.contactName ?? "");
+    setEditNumero(c.contactNumber);
+    setEditError("");
+  }
+
+  async function handleSalvarEdicao() {
+    if (!editingContato) return;
+    const nome = editNome.trim();
+    const numero = editNumero.replace(/\D/g, "");
+    if (!nome) { setEditError("Informe um nome."); return; }
+    if (numero.length < 10 || numero.length > 13) { setEditError("Número inválido — use DDD + número."); return; }
+
+    setEditError("");
+    setSalvando(editingContato.conversationId);
     try {
-      await fetch(`/api/ferramentas/whatsapp/conversas/${c.conversationId}`, {
+      const res = await fetch(`/api/ferramentas/whatsapp/conversas/${editingContato.conversationId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contactName: nome.trim() }),
+        body: JSON.stringify({ contactName: nome, contactNumber: numero }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setEditError(data.error ?? "Não foi possível salvar."); return; }
+      setEditingContato(null);
       router.refresh();
     } finally {
       setSalvando(null);
@@ -669,9 +690,9 @@ export function ContatosClient({ agentId, contatos, etiquetas, leadStatuses }: {
                       <span className="hidden md:inline text-xs font-semibold text-green-400 flex-shrink-0">{formatBRL(c.totalGanho)}</span>
                     )}
                     <button
-                      onClick={() => handleRenomear(c)}
+                      onClick={() => handleAbrirEdicao(c)}
                       disabled={salvando === c.conversationId}
-                      title={c.contactName ? "Renomear contato" : "Salvar nome do contato"}
+                      title="Editar nome/número"
                       className="text-gray-500 hover:text-white disabled:opacity-50 flex-shrink-0 p-1.5"
                     >
                       <Pencil size={14} />
@@ -690,6 +711,48 @@ export function ContatosClient({ agentId, contatos, etiquetas, leadStatuses }: {
           )}
         </div>
       </div>
+
+      {/* Editar nome/número do contato */}
+      {editingContato && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-gray-900 border border-gray-700 rounded-2xl p-5 space-y-3">
+            <p className="font-semibold flex items-center gap-2"><Pencil size={16} /> Editar contato</p>
+            <div className="space-y-2">
+              <div className="space-y-1">
+                <label className="text-xs text-gray-500">Nome</label>
+                <input
+                  autoFocus
+                  value={editNome}
+                  onChange={e => setEditNome(e.target.value)}
+                  maxLength={80}
+                  className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-gray-500">WhatsApp (DDD + número)</label>
+                <input
+                  value={editNumero}
+                  onChange={e => setEditNumero(e.target.value.replace(/[^\d\s()-]/g, ""))}
+                  inputMode="tel"
+                  maxLength={20}
+                  className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+                />
+              </div>
+            </div>
+            {editError && <p className="text-xs text-red-400">{editError}</p>}
+            <div className="flex justify-end gap-2 pt-1">
+              <button onClick={() => setEditingContato(null)} className="text-sm text-gray-400 hover:text-gray-200 px-3 py-2">Cancelar</button>
+              <button
+                onClick={handleSalvarEdicao}
+                disabled={salvando === editingContato.conversationId}
+                className="text-sm font-medium bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl px-4 py-2"
+              >
+                {salvando === editingContato.conversationId ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

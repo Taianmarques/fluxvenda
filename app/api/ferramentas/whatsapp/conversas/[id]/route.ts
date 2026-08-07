@@ -50,6 +50,7 @@ const patchSchema = z.object({
   status: z.enum(["ATIVO", "AGUARDANDO", "FINALIZADO"]).optional(),
   motivoEncerramento: z.string().max(200).optional(), // enviado junto com status FINALIZADO
   contactName: z.string().trim().min(1).max(80).optional(), // salvar/renomear o contato
+  contactNumber: z.string().trim().transform(v => v.replace(/\D/g, "")).refine(v => v.length >= 10 && v.length <= 13, { message: "Número inválido — use DDD + número" }).optional(),
   pinned: z.boolean().optional(),
 });
 
@@ -89,6 +90,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
   }
 
+  // Só valida/atualiza se realmente mudou — evita 409 falso quando o número enviado é o mesmo
+  if (body.data.contactNumber !== undefined && body.data.contactNumber !== conversation.contactNumber) {
+    const conflito = await prisma.conversation.findFirst({
+      where: { agentConfigId: conversation.agentConfigId, contactNumber: body.data.contactNumber, id: { not: id } },
+      select: { id: true },
+    });
+    if (conflito) return NextResponse.json({ error: "Já existe outro contato com esse número" }, { status: 409 });
+  }
+
   const encerrando = body.data.status === "FINALIZADO";
   const reabrindo = body.data.status !== undefined && body.data.status !== "FINALIZADO" && conversation.status === "FINALIZADO";
 
@@ -99,6 +109,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       ...(body.data.assignedToId !== undefined && { assignedToId: body.data.assignedToId }),
       ...(body.data.status !== undefined && { status: body.data.status }),
       ...(body.data.contactName !== undefined && { contactName: body.data.contactName }),
+      ...(body.data.contactNumber !== undefined && { contactNumber: body.data.contactNumber }),
       ...(body.data.pinned !== undefined && { pinned: body.data.pinned }),
       ...(encerrando && { motivoEncerramento: body.data.motivoEncerramento ?? null, encerradaEm: new Date() }),
       ...(reabrindo && { motivoEncerramento: null, encerradaEm: null }),
