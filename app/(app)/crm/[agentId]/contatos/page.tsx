@@ -38,7 +38,7 @@ async function ContatosPageContent({ params }: { params: Promise<{ agentId: stri
     );
   }
 
-  const [conversations, etiquetas] = await Promise.all([
+  const [conversations, etiquetas, leadStatuses] = await Promise.all([
     prisma.conversation.findMany({
       where: {
         agentConfigId: config.id,
@@ -59,6 +59,11 @@ async function ContatosPageContent({ params }: { params: Promise<{ agentId: stri
       orderBy: { createdAt: "asc" },
       select: { id: true, nome: true, cor: true },
     }),
+    prisma.leadStatus.findMany({
+      where: { agentConfigId: config.id },
+      orderBy: { order: "asc" },
+      select: { id: true, name: true, color: true },
+    }),
   ]);
 
   // Um contato por número — se houver mais de uma conversa, fica a de interação mais recente
@@ -69,14 +74,17 @@ async function ContatosPageContent({ params }: { params: Promise<{ agentId: stri
       conversationId: c.id,
       contactName: c.contactName,
       contactNumber: c.contactNumber,
+      leadStatusId: c.leadStatusId,
       leadStatusName: c.leadStatus?.name ?? null,
       leadStatusColor: c.leadStatus?.color ?? null,
       totalGanho: c.opportunities.filter(o => o.wonAt).reduce((s, o) => s + o.dealValue, 0),
       lastMessageAt: c.messages[0]?.createdAt.toISOString() ?? null,
+      assignedToId: c.assignedToId,
       atendenteNome: c.assignedTo?.name ?? null,
+      nivelCarteira: c.nivelCarteira,
       etiquetas: c.etiquetas,
     });
   }
 
-  return <ContatosClient agentId={config.id} contatos={Array.from(byNumber.values())} etiquetas={etiquetas} />;
+  return <ContatosClient agentId={config.id} contatos={Array.from(byNumber.values())} etiquetas={etiquetas} leadStatuses={leadStatuses} />;
 }

@@ -20,13 +20,18 @@ export type Contato = {
   conversationId: string;
   contactName: string | null;
   contactNumber: string;
+  leadStatusId: string | null;
   leadStatusName: string | null;
   leadStatusColor: string | null;
   totalGanho: number;
   lastMessageAt: string | null;
+  assignedToId: string | null;
   atendenteNome: string | null;
+  nivelCarteira: string | null;
   etiquetas: Etiqueta[];
 };
+
+export type LeadStatusOption = { id: string; name: string; color: string };
 
 type Attendant = { id: string; name: string; isManager: boolean };
 
@@ -57,9 +62,14 @@ function EtiquetaChip({ e, onRemove }: { e: Etiqueta; onRemove?: () => void }) {
   );
 }
 
-export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: string; contatos: Contato[]; etiquetas: Etiqueta[] }) {
+export function ContatosClient({ agentId, contatos, etiquetas, leadStatuses }: { agentId: string; contatos: Contato[]; etiquetas: Etiqueta[]; leadStatuses: LeadStatusOption[] }) {
   const router = useRouter();
   const [busca, setBusca] = useState("");
+  // Filtros da lista — combinam entre si (E lógico) e com a busca por texto
+  const [filtroAtendente, setFiltroAtendente] = useState("");
+  const [filtroNivel, setFiltroNivel] = useState("");
+  const [filtroEtiqueta, setFiltroEtiqueta] = useState("");
+  const [filtroStatus, setFiltroStatus] = useState("");
   const [salvando, setSalvando] = useState<string | null>(null);
   const [importando, setImportando] = useState(false);
   const [importResult, setImportResult] = useState<string | null>(null);
@@ -99,13 +109,27 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
-    if (!q) return contatos;
-    return contatos.filter(c =>
-      (c.contactName ?? "").toLowerCase().includes(q) ||
-      c.contactNumber.includes(q) ||
-      c.etiquetas.some(e => e.nome.toLowerCase().includes(q))
-    );
-  }, [busca, contatos]);
+    return contatos.filter(c => {
+      if (q && !(
+        (c.contactName ?? "").toLowerCase().includes(q) ||
+        c.contactNumber.includes(q) ||
+        c.etiquetas.some(e => e.nome.toLowerCase().includes(q))
+      )) return false;
+      if (filtroAtendente) {
+        if (filtroAtendente === "__sem_atendente__" ? c.assignedToId !== null : c.assignedToId !== filtroAtendente) return false;
+      }
+      if (filtroNivel) {
+        if (filtroNivel === "__sem_nivel__" ? c.nivelCarteira !== null : c.nivelCarteira !== filtroNivel) return false;
+      }
+      if (filtroEtiqueta && !c.etiquetas.some(e => e.id === filtroEtiqueta)) return false;
+      if (filtroStatus) {
+        if (filtroStatus === "__sem_status__" ? c.leadStatusId !== null : c.leadStatusId !== filtroStatus) return false;
+      }
+      return true;
+    });
+  }, [busca, contatos, filtroAtendente, filtroNivel, filtroEtiqueta, filtroStatus]);
+
+  const filtrosAtivos = Boolean(filtroAtendente || filtroNivel || filtroEtiqueta || filtroStatus);
 
   const todosSelecionados = filtrados.length > 0 && filtrados.every(c => selecionados.has(c.conversationId));
 
@@ -492,6 +516,53 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
             placeholder="Buscar por nome, número ou etiqueta..."
             className="w-full bg-gray-900 border border-gray-800 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-blue-600"
           />
+        </div>
+
+        {/* Filtros */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <select
+            value={filtroAtendente}
+            onChange={e => setFiltroAtendente(e.target.value)}
+            className="text-xs bg-gray-900 border border-gray-800 rounded-lg px-2.5 py-1.5"
+          >
+            <option value="">Vendedor: todos</option>
+            <option value="__sem_atendente__">Sem vendedor</option>
+            {attendants.map(a => <option key={a.id} value={a.id}>{a.name}{a.isManager ? " (gestor)" : ""}</option>)}
+          </select>
+          <select
+            value={filtroNivel}
+            onChange={e => setFiltroNivel(e.target.value)}
+            className="text-xs bg-gray-900 border border-gray-800 rounded-lg px-2.5 py-1.5"
+          >
+            <option value="">Nível: todos</option>
+            <option value="__sem_nivel__">Automático</option>
+            {NIVEL_CARTEIRA_OPTIONS.map(n => <option key={n.value} value={n.value}>{n.label}</option>)}
+          </select>
+          <select
+            value={filtroEtiqueta}
+            onChange={e => setFiltroEtiqueta(e.target.value)}
+            className="text-xs bg-gray-900 border border-gray-800 rounded-lg px-2.5 py-1.5"
+          >
+            <option value="">Etiqueta: todas</option>
+            {etiquetas.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
+          </select>
+          <select
+            value={filtroStatus}
+            onChange={e => setFiltroStatus(e.target.value)}
+            className="text-xs bg-gray-900 border border-gray-800 rounded-lg px-2.5 py-1.5"
+          >
+            <option value="">Status: todos</option>
+            <option value="__sem_status__">Sem status</option>
+            {leadStatuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          {filtrosAtivos && (
+            <button
+              onClick={() => { setFiltroAtendente(""); setFiltroNivel(""); setFiltroEtiqueta(""); setFiltroStatus(""); }}
+              className="text-xs text-gray-400 hover:text-white flex items-center gap-1"
+            >
+              <X size={12} /> Limpar filtros
+            </button>
+          )}
         </div>
 
         {/* Barra de ações em massa */}
