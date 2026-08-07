@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ThumbsUp, Trash2 } from "lucide-react";
+import { ThumbsUp, Trash2, ArrowRightLeft } from "lucide-react";
 
 export type Opportunity = { id: string; title: string | null; dealValue: number; wonAt: string | null };
 
@@ -28,6 +28,10 @@ export function OpportunitiesPanel({
   const [saving, setSaving] = useState(false);
   const [pipelines, setPipelines] = useState<PipelineOption[]>([]);
   const [pipelineId, setPipelineId] = useState("");
+  const [movingId, setMovingId] = useState<string | null>(null);
+  const [movePipelineId, setMovePipelineId] = useState("");
+  const [moveStageId, setMoveStageId] = useState("");
+  const [moving, setMoving] = useState(false);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -79,6 +83,31 @@ export function OpportunitiesPanel({
     onChange();
   }
 
+  function startMoving(oppId: string) {
+    setMovingId(oppId);
+    const firstPipeline = pipelines[0];
+    setMovePipelineId(firstPipeline?.id ?? "");
+    setMoveStageId(firstPipeline?.stages[0]?.id ?? "");
+  }
+
+  async function handleConfirmMove() {
+    if (!movingId || !moveStageId || moving) return;
+    setMoving(true);
+    try {
+      const res = await fetch(`/api/ferramentas/whatsapp/conversas/${conversationId}/oportunidades/${movingId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stageId: moveStageId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { alert(data.error ?? "Não foi possível mover a oportunidade."); return; }
+      setMovingId(null);
+      onChange();
+    } finally {
+      setMoving(false);
+    }
+  }
+
   return (
     <div
       ref={ref}
@@ -92,29 +121,76 @@ export function OpportunitiesPanel({
           <p className={`text-xs p-2 ${dark ? "text-gray-500" : "text-gray-400"}`}>Nenhuma oportunidade ainda.</p>
         )}
         {opportunities.map(o => (
-          <div key={o.id} className={`group flex items-center gap-1 rounded-lg px-2 py-1.5 ${dark ? "hover:bg-gray-800" : "hover:bg-gray-100"}`}>
-            <div className="flex-1 min-w-0">
-              <p className={`text-xs font-medium truncate ${dark ? "text-gray-200" : "text-gray-800"}`}>{o.title || "Negociação"}</p>
-              <p className={`text-xs font-semibold ${o.wonAt ? "text-green-500" : dark ? "text-gray-400" : "text-gray-500"}`}>
-                {formatBRL(o.dealValue)}{o.wonAt && " — ganho"}
-              </p>
-            </div>
-            {!o.wonAt && (
-              <button
-                onClick={() => handleMarcarGanho(o.id)}
-                title="Dar ganho"
-                className="p-1 rounded-lg bg-green-600 text-white flex-shrink-0"
-              >
-                <ThumbsUp size={12} />
-              </button>
+          <div key={o.id} className={`rounded-lg px-2 py-1.5 ${dark ? "hover:bg-gray-800" : "hover:bg-gray-100"}`}>
+            {movingId === o.id ? (
+              <div className="space-y-1.5">
+                <p className={`text-xs font-medium truncate ${dark ? "text-gray-200" : "text-gray-800"}`}>{o.title || "Negociação"}</p>
+                <select
+                  value={movePipelineId}
+                  onChange={e => {
+                    const pid = e.target.value;
+                    setMovePipelineId(pid);
+                    setMoveStageId(pipelines.find(p => p.id === pid)?.stages[0]?.id ?? "");
+                  }}
+                  className={`w-full text-xs rounded-lg px-2 py-1 border focus:outline-none ${dark ? "bg-gray-950 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+                >
+                  {pipelines.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+                <select
+                  value={moveStageId}
+                  onChange={e => setMoveStageId(e.target.value)}
+                  className={`w-full text-xs rounded-lg px-2 py-1 border focus:outline-none ${dark ? "bg-gray-950 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+                >
+                  {pipelines.find(p => p.id === movePipelineId)?.stages.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+                <div className="flex gap-1.5">
+                  <button onClick={handleConfirmMove} disabled={moving} className="flex-1 text-xs font-medium bg-blue-700 hover:bg-blue-600 disabled:opacity-50 text-white rounded-lg py-1">
+                    {moving ? "Movendo..." : "Confirmar"}
+                  </button>
+                  <button onClick={() => setMovingId(null)} className={`text-xs px-2 rounded-lg ${dark ? "text-gray-400 hover:bg-gray-800" : "text-gray-500 hover:bg-gray-100"}`}>
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="group flex items-center gap-1">
+                <div className="flex-1 min-w-0">
+                  <p className={`text-xs font-medium truncate ${dark ? "text-gray-200" : "text-gray-800"}`}>{o.title || "Negociação"}</p>
+                  <p className={`text-xs font-semibold ${o.wonAt ? "text-green-500" : dark ? "text-gray-400" : "text-gray-500"}`}>
+                    {formatBRL(o.dealValue)}{o.wonAt && " — ganho"}
+                  </p>
+                </div>
+                {!o.wonAt && pipelines.length > 1 && (
+                  <button
+                    onClick={() => startMoving(o.id)}
+                    title="Mover para outro pipeline"
+                    className="text-gray-500 hover:text-blue-400 p-1 flex-shrink-0 opacity-0 group-hover:opacity-100"
+                  >
+                    <ArrowRightLeft size={12} />
+                  </button>
+                )}
+                {!o.wonAt && (
+                  <button
+                    onClick={() => handleMarcarGanho(o.id)}
+                    title="Dar ganho"
+                    className="p-1 rounded-lg bg-green-600 text-white flex-shrink-0"
+                  >
+                    <ThumbsUp size={12} />
+                  </button>
+                )}
+                <button
+                  onClick={() => handleDelete(o.id)}
+                  title="Excluir"
+                  className="text-gray-500 hover:text-red-400 p-1 flex-shrink-0 opacity-0 group-hover:opacity-100"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
             )}
-            <button
-              onClick={() => handleDelete(o.id)}
-              title="Excluir"
-              className="text-gray-500 hover:text-red-400 p-1 flex-shrink-0 opacity-0 group-hover:opacity-100"
-            >
-              <Trash2 size={12} />
-            </button>
           </div>
         ))}
       </div>
