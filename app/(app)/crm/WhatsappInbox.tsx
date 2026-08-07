@@ -1069,13 +1069,13 @@ export function WhatsappInbox({
                 ))}
               </div>
               <div className="flex items-center gap-1.5">
-                <div className={`flex-1 flex items-center gap-2 rounded-lg px-3 py-1.5 ${t.toggleBar}`}>
-                  <Search size={14} className="opacity-60 flex-shrink-0" />
+                <div className={`flex-1 flex items-center gap-2 rounded-lg px-3 py-1.5 ${t.toggleBar} ${t.toggleInactive}`}>
+                  <Search size={14} className="flex-shrink-0" />
                   <input
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     placeholder="Buscar conversa..."
-                    className={`flex-1 bg-transparent text-sm focus:outline-none placeholder:opacity-60`}
+                    className={`flex-1 bg-transparent text-sm focus:outline-none ${theme === "dark" ? "text-white placeholder:text-gray-500" : "text-gray-900 placeholder:text-gray-400"}`}
                   />
                   {search && (
                     <button onClick={() => setSearch("")} className="opacity-60 hover:opacity-100"><X size={14} /></button>
