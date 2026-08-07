@@ -101,8 +101,23 @@ async function handleOneMessage(
     const { buffer, mimetype } = await downloadCloudMedia(message.audio.id, accessToken);
     text = await transcribeAudioBuffer(buffer, mimetype);
     mediaType = "audio";
+  } else if (message.type === "video") {
+    const { buffer, mimetype } = await downloadCloudMedia(message.video.id, accessToken);
+    caption = message.video?.caption ?? "";
+    mediaUrl = `data:${mimetype};base64,${buffer.toString("base64")}`;
+    mediaType = "video";
+    text = caption ? `[Vídeo] ${caption}` : "[Vídeo enviado pelo cliente]";
+  } else if (message.type === "document") {
+    const { buffer, mimetype } = await downloadCloudMedia(message.document.id, accessToken);
+    caption = message.document?.caption ?? "";
+    mediaUrl = `data:${mimetype};base64,${buffer.toString("base64")}`;
+    mediaType = "document";
+    // Prioriza o nome real do arquivo (vem da Meta) como conteúdo — a UI usa isso como texto
+    // do link e nome pro download, já que mediaUrl é um data URI sem nome de arquivo próprio.
+    const filename: string | undefined = message.document?.filename;
+    text = filename ? (caption ? `${filename} — ${caption}` : filename) : (caption ? `[Documento] ${caption}` : "[Documento enviado pelo cliente]");
   } else {
-    return; // tipo de mensagem não suportado (documento, localização, interativo, etc.)
+    return; // tipo de mensagem não suportado (localização, interativo, sticker, etc.)
   }
 
   if (!text) return;

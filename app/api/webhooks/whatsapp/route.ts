@@ -61,6 +61,26 @@ export async function POST(req: NextRequest) {
     } catch (err) {
       console.error("[whatsapp-webhook] erro ao baixar imagem:", err);
     }
+  } else if (mimetype?.startsWith("video/")) {
+    try {
+      const media = await downloadMessageMedia(config.uazapiToken, message.id || message.messageid);
+      mediaUrl = media.fileURL;
+      mediaType = "video";
+      text = caption ? `[Vídeo] ${caption}` : "[Vídeo enviado pelo cliente]";
+    } catch (err) {
+      console.error("[whatsapp-webhook] erro ao baixar vídeo:", err);
+    }
+  } else if (mimetype) {
+    // Qualquer outro mimetype com mídia anexada (PDF, docx, xlsx, etc.) — sem isso a mensagem
+    // ficava sem texto e era descartada silenciosamente pelo "if (!text) return" logo abaixo.
+    try {
+      const media = await downloadMessageMedia(config.uazapiToken, message.id || message.messageid);
+      mediaUrl = media.fileURL;
+      mediaType = "document";
+      text = caption ? `[Documento] ${caption}` : "[Documento enviado pelo cliente]";
+    } catch (err) {
+      console.error("[whatsapp-webhook] erro ao baixar documento:", err);
+    }
   }
 
   if (!text) return NextResponse.json({ ok: true });

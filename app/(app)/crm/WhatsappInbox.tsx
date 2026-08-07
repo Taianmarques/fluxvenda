@@ -687,11 +687,7 @@ export function WhatsappInbox({
     setShowQuickReplies(false);
   }
 
-  function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-
+  function applyAttachmentFile(file: File) {
     setAttachError("");
     if (file.size > MAX_ATTACHMENT_MB * 1024 * 1024) {
       setAttachError(`Arquivo muito grande (máx. ${MAX_ATTACHMENT_MB}MB).`);
@@ -711,6 +707,30 @@ export function WhatsappInbox({
     };
     reader.onerror = () => setAttachError("Não foi possível ler o arquivo.");
     reader.readAsDataURL(file);
+  }
+
+  function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    applyAttachmentFile(file);
+  }
+
+  // Cola direto do clipboard (print/screenshot copiado com Ctrl+C, ou "Copiar imagem" do navegador)
+  function handleInputPaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    if (detail && isIgContact(detail.contactNumber)) return; // Instagram DM só suporta texto
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.kind === "file" && item.type.startsWith("image/")) {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          applyAttachmentFile(file);
+        }
+        return;
+      }
+    }
   }
 
   async function openProductPicker() {
@@ -1549,6 +1569,7 @@ export function WhatsappInbox({
                             handlePrimaryAction();
                           }
                         }}
+                        onPaste={handleInputPaste}
                         rows={1}
                         placeholder={noteMode ? "Escreva uma nota interna (só a equipe vê)..." : attachment ? "Adicionar legenda (opcional)..." : "Digite uma mensagem para assumir a conversa..."}
                         className="w-full bg-transparent text-sm focus:outline-none resize-none leading-relaxed max-h-32 overflow-y-auto"
