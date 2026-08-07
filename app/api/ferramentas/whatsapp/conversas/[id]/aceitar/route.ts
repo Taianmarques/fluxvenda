@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getAgentConfigWithRole } from "@/lib/team";
+import { emitChatEvent } from "@/lib/realtime";
 
 // Atendente aceita a conversa: assume o atendimento manual (pausa a IA) e fica responsável por ela
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -23,6 +24,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     where: { id },
     data: { humanTakeover: true, status: "ATIVO", assignedToId: userId },
   });
+  emitChatEvent(conversation.agentConfigId, id); // some da lista dos colegas na hora, sem esperar o poll
 
   return NextResponse.json({ conversation: updated });
 }

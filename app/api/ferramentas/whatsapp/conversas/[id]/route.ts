@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getAgentConfigWithRole } from "@/lib/team";
+import { emitChatEvent } from "@/lib/realtime";
 import { z } from "zod";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -143,6 +144,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     await prisma.message.create({ data: { conversationId: id, role: "note", content: `TRANSFER: ${texto}` } });
   }
+
+  emitChatEvent(conversation.agentConfigId, id); // atribuição/status/pin somem ou aparecem na lista dos colegas na hora
 
   return NextResponse.json({ conversation: updated });
 }

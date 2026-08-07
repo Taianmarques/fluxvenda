@@ -150,8 +150,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     data: {
       humanTakeover: true,
       status: "ATIVO",
-      // "Primeiro a assumir": quem manda a primeira mensagem manual fica responsável pela conversa
-      ...(config.leadDistributionMode === "PRIMEIRO_A_ASSUMIR" && !conversation.assignedToId && { assignedToId: userId }),
+      // Quem manda a primeira mensagem manual numa conversa ainda sem dono fica responsável por
+      // ela — vale pra qualquer modo de distribuição, não só PRIMEIRO_A_ASSUMIR. Sem isso, sob
+      // MANUAL, um atendente podia responder várias mensagens sem nunca "aceitar" de fato, e a
+      // conversa continuava aparecendo como não atribuída pros colegas.
+      ...(!conversation.assignedToId && { assignedToId: userId }),
     },
   });
 
