@@ -55,6 +55,11 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
   const [importando, setImportando] = useState(false);
   const [importResult, setImportResult] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Passo de configuração antes de confirmar a importação: escolhe atendente/etiqueta
+  // pra aplicar em todo o lote (novos + já existentes), evita selecionar tudo manualmente depois
+  const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
+  const [importAtendenteId, setImportAtendenteId] = useState("");
+  const [importEtiquetaId, setImportEtiquetaId] = useState("");
 
   // Adicionar contato manual
   const [showNovo, setShowNovo] = useState(false);
@@ -189,11 +194,12 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
     return contatos;
   }
 
-  async function handleImportFile(file: File) {
+  async function handleConfirmImport() {
+    if (!pendingImportFile) return;
     setImportando(true);
     setImportResult(null);
     try {
-      const text = await file.text();
+      const text = await pendingImportFile.text();
       const parsed = parseCsv(text).slice(0, 1000);
       if (parsed.length === 0) {
         setImportResult("Nenhum contato encontrado no arquivo. Use uma coluna com o número (DDD + número) e, opcionalmente, uma com o nome.");
@@ -202,11 +208,18 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
       const res = await fetch(`/api/agentes/${agentId}/contatos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contatos: parsed }),
+        body: JSON.stringify({
+          contatos: parsed,
+          ...(importAtendenteId && { atendenteId: importAtendenteId }),
+          ...(importEtiquetaId && { etiquetaId: importEtiquetaId }),
+        }),
       });
       const data = await res.json();
       if (res.ok) {
         setImportResult(`Importação concluída: ${data.criados} novo${data.criados === 1 ? "" : "s"}, ${data.atualizados} atualizado${data.atualizados === 1 ? "" : "s"}${data.ignorados > 0 ? `, ${data.ignorados} ignorado${data.ignorados === 1 ? "" : "s"} (número inválido ou repetido)` : ""}.`);
+        setPendingImportFile(null);
+        setImportAtendenteId("");
+        setImportEtiquetaId("");
         router.refresh();
       } else {
         setImportResult(data.error ?? "Não foi possível importar. Tente novamente.");
@@ -293,7 +306,7 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
               type="file"
               accept=".csv,text/csv,text/plain"
               className="hidden"
-              onChange={e => { const f = e.target.files?.[0]; if (f) handleImportFile(f); }}
+              onChange={e => { const f = e.target.files?.[0]; if (f) setPendingImportFile(f); }}
             />
             <button
               onClick={() => setShowNovo(s => !s)}
@@ -328,6 +341,56 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
           <div className="bg-gray-900 border border-blue-800/40 text-sm text-gray-300 rounded-xl px-4 py-3 flex items-start justify-between gap-3">
             <span>{importResult}</span>
             <button onClick={() => setImportResult(null)} className="text-gray-500 hover:text-white flex-shrink-0"><X size={14} /></button>
+          </div>
+        )}
+
+        {/* Passo de configuração antes de confirmar a importação */}
+        {pendingImportFile && (
+          <div className="bg-blue-950/60 border border-blue-800/50 rounded-2xl px-4 py-3 space-y-3">
+            <p className="text-sm font-medium flex items-center gap-2">
+              <Upload size={14} className="text-blue-400 flex-shrink-0" />
+              Importar <span className="text-blue-300">{pendingImportFile.name}</span> — vincular a um vendedor e/ou aplicar um perfil de carteira (opcional):
+            </p>
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <UserCheck size={14} className="text-blue-400" />
+                <select
+                  value={importAtendenteId}
+                  onChange={e => setImportAtendenteId(e.target.value)}
+                  className="text-xs bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 max-w-[180px]"
+                >
+                  <option value="">Sem vendedor</option>
+                  {attendants.map(a => <option key={a.id} value={a.id}>{a.name}{a.isManager ? " (gestor)" : ""}</option>)}
+                </select>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Tags size={14} className="text-blue-400" />
+                <select
+                  value={importEtiquetaId}
+                  onChange={e => setImportEtiquetaId(e.target.value)}
+                  className="text-xs bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 max-w-[180px]"
+                >
+                  <option value="">Sem perfil de carteira</option>
+                  {etiquetas.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
+                </select>
+              </div>
+              <div className="flex items-center gap-2 ml-auto">
+                <button
+                  onClick={() => { setPendingImportFile(null); setImportAtendenteId(""); setImportEtiquetaId(""); }}
+                  disabled={importando}
+                  className="text-xs text-gray-400 hover:text-white disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleConfirmImport}
+                  disabled={importando}
+                  className="text-xs font-medium bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-4 py-1.5"
+                >
+                  {importando ? "Importando..." : "Confirmar importação"}
+                </button>
+              </div>
+            </div>
           </div>
         )}
 

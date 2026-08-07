@@ -9,6 +9,8 @@ const schema = z.object({
     nome: z.string().trim().max(80).optional(),
     numero: z.string().transform(v => v.replace(/\D/g, "")),
   })).min(1).max(1000),
+  atendenteId: z.string().optional(),  // vincula esse atendente a todo mundo do lote (novos + já existentes)
+  etiquetaId: z.string().optional(),   // aplica essa etiqueta a todo mundo do lote (novos + já existentes)
 });
 
 // Importa contatos em massa (CSV parseado no cliente). Cada contato vira uma conversa sem
@@ -59,6 +61,34 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
     if (existente && !existente.contactName && v.nome?.trim()) {
       await prisma.conversation.update({ where: { id: existente.id }, data: { contactName: v.nome.trim() } });
       atualizados++;
+    }
+  }
+
+  // Vincular atendente e/ou aplicar etiqueta a todo o lote (novos + já existentes) — evita ter
+  // que selecionar tudo manualmente na lista depois de importar um CSV grande.
+  if (body.data.atendenteId || body.data.etiquetaId) {
+    const criadosAgora = novos.length > 0
+      ? await prisma.conversation.findMany({
+          where: { agentConfigId: config.id, contactNumber: { in: novos.map(v => v.numero) } },
+          select: { id: true },
+        })
+      : [];
+    const loteIds = [...criadosAgora.map(c => c.id), ...existentes.map(e => e.id)];
+
+    if (body.data.atendenteId) {
+      const team = await prisma.team.findUnique({ where: { id: config.teamId } });
+      const member = await prisma.teamMember.findUnique({ where: { profileId: body.data.atendenteId } });
+      const pertence = team?.managerId === body.data.atendenteId || member?.teamId === config.teamId;
+      if (pertence) {
+        await prisma.conversation.updateMany({ where: { id: { in: loteIds } }, data: { assignedToId: body.data.atendenteId } });
+      }
+    }
+
+    if (body.data.etiquetaId) {
+      const etiqueta = await prisma.etiqueta.findFirst({ where: { id: body.data.etiquetaId, agentConfigId: config.id } });
+      if (etiqueta) {
+        await prisma.etiqueta.update({ where: { id: etiqueta.id }, data: { conversations: { connect: loteIds.map(id => ({ id })) } } });
+      }
     }
   }
 
