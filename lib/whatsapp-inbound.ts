@@ -816,7 +816,7 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       const perfilLabel = { MARCENEIRO: "Marceneiro", ARQUITETO: "Arquiteto", EMPRESA: "Empresa", CONSUMIDOR_FINAL: "Consumidor final" }[perfil as string];
       await prisma.message.create({ data: { conversationId, role: "note", content: `SDR: perfil do cliente — ${perfilLabel}.` } });
       emitChatEvent(agentConfigId, conversationId);
-      return "Perfil registrado. Continue entendendo o que o cliente procura.";
+      return "OK, salvo internamente — isso é só pra você, NÃO mencione ao cliente que anotou/registrou nada. Continue a conversa naturalmente entendendo o que ele procura.";
     }
 
     if (name === "registrar_material_interesse") {
@@ -828,7 +828,7 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
         data: { conversationId, role: "note", content: `SDR: material de interesse — ${material}.${observacoes ? ` ${observacoes}` : ""}` },
       });
       emitChatEvent(agentConfigId, conversationId);
-      return "Material registrado. Colete as especificações técnicas (cor, espessura, medidas, quantidade).";
+      return "OK, salvo internamente — isso é só pra você, NÃO mencione ao cliente que anotou/registrou nada. Continue naturalmente perguntando UMA especificação técnica de cada vez (cor, espessura, medidas ou quantidade).";
     }
 
     if (name === "registrar_especificacoes_tecnicas") {
@@ -847,7 +847,7 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
 
       await prisma.message.create({ data: { conversationId, role: "note", content: `SDR: especificações técnicas — ${linhas}` } });
       emitChatEvent(agentConfigId, conversationId);
-      return "Especificações registradas. Pergunte se o cliente precisa de corte ou fitamento de borda.";
+      return "OK, salvo internamente — isso é só pra você, NÃO mencione ao cliente que anotou/registrou nada. Se ainda faltar alguma especificação, pergunte só ela agora; senão, pergunte se ele precisa de corte ou fitamento de borda.";
     }
 
     if (name === "registrar_servicos_adicionais") {
@@ -865,7 +865,7 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
         },
       });
       emitChatEvent(agentConfigId, conversationId);
-      return "Serviços registrados. Se já tiver perfil, material e especificações, chame concluir_qualificacao_sdr pra encerrar e transferir pro vendedor.";
+      return "OK, salvo internamente — isso é só pra você, NÃO mencione ao cliente que anotou/registrou nada. Se já tiver perfil, material e especificações, chame concluir_qualificacao_sdr pra encerrar.";
     }
 
     if (name === "concluir_qualificacao_sdr") {
@@ -1548,7 +1548,7 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
   // instruções de comportamento enterradas no meio do texto. A posição final aumenta a
   // aderência do modelo a essa regra. Independe do systemPrompt salvo — vale pra qualquer
   // agente, mesmo os que já tiveram o prompt gerado antes dessa regra existir.
-  const humanizationInstruction = "\n\nESTILO DE ESCRITA HUMANIZADO, SEMPRE VÁLIDO: escreva como uma pessoa de verdade mandando mensagem no WhatsApp, nunca como um robô de atendimento ao cliente. (1) Antes de responder o conteúdo em si, reaja brevemente ao que o cliente disse quando fizer sentido (ex: \"entendi\", \"boa pergunta\", \"faz sentido\", \"ah, saquei\") em vez de pular direto pra resposta seca — mas não faça isso em toda mensagem, varie. (2) Varie a forma de começar as mensagens; nunca repita a mesma estrutura ou saudação em mensagens seguidas da mesma conversa. (3) Evite clichês de atendimento robotizado como \"estou à disposição\", \"não hesite em perguntar\", \"conte comigo para o que precisar\", \"qualquer dúvida estou aqui\", \"será um prazer ajudar\" — fale como uma pessoa falaria de verdade, não como um script de call center. (4) Não repita seu nome ou o nome da empresa a cada mensagem — só no início da conversa ou quando for perguntado. (5) Espelhe o nível de formalidade do cliente dentro do tom configurado: se ele escreve curto e direto, seja mais direto; se escreve formal, mantenha educado sem soar engessado.";
+  const humanizationInstruction = "\n\nESTILO DE ESCRITA HUMANIZADO, SEMPRE VÁLIDO: escreva como uma pessoa de verdade mandando mensagem no WhatsApp, nunca como um robô de atendimento ao cliente. (1) Antes de responder o conteúdo em si, reaja brevemente ao que o cliente disse quando fizer sentido (ex: \"entendi\", \"boa pergunta\", \"faz sentido\", \"ah, saquei\") em vez de pular direto pra resposta seca — mas não faça isso em toda mensagem, varie. (2) Varie a forma de começar as mensagens; nunca repita a mesma estrutura ou saudação em mensagens seguidas da mesma conversa. (3) Evite clichês de atendimento robotizado como \"estou à disposição\", \"não hesite em perguntar\", \"conte comigo para o que precisar\", \"qualquer dúvida estou aqui\", \"será um prazer ajudar\" — fale como uma pessoa falaria de verdade, não como um script de call center. (4) Não repita seu nome ou o nome da empresa a cada mensagem — só no início da conversa ou quando for perguntado. (5) Espelhe o nível de formalidade do cliente dentro do tom configurado: se ele escreve curto e direto, seja mais direto; se escreve formal, mantenha educado sem soar engessado. (6) NUNCA narre ou anuncie suas próprias ações internas pro cliente — frases como \"vou registrar que você precisa de X\", \"anotei isso\", \"já registrei essa informação\" soam robóticas e expõem o funcionamento interno do sistema; uma pessoa de verdade nunca fala assim. Simplesmente siga pra próxima pergunta ou comentário, sem narrar o que você acabou de fazer por trás dos panos. (7) Ao fazer uma pergunta, seja direto e claro sobre o que está pedindo — nunca inverta a pergunta de um jeito que soe como se você estivesse oferecendo a informação em vez de pedindo (errado: \"você gostaria de saber a espessura?\"; certo: \"qual espessura você precisa?\"). Evite frases redundantes que repetem a mesma ideia com palavras diferentes na mesma pergunta.";
 
   const brevityInstruction = "\n\nLEMBRETE FINAL, SEMPRE VÁLIDO: cada mensagem que você escrever vira uma bolha separada no WhatsApp, exatamente como uma pessoa mandando várias mensagens seguidas. Formato obrigatório: cada bolha tem no máximo 2-3 linhas curtas, e bolhas diferentes são separadas por uma linha em branco (pulo de linha duplo) na sua resposta. REGRA MAIS IMPORTANTE: você só pode fazer UMA pergunta por resposta, e ponto final — não é sobre formatar em bolhas diferentes, é sobre PARAR depois de fazer essa pergunta e esperar o cliente responder antes de perguntar a próxima coisa. Se precisar de várias informações (ex: espessura, medida, quantidade), pergunte só a primeira agora; as outras ficam pra depois que o cliente responder essa, uma de cada vez, mesmo que isso alongue a conversa em mais mensagens. Isso vale mesmo quando o pedido não usa \"?\": frases como \"me informe a espessura e a quantidade\" também são dois pedidos — se for perguntar, pergunte só o primeiro." + humanizationInstruction;
 
