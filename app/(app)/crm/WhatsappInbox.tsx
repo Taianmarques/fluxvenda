@@ -1049,7 +1049,7 @@ export function WhatsappInbox({
           {/* Lista de conversas — no mobile, some quando uma conversa está aberta */}
           <aside className={`${mobileChatOpen ? "hidden md:flex" : "flex"} w-full md:w-80 flex-shrink-0 md:border-r ${t.sidebar} flex-col`}>
             <div className={`px-3 py-2.5 border-b ${t.sidebar} flex-shrink-0 space-y-2`}>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1">
                 {([
                   ["ativos", "Ativos"],
                   ["pendentes", "Pendentes"],
@@ -1058,7 +1058,7 @@ export function WhatsappInbox({
                   <button
                     key={key}
                     onClick={() => setStatusFilter(key)}
-                    className={`flex-1 text-xs font-medium px-2.5 py-1.5 rounded-full border text-center transition-colors ${
+                    className={`flex-1 text-xs font-medium px-1.5 py-1.5 rounded-full border text-center whitespace-nowrap transition-colors ${
                       statusFilter === key
                         ? t.statusActive
                         : `border-transparent ${t.toggleBar} ${t.toggleInactive}`
