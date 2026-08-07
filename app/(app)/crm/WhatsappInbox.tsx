@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   MessageCircle, Search, X, Trophy, Lock, Unlock, Bot, User, UserPlus,
   FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap, StickyNote, ArrowRightLeft, HandCoins, CalendarClock, ListFilter, Instagram, ArrowLeft,
-  Reply, Forward, ChevronDown, Package, ImageOff, Pin,
+  Reply, Forward, ChevronDown, Package, ImageOff, Pin, Download, Maximize2,
 } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { EmojiPicker } from "./EmojiPicker";
@@ -239,9 +239,30 @@ function ContactAvatar({ agentId, conversationId, seed, isIg, statusColor }: {
   );
 }
 
+// Nome de arquivo pro download — usa o nome real quando a mensagem trouxe um (ex: legenda de
+// documento), senão cai no basename da URL (a UazAPI serve arquivos com nome tipo hash+extensão).
+function mediaFilename(mediaUrl: string, mediaType: string, content: string, isPlaceholder: boolean): string {
+  if (mediaType === "document" && !isPlaceholder) return content;
+  try {
+    const base = new URL(mediaUrl).pathname.split("/").pop();
+    if (base) return base;
+  } catch {}
+  const ext = mediaType === "image" ? "jpg" : mediaType === "video" ? "mp4" : mediaType === "audio" ? "mp3" : "arquivo";
+  return `${mediaType}.${ext}`;
+}
+
+// A mídia vive em tanacidade.uazapi.com (cross-origin) — o atributo `download` do HTML é
+// ignorado pelo navegador em links cross-origin, por isso passa pelo nosso proxy same-origin.
+function mediaDownloadHref(mediaUrl: string, filename: string): string {
+  return `/api/ferramentas/whatsapp/midia?url=${encodeURIComponent(mediaUrl)}&filename=${encodeURIComponent(filename)}`;
+}
+
 function MediaContent({ mediaUrl, mediaType, content }: { mediaUrl: string; mediaType: string; content: string }) {
   const isPlaceholder = !content || content.startsWith("[");
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const filename = mediaFilename(mediaUrl, mediaType, content, isPlaceholder);
+  const downloadHref = mediaDownloadHref(mediaUrl, filename);
+
   return (
     <div>
       {mediaType === "image" && (
@@ -257,24 +278,79 @@ function MediaContent({ mediaUrl, mediaType, content }: { mediaUrl: string; medi
               className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4"
               onClick={() => setLightboxOpen(false)}
             >
-              <button
-                onClick={() => setLightboxOpen(false)}
-                className="absolute top-4 right-4 text-white/80 hover:text-white p-2 rounded-full hover:bg-white/10"
-                aria-label="Fechar"
-              >
-                <X size={24} />
-              </button>
+              <div className="absolute top-4 right-4 flex items-center gap-2">
+                <a
+                  href={downloadHref}
+                  download={filename}
+                  onClick={e => e.stopPropagation()}
+                  className="text-white/80 hover:text-white p-2 rounded-full hover:bg-white/10"
+                  aria-label="Baixar"
+                >
+                  <Download size={22} />
+                </a>
+                <button
+                  onClick={() => setLightboxOpen(false)}
+                  className="text-white/80 hover:text-white p-2 rounded-full hover:bg-white/10"
+                  aria-label="Fechar"
+                >
+                  <X size={24} />
+                </button>
+              </div>
               <img src={mediaUrl} alt="" className="max-w-full max-h-full object-contain rounded-lg" onClick={e => e.stopPropagation()} />
             </div>
           )}
         </>
       )}
-      {mediaType === "video" && <video controls src={mediaUrl} className="rounded-lg max-w-[240px] mb-1" />}
+      {mediaType === "video" && (
+        <>
+          <div className="relative mb-1 inline-block">
+            <video controls src={mediaUrl} className="rounded-lg max-w-[240px]" />
+            <button
+              onClick={() => setLightboxOpen(true)}
+              title="Tela cheia"
+              className="absolute top-1.5 right-1.5 bg-black/60 hover:bg-black/80 text-white p-1.5 rounded-lg"
+            >
+              <Maximize2 size={14} />
+            </button>
+          </div>
+          {lightboxOpen && (
+            <div
+              className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4"
+              onClick={() => setLightboxOpen(false)}
+            >
+              <div className="absolute top-4 right-4 flex items-center gap-2">
+                <a
+                  href={downloadHref}
+                  download={filename}
+                  onClick={e => e.stopPropagation()}
+                  className="text-white/80 hover:text-white p-2 rounded-full hover:bg-white/10"
+                  aria-label="Baixar"
+                >
+                  <Download size={22} />
+                </a>
+                <button
+                  onClick={() => setLightboxOpen(false)}
+                  className="text-white/80 hover:text-white p-2 rounded-full hover:bg-white/10"
+                  aria-label="Fechar"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              <video controls autoPlay src={mediaUrl} className="max-w-full max-h-full rounded-lg" onClick={e => e.stopPropagation()} />
+            </div>
+          )}
+        </>
+      )}
       {mediaType === "audio" && <audio controls src={mediaUrl} className="mb-1" />}
       {mediaType === "document" && (
-        <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 underline mb-1">
-          <FileText size={14} /> {isPlaceholder ? "Documento" : content}
-        </a>
+        <div className="flex items-center gap-2 mb-1">
+          <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 underline">
+            <FileText size={14} /> {isPlaceholder ? "Documento" : content}
+          </a>
+          <a href={downloadHref} download={filename} title="Baixar" className="opacity-70 hover:opacity-100 flex-shrink-0">
+            <Download size={14} />
+          </a>
+        </div>
       )}
       {!isPlaceholder && mediaType !== "document" && <p className="whitespace-pre-wrap">{content}</p>}
     </div>
