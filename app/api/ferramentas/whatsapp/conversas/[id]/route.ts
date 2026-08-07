@@ -101,6 +101,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const encerrando = body.data.status === "FINALIZADO";
   const reabrindo = body.data.status !== undefined && body.data.status !== "FINALIZADO" && conversation.status === "FINALIZADO";
+  const assignedToIdMudou = body.data.assignedToId !== undefined && body.data.assignedToId !== conversation.assignedToId;
 
   const updated = await prisma.conversation.update({
     where: { id },
@@ -121,6 +122,26 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     await prisma.message.create({
       data: { conversationId: id, role: "note", content: `Atendimento encerrado — motivo: ${body.data.motivoEncerramento}.` },
     });
+  }
+
+  // Log de transferência — vira um banner de sistema na conversa (não é mensagem enviada ao
+  // cliente). Prefixo "TRANSFER:" avisa o front pra renderizar diferente da nota interna comum.
+  if (assignedToIdMudou) {
+    const ids = [conversation.assignedToId, body.data.assignedToId].filter((v): v is string => Boolean(v));
+    const perfis = ids.length > 0 ? await prisma.profile.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } }) : [];
+    const nomePorId = new Map(perfis.map(p => [p.id, p.name]));
+    const nomeAntigo = conversation.assignedToId ? (nomePorId.get(conversation.assignedToId) ?? "atendente removido") : null;
+    const nomeNovo = body.data.assignedToId ? (nomePorId.get(body.data.assignedToId) ?? "atendente removido") : null;
+    const agora = new Date();
+    const quando = `${agora.toLocaleDateString("pt-BR")} às ${agora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
+
+    const texto = nomeAntigo && nomeNovo
+      ? `Atendimento transferido de ${nomeAntigo} para ${nomeNovo} em ${quando}`
+      : nomeNovo
+        ? `Atendimento atribuído a ${nomeNovo} em ${quando}`
+        : `Atendimento ficou sem atendente em ${quando}`;
+
+    await prisma.message.create({ data: { conversationId: id, role: "note", content: `TRANSFER: ${texto}` } });
   }
 
   return NextResponse.json({ conversation: updated });

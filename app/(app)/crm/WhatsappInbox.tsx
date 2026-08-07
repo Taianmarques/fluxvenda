@@ -1348,6 +1348,15 @@ export function WhatsappInbox({
 
                 <div ref={chatScrollRef} onScroll={handleChatScroll} className={`flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-5 space-y-2 ${t.chatBg}`}>
                   {detail.messages.map(m => {
+                    if (m.role === "note" && m.content.startsWith("TRANSFER:")) {
+                      return (
+                        <div key={m.id} className="flex justify-center">
+                          <div className="w-full max-w-md bg-blue-600 text-white text-xs font-medium text-center rounded-lg px-3 py-2">
+                            {m.content.replace(/^TRANSFER:\s*/, "")}
+                          </div>
+                        </div>
+                      );
+                    }
                     if (m.role === "note") {
                       return (
                         <div key={m.id} className="flex justify-center">
