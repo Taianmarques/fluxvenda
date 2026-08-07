@@ -241,9 +241,34 @@ function ContactAvatar({ agentId, conversationId, seed, isIg, statusColor }: {
 
 function MediaContent({ mediaUrl, mediaType, content }: { mediaUrl: string; mediaType: string; content: string }) {
   const isPlaceholder = !content || content.startsWith("[");
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   return (
     <div>
-      {mediaType === "image" && <img src={mediaUrl} alt="" className="rounded-lg max-w-[240px] max-h-[240px] object-cover mb-1" />}
+      {mediaType === "image" && (
+        <>
+          <img
+            src={mediaUrl}
+            alt=""
+            onClick={() => setLightboxOpen(true)}
+            className="rounded-lg max-w-[240px] max-h-[240px] object-cover mb-1 cursor-pointer hover:opacity-90 transition-opacity"
+          />
+          {lightboxOpen && (
+            <div
+              className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4"
+              onClick={() => setLightboxOpen(false)}
+            >
+              <button
+                onClick={() => setLightboxOpen(false)}
+                className="absolute top-4 right-4 text-white/80 hover:text-white p-2 rounded-full hover:bg-white/10"
+                aria-label="Fechar"
+              >
+                <X size={24} />
+              </button>
+              <img src={mediaUrl} alt="" className="max-w-full max-h-full object-contain rounded-lg" onClick={e => e.stopPropagation()} />
+            </div>
+          )}
+        </>
+      )}
       {mediaType === "video" && <video controls src={mediaUrl} className="rounded-lg max-w-[240px] mb-1" />}
       {mediaType === "audio" && <audio controls src={mediaUrl} className="mb-1" />}
       {mediaType === "document" && (
