@@ -9,8 +9,8 @@ const schema = z.object({
     nome: z.string().trim().max(80).optional(),
     numero: z.string().transform(v => v.replace(/\D/g, "")),
   })).min(1).max(1000),
-  atendenteId: z.string().optional(),  // vincula esse atendente a todo mundo do lote (novos + já existentes)
-  etiquetaId: z.string().optional(),   // aplica essa etiqueta a todo mundo do lote (novos + já existentes)
+  atendenteId: z.string().optional(), // vincula esse atendente a todo mundo do lote (novos + já existentes)
+  nivelCarteira: z.enum(["A", "B", "C", "INATIVO", "PERDIDO"]).optional(), // override manual do nível pra todo o lote
 });
 
 // Importa contatos em massa (CSV parseado no cliente). Cada contato vira uma conversa sem
@@ -64,9 +64,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
     }
   }
 
-  // Vincular atendente e/ou aplicar etiqueta a todo o lote (novos + já existentes) — evita ter
-  // que selecionar tudo manualmente na lista depois de importar um CSV grande.
-  if (body.data.atendenteId || body.data.etiquetaId) {
+  // Vincular atendente e/ou definir o nível da carteira (override manual) pra todo o lote
+  // (novos + já existentes) — evita ter que selecionar tudo manualmente na lista depois de
+  // importar um CSV grande.
+  if (body.data.atendenteId || body.data.nivelCarteira) {
     const criadosAgora = novos.length > 0
       ? await prisma.conversation.findMany({
           where: { agentConfigId: config.id, contactNumber: { in: novos.map(v => v.numero) } },
@@ -84,11 +85,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
       }
     }
 
-    if (body.data.etiquetaId) {
-      const etiqueta = await prisma.etiqueta.findFirst({ where: { id: body.data.etiquetaId, agentConfigId: config.id } });
-      if (etiqueta) {
-        await prisma.etiqueta.update({ where: { id: etiqueta.id }, data: { conversations: { connect: loteIds.map(id => ({ id })) } } });
-      }
+    if (body.data.nivelCarteira) {
+      await prisma.conversation.updateMany({ where: { id: { in: loteIds } }, data: { nivelCarteira: body.data.nivelCarteira } });
     }
   }
 

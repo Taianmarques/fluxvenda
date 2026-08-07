@@ -7,6 +7,15 @@ import { BookUser, Search, Pencil, MessageCircle, Download, Upload, Instagram, X
 
 export type Etiqueta = { id: string; nome: string; cor: string };
 
+// Mesmo enum/labels do override manual em CarteiraClient.tsx (Nível da carteira)
+const NIVEL_CARTEIRA_OPTIONS = [
+  { value: "A", label: "A" },
+  { value: "B", label: "B" },
+  { value: "C", label: "C" },
+  { value: "INATIVO", label: "Inativo" },
+  { value: "PERDIDO", label: "Perdido" },
+] as const;
+
 export type Contato = {
   conversationId: string;
   contactName: string | null;
@@ -55,11 +64,11 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
   const [importando, setImportando] = useState(false);
   const [importResult, setImportResult] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  // Passo de configuração antes de confirmar a importação: escolhe atendente/etiqueta
+  // Passo de configuração antes de confirmar a importação: escolhe atendente/nível da carteira
   // pra aplicar em todo o lote (novos + já existentes), evita selecionar tudo manualmente depois
   const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
   const [importAtendenteId, setImportAtendenteId] = useState("");
-  const [importEtiquetaId, setImportEtiquetaId] = useState("");
+  const [importNivelCarteira, setImportNivelCarteira] = useState("");
 
   // Adicionar contato manual
   const [showNovo, setShowNovo] = useState(false);
@@ -211,7 +220,7 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
         body: JSON.stringify({
           contatos: parsed,
           ...(importAtendenteId && { atendenteId: importAtendenteId }),
-          ...(importEtiquetaId && { etiquetaId: importEtiquetaId }),
+          ...(importNivelCarteira && { nivelCarteira: importNivelCarteira }),
         }),
       });
       const data = await res.json();
@@ -219,7 +228,7 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
         setImportResult(`Importação concluída: ${data.criados} novo${data.criados === 1 ? "" : "s"}, ${data.atualizados} atualizado${data.atualizados === 1 ? "" : "s"}${data.ignorados > 0 ? `, ${data.ignorados} ignorado${data.ignorados === 1 ? "" : "s"} (número inválido ou repetido)` : ""}.`);
         setPendingImportFile(null);
         setImportAtendenteId("");
-        setImportEtiquetaId("");
+        setImportNivelCarteira("");
         router.refresh();
       } else {
         setImportResult(data.error ?? "Não foi possível importar. Tente novamente.");
@@ -366,17 +375,17 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
               <div className="flex items-center gap-1.5">
                 <Tags size={14} className="text-blue-400" />
                 <select
-                  value={importEtiquetaId}
-                  onChange={e => setImportEtiquetaId(e.target.value)}
+                  value={importNivelCarteira}
+                  onChange={e => setImportNivelCarteira(e.target.value)}
                   className="text-xs bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 max-w-[180px]"
                 >
-                  <option value="">Sem perfil de carteira</option>
-                  {etiquetas.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
+                  <option value="">Nível automático</option>
+                  {NIVEL_CARTEIRA_OPTIONS.map(n => <option key={n.value} value={n.value}>{n.label}</option>)}
                 </select>
               </div>
               <div className="flex items-center gap-2 ml-auto">
                 <button
-                  onClick={() => { setPendingImportFile(null); setImportAtendenteId(""); setImportEtiquetaId(""); }}
+                  onClick={() => { setPendingImportFile(null); setImportAtendenteId(""); setImportNivelCarteira(""); }}
                   disabled={importando}
                   className="text-xs text-gray-400 hover:text-white disabled:opacity-50"
                 >
