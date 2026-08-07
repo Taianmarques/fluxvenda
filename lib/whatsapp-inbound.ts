@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import {
   runAgent, runAgentWithImage, runAgentWithTools, classifyLeadQualified,
   SCHEDULING_TOOLS, COMMERCE_TOOLS, BILLING_TOOLS, PROSPECTING_TOOLS, POSVENDA_TOOLS, PIPELINE_TOOLS, DEPARTAMENTO_TOOLS,
-  PREVENDA_VEICULO_TOOLS, SDR_MATERIAIS_TOOLS,
+  PREVENDA_VEICULO_TOOLS, SDR_MATERIAIS_TOOLS, TRANSFERIR_FOTO_TOOLS,
 } from "@/lib/agent-engine";
 import { textToSpeech } from "@/lib/elevenlabs";
 import { logTokenUsage, isOverQuota } from "@/lib/token-usage";
@@ -720,6 +720,24 @@ function makeExecuteTool(config: AgentConfigFull, conversationId: string, contac
       return `Conversa transferida para "${dep.nome}"${assignedName ? ` (atendente: ${assignedName})` : ""}. Na SUA RESPOSTA, avise o cliente com naturalidade que o setor vai atendê-lo em instantes. Depois desta mensagem você para de responder — o atendimento é humano a partir daqui.`;
     }
 
+    if (name === "transferir_atendente_foto") {
+      const motivo = typeof args?.motivo === "string" ? args.motivo.trim() : "";
+      const current = await prisma.conversation.findUnique({ where: { id: conversationId }, select: { assignedToId: true } });
+      const assignedToId = resolveHandoffAssignee(config, current?.assignedToId ?? null);
+
+      await prisma.conversation.update({
+        where: { id: conversationId },
+        data: { humanTakeover: true, status: "ATIVO", ...(assignedToId ? { assignedToId } : {}) },
+      });
+      await prisma.message.create({
+        data: { conversationId, role: "note", content: `Transferida pela IA — cliente pediu foto/imagem.${motivo ? ` ${motivo}` : ""}` },
+      });
+      emitChatEvent(agentConfigId, conversationId);
+      notifyHumanTakeoverMessage(config, conversationId, assignedToId, contactName ?? contactNumber, motivo || "Cliente pediu foto/imagem de um produto.").catch(() => {});
+
+      return "Conversa transferida pra um atendente humano. Na SUA RESPOSTA, avise o cliente com naturalidade que alguém vai te mandar a foto em instantes. Depois desta mensagem você para de responder — o atendimento é humano a partir daqui.";
+    }
+
     if (name === "registrar_veiculo_interesse") {
       const tipo = args?.tipo === "MOTO" ? "MOTO" : args?.tipo === "CARRO" ? "CARRO" : null;
       const modeloDesejado = typeof args?.modeloDesejado === "string" ? args.modeloDesejado.trim() : "";
@@ -822,9 +840,11 @@ function makeExecuteTool(config: AgentConfigFull, conversationId: string, contac
       // critério de "quem a IA atende" depois que o SDR captura o dado, nunca antes.
       const perfisExcluidos = Array.isArray(config.iaPerfisExcluidos) ? config.iaPerfisExcluidos as string[] : [];
       if (perfisExcluidos.includes(perfil)) {
+        const current = await prisma.conversation.findUnique({ where: { id: conversationId }, select: { assignedToId: true } });
+        const assignedToId = resolveHandoffAssignee(config, current?.assignedToId ?? null);
         const conversation = await prisma.conversation.update({
           where: { id: conversationId },
-          data: { humanTakeover: true, status: "ATIVO" },
+          data: { humanTakeover: true, status: "ATIVO", ...(assignedToId ? { assignedToId } : {}) },
         });
         notifyHumanTakeoverMessage(config, conversationId, conversation.assignedToId, contactName ?? contactNumber, `Perfil ${perfilLabel} — atendimento humano configurado para este perfil.`).catch(() => {});
         return `Perfil ${perfilLabel} configurado para atendimento humano, não pela IA. Na SUA RESPOSTA, avise o cliente com naturalidade que um atendente vai continuar a conversa em instantes. Depois desta mensagem você para de responder — o atendimento é humano a partir daqui.`;
@@ -930,10 +950,16 @@ function makeExecuteTool(config: AgentConfigFull, conversationId: string, contac
         }
       }
 
-      // Não força atribuição — quem assume depende do leadDistributionMode já configurado
-      // (RODIZIO/IA_QUALIFICACAO já teriam atribuído antes; PRIMEIRO_A_ASSUMIR/MANUAL ficam
-      // pro primeiro humano que agir).
-      await prisma.conversation.update({ where: { id: conversationId }, data: { humanTakeover: true, status: "ATIVO" } });
+      // Não força atribuição por padrão — quem assume depende do leadDistributionMode já
+      // configurado (RODIZIO/IA_QUALIFICACAO já teriam atribuído antes; PRIMEIRO_A_ASSUMIR/MANUAL
+      // ficam pro primeiro humano que agir) — a menos que iaLeadAttendantId esteja configurado,
+      // caso em que resolveHandoffAssignee preenche o vendedor fixo pra receber leads da IA.
+      const currentConv = await prisma.conversation.findUnique({ where: { id: conversationId }, select: { assignedToId: true } });
+      const assignedToId = resolveHandoffAssignee(config, currentConv?.assignedToId ?? null);
+      await prisma.conversation.update({
+        where: { id: conversationId },
+        data: { humanTakeover: true, status: "ATIVO", ...(assignedToId ? { assignedToId } : {}) },
+      });
       await prisma.message.create({
         data: {
           conversationId, role: "note",
@@ -941,6 +967,7 @@ function makeExecuteTool(config: AgentConfigFull, conversationId: string, contac
         },
       });
       emitChatEvent(agentConfigId, conversationId);
+      notifyHumanTakeoverMessage(config, conversationId, assignedToId, contactName ?? contactNumber, "Qualificação SDR concluída — cliente pronto pro orçamento.").catch(() => {});
 
       return "Qualificação concluída, nota interna com o resumo criada e oportunidade criada/avançada no funil. Na SUA RESPOSTA, peça um momento ao cliente e avise que em instantes o orçamento vai ser encaminhado, com base no que foi conversado — não diga que vai \"encaminhar para um vendedor\" nem mencione um humano assumindo, o foco é o orçamento chegando. Depois desta mensagem você para de responder — o atendimento é humano a partir daqui.";
     }
@@ -1379,6 +1406,15 @@ function shouldAiHandle(config: AgentConfigFull, conversation: { assignedToId: s
   return true;
 }
 
+// Vendedor que recebe os handoffs originados pela IA (SDR, transferir_atendente_foto, exclusão
+// por perfil) — só entra em ação se a conversa ainda não tem dono, nunca rouba de quem já
+// assumiu. Sem iaLeadAttendantId configurado, mantém o comportamento padrão (fica null, respeita
+// leadDistributionMode normalmente).
+function resolveHandoffAssignee(config: AgentConfigFull, currentAssignedToId: string | null): string | null {
+  if (currentAssignedToId) return currentAssignedToId;
+  return config.iaLeadAttendantId ?? null;
+}
+
 const SESSION_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export async function processIncomingMessage(config: AgentConfigFull, msg: IncomingMessage, adapter: ChannelAdapter, opts?: { enforceSessionWindow?: boolean }): Promise<void> {
@@ -1547,6 +1583,7 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
         })
       : []),
     ...(config.sdrMateriaisEnabled ? SDR_MATERIAIS_TOOLS : []),
+    ...(config.transferirAoPedirFoto ? TRANSFERIR_FOTO_TOOLS : []),
   ];
 
   // Instrução de emoji injetada em tempo de execução — não exige regenerar o systemPrompt

@@ -43,6 +43,8 @@ const schema = z.object({
   iaNiveisCarteiraExcluidos: z.array(z.enum(["A", "B", "C", "INATIVO", "PERDIDO"])).max(5).default([]),
   iaNumerosBloqueados: z.array(z.string().transform(v => v.replace(/\D/g, ""))).max(500).default([]),
   iaPerfisExcluidos: z.array(z.enum(["MARCENEIRO", "ARQUITETO", "EMPRESA", "CONSUMIDOR_FINAL"])).max(4).default([]),
+  transferirAoPedirFoto: z.boolean().default(false),
+  iaLeadAttendantId: z.string().nullable().optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {
@@ -61,9 +63,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
     objetivo, fluxoAtendimento, comportamento, fluxoGatilhos, sdrMateriaisEnabled,
     followupEnabled, followupDelaysMinutes, emojiEnabled,
     iaIgnoraAtribuidos, iaNiveisCarteiraExcluidos, iaNumerosBloqueados, iaPerfisExcluidos,
+    transferirAoPedirFoto, iaLeadAttendantId,
   } = body.data;
 
   const team = await prisma.team.findUnique({ where: { id: existing.teamId } });
+
+  // Confirma que o vendedor escolhido pra receber leads da IA pertence a este time — evita
+  // gravar um profileId arbitrário vindo do client
+  let resolvedIaLeadAttendantId: string | null = null;
+  if (iaLeadAttendantId) {
+    const member = await prisma.teamMember.findUnique({ where: { profileId: iaLeadAttendantId } });
+    const pertence = team?.managerId === iaLeadAttendantId || member?.teamId === existing.teamId;
+    if (pertence) resolvedIaLeadAttendantId = iaLeadAttendantId;
+  }
 
   // Só regenera o system prompt se a personalidade/informações da empresa realmente mudaram
   const personaChanged = existing.nome !== nome || existing.tom !== tom || existing.horario !== horario
@@ -88,6 +100,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
       objetivo, fluxoAtendimento, comportamento, fluxoGatilhos, sdrMateriaisEnabled,
       systemPrompt, followupEnabled, followupDelaysMinutes, emojiEnabled,
       iaIgnoraAtribuidos, iaNiveisCarteiraExcluidos, iaNumerosBloqueados, iaPerfisExcluidos,
+      transferirAoPedirFoto, iaLeadAttendantId: resolvedIaLeadAttendantId,
     },
   });
 

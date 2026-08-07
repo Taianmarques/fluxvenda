@@ -28,7 +28,11 @@ type InitialConfig = {
   iaNiveisCarteiraExcluidos: string[];
   iaNumerosBloqueados: string[];
   iaPerfisExcluidos: string[];
+  transferirAoPedirFoto: boolean;
+  iaLeadAttendantId: string | null;
 } | null;
+
+type Attendant = { id: string; name: string; isManager: boolean };
 
 type DelayUnit = "horas" | "minutos";
 type DelayRow = { value: number; unit: DelayUnit };
@@ -205,6 +209,16 @@ export function WhatsappAgentClient({
   const [iaNiveisCarteiraExcluidos, setIaNiveisCarteiraExcluidos] = useState<string[]>(initialConfig?.iaNiveisCarteiraExcluidos ?? []);
   const [iaPerfisExcluidos, setIaPerfisExcluidos] = useState<string[]>(initialConfig?.iaPerfisExcluidos ?? []);
   const [iaNumerosBloqueadosText, setIaNumerosBloqueadosText] = useState((initialConfig?.iaNumerosBloqueados ?? []).join("\n"));
+  const [transferirAoPedirFoto, setTransferirAoPedirFoto] = useState(initialConfig?.transferirAoPedirFoto ?? false);
+  const [iaLeadAttendantId, setIaLeadAttendantId] = useState(initialConfig?.iaLeadAttendantId ?? "");
+  const [attendants, setAttendants] = useState<Attendant[]>([]);
+
+  useEffect(() => {
+    fetch(`/api/agentes/${agentId}/atendentes`)
+      .then(res => res.json())
+      .then(data => { if (data.attendants) setAttendants(data.attendants); })
+      .catch(() => {});
+  }, [agentId]);
 
   function addFollowupAttempt() {
     const last = followupDelays[followupDelays.length - 1] ?? { value: 24, unit: "horas" as DelayUnit };
@@ -257,6 +271,7 @@ export function WhatsappAgentClient({
           emojiEnabled,
           iaIgnoraAtribuidos, iaNiveisCarteiraExcluidos, iaPerfisExcluidos,
           iaNumerosBloqueados: splitLines(iaNumerosBloqueadosText),
+          transferirAoPedirFoto, iaLeadAttendantId: iaLeadAttendantId || null,
         }),
       });
       if (!res.ok) throw new Error();
@@ -327,6 +342,7 @@ export function WhatsappAgentClient({
           emojiEnabled,
           iaIgnoraAtribuidos, iaNiveisCarteiraExcluidos, iaPerfisExcluidos,
           iaNumerosBloqueados: splitLines(iaNumerosBloqueadosText),
+          transferirAoPedirFoto, iaLeadAttendantId: iaLeadAttendantId || null,
         }),
       });
       if (!res.ok) throw new Error();
@@ -647,6 +663,25 @@ export function WhatsappAgentClient({
             <input type="checkbox" checked={iaIgnoraAtribuidos} onChange={e => setIaIgnoraAtribuidos(e.target.checked)} className="w-4 h-4" />
             <span className="text-sm">Não responder conversas que já têm um vendedor atribuído</span>
           </label>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={transferirAoPedirFoto} onChange={e => setTransferirAoPedirFoto(e.target.checked)} className="w-4 h-4" />
+            <span className="text-sm">Transferir direto pra um atendente quando o cliente pedir foto/imagem</span>
+          </label>
+          <p className="text-xs text-gray-500 -mt-2">A IA não consegue enviar mídia — em vez de tentar contornar, ela já passa a conversa pra um humano assim que perceber o pedido.</p>
+
+          <div>
+            <label className="text-sm text-gray-400 block mb-1.5">Vendedor que recebe os leads transferidos pela IA</label>
+            <select
+              value={iaLeadAttendantId}
+              onChange={e => setIaLeadAttendantId(e.target.value)}
+              className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+            >
+              <option value="">Sem preferência (segue a distribuição padrão)</option>
+              {attendants.map(a => <option key={a.id} value={a.id}>{a.name}{a.isManager ? " (gestor)" : ""}</option>)}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">Vale só pra conversas ainda sem atendente — quando a IA transfere (SDR, pedido de foto, perfil excluído), esse vendedor é definido automaticamente. Não rouba conversas que já têm alguém.</p>
+          </div>
 
           <div>
             <label className="text-sm text-gray-400 block mb-1.5">Não responder estes níveis de carteira</label>

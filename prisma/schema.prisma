@@ -660,6 +660,15 @@ model AgentConfig {
   iaNumerosBloqueados       Json   @default("[]")  // números (só dígitos) que a IA nunca responde
   iaPerfisExcluidos         Json   @default("[]")  // ["MARCENEIRO","ARQUITETO","EMPRESA","CONSUMIDOR_FINAL"] — só some efeito com sdrMateriaisEnabled, verificado assim que registrar_perfil_lead roda
 
+  // Transferência automática pra humano quando o cliente pede foto/imagem (a IA não consegue
+  // enviar) — expõe a tool transferir_atendente_foto só quando ativo.
+  transferirAoPedirFoto Boolean @default(false)
+
+  // Vendedor que recebe os leads que a IA transfere (SDR, transferirAoPedirFoto, exclusão por
+  // perfil) — quando definido, sobrepõe o "não força atribuição" padrão só pra esses handoffs
+  // originados pela IA. Null = mantém o comportamento padrão (respeita leadDistributionMode).
+  iaLeadAttendantId String?
+
   // Estado inicial de todo agente novo: mensagens são salvas normalmente mas a IA não
   // responde em nenhum canal, até o gestor clicar em "Ativar IA" (vê/valida antes de ir ao ar).
   learningMode Boolean @default(false)
