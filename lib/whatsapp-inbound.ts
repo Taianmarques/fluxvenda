@@ -874,11 +874,21 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       // Junta os dados já registrados nas etapas anteriores (perfil, material,
       // especificações, serviços) numa nota interna única — o vendedor vê tudo de uma vez em
       // vez de procurar espalhado nas notas individuais de cada etapa.
+      // Dedup por categoria (texto antes do "—"): o modelo às vezes rechama uma ferramenta já
+      // registrada quando está registrando outra no mesmo turno — sem isso o vendedor veria o
+      // mesmo dado repetido várias vezes no resumo. Fica só o registro mais recente de cada
+      // categoria; a ordem de exibição segue a primeira vez que cada categoria apareceu.
       const sdrNotes = await prisma.message.findMany({
         where: { conversationId, role: "note", content: { startsWith: "SDR:" } },
         orderBy: { createdAt: "asc" },
       });
-      const qualificacaoResumo = sdrNotes.map(n => `• ${n.content.replace(/^SDR:\s*/, "")}`).join("\n");
+      const porCategoria = new Map<string, string>();
+      for (const n of sdrNotes) {
+        const texto = n.content.replace(/^SDR:\s*/, "");
+        const categoria = texto.split(" — ")[0] ?? texto;
+        porCategoria.set(categoria, texto);
+      }
+      const qualificacaoResumo = Array.from(porCategoria.values()).map(t => `• ${t}`).join("\n");
 
       // Cria/avança a oportunidade no funil — etapa seguinte à atual, ou a 2ª etapa do funil
       // padrão se a oportunidade ainda não existe (sinaliza "saiu de novo lead", sem depender
@@ -1572,7 +1582,7 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
     // não é o modelo "esquecer o fluxo", é ele pular uma ferramenta quando o cliente manda
     // várias informações juntas numa mensagem só (ex: material + cor + quantidade de uma vez).
     const sdrReinforcement = config.sdrMateriaisEnabled
-      ? "\n\nLEMBRETE DO FLUXO DE PRÉ-VENDAS (prioridade máxima): mesmo que o cliente informe várias coisas de uma vez na mesma mensagem (ex: material, cor, espessura e quantidade juntos), registre CADA informação com a ferramenta correspondente antes de seguir para a próxima etapa — nunca pule uma etapa do fluxo nem deixe de chamar uma ferramenta só porque os dados vieram juntos."
+      ? "\n\nLEMBRETE DO FLUXO DE PRÉ-VENDAS (prioridade máxima): mesmo que o cliente informe várias coisas de uma vez na mesma mensagem (ex: material, cor, espessura e quantidade juntos), registre CADA informação com a ferramenta correspondente antes de seguir para a próxima etapa — nunca pule uma etapa do fluxo nem deixe de chamar uma ferramenta só porque os dados vieram juntos. NÃO chame de novo uma ferramenta de registro (registrar_perfil_lead, registrar_material_interesse, registrar_especificacoes_tecnicas, registrar_servicos_adicionais) pra uma informação que você já registrou com sucesso antes nesta mesma conversa — cada dado só precisa ser registrado uma vez. Só chame de novo se o cliente estiver corrigindo ou atualizando algo que já foi registrado."
       : "";
 
     const result = await runAgentWithTools(
