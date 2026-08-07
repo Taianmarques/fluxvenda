@@ -1566,8 +1566,17 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
       + (departamentos.length > 0 ? buildDepartamentosContext(departamentos) : "")
       + (isProspect ? (await buildProspeccaoContext(config.id, contactNumber) ?? "") : "")
       + (config.sdrMateriaisEnabled ? buildSdrMateriaisContext() : "");
+
+    // Reforço do fluxo de qualificação na posição MAIS FINAL de todas (depois até do
+    // brevityInstruction) — é a regra de negócio mais crítica desse agente, e o risco real
+    // não é o modelo "esquecer o fluxo", é ele pular uma ferramenta quando o cliente manda
+    // várias informações juntas numa mensagem só (ex: material + cor + quantidade de uma vez).
+    const sdrReinforcement = config.sdrMateriaisEnabled
+      ? "\n\nLEMBRETE DO FLUXO DE PRÉ-VENDAS (prioridade máxima): mesmo que o cliente informe várias coisas de uma vez na mesma mensagem (ex: material, cor, espessura e quantidade juntos), registre CADA informação com a ferramenta correspondente antes de seguir para a próxima etapa — nunca pule uma etapa do fluxo nem deixe de chamar uma ferramenta só porque os dados vieram juntos."
+      : "";
+
     const result = await runAgentWithTools(
-      activeSystemPrompt + extraContext + brevityInstruction,
+      activeSystemPrompt + extraContext + brevityInstruction + sdrReinforcement,
       historyForAgent,
       text,
       tools,
