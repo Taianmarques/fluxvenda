@@ -1543,6 +1543,13 @@ model Message {
   replyTo     Message?  @relation("MessageReply", fields: [replyToId], references: [id], onDelete: SetNull, onUpdate: NoAction)
   replies     Message[] @relation("MessageReply")
 
+  // Editar/apagar mensagem já enviada — reflete a ação real no WhatsApp (via UazAPI), não é
+  // só cosmético no nosso banco. editedAt fica só como indicador visual ("editada"); deletedAt
+  // preserva a linha (mantém a posição na conversa e não quebra replyTo de outras mensagens),
+  // mas o conteúdo já foi limpo no momento da exclusão.
+  editedAt  DateTime?
+  deletedAt DateTime?
+
   @@index([conversationId, waMessageId])
 }
 

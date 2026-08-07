@@ -139,6 +139,38 @@ export async function downloadMessageMedia(token: string, messageId: string): Pr
   return res.json();
 }
 
+// Apaga uma mensagem já enviada "para todos" no WhatsApp real (não só no nosso banco).
+// `messageId` = waMessageId (id que a UazAPI devolveu no envio original).
+export async function deleteMessageOnWhatsApp(token: string, messageId: string): Promise<boolean> {
+  const res = await fetch(`${UAZAPI_URL}/message/delete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", token },
+    body: JSON.stringify({ id: messageId }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    console.error(`[whatsapp] Erro ao apagar mensagem: ${res.status} ${body}`);
+    return false;
+  }
+  return true;
+}
+
+// Edita o texto de uma mensagem já enviada no WhatsApp real (janela de tempo definida pelo
+// próprio WhatsApp, não pela UazAPI — pode falhar se a mensagem for antiga demais).
+export async function editMessageOnWhatsApp(token: string, messageId: string, text: string): Promise<boolean> {
+  const res = await fetch(`${UAZAPI_URL}/message/edit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", token },
+    body: JSON.stringify({ id: messageId, text }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    console.error(`[whatsapp] Erro ao editar mensagem: ${res.status} ${body}`);
+    return false;
+  }
+  return true;
+}
+
 // Busca a foto de perfil de um contato/chat (URL assinada da CDN do WhatsApp — expira depois
 // de um tempo, nunca deve ser guardada permanentemente, só usada na hora). `chatId` é o
 // número com "@s.whatsapp.net" (contato individual) ou "@g.us" (grupo).

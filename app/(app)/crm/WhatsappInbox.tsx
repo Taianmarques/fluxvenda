@@ -47,6 +47,9 @@ type Message = {
   createdAt: string;
   sender?: { name: string } | null;
   forwarded?: boolean;
+  waMessageId?: string | null;
+  editedAt?: string | null;
+  deletedAt?: string | null;
   replyTo?: { id: string; content: string; role: string; mediaType?: string | null; sender?: { name: string } | null } | null;
 };
 
@@ -409,6 +412,11 @@ export function WhatsappInbox({
   const [forwardTargets, setForwardTargets] = useState<string[]>([]);
   const [forwardSearch, setForwardSearch] = useState("");
   const [forwarding, setForwarding] = useState(false);
+  // Editar/apagar mensagem já enviada (reflete no WhatsApp de verdade)
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
   // Enviar item do catálogo manualmente (foto + legenda) na conversa
   const [pickingProduct, setPickingProduct] = useState(false);
   const [catalogProducts, setCatalogProducts] = useState<CatalogProduct[] | null>(null);
@@ -826,6 +834,45 @@ export function WhatsappInbox({
   function handlePrimaryAction() {
     if (noteMode) handleSendNote();
     else handleSend();
+  }
+
+  function startEditingMessage(m: Message) {
+    setEditingMessageId(m.id);
+    setEditingContent(m.content);
+    setMsgMenuId(null);
+  }
+
+  async function handleSaveEdit() {
+    if (!editingMessageId || !selectedId || !editingContent.trim() || savingEdit) return;
+    setSavingEdit(true);
+    try {
+      const res = await fetch(`/api/ferramentas/whatsapp/conversas/${selectedId}/mensagem/${editingMessageId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: editingContent.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { alert(data.error ?? "Não foi possível editar a mensagem."); return; }
+      setEditingMessageId(null);
+      await refreshDetail(selectedId);
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  async function handleDeleteMessage(m: Message) {
+    if (!selectedId || deletingMessageId) return;
+    if (!confirm("Apagar esta mensagem para todos no WhatsApp? Essa ação não pode ser desfeita.")) return;
+    setDeletingMessageId(m.id);
+    setMsgMenuId(null);
+    try {
+      const res = await fetch(`/api/ferramentas/whatsapp/conversas/${selectedId}/mensagem/${m.id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { alert(data.error ?? "Não foi possível apagar a mensagem."); return; }
+      await refreshDetail(selectedId);
+    } finally {
+      setDeletingMessageId(null);
+    }
   }
 
   // Nome mostrado no bloco de citação: quem escreveu a mensagem citada
@@ -1321,14 +1368,16 @@ export function WhatsappInbox({
                           m.role === "assistant" ? t.bubbleAssistant :
                           t.bubbleIncoming
                         }`}>
-                          {/* Menu da mensagem (responder/encaminhar) — hover no desktop, sempre sutil no mobile */}
-                          <button
-                            onClick={() => setMsgMenuId(msgMenuId === m.id ? null : m.id)}
-                            className="absolute top-1 right-1 p-0.5 rounded opacity-40 md:opacity-0 md:group-hover:opacity-100 hover:bg-black/20 transition-opacity"
-                            aria-label="Ações da mensagem"
-                          >
-                            <ChevronDown size={14} />
-                          </button>
+                          {/* Menu da mensagem (responder/encaminhar/editar/apagar) — hover no desktop, sempre sutil no mobile */}
+                          {!m.deletedAt && (
+                            <button
+                              onClick={() => setMsgMenuId(msgMenuId === m.id ? null : m.id)}
+                              className="absolute top-1 right-1 p-0.5 rounded opacity-40 md:opacity-0 md:group-hover:opacity-100 hover:bg-black/20 transition-opacity"
+                              aria-label="Ações da mensagem"
+                            >
+                              <ChevronDown size={14} />
+                            </button>
+                          )}
                           {msgMenuId === m.id && (
                             <>
                               <div className="fixed inset-0 z-10" onClick={() => setMsgMenuId(null)} />
@@ -1345,14 +1394,30 @@ export function WhatsappInbox({
                                 >
                                   <Forward size={14} /> Encaminhar
                                 </button>
+                                {isOutgoing && m.waMessageId && !m.mediaUrl && (
+                                  <button
+                                    onClick={() => startEditingMessage(m)}
+                                    className={`w-full flex items-center gap-2 text-left text-sm px-3 py-2 rounded-lg ${theme === "dark" ? "text-gray-200 hover:bg-gray-800" : "text-gray-700 hover:bg-gray-100"}`}
+                                  >
+                                    <PenLine size={14} /> Editar
+                                  </button>
+                                )}
+                                {isOutgoing && m.waMessageId && (
+                                  <button
+                                    onClick={() => handleDeleteMessage(m)}
+                                    className="w-full flex items-center gap-2 text-left text-sm px-3 py-2 rounded-lg text-red-400 hover:bg-red-500/10"
+                                  >
+                                    <Trash2 size={14} /> Apagar
+                                  </button>
+                                )}
                               </div>
                             </>
                           )}
 
-                          {m.forwarded && (
+                          {m.forwarded && !m.deletedAt && (
                             <p className="text-[10px] opacity-60 mb-0.5 flex items-center gap-1 italic"><Forward size={10} /> Encaminhada</p>
                           )}
-                          {m.replyTo && (
+                          {m.replyTo && !m.deletedAt && (
                             <button
                               onClick={() => scrollToMessage(m.replyTo!.id)}
                               className="w-full text-left mb-1 rounded border-l-2 border-green-400 bg-black/20 px-2 py-1"
@@ -1365,12 +1430,43 @@ export function WhatsappInbox({
                           )}
                           {m.role === "human" && <p className="text-[10px] opacity-70 mb-0.5 flex items-center gap-1 pr-5"><User size={10} /> {m.sender?.name ?? "Atendente"}</p>}
                           {m.role === "assistant" && <p className="text-[10px] opacity-70 mb-0.5 flex items-center gap-1 pr-5"><Bot size={10} /> {agentName}</p>}
-                          {m.mediaUrl && m.mediaType ? (
+                          {m.deletedAt ? (
+                            <p className="whitespace-pre-wrap pr-4 italic opacity-60 flex items-center gap-1.5">
+                              <Trash2 size={12} /> Mensagem apagada
+                            </p>
+                          ) : editingMessageId === m.id ? (
+                            <div className="pr-1 space-y-1.5">
+                              <textarea
+                                autoFocus
+                                value={editingContent}
+                                onChange={e => setEditingContent(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSaveEdit(); }
+                                  if (e.key === "Escape") setEditingMessageId(null);
+                                }}
+                                rows={2}
+                                className="w-full bg-black/20 rounded-lg px-2 py-1.5 text-sm resize-none focus:outline-none"
+                              />
+                              <div className="flex items-center justify-end gap-2">
+                                <button onClick={() => setEditingMessageId(null)} className="text-xs opacity-70 hover:opacity-100 px-2 py-1">Cancelar</button>
+                                <button
+                                  onClick={handleSaveEdit}
+                                  disabled={savingEdit || !editingContent.trim()}
+                                  className="text-xs font-medium bg-green-700 hover:bg-green-600 disabled:opacity-50 rounded-lg px-3 py-1"
+                                >
+                                  {savingEdit ? "Salvando..." : "Salvar"}
+                                </button>
+                              </div>
+                            </div>
+                          ) : m.mediaUrl && m.mediaType ? (
                             <MediaContent mediaUrl={m.mediaUrl} mediaType={m.mediaType} content={m.content} />
                           ) : (
                             <p className="whitespace-pre-wrap pr-4">{m.content}</p>
                           )}
-                          <p className="text-[10px] opacity-60 mt-1 text-right">{new Date(m.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</p>
+                          <p className="text-[10px] opacity-60 mt-1 text-right flex items-center justify-end gap-1">
+                            {m.editedAt && !m.deletedAt && <span className="italic">editada</span>}
+                            {new Date(m.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                          </p>
                         </div>
                       </div>
                     );
