@@ -27,6 +27,7 @@ export function ConversationPopup({ conversationId, onClose, dark }: { conversat
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   async function refresh() {
     try {
@@ -46,6 +47,13 @@ export function ConversationPopup({ conversationId, onClose, dark }: { conversat
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end" });
   }, [detail?.messages.length]);
+
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+  }, [input]);
 
   async function handleSend() {
     if (!input.trim() || sending) return;
@@ -138,13 +146,20 @@ export function ConversationPopup({ conversationId, onClose, dark }: { conversat
           <div ref={bottomRef} />
         </div>
 
-        <div className={`p-3 border-t flex items-center gap-2 flex-shrink-0 ${dark ? "border-gray-800" : "border-gray-200"}`}>
-          <input
+        <div className={`p-3 border-t flex items-end gap-2 flex-shrink-0 ${dark ? "border-gray-800" : "border-gray-200"}`}>
+          <textarea
+            ref={inputRef}
             value={input}
             onChange={e => setInput(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && handleSend()}
+            onKeyDown={e => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
+            rows={1}
             placeholder="Digite uma mensagem..."
-            className={`flex-1 text-sm rounded-xl px-3 py-2 border focus:outline-none ${dark ? "bg-gray-900 border-gray-800 text-white placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900 placeholder:text-gray-400"}`}
+            className={`flex-1 text-sm rounded-xl px-3 py-2 border resize-none leading-relaxed max-h-[120px] overflow-y-auto focus:outline-none ${dark ? "bg-gray-900 border-gray-800 text-white placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900 placeholder:text-gray-400"}`}
           />
           <button onClick={handleSend} disabled={sending} className="bg-green-700 hover:bg-green-600 disabled:opacity-50 rounded-full px-4 py-2 text-sm font-medium text-white flex-shrink-0">
             Enviar

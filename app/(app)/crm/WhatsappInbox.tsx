@@ -321,6 +321,7 @@ export function WhatsappInbox({
   const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const messageInputRef = useRef<HTMLTextAreaElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -341,6 +342,15 @@ export function WhatsappInbox({
     const saved = localStorage.getItem(THEME_STORAGE_KEY);
     if (saved === "light" || saved === "dark") setTheme(saved);
   }, []);
+
+  // Cresce junto com o texto (até um limite) e volta ao tamanho mínimo quando o campo
+  // é limpo — inclusive na limpeza programática após enviar, já que isso não passa pelo onChange.
+  useEffect(() => {
+    const el = messageInputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
+  }, [input]);
 
   useEffect(() => {
     fetch(`/api/agentes/${agentId}/atendentes`)
@@ -1322,12 +1332,19 @@ export function WhatsappInbox({
                           dark={theme === "dark"}
                         />
                       )}
-                      <input
+                      <textarea
+                        ref={messageInputRef}
                         value={input}
                         onChange={e => setInput(e.target.value)}
-                        onKeyDown={e => e.key === "Enter" && handlePrimaryAction()}
+                        onKeyDown={e => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handlePrimaryAction();
+                          }
+                        }}
+                        rows={1}
                         placeholder={noteMode ? "Escreva uma nota interna (só a equipe vê)..." : attachment ? "Adicionar legenda (opcional)..." : "Digite uma mensagem para assumir a conversa..."}
-                        className="w-full bg-transparent text-sm focus:outline-none"
+                        className="w-full bg-transparent text-sm focus:outline-none resize-none leading-relaxed max-h-32 overflow-y-auto"
                       />
                       <div className="flex items-center justify-between mt-1.5">
                         <div className="flex items-center gap-0.5">
