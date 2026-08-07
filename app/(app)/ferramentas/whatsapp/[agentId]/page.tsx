@@ -45,6 +45,10 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
               fluxoGatilhos: config.fluxoGatilhos as unknown as { gatilho: string; resposta: string }[],
               sdrMateriaisEnabled: config.sdrMateriaisEnabled,
               followupEnabled: config.followupEnabled, followupDelaysMinutes: config.followupDelaysMinutes as unknown as number[], emojiEnabled: config.emojiEnabled,
+              iaIgnoraAtribuidos: config.iaIgnoraAtribuidos,
+              iaNiveisCarteiraExcluidos: config.iaNiveisCarteiraExcluidos as unknown as string[],
+              iaNumerosBloqueados: config.iaNumerosBloqueados as unknown as string[],
+              iaPerfisExcluidos: config.iaPerfisExcluidos as unknown as string[],
             }}
           />
         </div>
@@ -104,6 +108,10 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
                 fluxoGatilhos: config.fluxoGatilhos as unknown as { gatilho: string; resposta: string }[],
                 sdrMateriaisEnabled: config.sdrMateriaisEnabled,
                 followupEnabled: config.followupEnabled, followupDelaysMinutes: config.followupDelaysMinutes as unknown as number[], emojiEnabled: config.emojiEnabled,
+              iaIgnoraAtribuidos: config.iaIgnoraAtribuidos,
+              iaNiveisCarteiraExcluidos: config.iaNiveisCarteiraExcluidos as unknown as string[],
+              iaNumerosBloqueados: config.iaNumerosBloqueados as unknown as string[],
+              iaPerfisExcluidos: config.iaPerfisExcluidos as unknown as string[],
               }}
             />
           </div>
@@ -202,6 +210,10 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
               fluxoGatilhos: config.fluxoGatilhos as unknown as { gatilho: string; resposta: string }[],
               sdrMateriaisEnabled: config.sdrMateriaisEnabled,
               followupEnabled: config.followupEnabled, followupDelaysMinutes: config.followupDelaysMinutes as unknown as number[], emojiEnabled: config.emojiEnabled,
+              iaIgnoraAtribuidos: config.iaIgnoraAtribuidos,
+              iaNiveisCarteiraExcluidos: config.iaNiveisCarteiraExcluidos as unknown as string[],
+              iaNumerosBloqueados: config.iaNumerosBloqueados as unknown as string[],
+              iaPerfisExcluidos: config.iaPerfisExcluidos as unknown as string[],
             }}
           />
         </div>

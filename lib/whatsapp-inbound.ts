@@ -398,7 +398,8 @@ Conduza a conversa de forma natural — não pareça um questionário. Quando ti
 Notas anteriores: ${prospect.notas || "nenhuma"}.`;
 }
 
-function makeExecuteTool(agentConfigId: string, conversationId: string, contactName: string | undefined, contactNumber: string, adapter: ChannelAdapter) {
+function makeExecuteTool(config: AgentConfigFull, conversationId: string, contactName: string | undefined, contactNumber: string, adapter: ChannelAdapter) {
+  const agentConfigId = config.id;
   async function resolveProfessional(name?: string) {
     if (!name) return null;
     return prisma.professional.findFirst({ where: { agentConfigId, active: true, name: { equals: name, mode: "insensitive" } } });
@@ -816,6 +817,19 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       const perfilLabel = { MARCENEIRO: "Marceneiro", ARQUITETO: "Arquiteto", EMPRESA: "Empresa", CONSUMIDOR_FINAL: "Consumidor final" }[perfil as string];
       await prisma.message.create({ data: { conversationId, role: "note", content: `SDR: perfil do cliente — ${perfilLabel}.` } });
       emitChatEvent(agentConfigId, conversationId);
+
+      // Perfil descoberto agora era desconhecido até este momento — só dá pra aplicar esse
+      // critério de "quem a IA atende" depois que o SDR captura o dado, nunca antes.
+      const perfisExcluidos = Array.isArray(config.iaPerfisExcluidos) ? config.iaPerfisExcluidos as string[] : [];
+      if (perfisExcluidos.includes(perfil)) {
+        const conversation = await prisma.conversation.update({
+          where: { id: conversationId },
+          data: { humanTakeover: true, status: "ATIVO" },
+        });
+        notifyHumanTakeoverMessage(config, conversationId, conversation.assignedToId, contactName ?? contactNumber, `Perfil ${perfilLabel} — atendimento humano configurado para este perfil.`).catch(() => {});
+        return `Perfil ${perfilLabel} configurado para atendimento humano, não pela IA. Na SUA RESPOSTA, avise o cliente com naturalidade que um atendente vai continuar a conversa em instantes. Depois desta mensagem você para de responder — o atendimento é humano a partir daqui.`;
+      }
+
       return "OK, salvo internamente — isso é só pra você, NÃO mencione ao cliente que anotou/registrou nada. Continue a conversa naturalmente entendendo o que ele procura.";
     }
 
@@ -1346,6 +1360,25 @@ function splitReplyIntoChunks(reply: string): string[] {
   return enforceOneQuestion(chunks);
 }
 
+// Decide se a IA deve gerar resposta automática pra essa conversa — critérios opcionais e
+// configuráveis por agente, todos "desligados" (sem filtrar nada) quando vazios. Independe de
+// humanTakeover/whatsappAiPaused (checados antes desta função); a mensagem já foi salva no
+// banco de qualquer forma (escuta ativa), isso só decide se a IA GERA uma resposta agora.
+function shouldAiHandle(config: AgentConfigFull, conversation: { assignedToId: string | null; contactNumber: string; nivelCarteira: string | null }): boolean {
+  if (config.iaIgnoraAtribuidos && conversation.assignedToId) return false;
+
+  const numerosBloqueados = Array.isArray(config.iaNumerosBloqueados) ? config.iaNumerosBloqueados as string[] : [];
+  if (numerosBloqueados.includes(conversation.contactNumber)) return false;
+
+  // Só considera o nível MANUAL/importado (nivelCarteira null = "automático", não replicamos
+  // aqui o cálculo por recorrência/ticket/recência que só existe na tela de Carteira) — uma
+  // conversa sem override explícito nunca é excluída por este critério.
+  const niveisExcluidos = Array.isArray(config.iaNiveisCarteiraExcluidos) ? config.iaNiveisCarteiraExcluidos as string[] : [];
+  if (conversation.nivelCarteira && niveisExcluidos.includes(conversation.nivelCarteira)) return false;
+
+  return true;
+}
+
 const SESSION_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export async function processIncomingMessage(config: AgentConfigFull, msg: IncomingMessage, adapter: ChannelAdapter, opts?: { enforceSessionWindow?: boolean }): Promise<void> {
@@ -1391,10 +1424,12 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
     await assignNextAttendant(config.id, config.teamId, conversation.id);
   }
 
-  // Atendente humano assumiu essa conversa — apenas registra a mensagem, sem o agente
-  // responder. Aqui a IA não avisa ninguém respondendo, então dispara web push pro
-  // atendente responsável (ou pra equipe toda, se a conversa ainda não tem dono).
-  if (conversation.humanTakeover) {
+  // Atendente humano assumiu essa conversa, ou um critério de "quem a IA atende" excluiu essa
+  // conversa (já tem vendedor / nível da carteira / número bloqueado) — apenas registra a
+  // mensagem, sem o agente responder. Em ambos os casos dispara web push pro atendente
+  // responsável (ou pra equipe toda, se a conversa ainda não tem dono) — ninguém deve ficar
+  // sem saber que chegou mensagem só porque a IA decidiu não responder.
+  if (conversation.humanTakeover || !shouldAiHandle(config, conversation)) {
     notifyHumanTakeoverMessage(config, conversation.id, conversation.assignedToId, conversation.contactName ?? contactNumber, text).catch(() => {});
     return;
   }
@@ -1590,7 +1625,7 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
       historyForAgent,
       text,
       tools,
-      makeExecuteTool(config.id, conversation.id, contactName, contactNumber, adapter)
+      makeExecuteTool(config, conversation.id, contactName, contactNumber, adapter)
     );
     reply = result.reply;
     logTokenUsage({ teamId: config.teamId, provider: "openai", model: "gpt-4o-mini", feature: "whatsapp_agent", ...result.usage });

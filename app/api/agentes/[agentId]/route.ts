@@ -38,6 +38,11 @@ const schema = z.object({
   followupEnabled: z.boolean().default(true),
   followupDelaysMinutes: z.array(z.number().int().min(1).max(43200)).max(10).default([1440]),
   emojiEnabled: z.boolean().default(false),
+  // Quem a IA atende quando está ligada — todos opcionais, vazio/false = sem filtro nesse critério
+  iaIgnoraAtribuidos: z.boolean().default(false),
+  iaNiveisCarteiraExcluidos: z.array(z.enum(["A", "B", "C", "INATIVO", "PERDIDO"])).max(5).default([]),
+  iaNumerosBloqueados: z.array(z.string().transform(v => v.replace(/\D/g, ""))).max(500).default([]),
+  iaPerfisExcluidos: z.array(z.enum(["MARCENEIRO", "ARQUITETO", "EMPRESA", "CONSUMIDOR_FINAL"])).max(4).default([]),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {
@@ -55,6 +60,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
     nome, tom, servicos, objecoes, horario, descricaoEmpresa, precos, enderecoContato,
     objetivo, fluxoAtendimento, comportamento, fluxoGatilhos, sdrMateriaisEnabled,
     followupEnabled, followupDelaysMinutes, emojiEnabled,
+    iaIgnoraAtribuidos, iaNiveisCarteiraExcluidos, iaNumerosBloqueados, iaPerfisExcluidos,
   } = body.data;
 
   const team = await prisma.team.findUnique({ where: { id: existing.teamId } });
@@ -81,6 +87,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
       nome, tom, servicos, objecoes, horario, descricaoEmpresa, precos, enderecoContato,
       objetivo, fluxoAtendimento, comportamento, fluxoGatilhos, sdrMateriaisEnabled,
       systemPrompt, followupEnabled, followupDelaysMinutes, emojiEnabled,
+      iaIgnoraAtribuidos, iaNiveisCarteiraExcluidos, iaNumerosBloqueados, iaPerfisExcluidos,
     },
   });
 

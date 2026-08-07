@@ -651,6 +651,15 @@ model AgentConfig {
   whatsappAiPaused  Boolean @default(false)
   instagramAiPaused Boolean @default(false)
 
+  // Quem a IA atende quando está ligada — cada critério é opcional e some (não filtra nada)
+  // quando vazio/desligado. Mensagem sempre é salva independente do resultado (escuta ativa):
+  // se algum critério excluir a conversa, ela só não gera resposta automática, mas o histórico
+  // continua completo pro atendente (ou a própria IA, se reativada depois) ter contexto.
+  iaIgnoraAtribuidos       Boolean @default(false) // true = não responde conversa que já tem vendedor
+  iaNiveisCarteiraExcluidos Json   @default("[]")  // ["A","B","C","INATIVO","PERDIDO"] — nível manual/importado, não o calculado automático
+  iaNumerosBloqueados       Json   @default("[]")  // números (só dígitos) que a IA nunca responde
+  iaPerfisExcluidos         Json   @default("[]")  // ["MARCENEIRO","ARQUITETO","EMPRESA","CONSUMIDOR_FINAL"] — só some efeito com sdrMateriaisEnabled, verificado assim que registrar_perfil_lead roda
+
   // Estado inicial de todo agente novo: mensagens são salvas normalmente mas a IA não
   // responde em nenhum canal, até o gestor clicar em "Ativar IA" (vê/valida antes de ir ao ar).
   learningMode Boolean @default(false)

@@ -24,6 +24,10 @@ type InitialConfig = {
   followupEnabled: boolean;
   followupDelaysMinutes: number[];
   emojiEnabled: boolean;
+  iaIgnoraAtribuidos: boolean;
+  iaNiveisCarteiraExcluidos: string[];
+  iaNumerosBloqueados: string[];
+  iaPerfisExcluidos: string[];
 } | null;
 
 type DelayUnit = "horas" | "minutos";
@@ -136,7 +140,26 @@ const TOM_OPTIONS = [
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 6;
+
+const NIVEL_CARTEIRA_CHECKBOX_OPTIONS = [
+  { value: "A", label: "A" },
+  { value: "B", label: "B" },
+  { value: "C", label: "C" },
+  { value: "INATIVO", label: "Inativo" },
+  { value: "PERDIDO", label: "Perdido" },
+] as const;
+
+const PERFIL_CHECKBOX_OPTIONS = [
+  { value: "MARCENEIRO", label: "Marceneiro" },
+  { value: "ARQUITETO", label: "Arquiteto" },
+  { value: "EMPRESA", label: "Empresa" },
+  { value: "CONSUMIDOR_FINAL", label: "Consumidor final" },
+] as const;
+
+function toggleInArray(arr: string[], value: string): string[] {
+  return arr.includes(value) ? arr.filter(v => v !== value) : [...arr, value];
+}
 
 export function WhatsappAgentClient({
   agentId, segmento, initialConfig,
@@ -176,6 +199,12 @@ export function WhatsappAgentClient({
   const [followupDelays, setFollowupDelays] = useState<DelayRow[]>(
     (initialConfig?.followupDelaysMinutes ?? [1440, 1440]).map(minutesToRow)
   );
+
+  // Quem a IA atende quando está ligada — critérios opcionais de exclusão
+  const [iaIgnoraAtribuidos, setIaIgnoraAtribuidos] = useState(initialConfig?.iaIgnoraAtribuidos ?? false);
+  const [iaNiveisCarteiraExcluidos, setIaNiveisCarteiraExcluidos] = useState<string[]>(initialConfig?.iaNiveisCarteiraExcluidos ?? []);
+  const [iaPerfisExcluidos, setIaPerfisExcluidos] = useState<string[]>(initialConfig?.iaPerfisExcluidos ?? []);
+  const [iaNumerosBloqueadosText, setIaNumerosBloqueadosText] = useState((initialConfig?.iaNumerosBloqueados ?? []).join("\n"));
 
   function addFollowupAttempt() {
     const last = followupDelays[followupDelays.length - 1] ?? { value: 24, unit: "horas" as DelayUnit };
@@ -226,6 +255,8 @@ export function WhatsappAgentClient({
           followupEnabled,
           followupDelaysMinutes: followupDelays.map(rowToMinutes),
           emojiEnabled,
+          iaIgnoraAtribuidos, iaNiveisCarteiraExcluidos, iaPerfisExcluidos,
+          iaNumerosBloqueados: splitLines(iaNumerosBloqueadosText),
         }),
       });
       if (!res.ok) throw new Error();
@@ -294,6 +325,8 @@ export function WhatsappAgentClient({
           followupEnabled,
           followupDelaysMinutes: followupDelays.map(rowToMinutes),
           emojiEnabled,
+          iaIgnoraAtribuidos, iaNiveisCarteiraExcluidos, iaPerfisExcluidos,
+          iaNumerosBloqueados: splitLines(iaNumerosBloqueadosText),
         }),
       });
       if (!res.ok) throw new Error();
@@ -600,6 +633,69 @@ export function WhatsappAgentClient({
           {followupEnabled && (
             <FollowupDelaysEditor followupDelays={followupDelays} onAdd={addFollowupAttempt} onRemove={removeFollowupAttempt} onUpdate={updateFollowupAttempt} />
           )}
+        </div>
+      )}
+
+      {step === 6 && (
+        <div className="space-y-4">
+          <p className="font-semibold">6. Quem a IA atende</p>
+          <p className="text-sm text-gray-400">
+            Enquanto a IA estiver ligada, esses critérios decidem quais conversas ela responde automaticamente. Quando algum critério exclui uma conversa, a mensagem continua sendo salva normalmente (a IA &quot;escuta&quot; tudo) e a equipe é avisada — só não sai resposta automática.
+          </p>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={iaIgnoraAtribuidos} onChange={e => setIaIgnoraAtribuidos(e.target.checked)} className="w-4 h-4" />
+            <span className="text-sm">Não responder conversas que já têm um vendedor atribuído</span>
+          </label>
+
+          <div>
+            <label className="text-sm text-gray-400 block mb-1.5">Não responder estes níveis de carteira</label>
+            <div className="flex flex-wrap gap-3">
+              {NIVEL_CARTEIRA_CHECKBOX_OPTIONS.map(n => (
+                <label key={n.value} className="flex items-center gap-1.5 cursor-pointer text-sm">
+                  <input
+                    type="checkbox"
+                    checked={iaNiveisCarteiraExcluidos.includes(n.value)}
+                    onChange={() => setIaNiveisCarteiraExcluidos(prev => toggleInArray(prev, n.value))}
+                    className="w-4 h-4"
+                  />
+                  {n.label}
+                </label>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">Considera só o nível definido manualmente ou por importação — o calculado automaticamente (recorrência/ticket/recência) não entra aqui.</p>
+          </div>
+
+          {sdrMateriaisEnabled && (
+            <div>
+              <label className="text-sm text-gray-400 block mb-1.5">Não responder estes perfis de cliente</label>
+              <div className="flex flex-wrap gap-3">
+                {PERFIL_CHECKBOX_OPTIONS.map(p => (
+                  <label key={p.value} className="flex items-center gap-1.5 cursor-pointer text-sm">
+                    <input
+                      type="checkbox"
+                      checked={iaPerfisExcluidos.includes(p.value)}
+                      onChange={() => setIaPerfisExcluidos(prev => toggleInArray(prev, p.value))}
+                      className="w-4 h-4"
+                    />
+                    {p.label}
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">O perfil só é conhecido depois que o fluxo de pré-vendas identifica o cliente — a partir daí, se o perfil estiver marcado aqui, a conversa passa pra um atendente.</p>
+            </div>
+          )}
+
+          <div>
+            <label className="text-sm text-gray-400 block mb-1.5">Números que a IA nunca responde (um por linha, com DDD)</label>
+            <textarea
+              value={iaNumerosBloqueadosText}
+              onChange={e => setIaNumerosBloqueadosText(e.target.value)}
+              rows={3}
+              placeholder={"84999990000\n11988887777"}
+              className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:border-blue-600"
+            />
+          </div>
 
           <p className="text-xs text-gray-500">Ao salvar, você escolhe qual canal conectar: WhatsApp (via QR code) ou Instagram — e pode conectar os dois depois, na página de Canais.</p>
         </div>
