@@ -1003,12 +1003,18 @@ export function WhatsappInbox({
     const next = !signatureEnabled;
     setSignatureSaving(true);
     try {
-      await fetch(`/api/agentes/${agentId}/assinatura`, {
+      const res = await fetch(`/api/agentes/${agentId}/assinatura`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ signatureEnabled: next }),
       });
+      // Sem checar res.ok aqui, uma falha (sessão expirada, erro do servidor) deixava o botão
+      // "ligado" visualmente sem nunca ter salvo — a assinatura parecia ativada mas nunca saía
+      // nas mensagens de verdade.
+      if (!res.ok) throw new Error();
       setSignatureEnabled(next);
+    } catch {
+      alert("Não foi possível alterar a assinatura. Tente novamente.");
     } finally {
       setSignatureSaving(false);
     }
