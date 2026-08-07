@@ -5,13 +5,16 @@ import { ThumbsUp, Trash2 } from "lucide-react";
 
 export type Opportunity = { id: string; title: string | null; dealValue: number; wonAt: string | null };
 
+type PipelineOption = { id: string; name: string; stages: { id: string; name: string }[] };
+
 function formatBRL(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 export function OpportunitiesPanel({
-  conversationId, opportunities, onChange, onClose, dark,
+  agentId, conversationId, opportunities, onChange, onClose, dark,
 }: {
+  agentId: string;
   conversationId: string;
   opportunities: Opportunity[];
   onChange: () => void;
@@ -23,6 +26,8 @@ export function OpportunitiesPanel({
   const [title, setTitle] = useState("");
   const [value, setValue] = useState("");
   const [saving, setSaving] = useState(false);
+  const [pipelines, setPipelines] = useState<PipelineOption[]>([]);
+  const [pipelineId, setPipelineId] = useState("");
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -32,15 +37,27 @@ export function OpportunitiesPanel({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [onClose]);
 
+  useEffect(() => {
+    fetch(`/api/agentes/${agentId}/pipelines`)
+      .then(res => res.json())
+      .then(data => {
+        const list: PipelineOption[] = data.pipelines ?? [];
+        setPipelines(list);
+        setPipelineId(prev => prev || list[0]?.id || "");
+      })
+      .catch(() => {});
+  }, [agentId]);
+
   async function handleCreate() {
     const dealValue = Number(value.replace(",", "."));
     if (!Number.isFinite(dealValue) || dealValue <= 0) return;
     setSaving(true);
     try {
+      const stageId = pipelines.find(p => p.id === pipelineId)?.stages[0]?.id ?? null;
       await fetch(`/api/ferramentas/whatsapp/conversas/${conversationId}/oportunidades`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: title.trim() || null, dealValue }),
+        body: JSON.stringify({ title: title.trim() || null, dealValue, stageId }),
       });
       setTitle(""); setValue(""); setShowForm(false);
       onChange();
@@ -104,6 +121,17 @@ export function OpportunitiesPanel({
       <div className={`p-2 border-t ${dark ? "border-gray-800" : "border-gray-200"}`}>
         {showForm ? (
           <div className="space-y-1.5">
+            {pipelines.length > 1 && (
+              <select
+                value={pipelineId}
+                onChange={e => setPipelineId(e.target.value)}
+                className={`w-full text-xs rounded-lg px-2 py-1.5 border focus:outline-none ${dark ? "bg-gray-950 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+              >
+                {pipelines.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            )}
             <input
               value={title}
               onChange={e => setTitle(e.target.value)}

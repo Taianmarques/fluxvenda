@@ -1265,6 +1265,7 @@ export function WhatsappInbox({
                       </button>
                       {showOpportunities && (
                         <OpportunitiesPanel
+                          agentId={agentId}
                           conversationId={detail.id}
                           opportunities={detail.opportunities}
                           onChange={() => refreshDetail(detail.id)}
