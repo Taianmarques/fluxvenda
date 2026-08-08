@@ -56,6 +56,7 @@ model Profile {
   assignedConversations Conversation[] @relation("AssignedConversations")
   scheduledMessages ScheduledMessage[]
   opportunityTasks OpportunityTask[]
+  trainingExamples TrainingExample[]
 }
 
 enum Role {
@@ -836,6 +837,7 @@ model AgentConfig {
   carteiraTouches      CarteiraTouch[]
   automacoes           Automacao[]
   campanhas            Campanha[]
+  trainingExamples     TrainingExample[]
 
   @@index([teamId])
 }
@@ -887,6 +889,28 @@ model Campanha {
 
   @@index([agentConfigId])
   @@index([status, nextSendAt])
+}
+
+// Conversa simulada (roleplay humano-humano: cliente x SDR) — matéria-prima pra um futuro
+// fine-tuning do agente. Não afeta o comportamento do agente hoje; só vira dado de treino quando
+// alguém exporta o lote em JSONL e sobe manualmente pra OpenAI.
+model TrainingExample {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agentConfigId String
+  agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id], onDelete: Cascade)
+
+  createdById String?
+  createdBy   Profile? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  cenario String // título curto do cenário simulado (ex: "Cliente pede foto")
+  // [{ role: "user" | "assistant", content: string }] — "user" = cliente, "assistant" = SDR
+  // (mesmos nomes de role que o formato de fine-tuning da OpenAI espera)
+  turnos Json
+
+  @@index([agentConfigId])
 }
 
 model CampanhaDestinatario {

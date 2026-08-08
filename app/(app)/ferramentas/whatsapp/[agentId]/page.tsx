@@ -2,7 +2,7 @@ import { currentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Bot, Smartphone, MessageCircle } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, Smartphone, MessageCircle, GraduationCap } from "lucide-react";
 import { getAgentConfigAsManager } from "@/lib/team";
 import { WhatsappAgentClient } from "../WhatsappAgentClient";
 import { DistribuicaoClient } from "../DistribuicaoClient";
@@ -177,6 +177,17 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
             <p className="text-sm text-gray-400 mt-1">Veja as conversas em tempo real, a agenda e assuma o atendimento manualmente quando precisar.</p>
           </div>
           <ArrowRight size={20} className="text-green-400 flex-shrink-0" />
+        </Link>
+
+        <Link
+          href={`/ferramentas/whatsapp/${config.id}/treino`}
+          className="flex items-center justify-between gap-4 bg-gradient-to-r from-purple-950/40 to-indigo-950/40 border border-purple-800/50 rounded-2xl p-5 hover:border-purple-600 transition-colors"
+        >
+          <div>
+            <p className="font-semibold text-purple-300 flex items-center gap-2"><GraduationCap size={18} /> Treinar com conversas simuladas</p>
+            <p className="text-sm text-gray-400 mt-1">Cadastre roleplays de cliente x SDR pra usar depois num fine-tuning do agente.</p>
+          </div>
+          <ArrowRight size={20} className="text-purple-400 flex-shrink-0" />
         </Link>
 
         <div>
