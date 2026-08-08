@@ -1629,11 +1629,14 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
     return;
   }
 
+  // Modelo fine-tunado do agente (opcional) — null usa o gpt-4o-mini padrão, igual sempre foi
+  const model = config.fineTunedModelId || undefined;
+
   let reply: string;
   if (imageUrl) {
-    const result = await runAgentWithImage(activeSystemPrompt + brevityInstruction, historyForAgent, imageUrl, caption);
+    const result = await runAgentWithImage(activeSystemPrompt + brevityInstruction, historyForAgent, imageUrl, caption, model);
     reply = result.reply;
-    logTokenUsage({ teamId: config.teamId, provider: "openai", model: "gpt-4o-mini", feature: "whatsapp_agent", ...result.usage });
+    logTokenUsage({ teamId: config.teamId, provider: "openai", model: model ?? "gpt-4o-mini", feature: "whatsapp_agent", ...result.usage });
   } else if (tools.length > 0) {
     const bookingUrl = `${process.env.NEXT_PUBLIC_APP_URL}/agendar/${config.storeSlug ?? config.id}`;
     const extraContext = (config.schedulingEnabled
@@ -1662,14 +1665,15 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
       historyForAgent,
       text,
       tools,
-      makeExecuteTool(config, conversation.id, contactName, contactNumber, adapter)
+      makeExecuteTool(config, conversation.id, contactName, contactNumber, adapter),
+      model
     );
     reply = result.reply;
-    logTokenUsage({ teamId: config.teamId, provider: "openai", model: "gpt-4o-mini", feature: "whatsapp_agent", ...result.usage });
+    logTokenUsage({ teamId: config.teamId, provider: "openai", model: model ?? "gpt-4o-mini", feature: "whatsapp_agent", ...result.usage });
   } else {
-    const result = await runAgent(activeSystemPrompt + brevityInstruction, historyForAgent, text);
+    const result = await runAgent(activeSystemPrompt + brevityInstruction, historyForAgent, text, model);
     reply = result.reply;
-    logTokenUsage({ teamId: config.teamId, provider: "openai", model: "gpt-4o-mini", feature: "whatsapp_agent", ...result.usage });
+    logTokenUsage({ teamId: config.teamId, provider: "openai", model: model ?? "gpt-4o-mini", feature: "whatsapp_agent", ...result.usage });
   }
 
   // IA decide quando o lead está qualificado e atribui a um atendente (rodízio), se ainda não tiver dono

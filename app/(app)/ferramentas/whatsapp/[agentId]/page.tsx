@@ -51,6 +51,7 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
               iaPerfisExcluidos: config.iaPerfisExcluidos as unknown as string[],
               transferirAoPedirFoto: config.transferirAoPedirFoto,
               iaLeadAttendantId: config.iaLeadAttendantId,
+              fineTunedModelId: config.fineTunedModelId,
             }}
           />
         </div>
@@ -116,6 +117,7 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
               iaPerfisExcluidos: config.iaPerfisExcluidos as unknown as string[],
               transferirAoPedirFoto: config.transferirAoPedirFoto,
               iaLeadAttendantId: config.iaLeadAttendantId,
+              fineTunedModelId: config.fineTunedModelId,
               }}
             />
           </div>
@@ -231,6 +233,7 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
               iaPerfisExcluidos: config.iaPerfisExcluidos as unknown as string[],
               transferirAoPedirFoto: config.transferirAoPedirFoto,
               iaLeadAttendantId: config.iaLeadAttendantId,
+              fineTunedModelId: config.fineTunedModelId,
             }}
           />
         </div>

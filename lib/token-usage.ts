@@ -5,6 +5,19 @@ const COSTS_PER_TOKEN: Record<string, { input: number; output: number }> = {
   "claude-sonnet-4-6": { input: 0.000003,   output: 0.000015   },
 };
 
+// Modelo fine-tunado (id tipo "ft:gpt-4o-mini-2024-07-18:org::abc123") não bate com a chave
+// exata acima — sem isso, o custo real ficava registrado como $0. Usa o dobro da taxa do
+// gpt-4o-mini base (proporção pública da OpenAI pra fine-tuning desse modelo); confirme o preço
+// vigente na OpenAI antes de usar esse número pra fechamento de fatura.
+function ratesFor(model: string): { input: number; output: number } {
+  if (COSTS_PER_TOKEN[model]) return COSTS_PER_TOKEN[model];
+  if (model.startsWith("ft:gpt-4o-mini")) {
+    const base = COSTS_PER_TOKEN["gpt-4o-mini"];
+    return { input: base.input * 2, output: base.output * 2 };
+  }
+  return { input: 0, output: 0 };
+}
+
 export async function logTokenUsage(params: {
   teamId: string;
   provider: string;
@@ -13,7 +26,7 @@ export async function logTokenUsage(params: {
   inputTokens: number;
   outputTokens: number;
 }): Promise<void> {
-  const rates = COSTS_PER_TOKEN[params.model] ?? { input: 0, output: 0 };
+  const rates = ratesFor(params.model);
   const costUsd = params.inputTokens * rates.input + params.outputTokens * rates.output;
   const totalTokens = params.inputTokens + params.outputTokens;
 

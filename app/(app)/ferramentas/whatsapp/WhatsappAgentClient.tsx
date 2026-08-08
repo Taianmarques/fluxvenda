@@ -30,6 +30,7 @@ type InitialConfig = {
   iaPerfisExcluidos: string[];
   transferirAoPedirFoto: boolean;
   iaLeadAttendantId: string | null;
+  fineTunedModelId: string | null;
 } | null;
 
 type Attendant = { id: string; name: string; isManager: boolean };
@@ -213,6 +214,13 @@ export function WhatsappAgentClient({
   const [iaLeadAttendantId, setIaLeadAttendantId] = useState(initialConfig?.iaLeadAttendantId ?? "");
   const [attendants, setAttendants] = useState<Attendant[]>([]);
 
+  // Modelo fine-tunado ativo no atendimento real — só editável direto no resumo (não faz parte
+  // do assistente por etapas, é uma troca avançada e pontual)
+  const [fineTunedModelId, setFineTunedModelId] = useState(initialConfig?.fineTunedModelId ?? "");
+  const [showFineTuned, setShowFineTuned] = useState(false);
+  const [savingFineTuned, setSavingFineTuned] = useState(false);
+  const [fineTunedError, setFineTunedError] = useState("");
+
   useEffect(() => {
     fetch(`/api/agentes/${agentId}/atendentes`)
       .then(res => res.json())
@@ -272,6 +280,7 @@ export function WhatsappAgentClient({
           iaIgnoraAtribuidos, iaNiveisCarteiraExcluidos, iaPerfisExcluidos,
           iaNumerosBloqueados: splitLines(iaNumerosBloqueadosText),
           transferirAoPedirFoto, iaLeadAttendantId: iaLeadAttendantId || null,
+          fineTunedModelId: fineTunedModelId || null,
         }),
       });
       if (!res.ok) throw new Error();
@@ -281,6 +290,47 @@ export function WhatsappAgentClient({
       setError("Não foi possível salvar. Tente novamente.");
     } finally {
       setSavingQuickFollowup(false);
+    }
+  }
+
+  function cancelFineTuned() {
+    setFineTunedModelId(initialConfig?.fineTunedModelId ?? "");
+    setFineTunedError("");
+    setShowFineTuned(false);
+  }
+
+  async function handleSaveFineTuned() {
+    setSavingFineTuned(true);
+    setFineTunedError("");
+    try {
+      const res = await fetch(`/api/agentes/${agentId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nome, tom,
+          descricaoEmpresa, enderecoContato, precos,
+          objetivo, fluxoAtendimento, comportamento,
+          fluxoGatilhos: fluxoGatilhos.filter(r => r.gatilho.trim() && r.resposta.trim()),
+          sdrMateriaisEnabled,
+          servicos: splitLines(servicos),
+          objecoes: splitLines(objecoes),
+          horario,
+          followupEnabled,
+          followupDelaysMinutes: followupDelays.map(rowToMinutes),
+          emojiEnabled,
+          iaIgnoraAtribuidos, iaNiveisCarteiraExcluidos, iaPerfisExcluidos,
+          iaNumerosBloqueados: splitLines(iaNumerosBloqueadosText),
+          transferirAoPedirFoto, iaLeadAttendantId: iaLeadAttendantId || null,
+          fineTunedModelId: fineTunedModelId.trim() || null,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      setShowFineTuned(false);
+      router.refresh();
+    } catch {
+      setFineTunedError("Não foi possível salvar. Tente novamente.");
+    } finally {
+      setSavingFineTuned(false);
     }
   }
 
@@ -346,6 +396,7 @@ export function WhatsappAgentClient({
           iaIgnoraAtribuidos, iaNiveisCarteiraExcluidos, iaPerfisExcluidos,
           iaNumerosBloqueados: splitLines(iaNumerosBloqueadosText),
           transferirAoPedirFoto, iaLeadAttendantId: iaLeadAttendantId || null,
+          fineTunedModelId: fineTunedModelId || null,
         }),
       });
       if (!res.ok) throw new Error();
@@ -422,6 +473,40 @@ export function WhatsappAgentClient({
                   {savingQuickFollowup ? "Salvando..." : "Salvar"}
                 </button>
                 <button onClick={cancelQuickFollowup} className="text-sm text-gray-400 hover:text-gray-200">Cancelar</button>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between gap-2 border-t border-gray-800 pt-3">
+            <p className="text-sm text-gray-400">
+              Modelo: <span className="text-gray-300">{fineTunedModelId ? "fine-tunado (custom)" : "padrão (gpt-4o-mini)"}</span>
+            </p>
+            {!showFineTuned && (
+              <button onClick={() => setShowFineTuned(true)} className="text-xs text-purple-400 hover:text-purple-300 flex-shrink-0">
+                {fineTunedModelId ? "Trocar/desativar" : "Ativar modelo fine-tunado"}
+              </button>
+            )}
+          </div>
+
+          {showFineTuned && (
+            <div className="border-t border-gray-800 pt-3 space-y-3">
+              <p className="text-xs text-gray-500">
+                Cole o id de um modelo fine-tunado da OpenAI já testado na tela de{" "}
+                <a href={`/ferramentas/whatsapp/${agentId}/treino`} className="text-purple-400 hover:text-purple-300">Treino</a>.
+                Isso passa a valer no atendimento real imediatamente ao salvar. Deixe em branco pra voltar ao modelo padrão.
+              </p>
+              <input
+                value={fineTunedModelId}
+                onChange={e => setFineTunedModelId(e.target.value)}
+                placeholder="ft:gpt-4o-mini-2024-07-18:org::abc123"
+                className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-xs font-mono focus:outline-none focus:border-purple-600"
+              />
+              {fineTunedError && <p className="text-sm text-red-400">{fineTunedError}</p>}
+              <div className="flex gap-3">
+                <button onClick={handleSaveFineTuned} disabled={savingFineTuned} className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 rounded-xl px-4 py-2 text-sm font-medium">
+                  {savingFineTuned ? "Salvando..." : "Salvar"}
+                </button>
+                <button onClick={cancelFineTuned} className="text-sm text-gray-400 hover:text-gray-200">Cancelar</button>
               </div>
             </div>
           )}

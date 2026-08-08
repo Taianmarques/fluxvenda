@@ -187,10 +187,11 @@ export async function runAgentWithImage(
   systemPrompt: string,
   history: { role: "user" | "assistant"; content: string }[],
   imageUrl: string,
-  caption: string
+  caption: string,
+  model: string = MODEL
 ): Promise<{ reply: string; usage: AgentUsage }> {
   const completion = await openai.chat.completions.create({
-    model: MODEL,
+    model,
     max_tokens: 400,
     messages: [
       { role: "system", content: systemPrompt },
@@ -679,7 +680,8 @@ export async function runAgentWithTools(
   history: { role: "user" | "assistant"; content: string }[],
   newMessage: string,
   tools: any[],
-  executeTool: (name: string, args: any) => Promise<string>
+  executeTool: (name: string, args: any) => Promise<string>,
+  model: string = MODEL
 ): Promise<{ reply: string; usage: AgentUsage }> {
   const messages: any[] = [
     { role: "system", content: systemPrompt },
@@ -695,7 +697,7 @@ export async function runAgentWithTools(
   // só para compor a resposta final em texto.
   for (let round = 0; round < 6; round++) {
     const completion = await openai.chat.completions.create({
-      model: MODEL,
+      model,
       max_tokens: 400,
       messages,
       tools,

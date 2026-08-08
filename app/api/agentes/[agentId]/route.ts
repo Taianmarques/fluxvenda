@@ -45,6 +45,11 @@ const schema = z.object({
   iaPerfisExcluidos: z.array(z.enum(["MARCENEIRO", "ARQUITETO", "EMPRESA", "CONSUMIDOR_FINAL"])).max(4).default([]),
   transferirAoPedirFoto: z.boolean().default(false),
   iaLeadAttendantId: z.string().nullable().optional(),
+  // Id de um modelo fine-tunado da OpenAI pra usar no atendimento real — null volta pro
+  // gpt-4o-mini padrão. Sem validação de formato aqui de propósito: se estiver errado, a
+  // chamada real à OpenAI só falha (mensagem do cliente continua salva, só não sai resposta) —
+  // detectável testando antes na tela "Testar agente".
+  fineTunedModelId: z.string().trim().max(200).nullable().optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {
@@ -63,7 +68,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
     objetivo, fluxoAtendimento, comportamento, fluxoGatilhos, sdrMateriaisEnabled,
     followupEnabled, followupDelaysMinutes, emojiEnabled,
     iaIgnoraAtribuidos, iaNiveisCarteiraExcluidos, iaNumerosBloqueados, iaPerfisExcluidos,
-    transferirAoPedirFoto, iaLeadAttendantId,
+    transferirAoPedirFoto, iaLeadAttendantId, fineTunedModelId,
   } = body.data;
 
   const team = await prisma.team.findUnique({ where: { id: existing.teamId } });
@@ -101,6 +106,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
       systemPrompt, followupEnabled, followupDelaysMinutes, emojiEnabled,
       iaIgnoraAtribuidos, iaNiveisCarteiraExcluidos, iaNumerosBloqueados, iaPerfisExcluidos,
       transferirAoPedirFoto, iaLeadAttendantId: resolvedIaLeadAttendantId,
+      fineTunedModelId: fineTunedModelId || null,
     },
   });
 

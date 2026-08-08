@@ -670,6 +670,12 @@ model AgentConfig {
   // originados pela IA. Null = mantém o comportamento padrão (respeita leadDistributionMode).
   iaLeadAttendantId String?
 
+  // Id de um modelo fine-tunado da OpenAI (ex: "ft:gpt-4o-mini-2024-07-18:org::abc123") pra usar
+  // no atendimento real, no lugar do modelo padrão — null (padrão) mantém o gpt-4o-mini de
+  // sempre. Preenchido só depois de testar isolado na tela "Testar agente" (ver
+  // TrainingExample); reversível a qualquer momento limpando o campo.
+  fineTunedModelId String?
+
   // Estado inicial de todo agente novo: mensagens são salvas normalmente mas a IA não
   // responde em nenhum canal, até o gestor clicar em "Ativar IA" (vê/valida antes de ir ao ar).
   learningMode Boolean @default(false)
