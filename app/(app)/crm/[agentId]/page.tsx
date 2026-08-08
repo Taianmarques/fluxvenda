@@ -54,6 +54,10 @@ async function WhatsappInboxPageContent({
     prisma.conversation.findMany({
       where: {
         agentConfigId: config.id,
+        // Contato importado/cadastrado manualmente vira uma conversa sem mensagens (pra já ter
+        // atendente/nível definidos quando o cliente escrever pela primeira vez) — não deve
+        // aparecer na caixa de entrada como se fosse um atendimento em aberto.
+        messages: { some: {} },
         ...(isManager ? {} : { OR: [{ assignedToId: user.id }, { assignedToId: null }] }),
       },
       orderBy: { updatedAt: "desc" },
