@@ -52,6 +52,8 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
               transferirAoPedirFoto: config.transferirAoPedirFoto,
               iaLeadAttendantId: config.iaLeadAttendantId,
               fineTunedModelId: config.fineTunedModelId,
+              ragSimilarityThreshold: config.ragSimilarityThreshold,
+              ragMaxResults: config.ragMaxResults,
             }}
           />
         </div>
@@ -118,6 +120,8 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
               transferirAoPedirFoto: config.transferirAoPedirFoto,
               iaLeadAttendantId: config.iaLeadAttendantId,
               fineTunedModelId: config.fineTunedModelId,
+              ragSimilarityThreshold: config.ragSimilarityThreshold,
+              ragMaxResults: config.ragMaxResults,
               }}
             />
           </div>
@@ -245,6 +249,8 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
               transferirAoPedirFoto: config.transferirAoPedirFoto,
               iaLeadAttendantId: config.iaLeadAttendantId,
               fineTunedModelId: config.fineTunedModelId,
+              ragSimilarityThreshold: config.ragSimilarityThreshold,
+              ragMaxResults: config.ragMaxResults,
             }}
           />
         </div>

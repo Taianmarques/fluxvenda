@@ -1640,7 +1640,10 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
   // RAG sobre a tela de Treino — busca atendimentos reais parecidos com a mensagem do cliente e
   // injeta como referência de tom/abordagem. Alternativa ao fine-tuning (indisponível pra contas
   // novas na OpenAI desde maio/2026). Não faz nada (custo zero) se o agente não tem exemplos.
-  const ragContext = buildRagContext(await retrieveRelevantExamples(config.id, text));
+  const ragContext = buildRagContext(await retrieveRelevantExamples(config.id, text, {
+    similarityThreshold: config.ragSimilarityThreshold,
+    maxResults: config.ragMaxResults,
+  }));
 
   let reply: string;
   if (imageUrl) {

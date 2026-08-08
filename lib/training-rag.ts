@@ -6,10 +6,11 @@ import { getEmbedding } from "@/lib/openai";
 
 export type Turno = { role: "user" | "assistant"; content: string };
 
-// Abaixo disso, o exemplo mais parecido ainda é considerado irrelevante — não injeta nada.
-// Ajustar com base em testes reais; começa conservador pra não confundir o modelo com exemplo errado.
-const SIMILARITY_THRESHOLD = 0.5;
-const MAX_RESULTS = 2;
+// Valores padrão (usados só se o agente ainda não tiver os campos preenchidos, ex: dado antigo
+// antes da migration) — ajustáveis por agente na tela de configuração (ragSimilarityThreshold,
+// ragMaxResults). Abaixo do limiar, o exemplo mais parecido ainda é considerado irrelevante.
+const DEFAULT_SIMILARITY_THRESHOLD = 0.5;
+const DEFAULT_MAX_RESULTS = 2;
 
 // Cenário (a descrição curta que o gestor escreveu) + a primeira fala do cliente — combina a
 // intenção resumida com a formulação real, pro embedding capturar os dois sinais.
@@ -40,7 +41,14 @@ function cosineSimilarity(a: number[], b: number[]): number {
   return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
-export async function retrieveRelevantExamples(agentConfigId: string, customerMessage: string): Promise<{ cenario: string; turnos: Turno[] }[]> {
+export async function retrieveRelevantExamples(
+  agentConfigId: string,
+  customerMessage: string,
+  opts?: { similarityThreshold?: number; maxResults?: number }
+): Promise<{ cenario: string; turnos: Turno[] }[]> {
+  const threshold = opts?.similarityThreshold ?? DEFAULT_SIMILARITY_THRESHOLD;
+  const maxResults = opts?.maxResults ?? DEFAULT_MAX_RESULTS;
+
   const exemplos = await prisma.trainingExample.findMany({
     where: { agentConfigId },
     select: { cenario: true, turnos: true, embedding: true },
@@ -58,9 +66,9 @@ export async function retrieveRelevantExamples(agentConfigId: string, customerMe
 
   return comEmbedding
     .map(e => ({ cenario: e.cenario, turnos: e.turnos as unknown as Turno[], score: cosineSimilarity(queryEmbedding, e.embedding) }))
-    .filter(e => e.score >= SIMILARITY_THRESHOLD)
+    .filter(e => e.score >= threshold)
     .sort((a, b) => b.score - a.score)
-    .slice(0, MAX_RESULTS)
+    .slice(0, maxResults)
     .map(({ cenario, turnos }) => ({ cenario, turnos }));
 }
 

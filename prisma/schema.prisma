@@ -676,6 +676,12 @@ model AgentConfig {
   // TrainingExample); reversível a qualquer momento limpando o campo.
   fineTunedModelId String?
 
+  // Parâmetros da busca por similaridade (RAG) sobre os exemplos de treino — ver lib/training-rag.ts.
+  // Abaixo do limiar, o exemplo mais parecido ainda é considerado irrelevante e não entra no prompt.
+  ragSimilarityThreshold Float @default(0.5)
+  // Quantos exemplos (no máximo) entram no prompt por mensagem, mesmo que mais passem do limiar.
+  ragMaxResults          Int   @default(2)
+
   // Estado inicial de todo agente novo: mensagens são salvas normalmente mas a IA não
   // responde em nenhum canal, até o gestor clicar em "Ativar IA" (vê/valida antes de ir ao ar).
   learningMode Boolean @default(false)

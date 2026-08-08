@@ -31,6 +31,8 @@ type InitialConfig = {
   transferirAoPedirFoto: boolean;
   iaLeadAttendantId: string | null;
   fineTunedModelId: string | null;
+  ragSimilarityThreshold: number;
+  ragMaxResults: number;
 } | null;
 
 type Attendant = { id: string; name: string; isManager: boolean };
@@ -221,6 +223,13 @@ export function WhatsappAgentClient({
   const [savingFineTuned, setSavingFineTuned] = useState(false);
   const [fineTunedError, setFineTunedError] = useState("");
 
+  // Parâmetros do RAG (busca por similaridade sobre os exemplos de treino)
+  const [ragSimilarityThreshold, setRagSimilarityThreshold] = useState(initialConfig?.ragSimilarityThreshold ?? 0.5);
+  const [ragMaxResults, setRagMaxResults] = useState(initialConfig?.ragMaxResults ?? 2);
+  const [showRag, setShowRag] = useState(false);
+  const [savingRag, setSavingRag] = useState(false);
+  const [ragError, setRagError] = useState("");
+
   useEffect(() => {
     fetch(`/api/agentes/${agentId}/atendentes`)
       .then(res => res.json())
@@ -281,6 +290,7 @@ export function WhatsappAgentClient({
           iaNumerosBloqueados: splitLines(iaNumerosBloqueadosText),
           transferirAoPedirFoto, iaLeadAttendantId: iaLeadAttendantId || null,
           fineTunedModelId: fineTunedModelId || null,
+          ragSimilarityThreshold, ragMaxResults,
         }),
       });
       if (!res.ok) throw new Error();
@@ -322,6 +332,7 @@ export function WhatsappAgentClient({
           iaNumerosBloqueados: splitLines(iaNumerosBloqueadosText),
           transferirAoPedirFoto, iaLeadAttendantId: iaLeadAttendantId || null,
           fineTunedModelId: fineTunedModelId.trim() || null,
+          ragSimilarityThreshold, ragMaxResults,
         }),
       });
       if (!res.ok) throw new Error();
@@ -331,6 +342,49 @@ export function WhatsappAgentClient({
       setFineTunedError("Não foi possível salvar. Tente novamente.");
     } finally {
       setSavingFineTuned(false);
+    }
+  }
+
+  function cancelRag() {
+    setRagSimilarityThreshold(initialConfig?.ragSimilarityThreshold ?? 0.5);
+    setRagMaxResults(initialConfig?.ragMaxResults ?? 2);
+    setRagError("");
+    setShowRag(false);
+  }
+
+  async function handleSaveRag() {
+    setSavingRag(true);
+    setRagError("");
+    try {
+      const res = await fetch(`/api/agentes/${agentId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nome, tom,
+          descricaoEmpresa, enderecoContato, precos,
+          objetivo, fluxoAtendimento, comportamento,
+          fluxoGatilhos: fluxoGatilhos.filter(r => r.gatilho.trim() && r.resposta.trim()),
+          sdrMateriaisEnabled,
+          servicos: splitLines(servicos),
+          objecoes: splitLines(objecoes),
+          horario,
+          followupEnabled,
+          followupDelaysMinutes: followupDelays.map(rowToMinutes),
+          emojiEnabled,
+          iaIgnoraAtribuidos, iaNiveisCarteiraExcluidos, iaPerfisExcluidos,
+          iaNumerosBloqueados: splitLines(iaNumerosBloqueadosText),
+          transferirAoPedirFoto, iaLeadAttendantId: iaLeadAttendantId || null,
+          fineTunedModelId: fineTunedModelId.trim() || null,
+          ragSimilarityThreshold, ragMaxResults,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      setShowRag(false);
+      router.refresh();
+    } catch {
+      setRagError("Não foi possível salvar. Tente novamente.");
+    } finally {
+      setSavingRag(false);
     }
   }
 
@@ -397,6 +451,7 @@ export function WhatsappAgentClient({
           iaNumerosBloqueados: splitLines(iaNumerosBloqueadosText),
           transferirAoPedirFoto, iaLeadAttendantId: iaLeadAttendantId || null,
           fineTunedModelId: fineTunedModelId || null,
+          ragSimilarityThreshold, ragMaxResults,
         }),
       });
       if (!res.ok) throw new Error();
@@ -507,6 +562,50 @@ export function WhatsappAgentClient({
                   {savingFineTuned ? "Salvando..." : "Salvar"}
                 </button>
                 <button onClick={cancelFineTuned} className="text-sm text-gray-400 hover:text-gray-200">Cancelar</button>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between gap-2 border-t border-gray-800 pt-3">
+            <p className="text-sm text-gray-400">
+              RAG: <span className="text-gray-300">limiar {ragSimilarityThreshold.toFixed(2)} · até {ragMaxResults} exemplo{ragMaxResults === 1 ? "" : "s"} por mensagem</span>
+            </p>
+            {!showRag && (
+              <button onClick={() => setShowRag(true)} className="text-xs text-teal-400 hover:text-teal-300 flex-shrink-0">Ajustar</button>
+            )}
+          </div>
+
+          {showRag && (
+            <div className="border-t border-gray-800 pt-3 space-y-3">
+              <p className="text-xs text-gray-500">
+                Controla a busca por similaridade sobre os exemplos da tela de{" "}
+                <a href={`/ferramentas/whatsapp/${agentId}/treino`} className="text-teal-400 hover:text-teal-300">Treino</a>.
+                Limiar mais alto = só injeta exemplo muito parecido (mais seguro, injeta menos). Mais exemplos por mensagem = mais contexto, porém mais tokens.
+              </p>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Limiar de similaridade: {ragSimilarityThreshold.toFixed(2)}</label>
+                <input
+                  type="range" min={0} max={1} step={0.05}
+                  value={ragSimilarityThreshold}
+                  onChange={e => setRagSimilarityThreshold(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Exemplos por mensagem (máximo)</label>
+                <input
+                  type="number" min={0} max={10}
+                  value={ragMaxResults}
+                  onChange={e => setRagMaxResults(Math.max(0, Math.min(10, Number(e.target.value))))}
+                  className="w-24 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-teal-600"
+                />
+              </div>
+              {ragError && <p className="text-sm text-red-400">{ragError}</p>}
+              <div className="flex gap-3">
+                <button onClick={handleSaveRag} disabled={savingRag} className="bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-xl px-4 py-2 text-sm font-medium">
+                  {savingRag ? "Salvando..." : "Salvar"}
+                </button>
+                <button onClick={cancelRag} className="text-sm text-gray-400 hover:text-gray-200">Cancelar</button>
               </div>
             </div>
           )}
