@@ -10,6 +10,7 @@ import {
   PREVENDA_VEICULO_TOOLS, SDR_MATERIAIS_TOOLS, TRANSFERIR_FOTO_TOOLS,
 } from "@/lib/agent-engine";
 import { textToSpeech } from "@/lib/elevenlabs";
+import { retrieveRelevantExamples, buildRagContext } from "@/lib/training-rag";
 import { logTokenUsage, isOverQuota } from "@/lib/token-usage";
 import { getAvailableSlots, isSlotAvailable, resolveAvailability, busyStatusWhere, formatSlotsForAgent, type AvailabilityRule } from "@/lib/scheduling";
 import { assignNextAttendant } from "@/lib/assignment";
@@ -1632,9 +1633,14 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
   // Modelo fine-tunado do agente (opcional) — null usa o gpt-4o-mini padrão, igual sempre foi
   const model = config.fineTunedModelId || undefined;
 
+  // RAG sobre a tela de Treino — busca atendimentos reais parecidos com a mensagem do cliente e
+  // injeta como referência de tom/abordagem. Alternativa ao fine-tuning (indisponível pra contas
+  // novas na OpenAI desde maio/2026). Não faz nada (custo zero) se o agente não tem exemplos.
+  const ragContext = buildRagContext(await retrieveRelevantExamples(config.id, text));
+
   let reply: string;
   if (imageUrl) {
-    const result = await runAgentWithImage(activeSystemPrompt + brevityInstruction, historyForAgent, imageUrl, caption, model);
+    const result = await runAgentWithImage(activeSystemPrompt + ragContext + brevityInstruction, historyForAgent, imageUrl, caption, model);
     reply = result.reply;
     logTokenUsage({ teamId: config.teamId, provider: "openai", model: model ?? "gpt-4o-mini", feature: "whatsapp_agent", ...result.usage });
   } else if (tools.length > 0) {
@@ -1661,7 +1667,7 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
       : "";
 
     const result = await runAgentWithTools(
-      activeSystemPrompt + extraContext + brevityInstruction + sdrReinforcement,
+      activeSystemPrompt + extraContext + ragContext + brevityInstruction + sdrReinforcement,
       historyForAgent,
       text,
       tools,
@@ -1671,7 +1677,7 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
     reply = result.reply;
     logTokenUsage({ teamId: config.teamId, provider: "openai", model: model ?? "gpt-4o-mini", feature: "whatsapp_agent", ...result.usage });
   } else {
-    const result = await runAgent(activeSystemPrompt + brevityInstruction, historyForAgent, text, model);
+    const result = await runAgent(activeSystemPrompt + ragContext + brevityInstruction, historyForAgent, text, model);
     reply = result.reply;
     logTokenUsage({ teamId: config.teamId, provider: "openai", model: model ?? "gpt-4o-mini", feature: "whatsapp_agent", ...result.usage });
   }

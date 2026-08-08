@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getAgentConfigAsManager } from "@/lib/team";
+import { computeAndStoreEmbedding } from "@/lib/training-rag";
 import { z } from "zod";
 
 const turnoSchema = z.object({
@@ -43,6 +44,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
     data: { cenario: body.data.cenario, turnos: body.data.turnos },
     include: { createdBy: { select: { name: true } } },
   });
+  await computeAndStoreEmbedding(exemplo.id, exemplo.cenario, exemplo.turnos as unknown as { role: "user" | "assistant"; content: string }[]);
 
   return NextResponse.json({ exemplo });
 }

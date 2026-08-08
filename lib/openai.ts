@@ -5,3 +5,9 @@ export const openai = new OpenAI({
 });
 
 export const MODEL = "gpt-4o-mini";
+export const EMBEDDING_MODEL = "text-embedding-3-small";
+
+export async function getEmbedding(text: string): Promise<number[]> {
+  const res = await openai.embeddings.create({ model: EMBEDDING_MODEL, input: text });
+  return res.data[0].embedding;
+}

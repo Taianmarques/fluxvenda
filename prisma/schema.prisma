@@ -916,6 +916,12 @@ model TrainingExample {
   // (mesmos nomes de role que o formato de fine-tuning da OpenAI espera)
   turnos Json
 
+  // Vetor de embedding (array de floats, text-embedding-3-small) do cenário + primeira fala do
+  // cliente — usado pra busca por similaridade em tempo real (RAG), já que fine-tuning não está
+  // disponível pra essa conta. Recalculado sempre que o exemplo é criado/editado. Null = ainda
+  // não processado (exemplos antigos até rodar o backfill).
+  embedding Json?
+
   @@index([agentConfigId])
 }
 
