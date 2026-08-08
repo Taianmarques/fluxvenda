@@ -162,10 +162,11 @@ export type AgentUsage = { inputTokens: number; outputTokens: number };
 export async function runAgent(
   systemPrompt: string,
   history: { role: "user" | "assistant"; content: string }[],
-  newMessage: string
+  newMessage: string,
+  model: string = MODEL
 ): Promise<{ reply: string; usage: AgentUsage }> {
   const completion = await openai.chat.completions.create({
-    model: MODEL,
+    model,
     max_tokens: 400,
     messages: [
       { role: "system", content: systemPrompt },

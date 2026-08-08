@@ -288,6 +288,9 @@ export function WhatsappAgentClient({
   const [chat, setChat] = useState<ChatMsg[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+  // Testar um modelo fine-tunado isolado (id da OpenAI) sem tocar na configuração do agente —
+  // some ao recarregar a página, é só pra essa sessão de teste
+  const [testModelId, setTestModelId] = useState("");
 
   function splitLines(v: string) {
     return v.split("\n").map(s => s.trim()).filter(Boolean);
@@ -367,10 +370,10 @@ export function WhatsappAgentClient({
       const res = await fetch(`/api/agentes/${agentId}/testar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, history: chat }),
+        body: JSON.stringify({ message, history: chat, modelId: testModelId.trim() || undefined }),
       });
       const data = await res.json();
-      setChat([...nextChat, { role: "assistant", content: data.reply ?? "—" }]);
+      setChat([...nextChat, { role: "assistant", content: res.ok ? (data.reply ?? "—") : (data.error ?? "Erro ao testar o agente.") }]);
     } catch {
       setChat([...nextChat, { role: "assistant", content: "Erro ao testar o agente." }]);
     } finally {
@@ -433,6 +436,20 @@ export function WhatsappAgentClient({
 
         {showTest && (
           <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-3">
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">
+                Modelo fine-tunado pra testar (opcional — em branco usa o modelo padrão)
+              </label>
+              <input
+                value={testModelId}
+                onChange={e => setTestModelId(e.target.value)}
+                placeholder="ft:gpt-4o-mini-2024-07-18:org::abc123"
+                className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-xs font-mono focus:outline-none focus:border-blue-600"
+              />
+              <p className="text-[11px] text-gray-600 mt-1">
+                Só vale pra essa conversa de teste — não muda a configuração do agente nem afeta o atendimento real.
+              </p>
+            </div>
             <div className="h-64 overflow-y-auto space-y-2 bg-gray-950 rounded-xl p-3">
               {chat.length === 0 && <p className="text-xs text-gray-500">Envie uma mensagem como se fosse um cliente no WhatsApp.</p>}
               {chat.map((m, i) => (
