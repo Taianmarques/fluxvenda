@@ -2,7 +2,7 @@ import { currentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Bot, Smartphone, MessageCircle, GraduationCap } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, Smartphone, MessageCircle, GraduationCap, FlaskConical } from "lucide-react";
 import { getAgentConfigAsManager } from "@/lib/team";
 import { WhatsappAgentClient } from "../WhatsappAgentClient";
 import { DistribuicaoClient } from "../DistribuicaoClient";
@@ -187,9 +187,20 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
         >
           <div>
             <p className="font-semibold text-purple-300 flex items-center gap-2"><GraduationCap size={18} /> Treinar com conversas simuladas</p>
-            <p className="text-sm text-gray-400 mt-1">Cadastre roleplays de cliente x SDR pra usar depois num fine-tuning do agente.</p>
+            <p className="text-sm text-gray-400 mt-1">Cadastre roleplays de cliente x SDR — usados pelo RAG do agente pra calibrar tom e abordagem em tempo real.</p>
           </div>
           <ArrowRight size={20} className="text-purple-400 flex-shrink-0" />
+        </Link>
+
+        <Link
+          href={`/ferramentas/whatsapp/${config.id}/simulador`}
+          className="flex items-center justify-between gap-4 bg-gradient-to-r from-teal-950/40 to-cyan-950/40 border border-teal-800/50 rounded-2xl p-5 hover:border-teal-600 transition-colors"
+        >
+          <div>
+            <p className="font-semibold text-teal-300 flex items-center gap-2"><FlaskConical size={18} /> Simulador de conversa</p>
+            <p className="text-sm text-gray-400 mt-1">Converse com o agente usando o pipeline real (ferramentas, RAG, humanização) — sem afetar clientes de verdade.</p>
+          </div>
+          <ArrowRight size={20} className="text-teal-400 flex-shrink-0" />
         </Link>
 
         <div>

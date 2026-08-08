@@ -1418,7 +1418,7 @@ function resolveHandoffAssignee(config: AgentConfigFull, currentAssignedToId: st
 
 const SESSION_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-export async function processIncomingMessage(config: AgentConfigFull, msg: IncomingMessage, adapter: ChannelAdapter, opts?: { enforceSessionWindow?: boolean }): Promise<void> {
+export async function processIncomingMessage(config: AgentConfigFull, msg: IncomingMessage, adapter: ChannelAdapter, opts?: { enforceSessionWindow?: boolean; sandbox?: boolean }): Promise<void> {
   const { text, caption, contactNumber, contactName, mediaUrl, mediaType, imageUrl } = msg;
 
   // Cliente respondeu — zera o contador de follow-up e marca prospect como RESPONDEU se aplicável
@@ -1466,18 +1466,22 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
   // mensagem, sem o agente responder. Em ambos os casos dispara web push pro atendente
   // responsável (ou pra equipe toda, se a conversa ainda não tem dono) — ninguém deve ficar
   // sem saber que chegou mensagem só porque a IA decidiu não responder.
-  if (conversation.humanTakeover || !shouldAiHandle(config, conversation)) {
+  // Modo sandbox (simulador de teste em Ferramentas > Treino): ignora as pausas/gates de
+  // produção — o gestor testando o agente sempre quer ver a IA responder, independente do
+  // agente estar pausado ou de "quem a IA atende" excluir aquele contato de mentira.
+  if (!opts?.sandbox && (conversation.humanTakeover || !shouldAiHandle(config, conversation))) {
     notifyHumanTakeoverMessage(config, conversation.id, conversation.assignedToId, conversation.contactName ?? contactNumber, text).catch(() => {});
     return;
   }
   // Canal pausado só pra IA (independente de "active", que desliga o canal inteiro) — a
   // mensagem já foi salva acima, só não gera resposta automática
-  if (config.whatsappAiPaused) return;
+  if (!opts?.sandbox && config.whatsappAiPaused) return;
 
   // Debounce: aguarda antes de chamar a IA para contextualizar mensagens enviadas em partes.
   // Se outra mensagem do mesmo contato chegar nesse intervalo, ela é salva no banco e esta
-  // chamada retorna sem responder — a mais recente processará o histórico completo.
-  const debounceMs = Number(process.env.MESSAGE_DEBOUNCE_MS ?? "8000");
+  // chamada retorna sem responder — a mais recente processará o histórico completo. Sem
+  // sentido no sandbox (cada envio do simulador já é uma mensagem deliberada, não uma rajada).
+  const debounceMs = opts?.sandbox ? 0 : Number(process.env.MESSAGE_DEBOUNCE_MS ?? "8000");
   if (debounceMs > 0) {
     await new Promise(resolve => setTimeout(resolve, debounceMs));
     const latestUserMsg = await prisma.message.findFirst({

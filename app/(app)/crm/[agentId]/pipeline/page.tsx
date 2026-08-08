@@ -40,6 +40,7 @@ export default async function PipelinePage({ params }: { params: Promise<{ agent
       where: {
         conversation: {
           agentConfigId: config.id,
+          isSandbox: false, // conversa de teste do simulador nunca aparece no pipeline real
           ...(isManager ? {} : { OR: [{ assignedToId: user.id }, { assignedToId: null }] }),
         },
       },

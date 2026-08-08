@@ -19,6 +19,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ agentId
       // Contato importado/cadastrado manualmente vira uma conversa sem mensagens — não deve
       // aparecer na caixa de entrada como se fosse um atendimento em aberto (ver page.tsx)
       messages: { some: {} },
+      isSandbox: false, // conversa de teste do simulador nunca aparece na caixa real
       // Gestor vê tudo; atendente só vê as dele + as ainda não atribuídas
       ...(isManager ? {} : { OR: [{ assignedToId: userId }, { assignedToId: null }] }),
     },

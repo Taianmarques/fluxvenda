@@ -43,7 +43,7 @@ async function VendasPageContent({ params }: { params: Promise<{ agentId: string
   }
 
   const wonDeals = await prisma.opportunity.findMany({
-    where: { wonAt: { not: null }, conversation: { agentConfigId: config.id } },
+    where: { wonAt: { not: null }, conversation: { agentConfigId: config.id, isSandbox: false } },
     orderBy: { wonAt: "desc" },
     include: { conversation: { select: { contactName: true, contactNumber: true } } },
   });
@@ -53,13 +53,13 @@ async function VendasPageContent({ params }: { params: Promise<{ agentId: string
   const ticketMedio = count > 0 ? total / count : 0;
 
   const openDeals = await prisma.opportunity.findMany({
-    where: { wonAt: null, conversation: { agentConfigId: config.id } },
+    where: { wonAt: null, conversation: { agentConfigId: config.id, isSandbox: false } },
     include: { stage: true },
   });
 
   // Motivos de encerramento das conversas finalizadas (o texto pode ter "— observação")
   const encerradas = await prisma.conversation.findMany({
-    where: { agentConfigId: config.id, status: "FINALIZADO", motivoEncerramento: { not: null } },
+    where: { agentConfigId: config.id, status: "FINALIZADO", motivoEncerramento: { not: null }, isSandbox: false },
     select: { motivoEncerramento: true },
   });
   const motivosMap = new Map<string, number>();

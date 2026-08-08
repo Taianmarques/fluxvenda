@@ -1449,6 +1449,10 @@ model Conversation {
   status         ConversationStatus @default(ATIVO)
   humanTakeover  Boolean            @default(false) // true = atendente humano assumiu, agente para de responder
 
+  // Conversa de teste do simulador (Ferramentas > Treino) — uma por gestor, reaproveitada entre
+  // sessões. Nunca deve aparecer na caixa de entrada nem em relatórios/métricas reais.
+  isSandbox Boolean @default(false)
+
   leadStatusId String?
   leadStatus   LeadStatus? @relation(fields: [leadStatusId], references: [id], onDelete: SetNull)
 

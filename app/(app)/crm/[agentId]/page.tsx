@@ -58,6 +58,7 @@ async function WhatsappInboxPageContent({
         // atendente/nível definidos quando o cliente escrever pela primeira vez) — não deve
         // aparecer na caixa de entrada como se fosse um atendimento em aberto.
         messages: { some: {} },
+        isSandbox: false, // conversa de teste do simulador nunca aparece na caixa real
         ...(isManager ? {} : { OR: [{ assignedToId: user.id }, { assignedToId: null }] }),
       },
       orderBy: { updatedAt: "desc" },
