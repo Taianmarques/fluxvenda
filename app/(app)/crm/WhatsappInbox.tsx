@@ -162,6 +162,7 @@ const THEMES = {
     bubbleHuman: "bg-green-700 text-white",
     inputBar: "border-gray-800",
     inputField: "bg-gray-900 border-gray-800 text-white placeholder:text-gray-500",
+    inputPlaceholder: "placeholder:text-gray-500",
   },
   light: {
     root: "bg-gray-50 text-gray-900",
@@ -185,6 +186,7 @@ const THEMES = {
     bubbleHuman: "bg-[#cfe9ff] text-gray-900",
     inputBar: "border-gray-200",
     inputField: "bg-white border-gray-300 text-gray-900 placeholder:text-gray-400",
+    inputPlaceholder: "placeholder:text-gray-500",
   },
 } satisfies Record<ChatTheme, Record<string, string>>;
 
@@ -1009,7 +1011,7 @@ export function WhatsappInbox({
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     placeholder="Buscar conversa..."
-                    className={`flex-1 bg-transparent text-sm focus:outline-none placeholder:opacity-60`}
+                    className={`flex-1 bg-transparent text-sm focus:outline-none ${t.inputPlaceholder}`}
                   />
                   {search && (
                     <button onClick={() => setSearch("")} className="opacity-60 hover:opacity-100"><X size={14} /></button>
