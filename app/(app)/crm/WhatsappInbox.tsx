@@ -186,7 +186,7 @@ const THEMES = {
     bubbleHuman: "bg-[#cfe9ff] text-gray-900",
     inputBar: "border-gray-200",
     inputField: "bg-white border-gray-300 text-gray-900 placeholder:text-gray-400",
-    inputPlaceholder: "placeholder:text-gray-500",
+    inputPlaceholder: "placeholder:text-gray-600",
   },
 } satisfies Record<ChatTheme, Record<string, string>>;
 
