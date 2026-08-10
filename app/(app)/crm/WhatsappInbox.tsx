@@ -375,6 +375,7 @@ export function WhatsappInbox({
   const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const messageInputRef = useRef<HTMLTextAreaElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -649,7 +650,7 @@ export function WhatsappInbox({
   }
 
   // Cola print/imagem direto do clipboard (Ctrl+V) como anexo — mesmo fluxo do botão de anexar.
-  function handlePaste(e: React.ClipboardEvent<HTMLInputElement>) {
+  function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
     if (isIgContact(detail?.contactNumber ?? "")) return; // Instagram DM só suporta texto
     const file = Array.from(e.clipboardData.items).find(item => item.kind === "file")?.getAsFile();
     if (!file) return;
@@ -798,6 +799,15 @@ export function WhatsappInbox({
     if (noteMode) handleSendNote();
     else handleSend();
   }
+
+  // Campo cresce com o texto (até um limite) e volta ao tamanho de uma linha ao esvaziar/enviar
+  const MESSAGE_INPUT_MAX_HEIGHT = 160;
+  useEffect(() => {
+    const el = messageInputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, MESSAGE_INPUT_MAX_HEIGHT)}px`;
+  }, [input]);
 
   // Nome mostrado no bloco de citação: quem escreveu a mensagem citada
   function replyAuthorLabel(m: { role: string; sender?: { name: string } | null }): string {
@@ -1404,13 +1414,20 @@ export function WhatsappInbox({
                           dark={theme === "dark"}
                         />
                       )}
-                      <input
+                      <textarea
+                        ref={messageInputRef}
                         value={input}
                         onChange={e => setInput(e.target.value)}
-                        onKeyDown={e => e.key === "Enter" && handlePrimaryAction()}
+                        onKeyDown={e => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handlePrimaryAction();
+                          }
+                        }}
                         onPaste={noteMode ? undefined : handlePaste}
                         placeholder={noteMode ? "Escreva uma nota interna (só a equipe vê)..." : attachment ? "Adicionar legenda (opcional)..." : "Digite uma mensagem para assumir a conversa..."}
-                        className="w-full bg-transparent text-sm focus:outline-none"
+                        rows={1}
+                        className="w-full bg-transparent text-sm focus:outline-none resize-none overflow-y-auto block"
                       />
                       <div className="flex items-center justify-between mt-1.5">
                         <div className="flex items-center gap-0.5">
