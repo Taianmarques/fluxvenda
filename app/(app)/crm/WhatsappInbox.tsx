@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   MessageCircle, Search, X, Trophy, Lock, Unlock, Bot, User, UserPlus,
   FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap, StickyNote, ArrowRightLeft, HandCoins, CalendarClock, ListFilter, Instagram, ArrowLeft,
-  Reply, Forward, ChevronDown, Package, ImageOff, Pin,
+  Reply, Forward, ChevronDown, Package, ImageOff, Pin, Maximize2, Download,
 } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { EmojiPicker } from "./EmojiPicker";
@@ -239,12 +239,64 @@ function ContactAvatar({ agentId, conversationId, seed, isIg, statusColor }: {
   );
 }
 
+function MediaLightbox({ mediaUrl, mediaType, onClose }: { mediaUrl: string; mediaType: "image" | "video"; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute top-4 right-4 flex items-center gap-2">
+        <a
+          href={mediaUrl}
+          download
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={e => e.stopPropagation()}
+          title="Baixar mídia"
+          className="p-2 rounded-lg bg-white/10 text-white hover:bg-white/20"
+        >
+          <Download size={20} />
+        </a>
+        <button type="button" onClick={onClose} title="Fechar" className="p-2 rounded-lg bg-white/10 text-white hover:bg-white/20">
+          <X size={20} />
+        </button>
+      </div>
+      {mediaType === "image" ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={mediaUrl} alt="" className="max-w-full max-h-full object-contain" onClick={e => e.stopPropagation()} />
+      ) : (
+        <video controls autoPlay src={mediaUrl} className="max-w-full max-h-full" onClick={e => e.stopPropagation()} />
+      )}
+    </div>
+  );
+}
+
 function MediaContent({ mediaUrl, mediaType, content }: { mediaUrl: string; mediaType: string; content: string }) {
   const isPlaceholder = !content || content.startsWith("[");
+  const [lightbox, setLightbox] = useState<"image" | "video" | null>(null);
   return (
     <div>
-      {mediaType === "image" && <img src={mediaUrl} alt="" className="rounded-lg max-w-[240px] max-h-[240px] object-cover mb-1" />}
-      {mediaType === "video" && <video controls src={mediaUrl} className="rounded-lg max-w-[240px] mb-1" />}
+      {mediaType === "image" && (
+        <button type="button" onClick={() => setLightbox("image")} className="block" title="Abrir em tela cheia">
+          <img src={mediaUrl} alt="" className="rounded-lg max-w-[240px] max-h-[240px] object-cover mb-1 cursor-zoom-in" />
+        </button>
+      )}
+      {mediaType === "video" && (
+        <div className="relative inline-block mb-1">
+          <video controls src={mediaUrl} className="rounded-lg max-w-[240px]" />
+          <button
+            type="button"
+            onClick={() => setLightbox("video")}
+            title="Abrir em tela cheia"
+            className="absolute top-1.5 right-1.5 p-1 rounded-lg bg-black/50 text-white hover:bg-black/70"
+          >
+            <Maximize2 size={14} />
+          </button>
+        </div>
+      )}
       {mediaType === "audio" && <audio controls src={mediaUrl} className="mb-1" />}
       {mediaType === "document" && (
         <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 underline mb-1">
@@ -252,6 +304,8 @@ function MediaContent({ mediaUrl, mediaType, content }: { mediaUrl: string; medi
         </a>
       )}
       {!isPlaceholder && mediaType !== "document" && <p className="whitespace-pre-wrap">{content}</p>}
+
+      {lightbox && <MediaLightbox mediaUrl={mediaUrl} mediaType={lightbox} onClose={() => setLightbox(null)} />}
     </div>
   );
 }
@@ -591,6 +645,34 @@ export function WhatsappInbox({
       });
     };
     reader.onerror = () => setAttachError("Não foi possível ler o arquivo.");
+    reader.readAsDataURL(file);
+  }
+
+  // Cola print/imagem direto do clipboard (Ctrl+V) como anexo — mesmo fluxo do botão de anexar.
+  function handlePaste(e: React.ClipboardEvent<HTMLInputElement>) {
+    if (isIgContact(detail?.contactNumber ?? "")) return; // Instagram DM só suporta texto
+    const file = Array.from(e.clipboardData.items).find(item => item.kind === "file")?.getAsFile();
+    if (!file) return;
+
+    e.preventDefault();
+    setAttachError("");
+    if (file.size > MAX_ATTACHMENT_MB * 1024 * 1024) {
+      setAttachError(`Arquivo muito grande (máx. ${MAX_ATTACHMENT_MB}MB).`);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const base64 = dataUrl.split(",")[1] ?? "";
+      setAttachment({
+        base64,
+        type: detectMediaKind(file.type),
+        fileName: file.name || `colado-${Date.now()}.png`,
+        previewUrl: dataUrl,
+      });
+    };
+    reader.onerror = () => setAttachError("Não foi possível ler o arquivo colado.");
     reader.readAsDataURL(file);
   }
 
@@ -1326,6 +1408,7 @@ export function WhatsappInbox({
                         value={input}
                         onChange={e => setInput(e.target.value)}
                         onKeyDown={e => e.key === "Enter" && handlePrimaryAction()}
+                        onPaste={noteMode ? undefined : handlePaste}
                         placeholder={noteMode ? "Escreva uma nota interna (só a equipe vê)..." : attachment ? "Adicionar legenda (opcional)..." : "Digite uma mensagem para assumir a conversa..."}
                         className="w-full bg-transparent text-sm focus:outline-none"
                       />

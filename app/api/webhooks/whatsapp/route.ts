@@ -13,6 +13,11 @@ function mediaMimetype(message: any): string | null {
     : null;
 }
 
+// Nome do arquivo, quando a mídia é um documento — os campos variam por versão da UazAPI.
+function mediaFileName(message: any): string | undefined {
+  return message?.content?.fileName ?? message?.content?.filename ?? message?.fileName ?? undefined;
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ ok: true });
@@ -60,6 +65,26 @@ export async function POST(req: NextRequest) {
       text = caption ? `[Imagem] ${caption}` : "[Imagem enviada pelo cliente]";
     } catch (err) {
       console.error("[whatsapp-webhook] erro ao baixar imagem:", err);
+    }
+  } else if (mimetype?.startsWith("video/")) {
+    try {
+      const media = await downloadMessageMedia(config.uazapiToken, message.id || message.messageid);
+      mediaUrl = media.fileURL;
+      mediaType = "video";
+      text = caption ? `[Vídeo] ${caption}` : "[Vídeo enviado pelo cliente]";
+    } catch (err) {
+      console.error("[whatsapp-webhook] erro ao baixar vídeo:", err);
+    }
+  } else if (mimetype && !mimetype.startsWith("audio/")) {
+    // Qualquer outro mimetype (PDF, planilha, etc.) vira documento
+    try {
+      const media = await downloadMessageMedia(config.uazapiToken, message.id || message.messageid);
+      mediaUrl = media.fileURL;
+      mediaType = "document";
+      const fileName = mediaFileName(message);
+      text = caption ? `[Documento] ${caption}` : `[Documento enviado pelo cliente${fileName ? `: ${fileName}` : ""}]`;
+    } catch (err) {
+      console.error("[whatsapp-webhook] erro ao baixar documento:", err);
     }
   }
 
