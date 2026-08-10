@@ -45,8 +45,11 @@ type Message = {
   mediaUrl?: string | null;
   mediaType?: string | null;
   createdAt: string;
-  sender?: { name: string } | null;
+  sender?: { id: string; name: string } | null;
   forwarded?: boolean;
+  edited?: boolean;
+  deleted?: boolean;
+  waMessageId?: string | null;
   replyTo?: { id: string; content: string; role: string; mediaType?: string | null; sender?: { name: string } | null } | null;
 };
 
@@ -360,6 +363,9 @@ export function WhatsappInbox({
   // Responder/encaminhar estilo WhatsApp
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [forwardingMessage, setForwardingMessage] = useState<Message | null>(null);
+  // Editar mensagem já enviada (edita/apaga de verdade no WhatsApp via UazAPI)
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
   const [msgMenuId, setMsgMenuId] = useState<string | null>(null);
   const [forwardTargets, setForwardTargets] = useState<string[]>([]);
   const [forwardSearch, setForwardSearch] = useState("");
@@ -780,6 +786,67 @@ export function WhatsappInbox({
     }
   }
 
+  function handleStartEdit(m: Message) {
+    setEditingMessage(m);
+    setReplyingTo(null);
+    setAttachment(null);
+    setInput(m.content);
+    setMsgMenuId(null);
+  }
+
+  async function handleSaveEdit() {
+    const content = input.trim();
+    if (!content || !selectedId || !editingMessage || sending) return;
+    setSending(true);
+    setAttachError("");
+    try {
+      const res = await fetch(`/api/ferramentas/whatsapp/conversas/${selectedId}/mensagem/${editingMessage.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setAttachError(data?.error ?? "Não foi possível editar a mensagem.");
+        return;
+      }
+      setInput("");
+      setEditingMessage(null);
+      await refreshDetail(selectedId);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function handleDeleteMessage(m: Message) {
+    if (!selectedId || deletingMessageId) return;
+    if (!window.confirm("Apagar esta mensagem para todos no WhatsApp?")) return;
+    setMsgMenuId(null);
+    setDeletingMessageId(m.id);
+    try {
+      const res = await fetch(`/api/ferramentas/whatsapp/conversas/${selectedId}/mensagem/${m.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setAttachError(data?.error ?? "Não foi possível apagar a mensagem.");
+        return;
+      }
+      await refreshDetail(selectedId);
+    } finally {
+      setDeletingMessageId(null);
+    }
+  }
+
+  function handleDownloadMedia(url: string, fileName?: string) {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName || "";
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
   async function handleSendNote() {
     if (!input.trim() || !selectedId || sending) return;
     const content = input.trim();
@@ -798,7 +865,8 @@ export function WhatsappInbox({
   }
 
   function handlePrimaryAction() {
-    if (noteMode) handleSendNote();
+    if (editingMessage) handleSaveEdit();
+    else if (noteMode) handleSendNote();
     else handleSend();
   }
 
@@ -1312,30 +1380,63 @@ export function WhatsappInbox({
                           >
                             <ChevronDown size={14} />
                           </button>
-                          {msgMenuId === m.id && (
-                            <>
-                              <div className="fixed inset-0 z-10" onClick={() => setMsgMenuId(null)} />
-                              <div className={`absolute z-20 top-6 ${isOutgoing ? "right-1" : "left-1"} w-40 rounded-xl border shadow-xl p-1 space-y-0.5 ${theme === "dark" ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}`}>
-                                <button
-                                  onClick={() => { setReplyingTo(m); setMsgMenuId(null); }}
-                                  className={`w-full flex items-center gap-2 text-left text-sm px-3 py-2 rounded-lg ${theme === "dark" ? "text-gray-200 hover:bg-gray-800" : "text-gray-700 hover:bg-gray-100"}`}
-                                >
-                                  <Reply size={14} /> Responder
-                                </button>
-                                <button
-                                  onClick={() => { setForwardingMessage(m); setForwardTargets([]); setForwardSearch(""); setMsgMenuId(null); }}
-                                  className={`w-full flex items-center gap-2 text-left text-sm px-3 py-2 rounded-lg ${theme === "dark" ? "text-gray-200 hover:bg-gray-800" : "text-gray-700 hover:bg-gray-100"}`}
-                                >
-                                  <Forward size={14} /> Encaminhar
-                                </button>
-                              </div>
-                            </>
-                          )}
+                          {msgMenuId === m.id && (() => {
+                            const canManageOnWa = !isIgContact(detail.contactNumber) && !m.deleted && !!m.waMessageId &&
+                              (m.role === "human" ? (m.sender?.id === currentUserId || isManager) : m.role === "assistant" ? isManager : false);
+                            return (
+                              <>
+                                <div className="fixed inset-0 z-10" onClick={() => setMsgMenuId(null)} />
+                                <div className={`absolute z-20 top-6 ${isOutgoing ? "right-1" : "left-1"} w-40 rounded-xl border shadow-xl p-1 space-y-0.5 ${theme === "dark" ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}`}>
+                                  {!m.deleted && (
+                                    <button
+                                      onClick={() => { setReplyingTo(m); setMsgMenuId(null); }}
+                                      className={`w-full flex items-center gap-2 text-left text-sm px-3 py-2 rounded-lg ${theme === "dark" ? "text-gray-200 hover:bg-gray-800" : "text-gray-700 hover:bg-gray-100"}`}
+                                    >
+                                      <Reply size={14} /> Responder
+                                    </button>
+                                  )}
+                                  {!m.deleted && (
+                                    <button
+                                      onClick={() => { setForwardingMessage(m); setForwardTargets([]); setForwardSearch(""); setMsgMenuId(null); }}
+                                      className={`w-full flex items-center gap-2 text-left text-sm px-3 py-2 rounded-lg ${theme === "dark" ? "text-gray-200 hover:bg-gray-800" : "text-gray-700 hover:bg-gray-100"}`}
+                                    >
+                                      <Forward size={14} /> Encaminhar
+                                    </button>
+                                  )}
+                                  {m.mediaUrl && (
+                                    <button
+                                      onClick={() => { handleDownloadMedia(m.mediaUrl!, m.id); setMsgMenuId(null); }}
+                                      className={`w-full flex items-center gap-2 text-left text-sm px-3 py-2 rounded-lg ${theme === "dark" ? "text-gray-200 hover:bg-gray-800" : "text-gray-700 hover:bg-gray-100"}`}
+                                    >
+                                      <Download size={14} /> Baixar
+                                    </button>
+                                  )}
+                                  {canManageOnWa && !m.mediaUrl && (
+                                    <button
+                                      onClick={() => handleStartEdit(m)}
+                                      className={`w-full flex items-center gap-2 text-left text-sm px-3 py-2 rounded-lg ${theme === "dark" ? "text-gray-200 hover:bg-gray-800" : "text-gray-700 hover:bg-gray-100"}`}
+                                    >
+                                      <PenLine size={14} /> Editar
+                                    </button>
+                                  )}
+                                  {canManageOnWa && (
+                                    <button
+                                      onClick={() => handleDeleteMessage(m)}
+                                      disabled={deletingMessageId === m.id}
+                                      className="w-full flex items-center gap-2 text-left text-sm px-3 py-2 rounded-lg text-red-500 hover:bg-red-500/10 disabled:opacity-50"
+                                    >
+                                      <Trash2 size={14} /> {deletingMessageId === m.id ? "Apagando..." : "Apagar"}
+                                    </button>
+                                  )}
+                                </div>
+                              </>
+                            );
+                          })()}
 
-                          {m.forwarded && (
+                          {m.forwarded && !m.deleted && (
                             <p className="text-[10px] opacity-60 mb-0.5 flex items-center gap-1 italic"><Forward size={10} /> Encaminhada</p>
                           )}
-                          {m.replyTo && (
+                          {m.replyTo && !m.deleted && (
                             <button
                               onClick={() => scrollToMessage(m.replyTo!.id)}
                               className="w-full text-left mb-1 rounded border-l-2 border-green-400 bg-black/20 px-2 py-1"
@@ -1348,12 +1449,17 @@ export function WhatsappInbox({
                           )}
                           {m.role === "human" && <p className="text-[10px] opacity-70 mb-0.5 flex items-center gap-1 pr-5"><User size={10} /> {m.sender?.name ?? "Atendente"}</p>}
                           {m.role === "assistant" && <p className="text-[10px] opacity-70 mb-0.5 flex items-center gap-1 pr-5"><Bot size={10} /> {agentName}</p>}
-                          {m.mediaUrl && m.mediaType ? (
+                          {m.deleted ? (
+                            <p className="italic opacity-60 flex items-center gap-1 pr-4"><Trash2 size={12} /> Mensagem apagada</p>
+                          ) : m.mediaUrl && m.mediaType ? (
                             <MediaContent mediaUrl={m.mediaUrl} mediaType={m.mediaType} content={m.content} />
                           ) : (
                             <p className="whitespace-pre-wrap pr-4">{m.content}</p>
                           )}
-                          <p className="text-[10px] opacity-60 mt-1 text-right">{new Date(m.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</p>
+                          <p className="text-[10px] opacity-60 mt-1 text-right">
+                            {m.edited && !m.deleted && <span className="italic mr-1">editada</span>}
+                            {new Date(m.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                          </p>
                         </div>
                       </div>
                     );
@@ -1386,6 +1492,16 @@ export function WhatsappInbox({
                       )}
                       {attachment.type !== "audio" && <span className="text-xs truncate flex-1">{attachment.fileName}</span>}
                       <button onClick={() => setAttachment(null)} className="text-gray-500 hover:text-red-400 px-1 flex-shrink-0"><X size={14} /></button>
+                    </div>
+                  )}
+                  {editingMessage && (
+                    <div className={`flex items-center gap-2 mb-2 p-2 rounded-lg border border-l-2 border-l-amber-500 ${t.inputField}`}>
+                      <PenLine size={14} className="opacity-60 flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-semibold opacity-70">Editando mensagem</p>
+                        <p className="text-xs truncate opacity-70">{editingMessage.content}</p>
+                      </div>
+                      <button onClick={() => { setEditingMessage(null); setInput(""); }} className="text-gray-500 hover:text-red-400 px-1 flex-shrink-0"><X size={14} /></button>
                     </div>
                   )}
 
@@ -1427,7 +1543,7 @@ export function WhatsappInbox({
                           }
                         }}
                         onPaste={noteMode ? undefined : handlePaste}
-                        placeholder={noteMode ? "Escreva uma nota interna (só a equipe vê)..." : attachment ? "Adicionar legenda (opcional)..." : "Digite uma mensagem para assumir a conversa..."}
+                        placeholder={editingMessage ? "Novo texto da mensagem..." : noteMode ? "Escreva uma nota interna (só a equipe vê)..." : attachment ? "Adicionar legenda (opcional)..." : "Digite uma mensagem para assumir a conversa..."}
                         rows={1}
                         className="w-full bg-transparent text-sm focus:outline-none resize-none overflow-y-auto block"
                       />
@@ -1448,7 +1564,7 @@ export function WhatsappInbox({
                           >
                             <Zap size={18} />
                           </button>
-                          {!isIgContact(detail.contactNumber) && (
+                          {!isIgContact(detail.contactNumber) && !editingMessage && (
                           <button
                             onClick={() => fileInputRef.current?.click()}
                             title="Anexar foto, vídeo, áudio ou documento"

@@ -18,7 +18,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         orderBy: { createdAt: "desc" },
         take: 100,
         include: {
-          sender: { select: { name: true } },
+          sender: { select: { id: true, name: true } },
           replyTo: { select: { id: true, content: true, role: true, mediaType: true, sender: { select: { name: true } } } },
         },
       },

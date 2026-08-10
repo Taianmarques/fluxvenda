@@ -139,6 +139,32 @@ export async function downloadMessageMedia(token: string, messageId: string): Pr
   return res.json();
 }
 
+// Apaga uma mensagem já enviada para todos os participantes ("apagar para todos" nativo do WhatsApp)
+export async function deleteMessage(token: string, messageId: string): Promise<void> {
+  const res = await fetch(`${UAZAPI_URL}/message/delete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", token },
+    body: JSON.stringify({ id: messageId }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Erro ao apagar mensagem: ${res.status} ${body}`);
+  }
+}
+
+// Edita o texto de uma mensagem já enviada (só funciona pra mensagens de texto puro)
+export async function editMessageText(token: string, messageId: string, text: string): Promise<void> {
+  const res = await fetch(`${UAZAPI_URL}/message/edit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", token },
+    body: JSON.stringify({ id: messageId, text }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Erro ao editar mensagem: ${res.status} ${body}`);
+  }
+}
+
 // Busca a foto de perfil de um contato/chat (URL assinada da CDN do WhatsApp — expira depois
 // de um tempo, nunca deve ser guardada permanentemente, só usada na hora). `chatId` é o
 // número com "@s.whatsapp.net" (contato individual) ou "@g.us" (grupo).
