@@ -981,7 +981,7 @@ export function WhatsappInbox({
 
       <div className="flex-1 flex overflow-hidden">
           {/* Lista de conversas — no mobile, some quando uma conversa está aberta */}
-          <aside className={`${mobileChatOpen ? "hidden md:flex" : "flex"} w-full md:w-80 flex-shrink-0 md:border-r ${t.sidebar} flex-col`}>
+          <aside className={`${mobileChatOpen ? "hidden md:flex" : "flex"} w-full md:w-96 flex-shrink-0 md:border-r ${t.sidebar} flex-col`}>
             <div className={`px-3 py-2.5 border-b ${t.sidebar} flex-shrink-0 space-y-2`}>
               <div className="flex items-center gap-1.5">
                 {([
