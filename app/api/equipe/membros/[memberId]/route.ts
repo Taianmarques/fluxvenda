@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getManagedTeam } from "@/lib/team";
 import { z } from "zod";
 
 const patchSchema = z.object({
   departamentoId: z.string().nullable().optional(),
   accessProfileId: z.string().nullable().optional(),
+  // ADMIN de propósito fora do enum aqui — é o super-admin da plataforma inteira (área /admin,
+  // todos os clientes), nunca deve ser atribuível a um membro de equipe por essa rota.
+  role: z.enum(["VENDEDOR", "FUNCIONARIO", "GESTOR"]).optional(),
 });
 
 // Define o departamento e/ou o perfil de acesso de um membro — só o gestor
@@ -14,8 +18,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ me
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { memberId } = await params;
-  const member = await prisma.teamMember.findUnique({ where: { id: memberId }, include: { team: true } });
-  if (!member || member.team.managerId !== userId) {
+  const member = await prisma.teamMember.findUnique({ where: { id: memberId } });
+  const managedTeam = await getManagedTeam(userId);
+  if (!member || !managedTeam || member.teamId !== managedTeam.id) {
     return NextResponse.json({ error: "Membro não encontrado" }, { status: 404 });
   }
 
@@ -31,7 +36,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ me
     if (!perfil) return NextResponse.json({ error: "Perfil inválido" }, { status: 400 });
   }
 
-  await prisma.teamMember.update({ where: { id: memberId }, data: body.data });
+  const { role, ...teamMemberData } = body.data;
+  await prisma.teamMember.update({ where: { id: memberId }, data: teamMemberData });
+  // role vive em Profile, não em TeamMember
+  if (role !== undefined) {
+    await prisma.profile.update({ where: { id: member.profileId }, data: { role } });
+  }
   return NextResponse.json({ ok: true });
 }
 
@@ -42,8 +52,9 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { memberId } = await params;
-  const member = await prisma.teamMember.findUnique({ where: { id: memberId }, include: { team: true } });
-  if (!member || member.team.managerId !== userId) {
+  const member = await prisma.teamMember.findUnique({ where: { id: memberId } });
+  const managedTeam = await getManagedTeam(userId);
+  if (!member || !managedTeam || member.teamId !== managedTeam.id) {
     return NextResponse.json({ error: "Membro não encontrado" }, { status: 404 });
   }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getManagedTeam } from "@/lib/team";
 import { z } from "zod";
 
 const patchSchema = z.object({
@@ -9,8 +10,9 @@ const patchSchema = z.object({
 });
 
 async function assertManager(userId: string, departamentoId: string) {
-  const dep = await prisma.departamento.findUnique({ where: { id: departamentoId }, include: { team: true } });
-  if (!dep || dep.team.managerId !== userId) return null;
+  const dep = await prisma.departamento.findUnique({ where: { id: departamentoId } });
+  const managedTeam = await getManagedTeam(userId);
+  if (!dep || !managedTeam || dep.teamId !== managedTeam.id) return null;
   return dep;
 }
 

@@ -13,6 +13,7 @@ type Membro = {
   joinedAt: string;
   departamentoId: string | null;
   accessProfileId: string | null;
+  role: string;
 };
 
 type Departamento = { id: string; nome: string; descricao: string };
@@ -37,6 +38,7 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
   const [criarNome, setCriarNome] = useState("");
   const [criarEmail, setCriarEmail] = useState("");
   const [criarSenha, setCriarSenha] = useState("");
+  const [criarRole, setCriarRole] = useState<"VENDEDOR" | "FUNCIONARIO" | "GESTOR">("VENDEDOR");
   const [criandoUsuario, setCriandoUsuario] = useState(false);
   const [criarUsuarioError, setCriarUsuarioError] = useState("");
 
@@ -135,6 +137,16 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
     router.refresh();
   }
 
+  async function handleSetRole(m: Membro, role: string) {
+    if (role === "GESTOR" && !confirm(`Dar acesso total (mesmo nível do gestor) para ${m.name}? A pessoa passa a ver e editar tudo, sem restrição.`)) return;
+    await fetch(`/api/equipe/membros/${m.memberId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role }),
+    });
+    router.refresh();
+  }
+
   async function handleCriarUsuario() {
     if (!criarNome.trim() || !criarEmail.trim() || criarSenha.length < 8) return;
     setCriandoUsuario(true);
@@ -143,11 +155,11 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
       const res = await fetch("/api/equipe/criar-usuario", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: criarNome.trim(), email: criarEmail.trim(), password: criarSenha }),
+        body: JSON.stringify({ name: criarNome.trim(), email: criarEmail.trim(), password: criarSenha, role: criarRole }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Erro ao criar usuário");
-      setCriarNome(""); setCriarEmail(""); setCriarSenha(""); setShowCriarUsuario(false);
+      setCriarNome(""); setCriarEmail(""); setCriarSenha(""); setCriarRole("VENDEDOR"); setShowCriarUsuario(false);
       router.refresh();
     } catch (err) {
       setCriarUsuarioError(err instanceof Error ? err.message : "Erro ao criar usuário");
@@ -266,6 +278,15 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
                   className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm"
                   maxLength={200}
                 />
+                <select
+                  value={criarRole}
+                  onChange={e => setCriarRole(e.target.value as typeof criarRole)}
+                  className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="VENDEDOR">Atendente</option>
+                  <option value="FUNCIONARIO">Funcionário</option>
+                  <option value="GESTOR">Gestor (acesso total, igual a você)</option>
+                </select>
                 {criarUsuarioError && <p className="text-xs text-red-400">{criarUsuarioError}</p>}
                 <div className="flex gap-2">
                   <button
@@ -473,8 +494,8 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
             {/* Atendentes */}
             {members.map(m => (
               <div key={m.memberId} className="flex items-center gap-3 px-5 py-3 flex-wrap">
-                <div className="w-9 h-9 rounded-full bg-blue-900/40 text-blue-400 flex items-center justify-center flex-shrink-0">
-                  <User size={15} />
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${m.role === "GESTOR" ? "bg-amber-900/40 text-amber-400" : "bg-blue-900/40 text-blue-400"}`}>
+                  {m.role === "GESTOR" ? <Crown size={15} /> : <User size={15} />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">
@@ -484,6 +505,18 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
                     {m.email} · entrou em {new Date(m.joinedAt).toLocaleDateString("pt-BR")}
                   </p>
                 </div>
+                {isManager && (
+                  <select
+                    value={m.role}
+                    onChange={e => handleSetRole(m, e.target.value)}
+                    className="text-xs bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 flex-shrink-0 max-w-[130px]"
+                    title="Cargo"
+                  >
+                    <option value="VENDEDOR">Atendente</option>
+                    <option value="FUNCIONARIO">Funcionário</option>
+                    <option value="GESTOR">Gestor (acesso total)</option>
+                  </select>
+                )}
                 {isManager && departamentos.length > 0 ? (
                   <select
                     value={m.departamentoId ?? ""}
@@ -496,7 +529,8 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
                   </select>
                 ) : (
                   <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-blue-900/40 text-blue-300 border border-blue-800/50 flex-shrink-0">
-                    {departamentos.find(d => d.id === m.departamentoId)?.nome ?? "Atendente"}
+                    {departamentos.find(d => d.id === m.departamentoId)?.nome
+                      ?? (m.role === "GESTOR" ? "Gestor" : m.role === "FUNCIONARIO" ? "Funcionário" : "Atendente")}
                   </span>
                 )}
                 {isManager && perfis.length > 0 && (
@@ -533,7 +567,8 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
 
         <p className="text-xs text-gray-600">
           Atendentes veem e respondem as conversas do CRM (as atribuídas a eles e as sem dono), mas não alteram as
-          configurações dos agentes. Remover alguém não apaga a conta da pessoa — só o acesso à equipe.
+          configurações dos agentes nem a equipe. Um membro com cargo &ldquo;Gestor&rdquo; tem acesso total, igual ao
+          dono da equipe. Remover alguém não apaga a conta da pessoa — só o acesso à equipe.
         </p>
       </div>
     </div>

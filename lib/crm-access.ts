@@ -9,9 +9,11 @@ export async function getCrmAllowedPages(userId: string): Promise<CrmPageKey[] |
 
   const membership = await prisma.teamMember.findUnique({
     where: { profileId: userId },
-    include: { accessProfile: true },
+    include: { accessProfile: true, profile: { select: { role: true } } },
   });
-  if (!membership?.accessProfile) return null;
+  if (!membership) return null;
+  if (membership.profile.role === "GESTOR") return null; // acesso total, igual ao dono
+  if (!membership.accessProfile) return null;
   return membership.accessProfile.allowedPages as CrmPageKey[];
 }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getManagedTeam } from "@/lib/team";
 import { z } from "zod";
 
 async function getManagerTeam(userId: string) {
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const team = await getManagerTeam(userId);
+  const team = await getManagedTeam(userId);
   if (!team) return NextResponse.json({ error: "Só o gestor cria departamentos" }, { status: 403 });
 
   const body = schema.safeParse(await req.json());

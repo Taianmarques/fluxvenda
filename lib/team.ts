@@ -10,10 +10,18 @@ export async function listMyAgentConfigs(userId: string) {
     return { isManager: true as const, teamId: ownTeam.id, configs };
   }
 
-  const membership = await prisma.teamMember.findUnique({ where: { profileId: userId } });
+  const membership = await prisma.teamMember.findUnique({
+    where: { profileId: userId },
+    include: { profile: { select: { role: true } } },
+  });
   if (!membership) return null;
   const configs = await prisma.agentConfig.findMany({ where: { teamId: membership.teamId }, orderBy: { createdAt: "asc" } });
-  return { isManager: false as const, teamId: membership.teamId, configs };
+  // Atendente promovido a GESTOR na tela Equipe (segundo dono) tem o mesmo acesso do dono
+  // original: enxerga tudo, sem o filtro de "só as conversas atribuídas a mim". ADMIN é o
+  // super-admin da plataforma inteira (área /admin, todos os clientes) — nunca conta aqui, e
+  // nunca é atribuível a um TeamMember (ver validação em app/api/equipe/membros/[memberId]/route.ts).
+  const isManager = membership.profile.role === "GESTOR";
+  return { isManager, teamId: membership.teamId, configs };
 }
 
 // Valida que agentConfigId pertence à equipe do usuário (gestor ou atendente) e devolve o
@@ -29,10 +37,22 @@ export async function getAgentConfigWithRole(userId: string, agentConfigId: stri
 // follow-up, etc. Atendentes usam o CRM mas não reconfiguram o agente.
 export async function getAgentConfigAsManager(userId: string, agentConfigId: string) {
   const profile = await prisma.profile.findUnique({ where: { id: userId } });
-  if (!profile || (profile.role !== "GESTOR" && profile.role !== "ADMIN")) return null;
-  const team = await prisma.team.findUnique({ where: { managerId: userId } });
-  if (!team) return null;
-  return prisma.agentConfig.findFirst({ where: { id: agentConfigId, teamId: team.id } });
+  if (!profile) return null;
+
+  const ownTeam = await prisma.team.findUnique({ where: { managerId: userId } });
+  if (ownTeam && (profile.role === "GESTOR" || profile.role === "ADMIN")) {
+    return prisma.agentConfig.findFirst({ where: { id: agentConfigId, teamId: ownTeam.id } });
+  }
+
+  // Atendente promovido a GESTOR (ver tela Equipe) também edita a config do agente, igual ao
+  // dono original. ADMIN nunca é atribuível a um TeamMember (é o super-admin da plataforma
+  // inteira), então não entra nesse segundo caminho.
+  if (profile.role === "GESTOR") {
+    const membership = await prisma.teamMember.findUnique({ where: { profileId: userId } });
+    if (membership) return prisma.agentConfig.findFirst({ where: { id: agentConfigId, teamId: membership.teamId } });
+  }
+
+  return null;
 }
 
 // Verifica se o usuário pertence à equipe (como gestor ou atendente) que é dona desse
@@ -41,4 +61,19 @@ export async function getAgentConfigAsManager(userId: string, agentConfigId: str
 export async function userBelongsToAgentConfig(userId: string, agentConfigId: string) {
   const result = await getAgentConfigWithRole(userId, agentConfigId);
   return result !== null;
+}
+
+// Time que esse usuário administra: o dono literal (Team.managerId) OU um atendente promovido
+// a GESTOR na tela Equipe — os dois administram a equipe (criar/remover usuário, departamentos,
+// perfis de acesso etc) no mesmo nível. Team.managerId em si nunca muda por aqui — não existe
+// "transferência de dono", só delegação de nível de acesso.
+export async function getManagedTeam(userId: string) {
+  const ownTeam = await prisma.team.findUnique({ where: { managerId: userId } });
+  if (ownTeam) return ownTeam;
+
+  const membership = await prisma.teamMember.findUnique({
+    where: { profileId: userId },
+    include: { profile: { select: { role: true } }, team: true },
+  });
+  return membership?.profile.role === "GESTOR" ? membership.team : null;
 }
