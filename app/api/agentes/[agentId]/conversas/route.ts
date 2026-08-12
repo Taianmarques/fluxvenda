@@ -20,8 +20,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ agentId
       // aparecer na caixa de entrada como se fosse um atendimento em aberto (ver page.tsx)
       messages: { some: {} },
       isSandbox: false, // conversa de teste do simulador nunca aparece na caixa real
-      // Gestor vê tudo; atendente só vê as dele + as ainda não atribuídas
-      ...(isManager ? {} : { OR: [{ assignedToId: userId }, { assignedToId: null }] }),
+      // Gestor vê tudo; atendente só vê as dele + as ainda não atribuídas em aberto — uma vez
+      // encerrada, uma conversa sem atendente (ex: IA cuidou sozinha) não deve ficar visível
+      // pra equipe inteira pra sempre, só pro gestor
+      ...(isManager ? {} : { OR: [{ assignedToId: userId }, { assignedToId: null, status: { not: "FINALIZADO" } }] }),
     },
     orderBy: { updatedAt: "desc" },
     include: {

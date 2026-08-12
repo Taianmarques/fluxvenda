@@ -5,6 +5,15 @@ import { getAgentConfigWithRole } from "@/lib/team";
 import { emitChatEvent } from "@/lib/realtime";
 import { z } from "zod";
 
+// Atendente não-gestor não pode ver: conversa atribuída a outra pessoa, nem conversa sem
+// atendente que já foi encerrada (ex: IA cuidou sozinha) — deixa de fazer sentido continuar
+// visível pra equipe inteira depois de fechada, só o gestor mantém acesso pra reatribuir se
+// precisar (ver filtro equivalente em app/api/agentes/[agentId]/conversas/route.ts)
+function negadaParaAtendente(conversation: { assignedToId: string | null; status: string }, userId: string): boolean {
+  if (conversation.assignedToId) return conversation.assignedToId !== userId;
+  return conversation.status === "FINALIZADO";
+}
+
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -32,7 +41,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const result = await getAgentConfigWithRole(userId, conversation.agentConfigId);
   if (!result) return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
   const { isManager } = result;
-  if (!isManager && conversation.assignedToId && conversation.assignedToId !== userId) {
+  if (!isManager && negadaParaAtendente(conversation, userId)) {
     return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
   }
 
@@ -71,7 +80,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const result = await getAgentConfigWithRole(userId, conversation.agentConfigId);
   if (!result) return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
   const { config, isManager } = result;
-  if (!isManager && conversation.assignedToId && conversation.assignedToId !== userId) {
+  if (!isManager && negadaParaAtendente(conversation, userId)) {
     return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
   }
 
@@ -102,13 +111,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const encerrando = body.data.status === "FINALIZADO";
   const reabrindo = body.data.status !== undefined && body.data.status !== "FINALIZADO" && conversation.status === "FINALIZADO";
-  const assignedToIdMudou = body.data.assignedToId !== undefined && body.data.assignedToId !== conversation.assignedToId;
+  // Encerrar uma conversa sem atendente (ex: IA cuidou sozinha, ninguém "aceitou" antes de
+  // fechar) reivindica ela pra quem encerrou — senão ela vira órfã: some da visão de todo mundo
+  // que não é gestor (ver negadaParaAtendente acima), sem ninguém dono pra reabrir se precisar.
+  const assumirAoEncerrar = encerrando && !conversation.assignedToId && body.data.assignedToId === undefined;
+  const novoAssignedToId = assumirAoEncerrar ? userId : body.data.assignedToId;
+  const assignedToIdMudou = novoAssignedToId !== undefined && novoAssignedToId !== conversation.assignedToId;
 
   const updated = await prisma.conversation.update({
     where: { id },
     data: {
       ...(body.data.leadStatusId !== undefined && { leadStatusId: body.data.leadStatusId }),
       ...(body.data.assignedToId !== undefined && { assignedToId: body.data.assignedToId }),
+      ...(assumirAoEncerrar && { assignedToId: novoAssignedToId }),
       ...(body.data.status !== undefined && { status: body.data.status }),
       ...(body.data.contactName !== undefined && { contactName: body.data.contactName }),
       ...(body.data.contactNumber !== undefined && { contactNumber: body.data.contactNumber }),
@@ -128,11 +143,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // Log de transferência — vira um banner de sistema na conversa (não é mensagem enviada ao
   // cliente). Prefixo "TRANSFER:" avisa o front pra renderizar diferente da nota interna comum.
   if (assignedToIdMudou) {
-    const ids = [conversation.assignedToId, body.data.assignedToId].filter((v): v is string => Boolean(v));
+    const ids = [conversation.assignedToId, novoAssignedToId].filter((v): v is string => Boolean(v));
     const perfis = ids.length > 0 ? await prisma.profile.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } }) : [];
     const nomePorId = new Map(perfis.map(p => [p.id, p.name]));
     const nomeAntigo = conversation.assignedToId ? (nomePorId.get(conversation.assignedToId) ?? "atendente removido") : null;
-    const nomeNovo = body.data.assignedToId ? (nomePorId.get(body.data.assignedToId) ?? "atendente removido") : null;
+    const nomeNovo = novoAssignedToId ? (nomePorId.get(novoAssignedToId) ?? "atendente removido") : null;
     const agora = new Date();
     const quando = `${agora.toLocaleDateString("pt-BR")} às ${agora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
 
