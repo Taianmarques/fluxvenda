@@ -239,7 +239,9 @@ export async function registerAgentWebhook(token: string, webhookUrl: string): P
       url: webhookUrl,
       enabled: true,
       events: ["messages"],
-      excludeMessages: ["wasSentByApi", "isGroupYes"],
+      // "isGroupYes" excluiria mensagem de grupo antes mesmo de chegar no nosso webhook — grupo
+      // agora vira conversa própria (aba Grupos no chat), precisa passar esse filtro.
+      excludeMessages: ["wasSentByApi"],
       addUrlEvents: false,
       addUrlTypesMessages: false,
     }),
