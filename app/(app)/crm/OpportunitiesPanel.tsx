@@ -28,6 +28,7 @@ export function OpportunitiesPanel({
   const [saving, setSaving] = useState(false);
   const [pipelines, setPipelines] = useState<PipelineOption[]>([]);
   const [pipelineId, setPipelineId] = useState("");
+  const [stageId, setStageId] = useState("");
   const [movingId, setMovingId] = useState<string | null>(null);
   const [movePipelineId, setMovePipelineId] = useState("");
   const [moveStageId, setMoveStageId] = useState("");
@@ -48,6 +49,7 @@ export function OpportunitiesPanel({
         const list: PipelineOption[] = data.pipelines ?? [];
         setPipelines(list);
         setPipelineId(prev => prev || list[0]?.id || "");
+        setStageId(prev => prev || list[0]?.stages[0]?.id || "");
       })
       .catch(() => {});
   }, [agentId]);
@@ -57,11 +59,11 @@ export function OpportunitiesPanel({
     if (!Number.isFinite(dealValue) || dealValue <= 0) return;
     setSaving(true);
     try {
-      const stageId = pipelines.find(p => p.id === pipelineId)?.stages[0]?.id ?? null;
+      const resolvedStageId = stageId || pipelines.find(p => p.id === pipelineId)?.stages[0]?.id || null;
       await fetch(`/api/ferramentas/whatsapp/conversas/${conversationId}/oportunidades`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: title.trim() || null, dealValue, stageId }),
+        body: JSON.stringify({ title: title.trim() || null, dealValue, stageId: resolvedStageId }),
       });
       setTitle(""); setValue(""); setShowForm(false);
       onChange();
@@ -200,11 +202,26 @@ export function OpportunitiesPanel({
             {pipelines.length > 1 && (
               <select
                 value={pipelineId}
-                onChange={e => setPipelineId(e.target.value)}
+                onChange={e => {
+                  const pid = e.target.value;
+                  setPipelineId(pid);
+                  setStageId(pipelines.find(p => p.id === pid)?.stages[0]?.id ?? "");
+                }}
                 className={`w-full text-xs rounded-lg px-2 py-1.5 border focus:outline-none ${dark ? "bg-gray-950 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`}
               >
                 {pipelines.map(p => (
                   <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            )}
+            {(pipelines.find(p => p.id === pipelineId)?.stages.length ?? 0) > 1 && (
+              <select
+                value={stageId}
+                onChange={e => setStageId(e.target.value)}
+                className={`w-full text-xs rounded-lg px-2 py-1.5 border focus:outline-none ${dark ? "bg-gray-950 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+              >
+                {pipelines.find(p => p.id === pipelineId)?.stages.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
               </select>
             )}
