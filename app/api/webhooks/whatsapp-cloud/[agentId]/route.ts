@@ -96,7 +96,9 @@ async function handleOneMessage(
     imageUrl = `data:${mimetype};base64,${buffer.toString("base64")}`;
     mediaUrl = imageUrl;
     mediaType = "image";
-    text = caption ? `[Imagem] ${caption}` : "[Imagem enviada pelo cliente]";
+    // Sem prefixo "[Imagem] " na legenda de verdade — a UI trata qualquer content começando
+    // com "[" como texto genérico (sem legenda) e não mostra, então a legenda real sumia.
+    text = caption || "[Imagem enviada pelo cliente]";
   } else if (message.type === "audio") {
     const { buffer, mimetype } = await downloadCloudMedia(message.audio.id, accessToken);
     text = await transcribeAudioBuffer(buffer, mimetype);
@@ -106,7 +108,7 @@ async function handleOneMessage(
     caption = message.video?.caption ?? "";
     mediaUrl = `data:${mimetype};base64,${buffer.toString("base64")}`;
     mediaType = "video";
-    text = caption ? `[Vídeo] ${caption}` : "[Vídeo enviado pelo cliente]";
+    text = caption || "[Vídeo enviado pelo cliente]";
   } else if (message.type === "document") {
     const { buffer, mimetype } = await downloadCloudMedia(message.document.id, accessToken);
     caption = message.document?.caption ?? "";
@@ -115,7 +117,7 @@ async function handleOneMessage(
     // Prioriza o nome real do arquivo (vem da Meta) como conteúdo — a UI usa isso como texto
     // do link e nome pro download, já que mediaUrl é um data URI sem nome de arquivo próprio.
     const filename: string | undefined = message.document?.filename;
-    text = filename ? (caption ? `${filename} — ${caption}` : filename) : (caption ? `[Documento] ${caption}` : "[Documento enviado pelo cliente]");
+    text = filename ? (caption ? `${filename} — ${caption}` : filename) : (caption || "[Documento enviado pelo cliente]");
   } else {
     return; // tipo de mensagem não suportado (localização, interativo, sticker, etc.)
   }

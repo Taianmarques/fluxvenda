@@ -57,7 +57,9 @@ export async function POST(req: NextRequest) {
       imageUrl = media.fileURL;
       mediaUrl = media.fileURL;
       mediaType = "image";
-      text = caption ? `[Imagem] ${caption}` : "[Imagem enviada pelo cliente]";
+      // Sem prefixo "[Imagem] " na legenda de verdade — a UI trata qualquer content começando
+      // com "[" como texto genérico (sem legenda) e não mostra, então a legenda real sumia.
+      text = caption || "[Imagem enviada pelo cliente]";
     } catch (err) {
       console.error("[whatsapp-webhook] erro ao baixar imagem:", err);
     }
@@ -66,7 +68,7 @@ export async function POST(req: NextRequest) {
       const media = await downloadMessageMedia(config.uazapiToken, message.id || message.messageid);
       mediaUrl = media.fileURL;
       mediaType = "video";
-      text = caption ? `[Vídeo] ${caption}` : "[Vídeo enviado pelo cliente]";
+      text = caption || "[Vídeo enviado pelo cliente]";
     } catch (err) {
       console.error("[whatsapp-webhook] erro ao baixar vídeo:", err);
     }
@@ -77,7 +79,7 @@ export async function POST(req: NextRequest) {
       const media = await downloadMessageMedia(config.uazapiToken, message.id || message.messageid);
       mediaUrl = media.fileURL;
       mediaType = "document";
-      text = caption ? `[Documento] ${caption}` : "[Documento enviado pelo cliente]";
+      text = caption || "[Documento enviado pelo cliente]";
     } catch (err) {
       console.error("[whatsapp-webhook] erro ao baixar documento:", err);
     }
