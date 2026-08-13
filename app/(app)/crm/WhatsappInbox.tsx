@@ -1141,19 +1141,24 @@ export function WhatsappInbox({
                   ["pendentes", "Pendentes"],
                   ["finalizados", "Finalizados"],
                   ["grupos", "Grupos"],
-                ] as const).map(([key, label]) => (
-                  <button
-                    key={key}
-                    onClick={() => setStatusFilter(key)}
-                    className={`flex-1 text-xs font-medium px-1.5 py-1.5 rounded-full border text-center whitespace-nowrap transition-colors ${
-                      statusFilter === key
-                        ? t.statusActive
-                        : `border-transparent ${t.toggleBar} ${t.toggleInactive}`
-                    }`}
-                  >
-                    {label} <span className="opacity-70">{statusCounts[key]}</span>
-                  </button>
-                ))}
+                ] as const).map(([key, label]) => {
+                  // Finalizados minimizada (só o ícone) — abre espaço pra Grupos não vazar da linha
+                  const iconOnly = key === "finalizados";
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => setStatusFilter(key)}
+                      title={label}
+                      className={`${iconOnly ? "flex-shrink-0 px-2.5" : "flex-1 px-1.5"} flex items-center justify-center gap-1 text-xs font-medium py-1.5 rounded-full border text-center whitespace-nowrap transition-colors ${
+                        statusFilter === key
+                          ? t.statusActive
+                          : `border-transparent ${t.toggleBar} ${t.toggleInactive}`
+                      }`}
+                    >
+                      {iconOnly ? <Check size={13} /> : label} <span className="opacity-70">{statusCounts[key]}</span>
+                    </button>
+                  );
+                })}
               </div>
               <div className="flex items-center gap-1.5">
                 <div className={`flex-1 min-w-0 flex items-center gap-2 rounded-lg px-3 py-1.5 ${t.toggleBar} ${t.toggleInactive}`}>
