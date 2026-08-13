@@ -1455,6 +1455,10 @@ model Conversation {
   status         ConversationStatus @default(ATIVO)
   humanTakeover  Boolean            @default(false) // true = atendente humano assumiu, agente para de responder
 
+  // Grupo do WhatsApp (contactNumber = id do grupo, contactName = nome do grupo) — IA nunca
+  // responde automaticamente aqui (ver shouldAiHandle em lib/whatsapp-inbound.ts), só atendente.
+  isGroup Boolean @default(false)
+
   // Conversa de teste do simulador (Ferramentas > Treino) — uma por gestor, reaproveitada entre
   // sessões. Nunca deve aparecer na caixa de entrada nem em relatórios/métricas reais.
   isSandbox Boolean @default(false)
@@ -1599,6 +1603,11 @@ model Message {
 
   senderId String?  // qual atendente mandou (role "human"), pra CRM multiusuário
   sender   Profile? @relation(fields: [senderId], references: [id], onDelete: SetNull)
+
+  // Nome de quem mandou dentro de um grupo do WhatsApp (role "user", conversation.isGroup) —
+  // cada mensagem pode ser de uma pessoa diferente do grupo, não dá pra usar o contato da
+  // conversa (que é o grupo em si) pra identificar o remetente.
+  groupSenderName String?
 
   // Reply/encaminhar estilo WhatsApp
   waMessageId String? // id da mensagem no provedor (UazAPI messageid / Cloud wamid) — habilita citação nativa

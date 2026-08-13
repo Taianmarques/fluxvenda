@@ -41,6 +41,7 @@ export default async function PipelinePage({ params }: { params: Promise<{ agent
         conversation: {
           agentConfigId: config.id,
           isSandbox: false, // conversa de teste do simulador nunca aparece no pipeline real
+          isGroup: false, // grupo do WhatsApp não é lead, fica só na aba Grupos do chat
           ...(isManager ? {} : { OR: [{ assignedToId: user.id }, { assignedToId: null }] }),
         },
       },

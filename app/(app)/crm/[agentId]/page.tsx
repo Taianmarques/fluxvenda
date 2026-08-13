@@ -121,6 +121,7 @@ async function WhatsappInboxPageContent({
         etiquetas: c.etiquetas,
         unreadCount: unreadMap.get(c.id) ?? 0,
         pinned: c.pinned,
+        isGroup: c.isGroup,
       }))}
     />
   );

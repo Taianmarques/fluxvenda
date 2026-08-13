@@ -74,7 +74,7 @@ async function VendasAvancadoPageContent({ params, searchParams }: {
 
   const [opportunities, conversations, team] = await Promise.all([
     prisma.opportunity.findMany({
-      where: { conversation: { agentConfigId: config.id, isSandbox: false } },
+      where: { conversation: { agentConfigId: config.id, isSandbox: false, isGroup: false } },
       select: {
         id: true, conversationId: true, dealValue: true, wonAt: true, lostAt: true, createdAt: true, stageId: true, stageEnteredAt: true,
         stage: { select: { name: true, color: true, order: true, pipeline: { select: { name: true } } } },
@@ -82,7 +82,7 @@ async function VendasAvancadoPageContent({ params, searchParams }: {
       },
     }),
     prisma.conversation.findMany({
-      where: { agentConfigId: config.id, isSandbox: false },
+      where: { agentConfigId: config.id, isSandbox: false, isGroup: false },
       select: { id: true, createdAt: true, assignedToId: true },
     }),
     prisma.team.findUnique({

@@ -43,6 +43,8 @@ export type IncomingMessage = {
   imageUrl: string | null;
   waMessageId?: string | null;       // id da mensagem no provedor (UazAPI messageid / Cloud wamid)
   quotedWaMessageId?: string | null; // id da mensagem citada, quando o cliente responde citando
+  isGroup?: boolean;                 // grupo do WhatsApp — IA nunca responde (ver shouldAiHandle)
+  groupSenderName?: string;          // nome de quem mandou dentro do grupo (varia por mensagem)
 };
 
 async function buildSchedulingContext(agentConfigId: string, requisitosAgendamento?: string, restricoesAgendamento?: string, atendimentoEspecial?: { enabled: boolean; descricao: string }): Promise<string> {
@@ -1392,7 +1394,11 @@ function splitReplyIntoChunks(reply: string): string[] {
 // configuráveis por agente, todos "desligados" (sem filtrar nada) quando vazios. Independe de
 // humanTakeover/whatsappAiPaused (checados antes desta função); a mensagem já foi salva no
 // banco de qualquer forma (escuta ativa), isso só decide se a IA GERA uma resposta agora.
-function shouldAiHandle(config: AgentConfigFull, conversation: { assignedToId: string | null; contactNumber: string; nivelCarteira: string | null }): boolean {
+function shouldAiHandle(config: AgentConfigFull, conversation: { assignedToId: string | null; contactNumber: string; nivelCarteira: string | null; isGroup: boolean }): boolean {
+  // Grupo do WhatsApp — a IA nunca responde automaticamente aqui, só atendente humano.
+  // Uma resposta roteirizada de vendas soltada no meio de uma conversa com várias pessoas
+  // seria um erro sério, então esse critério não é configurável por agente.
+  if (conversation.isGroup) return false;
   if (config.iaIgnoraAtribuidos && conversation.assignedToId) return false;
 
   const numerosBloqueados = Array.isArray(config.iaNumerosBloqueados) ? config.iaNumerosBloqueados as string[] : [];
@@ -1425,7 +1431,7 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
   const conversation = await prisma.conversation.upsert({
     where: { agentConfigId_contactNumber: { agentConfigId: config.id, contactNumber } },
     update: { status: "ATIVO", followupCount: 0, ...(contactName && { contactName }) },
-    create: { agentConfigId: config.id, contactNumber, contactName, status: "ATIVO" },
+    create: { agentConfigId: config.id, contactNumber, contactName, status: "ATIVO", isGroup: msg.isGroup ?? false },
   });
   if (config.prospeccaoEnabled) {
     await prisma.prospect.updateMany({
@@ -1451,7 +1457,10 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
     : null;
 
   const savedMsg = await prisma.message.create({
-    data: { conversationId: conversation.id, role: "user", content: text, mediaUrl, mediaType, waMessageId: msg.waMessageId ?? null, replyToId },
+    data: {
+      conversationId: conversation.id, role: "user", content: text, mediaUrl, mediaType,
+      waMessageId: msg.waMessageId ?? null, replyToId, groupSenderName: msg.groupSenderName ?? null,
+    },
   });
   emitChatEvent(config.id, conversation.id); // push em tempo real pro CRM
 

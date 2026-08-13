@@ -113,6 +113,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           caption: body.data.content ? `${signaturePrefix}${body.data.content}` : (signaturePrefix || undefined),
           fileName,
           replyId,
+          isGroup: conversation.isGroup,
         });
       } catch (err) {
         console.error("[mensagem] erro ao enviar mídia:", err);
@@ -130,7 +131,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
       if (!content) content = fileName ? `[${type}] ${fileName}` : `[${type}]`;
     } else {
-      waMessageId = await sendWhatsAppTextAsTeam(config.uazapiToken, conversation.contactNumber, `${signaturePrefix}${content}`, replyId);
+      waMessageId = await sendWhatsAppTextAsTeam(config.uazapiToken, conversation.contactNumber, `${signaturePrefix}${content}`, replyId, conversation.isGroup);
     }
   }
 

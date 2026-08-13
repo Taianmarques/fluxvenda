@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
         humanTakeover: false,
         status: { not: "FINALIZADO" },
         followupCount: { lt: delays.length },
+        isGroup: false, // IA nunca manda mensagem automática pra grupo
       },
       include: { messages: { where: { role: { not: "note" } }, orderBy: { createdAt: "desc" }, take: 20 } },
     });
@@ -107,7 +108,7 @@ O lead está na etapa "${stage.name}" do funil "${stage.pipeline.name}". Siga es
         wonAt: null,
         lostAt: null,
         stageFollowupCount: { lt: delays.length },
-        conversation: { humanTakeover: false, status: { not: "FINALIZADO" } },
+        conversation: { humanTakeover: false, status: { not: "FINALIZADO" }, isGroup: false }, // IA nunca manda mensagem automática pra grupo
       },
       include: { conversation: { include: { messages: { where: { role: { not: "note" } }, orderBy: { createdAt: "desc" }, take: 20 } } } },
     });
@@ -201,7 +202,7 @@ O lead está na etapa "${stage.name}" do funil "${stage.pipeline.name}". Siga es
       if (sender?.name) signaturePrefix = `*${sender.name}:*\n`;
     }
 
-    await sendWhatsAppTextAsTeam(config.uazapiToken, conversation.contactNumber, `${signaturePrefix}${scheduled.content}`);
+    await sendWhatsAppTextAsTeam(config.uazapiToken, conversation.contactNumber, `${signaturePrefix}${scheduled.content}`, undefined, conversation.isGroup);
     await prisma.message.create({
       data: { conversationId: conversation.id, role: "human", content: scheduled.content, senderId: scheduled.createdById },
     });

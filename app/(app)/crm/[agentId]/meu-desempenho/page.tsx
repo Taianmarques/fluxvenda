@@ -54,7 +54,7 @@ async function MeuDesempenhoPageContent({ params }: { params: Promise<{ agentId:
 
   const [conversations, orders, paidCobrancas] = await Promise.all([
     prisma.conversation.findMany({
-      where: { agentConfigId: config.id, assignedToId: user.id, isSandbox: false },
+      where: { agentConfigId: config.id, assignedToId: user.id, isSandbox: false, isGroup: false },
       select: {
         id: true, contactNumber: true, contactName: true, updatedAt: true, nivelCarteira: true,
         opportunities: { select: { id: true, dealValue: true, wonAt: true, lostAt: true, createdAt: true } },
