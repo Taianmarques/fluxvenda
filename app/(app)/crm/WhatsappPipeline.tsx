@@ -6,7 +6,9 @@ import {
   type DragEndEvent, type DragStartEvent,
 } from "@dnd-kit/core";
 import { useDroppable, useDraggable } from "@dnd-kit/core";
-import { ThumbsUp, ThumbsDown, MessageCircle, Bot, X, ListChecks, MoreVertical, ArrowRightLeft, GitBranch, Pencil, Trash2, Clock } from "lucide-react";
+import { SortableContext, useSortable, arrayMove, horizontalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { ThumbsUp, ThumbsDown, MessageCircle, Bot, X, ListChecks, MoreVertical, ArrowRightLeft, GitBranch, Pencil, Trash2, Clock, GripVertical } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { ConversationPopup } from "./ConversationPopup";
 import { PipelineTaskPanel } from "./PipelineTaskPanel";
@@ -406,7 +408,14 @@ function Column({
   dark: boolean;
   t: typeof PIPELINE_THEMES.dark;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: stage.id });
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({ id: stage.id });
+  // Reordenar colunas: registro separado do drop de cards acima (id diferente, "col-<id>")
+  // — arrasta pelo ícone de alça no cabeçalho, a coluna inteira continua sendo alvo pra cards.
+  const { attributes, listeners, setNodeRef: setSortableRef, transform, transition, isDragging: isDraggingColumn } = useSortable({
+    id: `col-${stage.id}`,
+    data: { type: "column" },
+  });
+  const columnStyle = { transform: CSS.Transform.toString(transform), transition };
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(stage.name);
 
@@ -450,13 +459,24 @@ function Column({
 
   return (
     <div
-      ref={setNodeRef}
-      className={`w-72 flex-shrink-0 flex flex-col rounded-2xl border overflow-hidden ${isOver ? "border-blue-500" : t.column}`}
+      ref={node => { setDroppableRef(node); setSortableRef(node); }}
+      style={columnStyle}
+      className={`w-72 flex-shrink-0 flex flex-col rounded-2xl border overflow-hidden ${isDraggingColumn ? "opacity-40" : ""} ${isOver ? "border-blue-500" : t.column}`}
     >
       <div className="h-[3px] flex-shrink-0" style={{ backgroundColor: stage.color }} />
       <div className={`group p-3 border-b ${t.columnHeaderBorder}`}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
+            {stage.id !== "__sem_etapa__" && (
+              <button
+                {...attributes}
+                {...listeners}
+                title="Arrastar para reordenar"
+                className="flex-shrink-0 cursor-grab active:cursor-grabbing md:opacity-0 md:group-hover:opacity-100 text-gray-500 hover:text-gray-300 touch-none"
+              >
+                <GripVertical size={14} />
+              </button>
+            )}
             {editing ? (
               <input
                 autoFocus
@@ -595,12 +615,14 @@ export function WhatsappPipeline({
   const [chatConversationId, setChatConversationId] = useState<string | null>(null);
   const [newStageName, setNewStageName] = useState("");
   const [localOpportunities, setLocalOpportunities] = useState(opportunities);
+  const [localStages, setLocalStages] = useState(stages);
   const [pipelines, setPipelines] = useState<PipelineOption[]>([]);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const t = PIPELINE_THEMES[theme];
 
   // sincroniza quando o pai atualiza (polling)
   useEffect(() => setLocalOpportunities(opportunities), [opportunities]);
+  useEffect(() => setLocalStages(stages), [stages]);
 
   // Lista de pipelines pra opção "mover pipeline" no card — busca uma vez, não muda com o polling
   useEffect(() => {
@@ -610,7 +632,7 @@ export function WhatsappPipeline({
       .catch(() => {});
   }, [agentId]);
 
-  const semEtapa = localOpportunities.filter(o => !o.stageId || !stages.some(s => s.id === o.stageId));
+  const semEtapa = localOpportunities.filter(o => !o.stageId || !localStages.some(s => s.id === o.stageId));
 
   function handleDragStart(e: DragStartEvent) {
     setActiveId(String(e.active.id));
@@ -618,6 +640,28 @@ export function WhatsappPipeline({
 
   async function handleDragEnd(e: DragEndEvent) {
     setActiveId(null);
+
+    // Reordenar colunas — ids desse drag vêm prefixados "col-<stageId>" (ver useSortable no Column)
+    if ((e.active.data.current as { type?: string } | undefined)?.type === "column") {
+      const activeStageId = String(e.active.id).replace(/^col-/, "");
+      const overStageId = e.over ? String(e.over.id).replace(/^col-/, "") : null;
+      if (!overStageId || activeStageId === overStageId) return;
+
+      const oldIndex = localStages.findIndex(s => s.id === activeStageId);
+      const newIndex = localStages.findIndex(s => s.id === overStageId);
+      if (oldIndex === -1 || newIndex === -1) return;
+
+      const reordered = arrayMove(localStages, oldIndex, newIndex);
+      setLocalStages(reordered);
+      await Promise.all(reordered.map((s, idx) => fetch(`/api/ferramentas/whatsapp/etapas/${s.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order: idx }),
+      })));
+      onStagesChange();
+      return;
+    }
+
     const oppId = String(e.active.id);
     const stageId = e.over ? String(e.over.id) : null;
     if (!stageId) return;
@@ -761,33 +805,35 @@ export function WhatsappPipeline({
               t={t}
             />
           )}
-          {stages.map(stage => (
-            <Column
-              key={stage.id}
-              agentId={agentId}
-              stage={stage}
-              opportunities={localOpportunities.filter(o => o.stageId === stage.id)}
-              attendants={attendants}
-              onClickCard={onSelectConversation}
-              onRename={handleRename}
-              onDelete={handleDelete}
-              onStagesChange={onStagesChange}
-              onValueChange={handleValueChange}
-              onLeadStatusChange={handleLeadStatusChange}
-              onMarcarGanho={handleMarcarGanho}
-              onMarcarPerda={handleMarcarPerda}
-              onTransfer={handleTransfer}
-              pipelines={pipelines}
-              onMovePipeline={handleMovePipeline}
-              onDeleteOpportunity={handleDeleteOpportunity}
-              onOpenChat={setChatConversationId}
-              onOpportunitiesChange={onOpportunitiesChange}
-              leadStatuses={leadStatuses}
-              onLeadStatusesChange={onLeadStatusesChange}
-              dark={theme === "dark"}
-              t={t}
-            />
-          ))}
+          <SortableContext items={localStages.map(s => `col-${s.id}`)} strategy={horizontalListSortingStrategy}>
+            {localStages.map(stage => (
+              <Column
+                key={stage.id}
+                agentId={agentId}
+                stage={stage}
+                opportunities={localOpportunities.filter(o => o.stageId === stage.id)}
+                attendants={attendants}
+                onClickCard={onSelectConversation}
+                onRename={handleRename}
+                onDelete={handleDelete}
+                onStagesChange={onStagesChange}
+                onValueChange={handleValueChange}
+                onLeadStatusChange={handleLeadStatusChange}
+                onMarcarGanho={handleMarcarGanho}
+                onMarcarPerda={handleMarcarPerda}
+                onTransfer={handleTransfer}
+                pipelines={pipelines}
+                onMovePipeline={handleMovePipeline}
+                onDeleteOpportunity={handleDeleteOpportunity}
+                onOpenChat={setChatConversationId}
+                onOpportunitiesChange={onOpportunitiesChange}
+                leadStatuses={leadStatuses}
+                onLeadStatusesChange={onLeadStatusesChange}
+                dark={theme === "dark"}
+                t={t}
+              />
+            ))}
+          </SortableContext>
           <div className="w-64 flex-shrink-0">
             <div className="flex gap-2">
               <input
