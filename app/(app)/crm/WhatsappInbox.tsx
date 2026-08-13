@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import {
   MessageCircle, Search, X, Trophy, Lock, Unlock, Bot, User, UserPlus,
   FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap, StickyNote, ArrowRightLeft, HandCoins, CalendarClock, ListFilter, Instagram, ArrowLeft,
@@ -36,6 +36,20 @@ type Attendant = { id: string; name: string; isManager: boolean };
 
 function formatBRL(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function isSameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+// Divisor de dia estilo WhatsApp: mostra a data uma vez por dia (não repetida em toda bolha)
+function formatDayLabel(date: Date): string {
+  const now = new Date();
+  const ontem = new Date(now);
+  ontem.setDate(now.getDate() - 1);
+  if (isSameDay(date, now)) return "Hoje";
+  if (isSameDay(date, ontem)) return "Ontem";
+  return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
 }
 
 type Message = {
@@ -1419,32 +1433,50 @@ export function WhatsappInbox({
                 </div>
 
                 <div ref={chatScrollRef} onScroll={handleChatScroll} className={`flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-5 space-y-2 ${t.chatBg}`}>
-                  {detail.messages.map(m => {
+                  {detail.messages.map((m, idx) => {
+                    const prev = detail.messages[idx - 1];
+                    const mDate = new Date(m.createdAt);
+                    const dayDivider = (!prev || !isSameDay(new Date(prev.createdAt), mDate)) && (
+                      <div className="flex justify-center py-1">
+                        <span className={`text-[11px] font-medium px-3 py-1 rounded-full ${theme === "dark" ? "bg-gray-800/80 text-gray-400" : "bg-gray-200 text-gray-600"}`}>
+                          {formatDayLabel(mDate)}
+                        </span>
+                      </div>
+                    );
+
                     if (m.role === "note" && m.content.startsWith("TRANSFER:")) {
                       return (
-                        <div key={m.id} className="flex justify-center">
-                          <div className="w-full max-w-md bg-blue-600 text-white text-xs font-medium text-center rounded-lg px-3 py-2">
-                            {m.content.replace(/^TRANSFER:\s*/, "")}
+                        <Fragment key={m.id}>
+                          {dayDivider}
+                          <div className="flex justify-center">
+                            <div className="w-full max-w-md bg-blue-600 text-white text-xs font-medium text-center rounded-lg px-3 py-2">
+                              {m.content.replace(/^TRANSFER:\s*/, "")}
+                            </div>
                           </div>
-                        </div>
+                        </Fragment>
                       );
                     }
                     if (m.role === "note") {
                       return (
-                        <div key={m.id} className="flex justify-center">
-                          <div className="max-w-[85%] rounded-lg px-3 py-2 text-sm bg-amber-900/30 border border-amber-800/40 text-amber-100">
-                            <p className="text-[10px] opacity-80 mb-0.5 flex items-center gap-1 text-amber-300">
-                              <StickyNote size={10} /> Nota interna — {m.sender?.name ?? "Atendente"}
-                            </p>
-                            <p className="whitespace-pre-wrap">{m.content}</p>
-                            <p className="text-[10px] opacity-60 mt-1 text-right">{new Date(m.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</p>
+                        <Fragment key={m.id}>
+                          {dayDivider}
+                          <div className="flex justify-center">
+                            <div className="max-w-[85%] rounded-lg px-3 py-2 text-sm bg-amber-900/30 border border-amber-800/40 text-amber-100">
+                              <p className="text-[10px] opacity-80 mb-0.5 flex items-center gap-1 text-amber-300">
+                                <StickyNote size={10} /> Nota interna — {m.sender?.name ?? "Atendente"}
+                              </p>
+                              <p className="whitespace-pre-wrap">{m.content}</p>
+                              <p className="text-[10px] opacity-60 mt-1 text-right">{new Date(m.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</p>
+                            </div>
                           </div>
-                        </div>
+                        </Fragment>
                       );
                     }
                     const isOutgoing = m.role === "assistant" || m.role === "human";
                     return (
-                      <div key={m.id} id={`msg-${m.id}`} className={`flex ${isOutgoing ? "justify-end" : "justify-start"}`}>
+                      <Fragment key={m.id}>
+                        {dayDivider}
+                        <div id={`msg-${m.id}`} className={`flex ${isOutgoing ? "justify-end" : "justify-start"}`}>
                         <div className={`group relative max-w-[70%] rounded-lg px-3 py-2 text-sm ${
                           m.role === "human" ? t.bubbleHuman :
                           m.role === "assistant" ? t.bubbleAssistant :
@@ -1550,7 +1582,8 @@ export function WhatsappInbox({
                             {new Date(m.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                           </p>
                         </div>
-                      </div>
+                        </div>
+                      </Fragment>
                     );
                   })}
                   <div ref={bottomRef} />
