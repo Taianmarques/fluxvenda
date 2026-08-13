@@ -426,6 +426,13 @@ export function WhatsappInbox({
   const [showScheduled, setShowScheduled] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<ConversationFilters>(EMPTY_FILTERS);
+  // Novo atendimento: busca rápida nos contatos do próprio atendente + iniciar com número novo
+  const [showNovoAtendimento, setShowNovoAtendimento] = useState(false);
+  const [novoQuery, setNovoQuery] = useState("");
+  const [novoNumero, setNovoNumero] = useState("");
+  const [novoNome, setNovoNome] = useState("");
+  const [iniciandoAtendimento, setIniciandoAtendimento] = useState(false);
+  const [novoAtendimentoError, setNovoAtendimentoError] = useState("");
   const [scheduledMessages, setScheduledMessages] = useState<ScheduledMessage[]>([]);
   const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -524,6 +531,38 @@ export function WhatsappInbox({
       const data = await res.json();
       if (data.quickReplies) setQuickReplies(data.quickReplies);
     } catch {}
+  }
+
+  function abrirConversaExistente(id: string) {
+    setSelectedId(id);
+    setMobileChatOpen(true);
+    setShowNovoAtendimento(false);
+    setNovoQuery(""); setNovoNumero(""); setNovoNome(""); setNovoAtendimentoError("");
+  }
+
+  async function handleIniciarAtendimento() {
+    const numero = novoNumero.replace(/\D/g, "");
+    if (numero.length < 10 || numero.length > 13) {
+      setNovoAtendimentoError("Número inválido — use DDD + número");
+      return;
+    }
+    setIniciandoAtendimento(true);
+    setNovoAtendimentoError("");
+    try {
+      const res = await fetch(`/api/agentes/${agentId}/conversas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ numero, nome: novoNome.trim() || undefined }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Não foi possível iniciar o atendimento");
+      await refreshList();
+      abrirConversaExistente(data.conversation.id);
+    } catch (err) {
+      setNovoAtendimentoError(err instanceof Error ? err.message : "Não foi possível iniciar o atendimento");
+    } finally {
+      setIniciandoAtendimento(false);
+    }
   }
 
   async function handleSalvarContato() {
@@ -1126,6 +1165,13 @@ export function WhatsappInbox({
                     />
                   )}
                 </div>
+                <button
+                  onClick={() => setShowNovoAtendimento(true)}
+                  title="Novo atendimento"
+                  className="p-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white flex-shrink-0"
+                >
+                  <UserPlus size={14} />
+                </button>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1.5">
@@ -1657,6 +1703,82 @@ export function WhatsappInbox({
             )}
           </main>
         </div>
+
+      {/* Novo atendimento: busca rápida nos próprios contatos + iniciar com número novo */}
+      {showNovoAtendimento && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className={`w-full max-w-sm rounded-2xl border p-5 space-y-3 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}>
+            <div className="flex items-center justify-between">
+              <p className="font-semibold">Novo atendimento</p>
+              <button
+                onClick={() => { setShowNovoAtendimento(false); setNovoQuery(""); setNovoNumero(""); setNovoNome(""); setNovoAtendimentoError(""); }}
+                className="text-gray-500 hover:text-gray-300"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className={`flex items-center gap-2 rounded-lg px-3 py-2 ${theme === "dark" ? "bg-gray-950 border border-gray-800" : "bg-gray-50 border border-gray-200"}`}>
+              <Search size={14} className="flex-shrink-0 opacity-60" />
+              <input
+                autoFocus
+                value={novoQuery}
+                onChange={e => setNovoQuery(e.target.value)}
+                placeholder="Buscar nos seus contatos..."
+                className={`flex-1 bg-transparent text-sm focus:outline-none ${theme === "dark" ? "text-white placeholder:text-gray-500" : "text-gray-900 placeholder:text-gray-400"}`}
+              />
+            </div>
+
+            {novoQuery.trim() && (() => {
+              const q = novoQuery.trim().toLowerCase();
+              const resultados = conversations
+                .filter(c => c.assignedToId === currentUserId)
+                .filter(c => (c.contactName ?? "").toLowerCase().includes(q) || c.contactNumber.includes(q))
+                .slice(0, 6);
+              return resultados.length > 0 ? (
+                <div className="max-h-40 overflow-y-auto space-y-1">
+                  {resultados.map(c => (
+                    <button
+                      key={c.id}
+                      onClick={() => abrirConversaExistente(c.id)}
+                      className={`w-full text-left text-sm px-3 py-2 rounded-lg truncate ${theme === "dark" ? "hover:bg-gray-800" : "hover:bg-gray-100"}`}
+                    >
+                      {c.contactName || c.contactNumber}
+                      {c.contactName && <span className="text-xs opacity-60"> · {c.contactNumber}</span>}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500">Nenhum contato seu encontrado — inicie com um número abaixo.</p>
+              );
+            })()}
+
+            <div className={`pt-3 border-t space-y-2 ${theme === "dark" ? "border-gray-800" : "border-gray-200"}`}>
+              <p className={`text-xs font-medium ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Ou inicie com um número novo</p>
+              <input
+                value={novoNumero}
+                onChange={e => setNovoNumero(e.target.value)}
+                placeholder="Número (DDD + número)"
+                className={`w-full rounded-lg border px-3 py-2 text-sm ${theme === "dark" ? "bg-gray-950 border-gray-800" : "bg-gray-50 border-gray-200"}`}
+              />
+              <input
+                value={novoNome}
+                onChange={e => setNovoNome(e.target.value)}
+                placeholder="Nome (opcional)"
+                className={`w-full rounded-lg border px-3 py-2 text-sm ${theme === "dark" ? "bg-gray-950 border-gray-800" : "bg-gray-50 border-gray-200"}`}
+              />
+              {novoAtendimentoError && <p className="text-xs text-red-400">{novoAtendimentoError}</p>}
+              <button
+                onClick={handleIniciarAtendimento}
+                disabled={iniciandoAtendimento || !novoNumero.trim()}
+                className="w-full text-sm font-medium bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl px-4 py-2"
+              >
+                {iniciandoAtendimento ? "Iniciando..." : "Iniciar atendimento"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de encerramento com motivo */}
       {showEncerrar && (
