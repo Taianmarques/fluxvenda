@@ -1103,8 +1103,8 @@ export function WhatsappInbox({
                 {([
                   ["ativos", "Ativos"],
                   ["pendentes", "Pendentes"],
-                  ["finalizados", "Finalizados"],
                   ["grupos", "Grupos"],
+                  ["finalizados", "Finalizados"],
                 ] as const).map(([key, label]) => {
                   // Finalizados minimizada (só o ícone) — abre espaço pra Grupos não vazar da linha
                   const iconOnly = key === "finalizados";
@@ -1119,7 +1119,7 @@ export function WhatsappInbox({
                           : `border-transparent ${t.toggleBar} ${t.toggleInactive}`
                       }`}
                     >
-                      {iconOnly ? <Check size={13} /> : label} <span className="opacity-70">{statusCounts[key]}</span>
+                      {iconOnly ? <Check size={13} /> : <>{label} <span className="opacity-70">{statusCounts[key]}</span></>}
                     </button>
                   );
                 })}
