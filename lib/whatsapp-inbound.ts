@@ -42,6 +42,8 @@ export type IncomingMessage = {
   imageUrl: string | null;
   waMessageId?: string | null;       // id da mensagem no provedor (UazAPI messageid / Cloud wamid)
   quotedWaMessageId?: string | null; // id da mensagem citada, quando o cliente responde citando
+  isGroup?: boolean;                 // grupo do WhatsApp — IA nunca responde (ver shouldAiHandle)
+  groupSenderName?: string;          // nome de quem mandou dentro do grupo (varia por mensagem)
 };
 
 async function buildSchedulingContext(agentConfigId: string, requisitosAgendamento?: string, restricoesAgendamento?: string, atendimentoEspecial?: { enabled: boolean; descricao: string }): Promise<string> {
@@ -1173,7 +1175,7 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
   const conversation = await prisma.conversation.upsert({
     where: { agentConfigId_contactNumber: { agentConfigId: config.id, contactNumber } },
     update: { status: "ATIVO", followupCount: 0, ...(contactName && { contactName }) },
-    create: { agentConfigId: config.id, contactNumber, contactName, status: "ATIVO" },
+    create: { agentConfigId: config.id, contactNumber, contactName, status: "ATIVO", isGroup: msg.isGroup ?? false },
   });
   if (config.prospeccaoEnabled) {
     await prisma.prospect.updateMany({
@@ -1199,7 +1201,10 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
     : null;
 
   const savedMsg = await prisma.message.create({
-    data: { conversationId: conversation.id, role: "user", content: text, mediaUrl, mediaType, waMessageId: msg.waMessageId ?? null, replyToId },
+    data: {
+      conversationId: conversation.id, role: "user", content: text, mediaUrl, mediaType,
+      waMessageId: msg.waMessageId ?? null, replyToId, groupSenderName: msg.groupSenderName ?? null,
+    },
   });
   emitChatEvent(config.id, conversation.id); // push em tempo real pro CRM
 
@@ -1216,6 +1221,11 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
     notifyHumanTakeoverMessage(config, conversation.id, conversation.assignedToId, conversation.contactName ?? contactNumber, text).catch(() => {});
     return;
   }
+  // Grupo do WhatsApp — a IA nunca responde automaticamente aqui, só atendente humano. Uma
+  // resposta roteirizada de vendas soltada no meio de uma conversa com várias pessoas seria
+  // um erro sério, então esse critério não é configurável por agente. A mensagem já foi salva
+  // acima (escuta ativa), isso só impede a IA de gerar uma resposta agora.
+  if (conversation.isGroup) return;
   // Canal pausado só pra IA (independente de "active", que desliga o canal inteiro) — a
   // mensagem já foi salva acima, só não gera resposta automática
   if (config.whatsappAiPaused) return;

@@ -67,10 +67,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (mediaBase64 && message.mediaType) {
         const sent = await sendMediaAsTeam(config.uazapiToken, target.contactNumber, message.mediaType as MediaType, mediaBase64, {
           caption: message.content.startsWith("[") ? undefined : message.content || undefined,
+          isGroup: target.isGroup,
         });
         waMessageId = sent.messageid ?? null;
       } else {
-        waMessageId = await sendWhatsAppTextAsTeam(config.uazapiToken, target.contactNumber, message.content);
+        waMessageId = await sendWhatsAppTextAsTeam(config.uazapiToken, target.contactNumber, message.content, undefined, target.isGroup);
       }
 
       await prisma.message.create({

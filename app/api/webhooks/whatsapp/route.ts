@@ -27,10 +27,13 @@ export async function POST(req: NextRequest) {
   const message = body.message;
   const token: string | undefined = body.token;
 
-  // Ignora eco de mensagens enviadas pela própria API, mensagens de grupo ou payloads incompletos
-  if (!message || !token || message.fromMe || message.wasSentByApi || message.isGroup) {
+  // Ignora eco de mensagens enviadas pela própria API ou payloads incompletos. Mensagem de
+  // grupo passa — vira uma conversa própria (aba Grupos no CRM), só que a IA nunca responde
+  // nela automaticamente (ver shouldAiHandle em lib/whatsapp-inbound.ts).
+  if (!message || !token || message.fromMe || message.wasSentByApi) {
     return NextResponse.json({ ok: true });
   }
+  const isGroup = Boolean(message.isGroup);
 
   const config = await prisma.agentConfig.findFirst({ where: { uazapiToken: token, active: true } });
   if (!config || !config.systemPrompt || !config.uazapiToken) {
@@ -90,8 +93,19 @@ export async function POST(req: NextRequest) {
 
   if (!text) return NextResponse.json({ ok: true });
 
-  const contactNumber: string = String(message.sender_pn || message.chatid).split("@")[0];
-  const contactName: string | undefined = message.senderName || body.chat?.wa_contactName || body.chat?.name;
+  // Grupo: a "conversa" é o grupo em si (chatid), não quem mandou a mensagem — sender_pn
+  // trocaria de pessoa a cada mensagem e criaria uma conversa por participante, errado.
+  // Nome do grupo: campo exato varia por versão da UazAPI (extração defensiva, igual ao
+  // quoted abaixo) — cai pro próprio número do grupo se nenhum vier preenchido.
+  const contactNumber: string = isGroup
+    ? String(message.chatid).split("@")[0]
+    : String(message.sender_pn || message.chatid).split("@")[0];
+  const contactName: string | undefined = isGroup
+    ? (body.chat?.name || message.chat?.name || body.chat?.wa_contactName || contactNumber)
+    : (message.senderName || body.chat?.wa_contactName || body.chat?.name);
+  // Quem mandou essa mensagem específica dentro do grupo — cada mensagem pode ser de uma
+  // pessoa diferente, ao contrário do 1-pra-1 onde contactName já identifica o remetente.
+  const groupSenderName: string | undefined = isGroup ? message.senderName : undefined;
 
   // Id da mensagem no provedor + id da mensagem citada (quando o cliente responde citando).
   // Os campos do quoted variam por versão da UazAPI — extração defensiva.
@@ -109,7 +123,7 @@ export async function POST(req: NextRequest) {
     sendMedia: async (phone, type, base64, opts) => (await sendMediaAsTeam(uazapiToken, phone, type === "audio" ? "myaudio" : type, base64, opts))?.messageid ?? null,
   };
 
-  await processIncomingMessage(config, { text, caption, contactNumber, contactName, mediaUrl, mediaType, imageUrl, waMessageId, quotedWaMessageId }, adapter);
+  await processIncomingMessage(config, { text, caption, contactNumber, contactName, mediaUrl, mediaType, imageUrl, waMessageId, quotedWaMessageId, isGroup, groupSenderName }, adapter);
 
   return NextResponse.json({ ok: true });
 }

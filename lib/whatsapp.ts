@@ -2,15 +2,19 @@ const UAZAPI_URL = process.env.UAZAPI_URL ?? "";
 const UAZAPI_TOKEN = process.env.UAZAPI_TOKEN ?? "";
 const UAZAPI_ADMIN_TOKEN = process.env.UAZAPI_ADMIN_TOKEN ?? "";
 
-export function formatPhone(phone: string): string {
+// Grupo (isGroup) não é número de telefone — usa o id do grupo direto, com o sufixo "@g.us"
+// (mesma convenção que a UazAPI já usa pra chatId em getChatProfilePicture abaixo). Formatar
+// como telefone brasileiro (dígitos + prefixo 55) corromperia o id do grupo.
+export function formatPhone(phone: string, isGroup = false): string {
+  if (isGroup) return `${phone}@g.us`;
   const digits = phone.replace(/\D/g, "");
   return digits.startsWith("55") ? digits : `55${digits}`;
 }
 
 // `replyId` = messageid da mensagem citada (reply nativo do WhatsApp).
 // Retorna o messageid da mensagem enviada (usado pra permitir citações futuras), ou null.
-async function sendText(url: string, token: string, phone: string, text: string, replyId?: string): Promise<string | null> {
-  const number = formatPhone(phone);
+async function sendText(url: string, token: string, phone: string, text: string, replyId?: string, isGroup = false): Promise<string | null> {
+  const number = formatPhone(phone, isGroup);
 
   const res = await fetch(`${url}/send/text`, {
     method: "POST",
@@ -41,12 +45,12 @@ export async function sendWhatsAppText(phone: string, text: string): Promise<str
 }
 
 // Envia pela instância própria de uma empresa (agente de atendimento por equipe)
-export async function sendWhatsAppTextAsTeam(token: string, phone: string, text: string, replyId?: string): Promise<string | null> {
+export async function sendWhatsAppTextAsTeam(token: string, phone: string, text: string, replyId?: string, isGroup = false): Promise<string | null> {
   if (!UAZAPI_URL || !token) {
     console.warn("[whatsapp] Instância da equipe não configurada — mensagem não enviada");
     return null;
   }
-  return sendText(UAZAPI_URL, token, phone, text, replyId);
+  return sendText(UAZAPI_URL, token, phone, text, replyId, isGroup);
 }
 
 // "audio" = arquivo comum (aparece como anexo encaminhado); "myaudio" = nota de voz nativa
@@ -60,9 +64,9 @@ export async function sendMediaAsTeam(
   phone: string,
   type: MediaType,
   fileBase64: string,
-  options?: { caption?: string; fileName?: string; replyId?: string }
+  options?: { caption?: string; fileName?: string; replyId?: string; isGroup?: boolean }
 ): Promise<{ messageid: string }> {
-  const number = formatPhone(phone);
+  const number = formatPhone(phone, options?.isGroup);
 
   const res = await fetch(`${UAZAPI_URL}/send/media`, {
     method: "POST",

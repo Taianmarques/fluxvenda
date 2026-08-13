@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  MessageCircle, Search, X, Trophy, Lock, Unlock, Bot, User, UserPlus,
+  MessageCircle, Search, X, Trophy, Lock, Unlock, Bot, User, UserPlus, Users,
   FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap, StickyNote, ArrowRightLeft, HandCoins, CalendarClock, ListFilter, Instagram, ArrowLeft,
   Reply, Forward, ChevronDown, Package, ImageOff, Pin, Maximize2, Download,
 } from "lucide-react";
@@ -30,6 +30,7 @@ type ConversationSummary = {
   etiquetas: { id: string; nome: string; cor: string }[];
   unreadCount: number;
   pinned: boolean;
+  isGroup: boolean;
 };
 
 type Attendant = { id: string; name: string; isManager: boolean };
@@ -50,6 +51,7 @@ type Message = {
   edited?: boolean;
   deleted?: boolean;
   waMessageId?: string | null;
+  groupSenderName?: string | null;
   replyTo?: { id: string; content: string; role: string; mediaType?: string | null; sender?: { name: string } | null } | null;
 };
 
@@ -136,6 +138,7 @@ type ConversationDetail = {
   assignedToId: string | null;
   opportunities: Opportunity[];
   messages: Message[];
+  isGroup: boolean;
 };
 
 type ChatTheme = "dark" | "light";
@@ -329,7 +332,7 @@ export function WhatsappInbox({
 }) {
   const [theme, setTheme] = useState<ChatTheme>("dark");
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"ativos" | "pendentes" | "finalizados">("ativos");
+  const [statusFilter, setStatusFilter] = useState<"ativos" | "pendentes" | "finalizados" | "grupos">("ativos");
   const [conversations, setConversations] = useState(initialConversations);
   const [leadStatuses, setLeadStatuses] = useState(initialLeadStatuses);
   const [attendants, setAttendants] = useState<Attendant[]>([]);
@@ -445,6 +448,7 @@ export function WhatsappInbox({
           etiquetas: c.etiquetas ?? [],
           unreadCount: c.unreadCount ?? 0,
           pinned: Boolean(c.pinned),
+          isGroup: Boolean(c.isGroup),
         }));
         // Só re-renderiza a lista se algo realmente mudou
         const fp = JSON.stringify(next.map((c: any) => [
@@ -1038,12 +1042,15 @@ export function WhatsappInbox({
   }
 
   const statusCounts = {
-    ativos: conversations.filter(c => c.humanTakeover && c.status !== "FINALIZADO").length,
-    pendentes: conversations.filter(c => !c.humanTakeover && c.status !== "FINALIZADO").length,
-    finalizados: conversations.filter(c => c.status === "FINALIZADO").length,
+    ativos: conversations.filter(c => !c.isGroup && c.humanTakeover && c.status !== "FINALIZADO").length,
+    pendentes: conversations.filter(c => !c.isGroup && !c.humanTakeover && c.status !== "FINALIZADO").length,
+    finalizados: conversations.filter(c => !c.isGroup && c.status === "FINALIZADO").length,
+    grupos: conversations.filter(c => c.isGroup).length,
   };
 
   const statusFiltered = conversations.filter(c => {
+    if (statusFilter === "grupos") return c.isGroup;
+    if (c.isGroup) return false;
     if (statusFilter === "ativos") return c.humanTakeover && c.status !== "FINALIZADO";
     if (statusFilter === "pendentes") return !c.humanTakeover && c.status !== "FINALIZADO";
     return c.status === "FINALIZADO";
@@ -1097,6 +1104,7 @@ export function WhatsappInbox({
                   ["ativos", "Ativos"],
                   ["pendentes", "Pendentes"],
                   ["finalizados", "Finalizados"],
+                  ["grupos", "Grupos"],
                 ] as const).map(([key, label]) => (
                   <button
                     key={key}
@@ -1172,7 +1180,13 @@ export function WhatsappInbox({
                     style={statusColor ? { borderLeftColor: statusColor } : undefined}
                   >
                     <div className="relative flex-shrink-0 mt-0.5">
-                      <ContactAvatar agentId={agentId} conversationId={c.id} seed={seed} isIg={isIg} statusColor={statusColor} />
+                      {c.isGroup ? (
+                        <div className="w-9 h-9 rounded-full bg-gray-700 flex items-center justify-center">
+                          <Users size={16} className="text-gray-300" />
+                        </div>
+                      ) : (
+                        <ContactAvatar agentId={agentId} conversationId={c.id} seed={seed} isIg={isIg} statusColor={statusColor} />
+                      )}
                       <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-gray-950 flex items-center justify-center border border-gray-800">
                         {isIg ? <Instagram size={8} className="text-pink-400" /> : <WhatsAppIcon size={8} />}
                       </span>
@@ -1278,7 +1292,9 @@ export function WhatsappInbox({
                     </button>
                   <div className="min-w-0">
                     <p className="font-semibold flex items-center gap-1.5">
-                      {isIgContact(detail.contactNumber)
+                      {detail.isGroup
+                        ? <Users size={14} className="flex-shrink-0" />
+                        : isIgContact(detail.contactNumber)
                         ? <Instagram size={14} className="text-pink-400 flex-shrink-0" />
                         : <WhatsAppIcon size={14} />}
                       {detail.contactName || (isIgContact(detail.contactNumber) ? "Instagram DM" : detail.contactNumber)}
@@ -1495,6 +1511,9 @@ export function WhatsappInbox({
                           )}
                           {m.role === "human" && <p className="text-[10px] opacity-70 mb-0.5 flex items-center gap-1 pr-5"><User size={10} /> {m.sender?.name ?? "Atendente"}</p>}
                           {m.role === "assistant" && <p className="text-[10px] opacity-70 mb-0.5 flex items-center gap-1 pr-5"><Bot size={10} /> {agentName}</p>}
+                          {m.role === "user" && detail.isGroup && m.groupSenderName && (
+                            <p className="text-[10px] opacity-70 mb-0.5 flex items-center gap-1 pr-5"><User size={10} /> {m.groupSenderName}</p>
+                          )}
                           {m.deleted ? (
                             <p className="italic opacity-60 flex items-center gap-1 pr-4"><Trash2 size={12} /> Mensagem apagada</p>
                           ) : m.mediaUrl && m.mediaType ? (
@@ -1699,7 +1718,7 @@ export function WhatsappInbox({
             {novoQuery.trim() && (() => {
               const q = novoQuery.trim().toLowerCase();
               const resultados = conversations
-                .filter(c => c.assignedToId === currentUserId)
+                .filter(c => c.assignedToId === currentUserId && !c.isGroup)
                 .filter(c => (c.contactName ?? "").toLowerCase().includes(q) || c.contactNumber.includes(q))
                 .slice(0, 6);
               return resultados.length > 0 ? (

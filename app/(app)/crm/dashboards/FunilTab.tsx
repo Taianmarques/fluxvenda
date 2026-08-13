@@ -10,11 +10,11 @@ export async function FunilTab({ agentId, config }: { agentId: string; config: A
       include: { stages: { orderBy: { order: "asc" }, select: { id: true, name: true, color: true } } },
     }),
     prisma.conversation.findMany({
-      where: { agentConfigId: config.id },
+      where: { agentConfigId: config.id, isSandbox: false, isGroup: false },
       select: { id: true, contactNumber: true, createdAt: true },
     }),
     prisma.opportunity.findMany({
-      where: { conversation: { agentConfigId: config.id } },
+      where: { conversation: { agentConfigId: config.id, isSandbox: false, isGroup: false } },
       select: { id: true, conversationId: true, stageId: true, dealValue: true, wonAt: true, createdAt: true },
     }),
     prisma.prospect.findMany({

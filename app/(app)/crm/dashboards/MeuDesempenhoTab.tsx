@@ -16,7 +16,7 @@ export async function MeuDesempenhoTab({ agentId, config, userId }: { agentId: s
 
   const [conversations, orders, paidCobrancas] = await Promise.all([
     prisma.conversation.findMany({
-      where: { agentConfigId: config.id, assignedToId: userId },
+      where: { agentConfigId: config.id, assignedToId: userId, isSandbox: false, isGroup: false },
       select: {
         id: true, contactNumber: true, contactName: true, updatedAt: true, nivelCarteira: true,
         opportunities: { select: { id: true, dealValue: true, wonAt: true, lostAt: true, createdAt: true } },

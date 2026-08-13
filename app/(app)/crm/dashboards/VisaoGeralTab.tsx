@@ -11,12 +11,12 @@ export async function VisaoGeralTab({ agentId, config }: { agentId: string; conf
 
   const [conversations, leadStatuses, opportunities, pendingTasks, team] = await Promise.all([
     prisma.conversation.findMany({
-      where: { agentConfigId: config.id },
+      where: { agentConfigId: config.id, isSandbox: false, isGroup: false },
       select: { id: true, createdAt: true, status: true, humanTakeover: true, followupCount: true, leadStatusId: true, assignedToId: true },
     }),
     prisma.leadStatus.findMany({ where: { agentConfigId: config.id }, orderBy: { order: "asc" } }),
     prisma.opportunity.findMany({
-      where: { conversation: { agentConfigId: config.id } },
+      where: { conversation: { agentConfigId: config.id, isSandbox: false, isGroup: false } },
       select: {
         id: true, dealValue: true, wonAt: true, lostAt: true, stageFollowupCount: true, createdAt: true,
         conversation: { select: { assignedToId: true } },
