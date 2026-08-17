@@ -547,6 +547,20 @@ export const SDR_MATERIAIS_TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "transferir_atendente_duvida",
+      description: "Transfere a conversa pro atendente responsável quando VOCÊ não tem certeza absoluta da resposta — pergunta técnica específica (medida padrão, espessura disponível, especificação de corte/rebaixo, prazo, valor, disponibilidade de estoque) que não está nas informações da empresa que você recebeu. Use isso em vez de inventar ou generalizar uma resposta. Depois de chamar essa função você para de responder — o atendente assume a partir daí.",
+      parameters: {
+        type: "object",
+        properties: {
+          duvida: { type: "string", description: "A pergunta ou dúvida específica do cliente que motivou a transferência" },
+        },
+        required: ["duvida"],
+      },
+    },
+  },
 ];
 
 export const PIPELINE_TOOLS = [
