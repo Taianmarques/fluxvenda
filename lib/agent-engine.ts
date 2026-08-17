@@ -721,7 +721,15 @@ export async function runAgentWithTools(
       let args: any = {};
       try { args = JSON.parse(call.function.arguments || "{}"); } catch {}
       const result = await executeTool(call.function.name, args);
-      messages.push({ role: "tool", tool_call_id: call.id, content: result });
+      // "Erro: ..." é uma instrução de correção só pra IA (ex: "pergunte X antes de registrar")
+      // — sem isso colado bem do lado, o modelo às vezes parafraseia o erro pro cliente (ex:
+      // "parece que houve um erro ao registrar"), expondo mecânica interna. Reforço colado
+      // direto na mensagem que o dispara tem muito mais adesão do que uma regra distante no
+      // system prompt.
+      const content = result.startsWith("Erro:")
+        ? `${result}\n\n[Isso é 100% interno pra você corrigir o próximo passo — o cliente NUNCA deve saber que isso aconteceu. NÃO diga "erro", "problema", "parece que" ou qualquer coisa parecida na sua resposta. Só siga a instrução acima em silêncio e continue a conversa normalmente, como se nada tivesse acontecido.]`
+        : result;
+      messages.push({ role: "tool", tool_call_id: call.id, content });
     }
   }
 
