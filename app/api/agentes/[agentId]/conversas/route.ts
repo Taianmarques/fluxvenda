@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getAgentConfigWithRole } from "@/lib/team";
+import { getAgentConfigWithRole, negadaParaAtendente } from "@/lib/team";
 import { Prisma } from "@/app/generated/prisma/client";
 import { z } from "zod";
 
@@ -14,6 +14,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ agentId
   if (!result) return NextResponse.json({ conversations: [] });
   const { config, isManager } = result;
 
+  // Contato novo sem atendente: se o agente tem um atendente padrão pro online configurado
+  // (iaLeadAttendantId), só ele enxerga a fila de leads sem dono — os outros só veem o que já é
+  // deles. Sem atendente padrão configurado, mantém o comportamento antigo (fila visível a todos).
+  const unassignedVisible = isManager || !config.iaLeadAttendantId || config.iaLeadAttendantId === userId;
+
   const conversations = await prisma.conversation.findMany({
     where: {
       agentConfigId: config.id,
@@ -21,10 +26,16 @@ export async function GET(_req: Request, { params }: { params: Promise<{ agentId
       // aparecer na caixa de entrada como se fosse um atendimento em aberto (ver page.tsx)
       messages: { some: {} },
       isSandbox: false, // conversa de teste do simulador nunca aparece na caixa real
-      // Gestor vê tudo; atendente só vê as dele + as ainda não atribuídas em aberto — uma vez
-      // encerrada, uma conversa sem atendente (ex: IA cuidou sozinha) não deve ficar visível
-      // pra equipe inteira pra sempre, só pro gestor
-      ...(isManager ? {} : { OR: [{ assignedToId: userId }, { assignedToId: null, status: { not: "FINALIZADO" } }] }),
+      // Gestor vê tudo; atendente só vê as dele + (se for o atendente padrão, ou não houver um
+      // configurado) as ainda não atribuídas em aberto — uma vez encerrada, uma conversa sem
+      // atendente (ex: IA cuidou sozinha) não deve ficar visível pra equipe inteira pra sempre,
+      // só pro gestor
+      ...(isManager ? {} : {
+        OR: [
+          { assignedToId: userId },
+          ...(unassignedVisible ? [{ assignedToId: null, status: { not: "FINALIZADO" as const } }] : []),
+        ],
+      }),
     },
     orderBy: { updatedAt: "desc" },
     include: {
@@ -94,8 +105,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
   });
 
   if (existing) {
-    // Mesma regra de sempre: atendente não abre uma conversa que já é de outro colega
-    if (!isManager && existing.assignedToId && existing.assignedToId !== userId) {
+    // Mesma regra de sempre: atendente não abre uma conversa que já é de outro colega, nem uma
+    // sem dono que só o atendente padrão do online pode ver (ver negadaParaAtendente)
+    if (!isManager && negadaParaAtendente(existing, userId, config.iaLeadAttendantId)) {
       return NextResponse.json({ error: "Esse contato já está com outro atendente" }, { status: 409 });
     }
     const conversation = existing.assignedToId

@@ -50,6 +50,11 @@ async function WhatsappInboxPageContent({
 
   const { c } = await searchParams;
 
+  // Contato novo sem atendente: se o agente tem um atendente padrão pro online configurado
+  // (iaLeadAttendantId), só ele enxerga a fila de leads sem dono — os outros só veem o que já é
+  // deles (mesma regra de app/api/agentes/[agentId]/conversas/route.ts, que o polling usa).
+  const unassignedVisible = isManager || !config.iaLeadAttendantId || config.iaLeadAttendantId === user.id;
+
   const [conversations, leadStatuses] = await Promise.all([
     prisma.conversation.findMany({
       where: {
@@ -59,7 +64,14 @@ async function WhatsappInboxPageContent({
         // aparecer na caixa de entrada como se fosse um atendimento em aberto.
         messages: { some: {} },
         isSandbox: false, // conversa de teste do simulador nunca aparece na caixa real
-        ...(isManager ? {} : { OR: [{ assignedToId: user.id }, { assignedToId: null }] }),
+        // Uma vez encerrada, uma conversa sem atendente não deve ficar visível pra equipe
+        // inteira pra sempre, só pro gestor.
+        ...(isManager ? {} : {
+          OR: [
+            { assignedToId: user.id },
+            ...(unassignedVisible ? [{ assignedToId: null, status: { not: "FINALIZADO" as const } }] : []),
+          ],
+        }),
       },
       orderBy: { updatedAt: "desc" },
       include: {

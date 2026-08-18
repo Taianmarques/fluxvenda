@@ -63,6 +63,22 @@ export async function userBelongsToAgentConfig(userId: string, agentConfigId: st
   return result !== null;
 }
 
+// Atendente não-gestor não pode ver/agir numa conversa quando: (a) ela já é de outro colega, (b)
+// está encerrada sem dono (ver isso em app/api/ferramentas/whatsapp/conversas/[id]/route.ts), ou
+// (c) ainda está sem dono mas o agente tem um atendente padrão pro online (iaLeadAttendantId) e
+// quem está olhando não é ele — nesse caso, contato novo sem atendimento só aparece pro atendente
+// designado, não pro time inteiro (antes disso, qualquer não-gestor via/aceitava lead sem dono).
+export function negadaParaAtendente(
+  conversation: { assignedToId: string | null; status: string },
+  userId: string,
+  iaLeadAttendantId: string | null
+): boolean {
+  if (conversation.assignedToId) return conversation.assignedToId !== userId;
+  if (conversation.status === "FINALIZADO") return true;
+  if (iaLeadAttendantId) return iaLeadAttendantId !== userId;
+  return false;
+}
+
 // Time que esse usuário administra: o dono literal (Team.managerId) OU um atendente promovido
 // a GESTOR na tela Equipe — os dois administram a equipe (criar/remover usuário, departamentos,
 // perfis de acesso etc) no mesmo nível. Team.managerId em si nunca muda por aqui — não existe

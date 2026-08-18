@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getAgentConfigWithRole } from "@/lib/team";
+import { getAgentConfigWithRole, negadaParaAtendente } from "@/lib/team";
 import { emitChatEvent } from "@/lib/realtime";
 
 // Atendente aceita a conversa: assume o atendimento manual (pausa a IA) e fica responsável por ela
@@ -15,8 +15,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
   const result = await getAgentConfigWithRole(userId, conversation.agentConfigId);
   if (!result) return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
-  const { isManager } = result;
-  if (!isManager && conversation.assignedToId && conversation.assignedToId !== userId) {
+  const { config, isManager } = result;
+  if (!isManager && negadaParaAtendente(conversation, userId, config.iaLeadAttendantId)) {
     return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
   }
 

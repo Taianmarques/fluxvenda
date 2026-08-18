@@ -1,18 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getAgentConfigWithRole } from "@/lib/team";
+import { getAgentConfigWithRole, negadaParaAtendente } from "@/lib/team";
 import { emitChatEvent } from "@/lib/realtime";
 import { z } from "zod";
-
-// Atendente não-gestor não pode ver: conversa atribuída a outra pessoa, nem conversa sem
-// atendente que já foi encerrada (ex: IA cuidou sozinha) — deixa de fazer sentido continuar
-// visível pra equipe inteira depois de fechada, só o gestor mantém acesso pra reatribuir se
-// precisar (ver filtro equivalente em app/api/agentes/[agentId]/conversas/route.ts)
-function negadaParaAtendente(conversation: { assignedToId: string | null; status: string }, userId: string): boolean {
-  if (conversation.assignedToId) return conversation.assignedToId !== userId;
-  return conversation.status === "FINALIZADO";
-}
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { userId } = await auth();
@@ -40,8 +31,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   const result = await getAgentConfigWithRole(userId, conversation.agentConfigId);
   if (!result) return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
-  const { isManager } = result;
-  if (!isManager && negadaParaAtendente(conversation, userId)) {
+  const { config, isManager } = result;
+  if (!isManager && negadaParaAtendente(conversation, userId, config.iaLeadAttendantId)) {
     return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
   }
 
@@ -80,7 +71,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const result = await getAgentConfigWithRole(userId, conversation.agentConfigId);
   if (!result) return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
   const { config, isManager } = result;
-  if (!isManager && negadaParaAtendente(conversation, userId)) {
+  if (!isManager && negadaParaAtendente(conversation, userId, config.iaLeadAttendantId)) {
     return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
   }
 
