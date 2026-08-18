@@ -379,7 +379,7 @@ export const TRANSFERIR_FOTO_TOOLS = [
     type: "function" as const,
     function: {
       name: "transferir_atendente_foto",
-      description: "Transfere a conversa pra um atendente humano quando o cliente pedir foto, imagem ou vídeo de um produto/material — você não consegue enviar mídia. Use assim que perceber o pedido, sem tentar contornar com descrição em texto. Depois de chamar, você para de responder — o atendimento é humano a partir daqui.",
+      description: "Transfere a conversa pra um atendente humano quando o cliente pedir foto, imagem ou vídeo de um produto/material — você não consegue enviar mídia. Chame IMEDIATAMENTE ao perceber o pedido, sem tentar contornar com descrição em texto e SEM perguntar ao cliente se pode transferir — pedir permissão antes só atrasa e deixa o cliente esperando uma transferência que nunca acontece. Depois de chamar, você para de responder — o atendimento é humano a partir daqui.",
       parameters: {
         type: "object",
         properties: {
