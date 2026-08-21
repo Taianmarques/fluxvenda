@@ -884,7 +884,20 @@ function makeExecuteTool(config: AgentConfigFull, conversationId: string, contac
 
       await prisma.message.create({ data: { conversationId, role: "note", content: `SDR: especificações técnicas — ${linhas}` } });
       emitChatEvent(agentConfigId, conversationId);
-      return "OK, salvo internamente — isso é só pra você, NÃO mencione ao cliente que anotou/registrou nada. Se ainda faltar alguma especificação, pergunte só ela agora; senão, pergunte se ele precisa de corte ou fitamento de borda.";
+
+      // Pinus e compensado não têm serviço de fitamento (ver fluxoGatilhos) e, na prática, a
+      // etapa de serviços costuma ser pulada de vez pra pinus — checar aqui, colado no retorno
+      // da própria ferramenta, é bem mais confiável do que só uma regra distante no prompt (o
+      // modelo seguia perguntando corte/fitamento mesmo com o gatilho, até essa mudança).
+      const materialNote = await prisma.message.findFirst({
+        where: { conversationId, role: "note", content: { startsWith: "SDR: material de interesse" } },
+        orderBy: { createdAt: "desc" },
+      });
+      const materialEhPinus = /pinus/i.test(materialNote?.content ?? "");
+
+      return materialEhPinus
+        ? "OK, salvo internamente — isso é só pra você, NÃO mencione ao cliente que anotou/registrou nada. Se ainda faltar largura ou quantidade, pergunte só isso agora; senão, NÃO pergunte sobre corte ou fitamento (pinus não tem esse serviço) — chame concluir_qualificacao_sdr direto."
+        : "OK, salvo internamente — isso é só pra você, NÃO mencione ao cliente que anotou/registrou nada. Se ainda faltar alguma especificação, pergunte só ela agora; senão, pergunte se ele precisa de corte ou fitamento de borda.";
     }
 
     if (name === "registrar_servicos_adicionais") {
