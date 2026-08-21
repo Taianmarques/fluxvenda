@@ -61,3 +61,14 @@ export async function userBelongsToAgentConfig(userId: string, agentConfigId: st
   const result = await getAgentConfigWithRole(userId, agentConfigId);
   return result !== null;
 }
+
+// Atendente não-gestor não pode ver/agir numa conversa de grupo quando ela tem uma lista de
+// visibilidade configurada e ele não está nela (lista vazia = todo mundo vê, padrão).
+export function negadoGrupoParaAtendente(
+  conversation: { isGroup?: boolean; groupVisibleToIds?: string[] },
+  userId: string
+): boolean {
+  if (!conversation.isGroup) return false;
+  const lista = conversation.groupVisibleToIds ?? [];
+  return lista.length > 0 && !lista.includes(userId);
+}

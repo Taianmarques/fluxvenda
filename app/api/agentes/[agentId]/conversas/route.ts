@@ -17,8 +17,15 @@ export async function GET(_req: Request, { params }: { params: Promise<{ agentId
   const conversations = await prisma.conversation.findMany({
     where: {
       agentConfigId: config.id,
-      // Gestor vê tudo; atendente só vê as dele + as ainda não atribuídas
-      ...(isManager ? {} : { OR: [{ assignedToId: userId }, { assignedToId: null }] }),
+      // Gestor vê tudo. Atendente: conversa normal (não-grupo) — dele, ou ainda não atribuída;
+      // grupo — lista de visibilidade vazia (padrão) mostra pra todo mundo, senão só quem tá na
+      // lista (ver groupVisibleToIds, configurado pelo cabeçalho do chat do grupo).
+      ...(isManager ? {} : {
+        OR: [
+          { isGroup: false, OR: [{ assignedToId: userId }, { assignedToId: null }] },
+          { isGroup: true, OR: [{ groupVisibleToIds: { isEmpty: true } }, { groupVisibleToIds: { has: userId } }] },
+        ],
+      }),
     },
     orderBy: { updatedAt: "desc" },
     include: {

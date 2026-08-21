@@ -1418,6 +1418,11 @@ model Conversation {
   // responde automaticamente aqui (ver shouldAiHandle em lib/whatsapp-inbound.ts), só atendente.
   isGroup Boolean @default(false)
 
+  // Só relevante quando isGroup — lista de profileId que podem ver esse grupo específico.
+  // Vazio = visível pra equipe inteira (padrão, compatível com grupos já existentes). Gestor
+  // configura pelo cabeçalho do chat do grupo.
+  groupVisibleToIds String[] @default([])
+
   // Conversa de teste do simulador (Ferramentas > Treino) — uma por gestor, reaproveitada entre
   // sessões. Nunca deve aparecer na caixa de entrada nem em relatórios/métricas reais.
   isSandbox Boolean @default(false)

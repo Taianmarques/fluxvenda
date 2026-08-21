@@ -54,7 +54,15 @@ async function WhatsappInboxPageContent({
     prisma.conversation.findMany({
       where: {
         agentConfigId: config.id,
-        ...(isManager ? {} : { OR: [{ assignedToId: user.id }, { assignedToId: null }] }),
+        // Gestor vê tudo. Atendente: conversa normal (não-grupo) — dele, ou ainda não atribuída;
+        // grupo — lista de visibilidade vazia (padrão) mostra pra todo mundo, senão só quem tá na
+        // lista (ver groupVisibleToIds, configurado pelo cabeçalho do chat do grupo).
+        ...(isManager ? {} : {
+          OR: [
+            { isGroup: false, OR: [{ assignedToId: user.id }, { assignedToId: null }] },
+            { isGroup: true, OR: [{ groupVisibleToIds: { isEmpty: true } }, { groupVisibleToIds: { has: user.id } }] },
+          ],
+        }),
       },
       orderBy: { updatedAt: "desc" },
       include: {
@@ -117,6 +125,7 @@ async function WhatsappInboxPageContent({
         unreadCount: unreadMap.get(c.id) ?? 0,
         pinned: c.pinned,
         isGroup: c.isGroup,
+        groupVisibleToIds: c.groupVisibleToIds,
       }))}
     />
   );
