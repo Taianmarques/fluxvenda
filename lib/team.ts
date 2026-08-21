@@ -63,16 +63,22 @@ export async function userBelongsToAgentConfig(userId: string, agentConfigId: st
   return result !== null;
 }
 
-// Atendente não-gestor não pode ver/agir numa conversa quando: (a) ela já é de outro colega, (b)
-// está encerrada sem dono (ver isso em app/api/ferramentas/whatsapp/conversas/[id]/route.ts), ou
-// (c) ainda está sem dono mas o agente tem um atendente padrão pro online (iaLeadAttendantId) e
-// quem está olhando não é ele — nesse caso, contato novo sem atendimento só aparece pro atendente
-// designado, não pro time inteiro (antes disso, qualquer não-gestor via/aceitava lead sem dono).
+// Atendente não-gestor não pode ver/agir numa conversa quando: (a) é um grupo com lista de
+// visibilidade configurada e ele não está nela (lista vazia = todo mundo vê, padrão); (b) ela já
+// é de outro colega; (c) está encerrada sem dono (ver isso em
+// app/api/ferramentas/whatsapp/conversas/[id]/route.ts); ou (d) ainda está sem dono mas o agente
+// tem um atendente padrão pro online (iaLeadAttendantId) e quem está olhando não é ele — nesse
+// caso, contato novo sem atendimento só aparece pro atendente designado, não pro time inteiro
+// (antes disso, qualquer não-gestor via/aceitava lead sem dono).
 export function negadaParaAtendente(
-  conversation: { assignedToId: string | null; status: string },
+  conversation: { assignedToId: string | null; status: string; isGroup?: boolean; groupVisibleToIds?: string[] },
   userId: string,
   iaLeadAttendantId: string | null
 ): boolean {
+  if (conversation.isGroup) {
+    const lista = conversation.groupVisibleToIds ?? [];
+    return lista.length > 0 && !lista.includes(userId);
+  }
   if (conversation.assignedToId) return conversation.assignedToId !== userId;
   if (conversation.status === "FINALIZADO") return true;
   if (iaLeadAttendantId) return iaLeadAttendantId !== userId;

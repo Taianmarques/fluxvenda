@@ -65,11 +65,18 @@ async function WhatsappInboxPageContent({
         messages: { some: {} },
         isSandbox: false, // conversa de teste do simulador nunca aparece na caixa real
         // Uma vez encerrada, uma conversa sem atendente não deve ficar visível pra equipe
-        // inteira pra sempre, só pro gestor.
+        // inteira pra sempre, só pro gestor. Grupo segue a lista de visibilidade própria
+        // (groupVisibleToIds) em vez de assignedToId — vazia = todo mundo vê.
         ...(isManager ? {} : {
           OR: [
-            { assignedToId: user.id },
-            ...(unassignedVisible ? [{ assignedToId: null, status: { not: "FINALIZADO" as const } }] : []),
+            {
+              isGroup: false,
+              OR: [
+                { assignedToId: user.id },
+                ...(unassignedVisible ? [{ assignedToId: null, status: { not: "FINALIZADO" as const } }] : []),
+              ],
+            },
+            { isGroup: true, OR: [{ groupVisibleToIds: { isEmpty: true } }, { groupVisibleToIds: { has: user.id } }] },
           ],
         }),
       },
@@ -134,6 +141,7 @@ async function WhatsappInboxPageContent({
         unreadCount: unreadMap.get(c.id) ?? 0,
         pinned: c.pinned,
         isGroup: c.isGroup,
+        groupVisibleToIds: c.groupVisibleToIds,
       }))}
     />
   );

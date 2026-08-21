@@ -53,6 +53,7 @@ const patchSchema = z.object({
   contactName: z.string().trim().min(1).max(80).optional(), // salvar/renomear o contato
   contactNumber: z.string().trim().transform(v => v.replace(/\D/g, "")).refine(v => v.length >= 10 && v.length <= 13, { message: "Número inválido — use DDD + número" }).optional(),
   pinned: z.boolean().optional(),
+  groupVisibleToIds: z.array(z.string()).max(200).optional(), // só grupo, só gestor — ver checagem abaixo
 });
 
 // Muda o status do lead, o status da conversa e/ou o atendente responsável.
@@ -91,6 +92,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
   }
 
+  // Quem pode ver o grupo: só o gestor configura, e só faz sentido pra conversa de grupo. Valida
+  // que cada id realmente pertence à equipe (atendente ou o próprio gestor) — evita salvar um
+  // profileId de fora.
+  if (body.data.groupVisibleToIds !== undefined) {
+    if (!isManager) return NextResponse.json({ error: "Só o gestor configura quem vê o grupo" }, { status: 403 });
+    if (!conversation.isGroup) return NextResponse.json({ error: "Essa configuração é só pra conversas de grupo" }, { status: 400 });
+    if (body.data.groupVisibleToIds.length > 0) {
+      const team = await prisma.team.findUnique({ where: { id: config.teamId } });
+      const membros = await prisma.teamMember.findMany({ where: { teamId: config.teamId }, select: { profileId: true } });
+      const idsValidos = new Set([team?.managerId, ...membros.map(m => m.profileId)].filter(Boolean));
+      const invalido = body.data.groupVisibleToIds.some(pid => !idsValidos.has(pid));
+      if (invalido) return NextResponse.json({ error: "Atendente não encontrado" }, { status: 404 });
+    }
+  }
+
   // Só valida/atualiza se realmente mudou — evita 409 falso quando o número enviado é o mesmo
   if (body.data.contactNumber !== undefined && body.data.contactNumber !== conversation.contactNumber) {
     const conflito = await prisma.conversation.findFirst({
@@ -119,6 +135,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       ...(body.data.contactName !== undefined && { contactName: body.data.contactName }),
       ...(body.data.contactNumber !== undefined && { contactNumber: body.data.contactNumber }),
       ...(body.data.pinned !== undefined && { pinned: body.data.pinned }),
+      ...(body.data.groupVisibleToIds !== undefined && { groupVisibleToIds: body.data.groupVisibleToIds }),
       ...(encerrando && { motivoEncerramento: body.data.motivoEncerramento ?? null, encerradaEm: new Date() }),
       ...(reabrindo && { motivoEncerramento: null, encerradaEm: null }),
     },

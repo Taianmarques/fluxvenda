@@ -26,14 +26,21 @@ export async function GET(_req: Request, { params }: { params: Promise<{ agentId
       // aparecer na caixa de entrada como se fosse um atendimento em aberto (ver page.tsx)
       messages: { some: {} },
       isSandbox: false, // conversa de teste do simulador nunca aparece na caixa real
-      // Gestor vê tudo; atendente só vê as dele + (se for o atendente padrão, ou não houver um
-      // configurado) as ainda não atribuídas em aberto — uma vez encerrada, uma conversa sem
-      // atendente (ex: IA cuidou sozinha) não deve ficar visível pra equipe inteira pra sempre,
-      // só pro gestor
+      // Gestor vê tudo. Atendente: conversa normal (não-grupo) — dele, ou (se for o atendente
+      // padrão do online, ou não houver um configurado) ainda não atribuída em aberto; conversa
+      // encerrada sem dono não fica visível pra equipe inteira pra sempre, só pro gestor. Grupo —
+      // lista de visibilidade vazia (padrão) mostra pra todo mundo, senão só quem tá na lista
+      // (ver groupVisibleToIds, configurado pelo cabeçalho do chat do grupo).
       ...(isManager ? {} : {
         OR: [
-          { assignedToId: userId },
-          ...(unassignedVisible ? [{ assignedToId: null, status: { not: "FINALIZADO" as const } }] : []),
+          {
+            isGroup: false,
+            OR: [
+              { assignedToId: userId },
+              ...(unassignedVisible ? [{ assignedToId: null, status: { not: "FINALIZADO" as const } }] : []),
+            ],
+          },
+          { isGroup: true, OR: [{ groupVisibleToIds: { isEmpty: true } }, { groupVisibleToIds: { has: userId } }] },
         ],
       }),
     },

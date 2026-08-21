@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import {
-  MessageCircle, Search, X, Lock, Unlock, Bot, User, UserPlus, Users,
+  MessageCircle, Search, X, Lock, Unlock, Bot, User, UserPlus, Users, Eye,
   FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap, StickyNote, ArrowRightLeft, HandCoins, CalendarClock, ListFilter, Instagram, ArrowLeft,
   Reply, Forward, ChevronDown, Package, ImageOff, Pin, Download, Maximize2,
 } from "lucide-react";
@@ -31,6 +31,7 @@ type ConversationSummary = {
   unreadCount: number;
   pinned: boolean;
   isGroup: boolean;
+  groupVisibleToIds: string[];
 };
 
 type Attendant = { id: string; name: string; isManager: boolean };
@@ -153,6 +154,7 @@ type ConversationDetail = {
   opportunities: Opportunity[];
   messages: Message[];
   isGroup: boolean;
+  groupVisibleToIds: string[];
 };
 
 type ChatTheme = "dark" | "light";
@@ -441,6 +443,9 @@ export function WhatsappInbox({
   const [productSearch, setProductSearch] = useState("");
   const [showOpportunities, setShowOpportunities] = useState(false);
   const [showScheduled, setShowScheduled] = useState(false);
+  // Quem vê esse grupo (só gestor, só conversa de grupo)
+  const [showGroupVisibility, setShowGroupVisibility] = useState(false);
+  const [savingGroupVisibility, setSavingGroupVisibility] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<ConversationFilters>(EMPTY_FILTERS);
   // Novo atendimento: busca rápida nos contatos do próprio atendente + iniciar com número novo
@@ -519,6 +524,7 @@ export function WhatsappInbox({
           unreadCount: c.unreadCount ?? 0,
           pinned: Boolean(c.pinned),
           isGroup: Boolean(c.isGroup),
+          groupVisibleToIds: c.groupVisibleToIds ?? [],
         }));
         // Só re-renderiza a lista se algo realmente mudou
         const fp = JSON.stringify(next.map((c: any) => [
@@ -616,6 +622,24 @@ export function WhatsappInbox({
       body: JSON.stringify({ pinned: !pinned }),
     });
     refreshList();
+  }
+
+  async function handleToggleGroupVisibility(profileId: string) {
+    if (!detail || savingGroupVisibility) return;
+    const atual = detail.groupVisibleToIds;
+    const proxima = atual.includes(profileId) ? atual.filter(id => id !== profileId) : [...atual, profileId];
+    setSavingGroupVisibility(true);
+    try {
+      const res = await fetch(`/api/ferramentas/whatsapp/conversas/${detail.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ groupVisibleToIds: proxima }),
+      });
+      if (!res.ok) { const data = await res.json().catch(() => ({})); alert(data.error ?? "Não foi possível salvar."); return; }
+      setDetail(d => (d ? { ...d, groupVisibleToIds: proxima } : d));
+    } finally {
+      setSavingGroupVisibility(false);
+    }
   }
 
   async function refreshDetail(id: string, isPoll = false) {
@@ -1368,6 +1392,45 @@ export function WhatsappInbox({
                   </div>
                   </div>
                   <div className="flex items-center gap-0.5 md:gap-1.5 flex-nowrap flex-shrink-0">
+                    {detail.isGroup && isManager && (
+                      <div className="relative">
+                        <button
+                          onClick={() => setShowGroupVisibility(s => !s)}
+                          title="Quem vê esse grupo"
+                          className={`p-2 rounded-lg ${detail.groupVisibleToIds.length > 0 ? "bg-blue-600 text-white" : `${t.toggleInactive} hover:bg-black/10`}`}
+                        >
+                          <Eye size={16} />
+                        </button>
+                        {showGroupVisibility && (
+                          <>
+                            <div className="fixed inset-0 z-10" onClick={() => setShowGroupVisibility(false)} />
+                            <div className={`absolute z-20 top-10 right-0 w-56 rounded-xl border shadow-xl p-3 space-y-2 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}>
+                              <p className="text-xs font-semibold">Quem vê esse grupo</p>
+                              <p className={`text-[11px] ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
+                                Ninguém marcado = visível pra equipe inteira.
+                              </p>
+                              <div className="space-y-1 max-h-48 overflow-y-auto">
+                                {attendants.filter(a => !a.isManager).map(a => (
+                                  <label key={a.id} className="flex items-center gap-2 text-xs cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={detail.groupVisibleToIds.includes(a.id)}
+                                      onChange={() => handleToggleGroupVisibility(a.id)}
+                                      disabled={savingGroupVisibility}
+                                      className="rounded"
+                                    />
+                                    {a.name}
+                                  </label>
+                                ))}
+                                {attendants.filter(a => !a.isManager).length === 0 && (
+                                  <p className="text-xs text-gray-500">Nenhum atendente na equipe ainda.</p>
+                                )}
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
                     <div className="relative">
                       <button
                         onClick={() => setShowOpportunities(s => !s)}
