@@ -764,7 +764,10 @@ export function WhatsappInbox({
   }
 
   function handleSelectQuickReply(content: string) {
-    setInput(content);
+    // Mesmo token {nome} usado em campanhas/cobrança (ver app/api/cron/campanhas/route.ts) —
+    // troca pelo primeiro nome do contato da conversa aberta.
+    const primeiroNome = (detail?.contactName || "").trim().split(" ")[0] || "";
+    setInput(content.replaceAll("{nome}", primeiroNome));
     setShowQuickReplies(false);
   }
 
