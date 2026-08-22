@@ -46,7 +46,7 @@ export default async function CrmInicioPage() {
   });
 
   return (
-    <div className="min-h-full bg-gray-950 text-white p-4 md:p-6 overflow-y-auto h-full flex items-center justify-center">
+    <div className="min-h-full bg-gradient-to-br from-blue-50 via-white to-blue-50 text-gray-900 p-4 md:p-6 overflow-y-auto h-full flex items-center justify-center">
       <div className="max-w-2xl w-full py-6">
         <GettingStartedChecklist steps={checklist} name={firstName} dismissHref="/crm/hub" />
       </div>

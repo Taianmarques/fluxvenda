@@ -24,28 +24,28 @@ export function GettingStartedChecklist({ steps, name, dismissHref }: { steps: C
   }
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 md:p-6 space-y-5">
+    <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-5 md:p-6 space-y-5">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h2 className="text-lg md:text-xl font-bold">
+          <h2 className="text-lg md:text-xl font-bold text-gray-900">
             {allDone ? `Tudo pronto, ${name}!` : `Seu CRM está pronto, ${name}`}
           </h2>
-          <p className="text-sm text-gray-400 mt-0.5">
+          <p className="text-sm text-gray-500 mt-0.5">
             {allDone
               ? "Você concluiu os primeiros passos — a operação já está no ar."
               : "Use estes passos pra transformar a conta nova em uma operação pronta pra atender e vender."}
           </p>
         </div>
         {allDone && (
-          <button onClick={handleDismiss} className="text-xs text-gray-500 hover:text-gray-300 transition-colors flex-shrink-0">
+          <button onClick={handleDismiss} className="text-xs text-gray-400 hover:text-gray-700 transition-colors flex-shrink-0">
             Dispensar
           </button>
         )}
       </div>
 
       <div className="space-y-1.5">
-        <p className="text-xs text-gray-500">{doneCount} de {steps.length} concluídos</p>
-        <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+        <p className="text-xs text-gray-400">{doneCount} de {steps.length} concluídos</p>
+        <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
           <div
             className="h-full bg-blue-500 rounded-full transition-all"
             style={{ width: `${(doneCount / steps.length) * 100}%` }}
@@ -57,22 +57,22 @@ export function GettingStartedChecklist({ steps, name, dismissHref }: { steps: C
         {steps.map(step => {
           const open = openKey === step.key;
           return (
-            <div key={step.key} className="border border-gray-800 rounded-xl overflow-hidden">
+            <div key={step.key} className="border border-gray-200 rounded-xl overflow-hidden">
               <button
                 onClick={() => setOpenKey(open ? null : step.key)}
-                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
+                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
               >
                 {step.done
-                  ? <CheckCircle2 size={20} className="text-green-500 flex-shrink-0" />
-                  : <Circle size={20} className="text-gray-600 flex-shrink-0" />}
-                <span className={`text-sm font-medium flex-1 ${step.done ? "text-gray-400 line-through" : "text-white"}`}>
+                  ? <CheckCircle2 size={20} className="text-green-600 flex-shrink-0" />
+                  : <Circle size={20} className="text-gray-300 flex-shrink-0" />}
+                <span className={`text-sm font-medium flex-1 ${step.done ? "text-gray-400 line-through" : "text-gray-900"}`}>
                   {step.label}
                 </span>
-                <ChevronDown size={16} className={`text-gray-500 transition-transform flex-shrink-0 ${open ? "rotate-180" : ""}`} />
+                <ChevronDown size={16} className={`text-gray-400 transition-transform flex-shrink-0 ${open ? "rotate-180" : ""}`} />
               </button>
               {open && (
                 <div className="px-4 pb-4 pl-11 space-y-3">
-                  <p className="text-sm text-gray-400">{step.description}</p>
+                  <p className="text-sm text-gray-500">{step.description}</p>
                   <Link
                     href={step.href}
                     className="inline-block bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-2 text-sm font-medium transition-colors"
