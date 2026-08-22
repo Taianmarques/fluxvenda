@@ -228,7 +228,9 @@ function OnboardingForm({ variant, teamName, memberDestino, memberRole }: { vari
   // ── STEP: gestor — dados da empresa ─────────────────────────────────────
   if (step === "company") {
     const subsegments = segment ? (SUBSEGMENTS[segment] ?? []) : [];
-    const canNext = companyName.trim() && segment && subsegment && teamSize;
+    // CRM: fluxo enxuto, sem categoria dentro do segmento nem escolha de produto
+    // (quem chega por aqui já contratou CRM — não tem o que escolher).
+    const canNext = companyName.trim() && segment && teamSize && (variant === "crm" || subsegment);
     const copy = COMPANY_COPY[variant === "membro" ? "generic" : variant];
 
     return (
@@ -305,7 +307,7 @@ function OnboardingForm({ variant, teamName, memberDestino, memberRole }: { vari
               </div>
             </div>
 
-            {segment && subsegments.length > 0 && (
+            {variant !== "crm" && segment && subsegments.length > 0 && (
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-300">Categoria dentro de {segment} *</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -331,11 +333,11 @@ function OnboardingForm({ variant, teamName, memberDestino, memberRole }: { vari
               </div>
             </div>
 
-            {segment && subsegment && businessModel && (
+            {segment && businessModel && (variant === "crm" || subsegment) && (
               <div className="bg-blue-950/20 border border-blue-800/50 rounded-xl p-4 space-y-1">
                 <p className="text-xs font-semibold text-blue-400 uppercase tracking-wider">Perfil da empresa</p>
                 <p className="text-sm text-gray-200">
-                  <span className="font-semibold">{businessModel}</span> • {segment} / {subsegment}
+                  <span className="font-semibold">{businessModel}</span> • {segment}{subsegment ? ` / ${subsegment}` : ""}
                 </p>
                 <p className="text-xs text-gray-500">O diagnóstico e os treinamentos serão personalizados para este perfil.</p>
               </div>
