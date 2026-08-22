@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 
 export function SignUpForm({ redirectUrl }: { redirectUrl: string }) {
@@ -37,6 +38,7 @@ export function SignUpForm({ redirectUrl }: { redirectUrl: string }) {
     <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center px-4">
       <form onSubmit={submit} className="w-full max-w-sm space-y-6">
         <div className="text-center space-y-2">
+          <Image src="/logoflux.png" alt="FluxVenda" width={200} height={50} className="mx-auto" priority />
           <h1 className="text-2xl font-bold">Criar conta</h1>
           <p className="text-gray-400 text-sm">Comece a usar a FluxVenda</p>
         </div>

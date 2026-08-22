@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 
 export default function EsqueciSenhaPage() {
@@ -24,6 +25,7 @@ export default function EsqueciSenhaPage() {
     <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center space-y-2">
+          <Image src="/logoflux.png" alt="FluxVenda" width={200} height={50} className="mx-auto" priority />
           <h1 className="text-2xl font-bold">Esqueci minha senha</h1>
           <p className="text-gray-400 text-sm">Informe seu e-mail pra receber o link de redefinição</p>
         </div>
