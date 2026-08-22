@@ -81,9 +81,6 @@ function OnboardingForm({ variant, teamName, memberDestino, memberRole }: { vari
   const [vendSegment, setVendSegment] = useState("");
   const [inviteCode, setInviteCode] = useState("");
 
-  // Compartilhado
-  const [phone, setPhone] = useState("");
-
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -101,7 +98,6 @@ function OnboardingForm({ variant, teamName, memberDestino, memberRole }: { vari
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           role,
-          phone:         phone.trim() || undefined,
           companyName:   role === "GESTOR" ? companyName.trim() : undefined,
           businessModel: role === "GESTOR" ? businessModel : undefined,
           segment:       role === "GESTOR" ? segment : role === "VENDEDOR" ? vendSegment : undefined,
@@ -134,7 +130,7 @@ function OnboardingForm({ variant, teamName, memberDestino, memberRole }: { vari
     }
   }
 
-  // ── STEP: membro convidado (já entrou na equipe pelo link) — só o WhatsApp ─
+  // ── STEP: membro convidado (já entrou na equipe pelo link) — só confirmar ─
   if (step === "membro") {
     return (
       <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center px-4">
@@ -146,18 +142,6 @@ function OnboardingForm({ variant, teamName, memberDestino, memberRole }: { vari
           </div>
 
           <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4">
-            <div>
-              <label className="text-sm text-gray-400 block mb-1.5">Seu WhatsApp (com DDD)</label>
-              <input
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
-                placeholder="(11) 99999-9999"
-                inputMode="tel"
-                className="w-full bg-gray-950 border border-gray-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500"
-              />
-              <p className="text-xs text-gray-500 mt-1.5">Opcional — usado pra avisos da equipe.</p>
-            </div>
-
             {error && <p className="text-red-400 text-sm">{error}</p>}
 
             <button
@@ -347,14 +331,6 @@ function OnboardingForm({ variant, teamName, memberDestino, memberRole }: { vari
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300">WhatsApp <span className="text-gray-500">(opcional)</span></label>
-              <input value={phone} onChange={e => setPhone(e.target.value)}
-                placeholder="(11) 99999-9999" type="tel"
-                className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors" />
-              <p className="text-xs text-gray-500">Você receberá uma mensagem de boas-vindas no WhatsApp.</p>
-            </div>
-
             {segment && subsegment && businessModel && (
               <div className="bg-blue-950/20 border border-blue-800/50 rounded-xl p-4 space-y-1">
                 <p className="text-xs font-semibold text-blue-400 uppercase tracking-wider">Perfil da empresa</p>
@@ -417,14 +393,6 @@ function OnboardingForm({ variant, teamName, memberDestino, memberRole }: { vari
               <p className="text-xs text-gray-500">Se não tiver agora, pode entrar em uma equipe depois pelo link do seu gestor.</p>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300">WhatsApp <span className="text-gray-500">(opcional)</span></label>
-              <input value={phone} onChange={e => setPhone(e.target.value)}
-                placeholder="(11) 99999-9999" type="tel"
-                className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500 transition-colors" />
-              <p className="text-xs text-gray-500">Você receberá uma mensagem de boas-vindas no WhatsApp.</p>
-            </div>
-
             {error && <p className="text-red-400 text-sm">{error}</p>}
 
             <button onClick={submit} disabled={!canNext || saving}
@@ -464,14 +432,6 @@ function OnboardingForm({ variant, teamName, memberDestino, memberRole }: { vari
                 placeholder="Cole o código que seu gestor te enviou"
                 className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 transition-colors font-mono text-sm" />
               <p className="text-xs text-gray-500">Peça o código de acesso para o responsável pela sua equipe.</p>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300">WhatsApp <span className="text-gray-500">(opcional)</span></label>
-              <input value={phone} onChange={e => setPhone(e.target.value)}
-                placeholder="(11) 99999-9999" type="tel"
-                className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 transition-colors" />
-              <p className="text-xs text-gray-500">Você receberá uma mensagem de boas-vindas no WhatsApp.</p>
             </div>
 
             {error && <p className="text-red-400 text-sm">{error}</p>}

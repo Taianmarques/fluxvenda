@@ -67,6 +67,23 @@ model Profile {
   opportunityTasks OpportunityTask[]
 }
 
+// Cadastro "em espera" enquanto o código de verificação do WhatsApp não é
+// confirmado — o Profile só é criado de verdade em /api/auth/cadastro/verificar.
+// Evita conta com número de WhatsApp falso/de terceiro na base.
+model PendingSignup {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+
+  name          String
+  email         String   @unique
+  passwordHash  String
+  phone         String
+
+  code          String
+  codeExpiresAt DateTime
+  attempts      Int      @default(0)
+}
+
 enum Role {
   VENDEDOR
   FUNCIONARIO

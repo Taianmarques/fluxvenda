@@ -267,3 +267,7 @@ export function buildWelcomeMessage(name: string, role: "GESTOR" | "VENDEDOR" | 
     `Seu perfil de vendedor foi criado. Acesse seu dashboard e comece os treinamentos personalizados para o seu segmento. 🎯`,
   ].join("\n");
 }
+
+export function buildOtpMessage(code: string): string {
+  return `Seu código de verificação FluxVenda é *${code}*.\n\nVálido por 10 minutos. Não compartilhe esse código com ninguém.`;
+}

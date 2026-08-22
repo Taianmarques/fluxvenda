@@ -7,7 +7,6 @@ import { sendWhatsAppText, buildWelcomeMessage } from "@/lib/whatsapp";
 
 const schema = z.object({
   role: z.enum(["VENDEDOR", "FUNCIONARIO", "GESTOR"]),
-  phone: z.string().optional(),
   // gestor
   companyName:   z.string().optional(),
   businessModel: z.enum(["B2B", "B2C"]).optional(),
@@ -27,13 +26,13 @@ export async function POST(req: NextRequest) {
     const body = schema.safeParse(await req.json());
     if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
 
-    const { role, phone, companyName, businessModel, segment, subsegment, teamSize, products, inviteCode } = body.data;
+    const { role, companyName, businessModel, segment, subsegment, teamSize, products, inviteCode } = body.data;
 
-    // Profile já existe desde o cadastro (nome/e-mail definidos lá) — onboarding só
-    // completa role/segmento/telefone e marca como onboarded.
+    // Profile já existe desde o cadastro (nome/e-mail/telefone verificado por WhatsApp
+    // definidos lá) — onboarding só completa role/segmento e marca como onboarded.
     const profile = await prisma.profile.update({
       where: { id: userId },
-      data: { role, segment, onboarded: true, ...(phone && { phone }) },
+      data: { role, segment, onboarded: true },
     });
     const name = profile.name;
 
@@ -84,10 +83,10 @@ export async function POST(req: NextRequest) {
     // usuário continuaria "preso" nas regras da sessão antiga até logar de novo.
     await updateSession({ role, onboarded: true });
 
-    // Dispara WhatsApp de boas-vindas em background
-    if (phone) {
+    // Dispara WhatsApp de boas-vindas em background — telefone já verificado no cadastro
+    if (profile.phone) {
       const message = buildWelcomeMessage(name, role, companyName);
-      sendWhatsAppText(phone, message).catch(() => {});
+      sendWhatsAppText(profile.phone, message).catch(() => {});
     }
 
     return NextResponse.json({ ok: true, teamJoined });
