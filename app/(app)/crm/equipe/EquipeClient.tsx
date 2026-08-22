@@ -32,6 +32,15 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
   const [copied, setCopied] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
 
+  // Adicionar membro direto (sem link de convite)
+  const [showAdicionar, setShowAdicionar] = useState(false);
+  const [novoNome, setNovoNome] = useState("");
+  const [novoEmail, setNovoEmail] = useState("");
+  const [novoTelefone, setNovoTelefone] = useState("");
+  const [salvandoMembro, setSalvandoMembro] = useState(false);
+  const [erroMembro, setErroMembro] = useState("");
+  const [sucessoMembro, setSucessoMembro] = useState("");
+
   // Departamentos
   const [showNovoDep, setShowNovoDep] = useState(false);
   const [depNome, setDepNome] = useState("");
@@ -141,6 +150,34 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
   }
 
+  async function handleAdicionarMembro() {
+    if (!novoNome.trim() || !novoEmail.trim()) return;
+    setSalvandoMembro(true);
+    setErroMembro("");
+    setSucessoMembro("");
+    try {
+      const res = await fetch("/api/equipe/membros", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: novoNome.trim(), email: novoEmail.trim(), phone: novoTelefone.trim() || undefined }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErroMembro(data.error ?? "Não foi possível adicionar o membro.");
+        return;
+      }
+      setSucessoMembro(
+        data.needsPassword
+          ? `${novoNome.trim()} foi adicionado(a) — mandamos um e-mail pra definir a senha.`
+          : `${novoNome.trim()} foi adicionado(a) à equipe.`
+      );
+      setNovoNome(""); setNovoEmail(""); setNovoTelefone("");
+      router.refresh();
+    } finally {
+      setSalvandoMembro(false);
+    }
+  }
+
   async function handleRemove(m: Membro) {
     if (!confirm(`Remover ${m.name} da equipe? As conversas atribuídas a essa pessoa voltam para "sem atendente".`)) return;
     setRemoving(m.memberId);
@@ -165,34 +202,91 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
           </p>
         </div>
 
-        {/* Convite (só gestor) */}
-        {isManager && inviteLink && (
-          <div className="bg-gray-900 border border-blue-800/40 rounded-2xl p-5 space-y-3">
+        {/* Adicionar usuário (só gestor) — por link de convite ou direto */}
+        {isManager && (
+          <div className="bg-gray-900 border border-blue-800/40 rounded-2xl p-5 space-y-4">
             <div>
               <p className="font-semibold text-sm text-blue-300">Adicionar usuário</p>
               <p className="text-xs text-gray-500 mt-0.5">
-                Envie o link — a pessoa cria a conta e entra automaticamente na equipe como atendente.
+                Envie o link de convite, ou cadastre a pessoa direto — sem precisar de convite.
               </p>
             </div>
-            <div className="flex items-center gap-2 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2.5">
-              <code className="flex-1 text-xs text-gray-300 truncate">{inviteLink}</code>
-            </div>
-            <div className="flex gap-2 flex-wrap">
+
+            <div className="flex gap-1.5 border-b border-gray-800 -mb-1">
               <button
-                onClick={copyLink}
-                className="flex items-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-2 transition-colors"
+                onClick={() => setShowAdicionar(false)}
+                className={`text-sm font-medium px-3 py-2 border-b-2 transition-colors ${!showAdicionar ? "text-white border-blue-500" : "text-gray-500 border-transparent hover:text-gray-300"}`}
               >
-                {copied ? <Check size={14} /> : <Copy size={14} />}
-                {copied ? "Copiado!" : "Copiar link"}
+                Link de convite
               </button>
               <button
-                onClick={shareWhatsApp}
-                className="flex items-center gap-1.5 text-sm font-medium text-green-400 hover:text-green-300 border border-green-800/50 hover:border-green-600/50 rounded-xl px-4 py-2 transition-colors"
+                onClick={() => setShowAdicionar(true)}
+                className={`text-sm font-medium px-3 py-2 border-b-2 transition-colors ${showAdicionar ? "text-white border-blue-500" : "text-gray-500 border-transparent hover:text-gray-300"}`}
               >
-                <MessageCircle size={14} />
-                Enviar pelo WhatsApp
+                Adicionar direto
               </button>
             </div>
+
+            {!showAdicionar ? (
+              inviteLink && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2.5">
+                    <code className="flex-1 text-xs text-gray-300 truncate">{inviteLink}</code>
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    <button
+                      onClick={copyLink}
+                      className="flex items-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-2 transition-colors"
+                    >
+                      {copied ? <Check size={14} /> : <Copy size={14} />}
+                      {copied ? "Copiado!" : "Copiar link"}
+                    </button>
+                    <button
+                      onClick={shareWhatsApp}
+                      className="flex items-center gap-1.5 text-sm font-medium text-green-400 hover:text-green-300 border border-green-800/50 hover:border-green-600/50 rounded-xl px-4 py-2 transition-colors"
+                    >
+                      <MessageCircle size={14} />
+                      Enviar pelo WhatsApp
+                    </button>
+                  </div>
+                </div>
+              )
+            ) : (
+              <div className="space-y-2.5">
+                <input
+                  value={novoNome}
+                  onChange={e => setNovoNome(e.target.value)}
+                  placeholder="Nome"
+                  className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm"
+                />
+                <input
+                  value={novoEmail}
+                  onChange={e => setNovoEmail(e.target.value)}
+                  placeholder="E-mail"
+                  type="email"
+                  className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm"
+                />
+                <input
+                  value={novoTelefone}
+                  onChange={e => setNovoTelefone(e.target.value)}
+                  placeholder="WhatsApp (opcional)"
+                  type="tel"
+                  className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm"
+                />
+                {erroMembro && <p className="text-xs text-red-400">{erroMembro}</p>}
+                {sucessoMembro && <p className="text-xs text-green-400">{sucessoMembro}</p>}
+                <button
+                  onClick={handleAdicionarMembro}
+                  disabled={salvandoMembro || !novoNome.trim() || !novoEmail.trim()}
+                  className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-4 py-2 text-sm font-medium"
+                >
+                  {salvandoMembro ? "Adicionando..." : "Adicionar à equipe"}
+                </button>
+                <p className="text-xs text-gray-600">
+                  A pessoa entra direto na equipe como atendente e recebe um e-mail pra definir a senha (ou só um aviso, se já tiver conta).
+                </p>
+              </div>
+            )}
           </div>
         )}
 

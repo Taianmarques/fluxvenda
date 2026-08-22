@@ -31,6 +31,30 @@ export async function sendVerificationEmail(to: string, name: string, token: str
   );
 }
 
+// Gestor adicionou a pessoa direto na equipe (sem passar pelo link de convite). Com token
+// pede pra definir a primeira senha; sem token (conta já tinha senha) só avisa e manda pro login.
+export async function sendTeamMemberAddedEmail(to: string, name: string, teamName: string, token: string | null): Promise<boolean> {
+  if (token) {
+    const url = `${APP_URL}/redefinir-senha?token=${token}`;
+    return send(
+      to,
+      `Você foi adicionado à equipe ${teamName} — FluxVenda`,
+      `<p>Olá, ${name}!</p>
+       <p>Você foi adicionado(a) à equipe <strong>${teamName}</strong> no FluxVenda. Defina sua senha pra acessar o CRM:</p>
+       <p><a href="${url}">${url}</a></p>
+       <p>Esse link expira em 1 hora. Se precisar de um novo, use "esqueci minha senha" na tela de login com este e-mail.</p>`
+    );
+  }
+  const url = `${APP_URL}/sign-in`;
+  return send(
+    to,
+    `Você foi adicionado à equipe ${teamName} — FluxVenda`,
+    `<p>Olá, ${name}!</p>
+     <p>Você foi adicionado(a) à equipe <strong>${teamName}</strong> no FluxVenda. Faça login normalmente com sua senha de sempre:</p>
+     <p><a href="${url}">${url}</a></p>`
+  );
+}
+
 export async function sendPasswordResetEmail(to: string, name: string, token: string, isMigration = false): Promise<boolean> {
   const url = `${APP_URL}/redefinir-senha?token=${token}`;
   const intro = isMigration
