@@ -66,7 +66,7 @@ export function HubClient({ agents, isManager }: { agents: HubAgent[]; isManager
       nome: "Agente de Atendimento",
       desc: "Responde clientes 24/7 no WhatsApp e Instagram com o conhecimento da empresa: tira dúvidas, qualifica leads e conduz a conversa até a venda.",
       icon: Headset,
-      configHref: `/ferramentas/whatsapp/${agent.id}`,
+      configHref: `/crm/${agent.id}/configurar`,
       metrica: `${agent.metricas.conversas7d} conversas em 7 dias`,
     },
     {

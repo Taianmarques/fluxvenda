@@ -6,7 +6,7 @@ import { LayoutGrid, ArrowLeft, Plus } from "lucide-react";
 import { listMyAgentConfigs } from "@/lib/team";
 import { getInstanceStatus } from "@/lib/whatsapp";
 import { HubClient, type HubAgent } from "./HubClient";
-import { NovoAgenteCard } from "../../ferramentas/NovoAgenteCard";
+import { NovoAgenteCard } from "./NovoAgenteCard";
 
 // Hub de agentes de IA: catálogo dos "funcionários virtuais" da empresa —
 // o que cada um faz, status e ativação com um clique.

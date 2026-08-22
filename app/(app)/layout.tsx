@@ -49,7 +49,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     ] : []),
     { href: "/crm",         label: "CRM",         icon: "crm" as const, show: isTeamMember, locked: !hasCrm },
     { href: "/creditos",    label: "Créditos de IA", icon: "creditos" as const, show: isGestor, locked: false },
-    { href: "/ferramentas", label: "Ferramentas", icon: "ferramentas" as const, show: isGestor, locked: !hasCrm },
     { href: "/admin",       label: "Super Admin", icon: "admin" as const, show: isAdmin, locked: false },
     ...(hasPlataforma ? [] : [
       { href: "/produtos/plataforma", label: "Plataforma B2B", icon: "plataforma" as const, show: true, locked: true },

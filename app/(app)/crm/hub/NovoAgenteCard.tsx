@@ -27,7 +27,7 @@ export function NovoAgenteCard() {
       });
       if (!res.ok) throw new Error();
       const data = await res.json();
-      router.push(`/ferramentas/whatsapp/${data.config.id}`);
+      router.push(`/crm/${data.config.id}/configurar`);
     } catch {
       setError("Não foi possível criar o agente. Tente novamente.");
       setSaving(false);

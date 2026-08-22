@@ -6,7 +6,7 @@ import { useState } from "react";
 import { UserMenu } from "./UserMenu";
 import {
   LayoutDashboard, ScanSearch, Target, Gamepad2, BookOpen, MessageSquare,
-  PenTool, BookText, Trophy, Users, Headset, Wrench, ShieldCheck, Menu, X, Coins, Lock, GraduationCap,
+  PenTool, BookText, Trophy, Users, Headset, ShieldCheck, Menu, X, Coins, Lock, GraduationCap,
 } from "lucide-react";
 
 const ICONS = {
@@ -21,7 +21,6 @@ const ICONS = {
   ranking: Trophy,
   equipe: Users,
   crm: Headset,
-  ferramentas: Wrench,
   admin: ShieldCheck,
   creditos: Coins,
   plataforma: GraduationCap,

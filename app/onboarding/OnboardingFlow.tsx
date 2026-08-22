@@ -121,8 +121,10 @@ function OnboardingForm({ variant, teamName, memberDestino, memberRole }: { vari
         // Convidado: já é membro da equipe — cai direto no produto dela (CRM ou dashboard)
         router.push(memberDestino ?? "/dashboard");
       } else if (role === "GESTOR") {
-        // Time sem Plataforma (só CRM) não tem acesso a /gestor — manda pra configuração do agente
-        router.push(products.has("PLATAFORMA") ? "/gestor" : "/ferramentas");
+        // Time sem Plataforma (só CRM) não tem acesso a /gestor — cai direto no CRM (que
+        // manda pro Hub de agentes quando ainda não tem nenhum criado), sem passar pela
+        // casca da Plataforma.
+        router.push(products.has("PLATAFORMA") ? "/gestor" : "/crm");
       } else {
         router.push("/dashboard");
       }

@@ -981,7 +981,7 @@ export function ComercioClient({
                 <p className="text-xs text-gray-500">
                   A IA identifica o veículo de interesse, qualifica o cliente (pagamento à vista/financiado, troca, urgência), coleta os documentos pra simulação de financiamento quando for o caso, e transfere pro vendedor.
                   Quem recebe a conversa depende do modo de distribuição já configurado em{" "}
-                  <Link href={`/ferramentas/whatsapp/${agentId}`} className="text-blue-400 hover:text-blue-300 underline">Ferramentas → Distribuição</Link>.
+                  <Link href={`/crm/${agentId}/configurar`} className="text-blue-400 hover:text-blue-300 underline">Configurar agente → Distribuição</Link>.
                   A etapa de agendar visita só aparece se o Agendamento também estiver ativado pro agente.
                 </p>
                 {prevendaVeiculoEnabled && (

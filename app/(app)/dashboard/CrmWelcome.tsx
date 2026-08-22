@@ -19,7 +19,7 @@ export function CrmWelcome({ firstName, agentCount }: { firstName: string; agent
             </p>
           </div>
           <Link
-            href="/ferramentas"
+            href="/crm/hub"
             className="inline-flex items-center gap-2 px-8 py-3.5 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-lg transition-colors"
           >
             <Wrench size={18} /> Criar meu primeiro agente
@@ -58,17 +58,6 @@ export function CrmWelcome({ firstName, agentCount }: { firstName: string; agent
           <div>
             <p className="font-semibold flex items-center gap-1">Hub de agentes <ArrowRight size={14} className="text-gray-600" /></p>
             <p className="text-sm text-gray-500 mt-0.5">Acompanhe métricas e ligue/desligue cada agente.</p>
-          </div>
-        </Link>
-
-        <Link
-          href="/ferramentas"
-          className="flex flex-col gap-3 p-6 bg-gray-900 border border-gray-800 hover:border-purple-700 rounded-2xl transition-colors"
-        >
-          <span className="w-11 h-11 rounded-xl bg-purple-900/40 text-purple-400 flex items-center justify-center"><Wrench size={20} /></span>
-          <div>
-            <p className="font-semibold flex items-center gap-1">Ferramentas <ArrowRight size={14} className="text-gray-600" /></p>
-            <p className="text-sm text-gray-500 mt-0.5">Crie um novo agente ou ajuste a configuração.</p>
           </div>
         </Link>
       </div>
