@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { auth } from "@/lib/auth/server";
+import { updateSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { sendWhatsAppText, buildWelcomeMessage } from "@/lib/whatsapp";
 
 const schema = z.object({
   role: z.enum(["VENDEDOR", "FUNCIONARIO", "GESTOR"]),
-  name: z.string().optional(),
-  email: z.string().optional(),
   phone: z.string().optional(),
   // gestor
   companyName:   z.string().optional(),
@@ -28,22 +27,15 @@ export async function POST(req: NextRequest) {
     const body = schema.safeParse(await req.json());
     if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
 
-    const { role, name, email, phone, companyName, businessModel, segment, subsegment, teamSize, products, inviteCode } = body.data;
+    const { role, phone, companyName, businessModel, segment, subsegment, teamSize, products, inviteCode } = body.data;
 
-    // Cria ou atualiza o perfil
-    await prisma.profile.upsert({
+    // Profile já existe desde o cadastro (nome/e-mail definidos lá) — onboarding só
+    // completa role/segmento/telefone e marca como onboarded.
+    const profile = await prisma.profile.update({
       where: { id: userId },
-      update: { role, segment, onboarded: true, ...(name && { name }), ...(email && { email }), ...(phone && { phone }) },
-      create: {
-        id: userId,
-        email: email ?? `${userId}@placeholder.com`,
-        name: name ?? "Usuário",
-        role,
-        segment,
-        onboarded: true,
-        ...(phone && { phone }),
-      },
+      data: { role, segment, onboarded: true, ...(phone && { phone }) },
     });
+    const name = profile.name;
 
     let teamJoined = false;
 
@@ -88,13 +80,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Atualiza metadados do Clerk em background (não bloqueia)
-    updateClerkMetadata(userId, role).catch(() => {});
+    // Reemite o cookie de sessão já com role/onboarded atualizados — sem isso o
+    // usuário continuaria "preso" nas regras da sessão antiga até logar de novo.
+    await updateSession({ role, onboarded: true });
 
     // Dispara WhatsApp de boas-vindas em background
     if (phone) {
-      const displayName = name ?? "Usuário";
-      const message = buildWelcomeMessage(displayName, role, companyName);
+      const message = buildWelcomeMessage(name, role, companyName);
       sendWhatsAppText(phone, message).catch(() => {});
     }
 
@@ -103,12 +95,4 @@ export async function POST(req: NextRequest) {
     console.error("[onboarding]", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
-}
-
-async function updateClerkMetadata(userId: string, role: string) {
-  const { clerkClient } = await import("@clerk/nextjs/server");
-  const client = await clerkClient();
-  await client.users.updateUserMetadata(userId, {
-    publicMetadata: { onboarded: true, role },
-  });
 }

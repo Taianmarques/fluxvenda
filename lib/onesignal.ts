@@ -1,7 +1,7 @@
 const APP_ID = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID;
 const API_KEY = process.env.ONESIGNAL_REST_API_KEY;
 
-// Envia web push via OneSignal pros usuários indicados (external_id = id do Clerk,
+// Envia web push via OneSignal pros usuários indicados (external_id = Profile.id,
 // vinculado no login pelo OneSignalInit). Fire-and-forget: falha nunca quebra o fluxo.
 export async function notifyUsers(userIds: string[], titulo: string, mensagem: string, url?: string): Promise<void> {
   if (!APP_ID || !API_KEY || userIds.length === 0) return;

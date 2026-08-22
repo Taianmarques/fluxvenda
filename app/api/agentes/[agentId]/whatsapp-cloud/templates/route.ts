@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
+import { currentUser } from "@/lib/auth/server";
 import { getAgentConfigAsManager } from "@/lib/team";
 import { listMessageTemplates } from "@/lib/whatsapp-cloud";
 

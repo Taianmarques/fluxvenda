@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
+import { currentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { getAgentConfigWithRole } from "@/lib/team";
 import { makeOutboundCall } from "@/lib/twilio-voice";

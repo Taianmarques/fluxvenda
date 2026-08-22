@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
 import { Link2, XCircle, Building2 } from "lucide-react";
 
 type TeamInfo = { name: string; segment: string; size: string; memberCount: number; managerName: string };
@@ -10,8 +9,17 @@ type TeamInfo = { name: string; segment: string; size: string; memberCount: numb
 export default function EntrarCodigoPage() {
   const { code } = useParams<{ code: string }>();
   const router = useRouter();
-  const { isSignedIn, isLoaded } = useUser();
+  const [isSignedIn, setIsSignedIn] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
   const [team, setTeam] = useState<TeamInfo | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then(r => r.json())
+      .then(d => setIsSignedIn(Boolean(d.signedIn)))
+      .catch(() => {})
+      .finally(() => setIsLoaded(true));
+  }, []);
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState("");

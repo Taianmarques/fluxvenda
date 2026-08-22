@@ -1,4 +1,4 @@
-import { currentUser } from "@clerk/nextjs/server";
+import { currentUser } from "@/lib/auth/server";
 import { redirect } from "next/navigation";
 import { listMyAgentConfigs } from "@/lib/team";
 import { ProductGate } from "../ProductGate";

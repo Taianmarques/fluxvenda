@@ -8,11 +8,11 @@ datasource db {
 }
 
 // ===================================
-// PERFIL E AUTH (Clerk gerencia auth)
+// PERFIL E AUTH (login/senha próprios — ver lib/auth/)
 // ===================================
 
 model Profile {
-  id        String   @id // Clerk user ID
+  id        String   @id @default(cuid())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -23,6 +23,16 @@ model Profile {
   role      Role     @default(VENDEDOR)
   segment   String?
   onboarded Boolean  @default(false)
+
+  // Login próprio — nullable pq contas migradas do Clerk nascem sem senha (ver
+  // lib/auth/password.ts); usuário é direcionado a "esqueci minha senha" nesse caso.
+  passwordHash    String?
+  emailVerifiedAt DateTime?
+
+  emailVerifyToken      String?   @unique
+  emailVerifyExpiresAt  DateTime?
+  passwordResetToken    String?   @unique
+  passwordResetExpiresAt DateTime?
 
   // Assinatura Stripe
   stripeCustomerId     String? @unique

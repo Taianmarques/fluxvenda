@@ -1,15 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useUser } from "@clerk/nextjs";
 import { Link2 } from "lucide-react";
 
 export default function EntrarPage() {
   const router = useRouter();
-  const { isSignedIn } = useUser();
+  const [isSignedIn, setIsSignedIn] = useState(false);
   const [code, setCode] = useState("");
+
+  useEffect(() => {
+    fetch("/api/auth/me").then(r => r.json()).then(d => setIsSignedIn(Boolean(d.signedIn))).catch(() => {});
+  }, []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 

@@ -1,4 +1,4 @@
-import { SignUp } from "@clerk/nextjs";
+import { SignUpForm } from "./SignUpForm";
 
 // ?product=crm|plataforma vem das landing pages dedicadas (app/(marketing)/produtos/crm,
 // app/(marketing)/produtos/plataforma) e manda pro onboarding específico de cada produto.
@@ -11,9 +11,5 @@ export default async function SignUpPage({
   const validProduct = product === "crm" || product === "plataforma" ? product : null;
   const redirectUrl = validProduct ? `/onboarding/${validProduct}` : "/onboarding";
 
-  return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-      <SignUp signInUrl="/sign-in" fallbackRedirectUrl={redirectUrl} />
-    </div>
-  );
+  return <SignUpForm redirectUrl={redirectUrl} />;
 }

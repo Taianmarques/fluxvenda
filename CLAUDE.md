@@ -29,17 +29,19 @@ FluxVenda — B2B SaaS combining a sales training platform (diagnostics, gamific
 - **OpenAI / GPT-4o-mini** (`lib/openai.ts`): WhatsApp agent subsystem — system prompt synthesis (`generateSystemPrompt` in `lib/agent-engine.ts`) and audio transcription (Whisper-1 via `transcribeAudio`).
 
 ### Next.js 16 specifics
-- **Middleware is called `proxy.ts`** (root level), not `middleware.ts`. Clerk auth + role-based route protection lives there.
+- **Middleware is called `proxy.ts`** (root level), not `middleware.ts`. Proxy runs on the **Node.js runtime by default** in Next 16 (not Edge) — auth/role checks live there.
 - `params` in route handlers and page components is a `Promise<{...}>` — always `await params` before destructuring.
 - `NEXT_PUBLIC_*` vars are baked into the client bundle at build time; they cannot be injected at runtime in Docker — pass them as Docker `ARG`s before `npm run build`.
 
 ### Database
-Two separate `DATABASE_URL` / `DIRECT_URL` are required:
-- `DATABASE_URL` → Supabase PgBouncer pooler (used by app at runtime via `lib/prisma.ts` with `@prisma/adapter-pg`).
-- `DIRECT_URL` → direct Supabase connection (used exclusively by Prisma CLI via `prisma.config.ts`; migrations will fail against PgBouncer transaction mode).
+Production runs a **self-hosted PostgreSQL on the VPS** (`localhost:5432`, not reachable from outside the VPS) — migrated off Supabase via `scripts/migrar-banco-vps.sh` for latency (queries dropped from ~180ms to <1ms). `DATABASE_URL` and `DIRECT_URL` both point at the same local instance now (no pooler split needed for a local connection); `lib/prisma.ts` uses `@prisma/adapter-pg`, `prisma.config.ts` reads `DIRECT_URL` for the CLI. Daily backups run at 3am into `/root/backups` (7-day retention) via a cron job the migration script installs. Local dev machines still have stale Supabase URLs in `.env.local` from before the migration — the Supabase project itself may no longer be reachable (likely paused from inactivity); it's kept only as a point-in-time snapshot from the day of the VPS migration, not a live fallback. Deploys run `scripts/atualizar.sh` (`git pull && bash scripts/atualizar.sh`), which applies pending migrations via `prisma migrate deploy` before building.
 
-### Clerk auth + roles
-Role comes from `sessionClaims.publicMetadata.role` (JWT). Roles: `VENDEDOR | FUNCIONARIO | GESTOR | ADMIN`. Database role changes don't take effect until the user's Clerk session refreshes.
+### Auth — login/senha próprios (sem Clerk)
+`lib/auth/` implements the whole stack: `session.ts` (JWT session cookie via `jose`, `fv_session`, 30 days), `dal.ts` (`verifySession`/`getCurrentProfile`, the real source of truth — reads the DB, cached with React `cache`), `server.ts` (a **Clerk-API-compatible shim** — `auth()` → `{ userId }`, `currentUser()` → `{ id, emailAddresses }` — most of the app still calls these two functions unchanged, just importing from `@/lib/auth/server` instead of `@clerk/nextjs/server`), `password.ts` (bcryptjs — not native `bcrypt`, the Alpine Docker image has no build toolchain), `tokens.ts` (email verification / password reset tokens).
+
+Role and `onboarded` live in the JWT payload for `proxy.ts`'s optimistic route gate (`VENDEDOR` blocked from `/gestor`, `/ferramentas`) — same staleness trade-off Clerk had: changes only take effect when the session is reissued (`updateSession()`, called explicitly after `/api/onboarding` writes). Everywhere else (~19+ call sites) reads `Profile.role` straight from the DB, which is always fresh.
+
+`Profile` is the only identity table (no separate `User` model) — `passwordHash` is nullable because accounts migrated from Clerk start without one; `app/api/auth/login` detects this and points them to `/esqueci-senha` instead of "invalid credentials". Roles: `VENDEDOR | FUNCIONARIO | GESTOR | ADMIN`.
 
 ### WhatsApp multi-tenancy
 Two tiers of UazAPI credentials:
@@ -47,11 +49,13 @@ Two tiers of UazAPI credentials:
 2. **Per-team** (`AgentConfig.uazapiInstance` / `AgentConfig.uazapiToken`) — used for all CRM/agent traffic via `sendWhatsAppTextAsTeam` / `sendMediaAsTeam`.
 
 ### Cron routes
-`/api/cron/followup`, `/api/cron/cobranca`, `/api/cron/prospeccao` — public routes (no Clerk) protected by `Authorization: Bearer <CRON_SECRET>`. Must be called by an external scheduler.
+`/api/cron/followup`, `/api/cron/cobranca`, `/api/cron/prospeccao` — public routes (no session cookie) protected by `Authorization: Bearer <CRON_SECRET>`. Must be called by an external scheduler.
 
 ### Key lib files
 | File | Purpose |
 |---|---|
+| `lib/auth/` | Login/session/password — see "Auth" section above |
+| `lib/email.ts` | Resend wrappers: `sendVerificationEmail`, `sendPasswordResetEmail` |
 | `lib/team.ts` | Multi-agent access control: `listMyAgentConfigs`, `getAgentConfigWithRole`, `getAgentConfigAsManager`, `userBelongsToAgentConfig` |
 | `lib/agent-engine.ts` | WhatsApp agent brain: `generateSystemPrompt`, `transcribeAudio`, tool definitions (SCHEDULING_TOOLS, COMMERCE_TOOLS, BILLING_TOOLS, PROSPECTING_TOOLS) |
 | `lib/whatsapp.ts` | UazAPI wrappers for sending text, media, and audio |

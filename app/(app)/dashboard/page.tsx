@@ -1,4 +1,4 @@
-import { currentUser } from "@clerk/nextjs/server";
+import { currentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { getEffectiveProducts, hasProduct } from "@/lib/products";
@@ -15,10 +15,11 @@ export default async function DashboardPage() {
   const products = await getEffectiveProducts(user!.id);
   if (!hasProduct(products, "PLATAFORMA")) {
     const result = await listMyAgentConfigs(user!.id);
+    const name = (await prisma.profile.findUnique({ where: { id: user!.id }, select: { name: true } }))?.name ?? "";
     return (
       <div className="h-full flex flex-col overflow-y-auto">
         <TrialBanner />
-        <CrmWelcome firstName={user?.firstName ?? ""} agentCount={result?.configs.length ?? 0} />
+        <CrmWelcome firstName={name.split(" ")[0] ?? ""} agentCount={result?.configs.length ?? 0} />
       </div>
     );
   }
@@ -52,7 +53,7 @@ export default async function DashboardPage() {
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-8">
       <div>
-        <h1 className="text-2xl font-bold">Olá, {user?.firstName}!</h1>
+        <h1 className="text-2xl font-bold">Olá, {profile?.name.split(" ")[0]}!</h1>
         <p className="text-gray-400 mt-1">Aqui está o seu progresso.</p>
       </div>
 

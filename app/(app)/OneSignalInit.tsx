@@ -8,7 +8,7 @@ declare global {
   }
 }
 
-// Carrega o SDK do OneSignal e vincula o usuário logado (external_id = id do Clerk) —
+// Carrega o SDK do OneSignal e vincula o usuário logado (external_id = Profile.id) —
 // assim o servidor notifica por usuário sem guardar token de push no nosso banco.
 // A permissão de notificação NÃO é pedida aqui: só no clique do botão (NotificationsButton).
 export function OneSignalInit({ userId }: { userId: string }) {

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AlertTriangle, Clock } from "lucide-react";
-import { currentUser } from "@clerk/nextjs/server";
+import { currentUser } from "@/lib/auth/server";
 import { getCrmTrialStatus } from "@/lib/products";
 
 // Contagem regressiva (ou aviso de expirado) do teste grátis de 7 dias do CRM — mostrado

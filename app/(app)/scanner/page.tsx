@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { currentUser } from "@clerk/nextjs/server";
+import { currentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { ProductGate } from "../ProductGate";
 

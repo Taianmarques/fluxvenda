@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { auth } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { anthropic, MODEL } from "@/lib/anthropic";
 import { logTokenUsage, getTeamIdForUser } from "@/lib/token-usage";

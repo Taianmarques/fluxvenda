@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { UserButton } from "@clerk/nextjs";
 import { useState } from "react";
+import { UserMenu } from "./UserMenu";
 import {
   LayoutDashboard, ScanSearch, Target, Gamepad2, BookOpen, MessageSquare,
   PenTool, BookText, Trophy, Users, Headset, Wrench, ShieldCheck, Menu, X, Coins, Lock, GraduationCap,
@@ -84,7 +84,7 @@ export function AppSidebar({
             })}
           </nav>
           <div className="px-4 py-4 border-t border-gray-800 flex items-center gap-3">
-            <UserButton afterSignOutUrl="/" />
+            <UserMenu name={profileName} />
             <div className="min-w-0">
               <p className="text-sm font-medium truncate">{profileName}</p>
               <p className="text-xs text-gray-500 truncate">{email}</p>
@@ -127,7 +127,7 @@ export function AppSidebar({
       </nav>
 
       <div className="px-4 py-4 border-t border-gray-800 flex items-center gap-3">
-        <UserButton afterSignOutUrl="/" />
+        <UserMenu name={profileName} />
         <div className="min-w-0">
           <p className="text-sm font-medium truncate">{profileName}</p>
           <p className="text-xs text-gray-500 truncate">{email}</p>

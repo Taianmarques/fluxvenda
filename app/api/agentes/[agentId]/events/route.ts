@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { auth } from "@/lib/auth/server";
 import { userBelongsToAgentConfig } from "@/lib/team";
 import { subscribeChatEvents } from "@/lib/realtime";
 

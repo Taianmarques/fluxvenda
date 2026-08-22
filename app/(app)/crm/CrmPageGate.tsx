@@ -1,4 +1,4 @@
-import { currentUser } from "@clerk/nextjs/server";
+import { currentUser } from "@/lib/auth/server";
 import { redirect } from "next/navigation";
 import { Lock } from "lucide-react";
 import { hasCrmPageAccess } from "@/lib/crm-access";

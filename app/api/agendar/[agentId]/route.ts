@@ -19,7 +19,7 @@ const schema = z.object({
 });
 
 // Cria o agendamento a partir da página pública — mesma lógica do POST autenticado de
-// app/api/agentes/[agentId]/agendamentos, trocando a auth Clerk pelo gate schedulingEnabled.
+// app/api/agentes/[agentId]/agendamentos, trocando a sessão de usuário pelo gate schedulingEnabled.
 // Com cobrança de sinal ativa, a reserva nasce AGUARDANDO_PAGAMENTO e só confirma via
 // webhook do Asaas (app/api/webhooks/asaas/[agentId]).
 export async function POST(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {

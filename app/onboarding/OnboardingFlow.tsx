@@ -2,7 +2,6 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useClerk, useUser } from "@clerk/nextjs";
 import { SEGMENTS, SUBSEGMENTS } from "@/lib/segments";
 
 const TEAM_SIZES = ["1-5", "6-15", "16-50", "51-200", "200+"];
@@ -44,8 +43,6 @@ export function OnboardingFlow({ variant, ...memberProps }: { variant: Onboardin
 }
 
 function OnboardingForm({ variant, teamName, memberDestino, memberRole }: { variant: OnboardingVariant } & MemberProps) {
-  const { user } = useUser();
-  const { session } = useClerk();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -99,16 +96,11 @@ function OnboardingForm({ variant, teamName, memberDestino, memberRole }: { vari
     setSaving(true);
     setError("");
     try {
-      const name = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "Usuário";
-      const email = user?.emailAddresses[0]?.emailAddress;
-
       const res = await fetch("/api/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           role,
-          name,
-          email,
           phone:         phone.trim() || undefined,
           companyName:   role === "GESTOR" ? companyName.trim() : undefined,
           businessModel: role === "GESTOR" ? businessModel : undefined,
@@ -126,7 +118,6 @@ function OnboardingForm({ variant, teamName, memberDestino, memberRole }: { vari
       }
 
       await res.json();
-      try { await session?.reload(); } catch {}
 
       if (variant === "membro") {
         // Convidado: já é membro da equipe — cai direto no produto dela (CRM ou dashboard)

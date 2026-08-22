@@ -1,50 +1,57 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { decryptSessionToken, SESSION_COOKIE_NAME } from "@/lib/auth/session";
 
-const isPublicRoute = createRouteMatcher([
-  "/",
-  "/produtos(.*)",          // landing pages de CRM e Plataforma — públicas, sem login
-  "/sign-in(.*)",
-  "/sign-up(.*)",
-  "/onboarding(.*)",
-  "/entrar(.*)",           // página de convite — precisa estar autenticado mas não onboarded
-  "/api/webhooks(.*)",
-  "/api/onboarding(.*)",
-  "/api/equipe/convite(.*)", // info pública do time para a página de convite
-  "/api/cron(.*)",          // protegido por CRON_SECRET, não por sessão de usuário
-  "/api/instagram/callback", // callback do OAuth — valida via OAuthState, sem sessão Clerk
-  "/loja(.*)",              // catálogo público (PWA) — clientes finais, sem login
-  "/agenda(.*)",            // agenda do profissional (PWA) — acesso por token secreto, sem login
-  "/agendar(.*)",           // página pública de auto-agendamento (PWA) — clientes finais, sem login
-  "/api/agendar(.*)",       // horários livres + criação de agendamento da página pública
-  "/api/branding/icon(.*)", // ícones do manifest do PWA — navegador/instalador busca sem sessão
-]);
+function matchesAny(pathname: string, patterns: RegExp[]) {
+  return patterns.some((p) => p.test(pathname));
+}
 
-const isGestorRoute = createRouteMatcher(["/gestor(.*)", "/ferramentas(.*)"]);
-const isVendedorRoute = createRouteMatcher(["/dashboard(.*)", "/scanner(.*)", "/simulacao(.*)", "/trilhas(.*)", "/objecoes(.*)", "/scripts(.*)"]);
+const PUBLIC_ROUTES: RegExp[] = [
+  /^\/$/,
+  /^\/produtos(\/.*)?$/,          // landing pages de CRM e Plataforma — públicas, sem login
+  /^\/sign-in(\/.*)?$/,
+  /^\/sign-up(\/.*)?$/,
+  /^\/esqueci-senha(\/.*)?$/,
+  /^\/redefinir-senha(\/.*)?$/,
+  /^\/verificar-email(\/.*)?$/,
+  /^\/onboarding(\/.*)?$/,
+  /^\/entrar(\/.*)?$/,             // página de convite — precisa estar autenticado mas não onboarded
+  /^\/api\/webhooks(\/.*)?$/,
+  /^\/api\/onboarding(\/.*)?$/,
+  /^\/api\/auth(\/.*)?$/,          // login, cadastro, logout, esqueci-senha, etc.
+  /^\/api\/equipe\/convite(\/.*)?$/, // info pública do time para a página de convite
+  /^\/api\/cron(\/.*)?$/,          // protegido por CRON_SECRET, não por sessão de usuário
+  /^\/api\/instagram\/callback$/,  // callback do OAuth — valida via OAuthState, sem sessão
+  /^\/loja(\/.*)?$/,               // catálogo público (PWA) — clientes finais, sem login
+  /^\/agenda(\/.*)?$/,             // agenda do profissional (PWA) — acesso por token secreto
+  /^\/agendar(\/.*)?$/,            // página pública de auto-agendamento (PWA)
+  /^\/api\/agendar(\/.*)?$/,       // horários livres + criação de agendamento da página pública
+  /^\/api\/branding\/icon(\/.*)?$/, // ícones do manifest do PWA — busca sem sessão
+];
 
-export default clerkMiddleware(async (auth, req) => {
-  const { userId, sessionClaims } = await auth();
+const GESTOR_ROUTES: RegExp[] = [/^\/gestor(\/.*)?$/, /^\/ferramentas(\/.*)?$/];
 
-  // Rotas públicas
-  if (isPublicRoute(req)) return NextResponse.next();
+export default async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  if (matchesAny(pathname, PUBLIC_ROUTES)) return NextResponse.next();
+
+  const session = await decryptSessionToken(request.cookies.get(SESSION_COOKIE_NAME)?.value);
 
   // Não autenticado → login
-  if (!userId) {
-    const signInUrl = new URL("/sign-in", req.url);
-    signInUrl.searchParams.set("redirect_url", req.url);
+  if (!session?.profileId) {
+    const signInUrl = new URL("/sign-in", request.url);
+    signInUrl.searchParams.set("redirect_url", request.url);
     return NextResponse.redirect(signInUrl);
   }
 
-  const role = (sessionClaims?.publicMetadata as any)?.role as string | undefined;
-
   // Vendedor tentando acessar área de gestor
-  if (isGestorRoute(req) && role === "VENDEDOR") {
-    return NextResponse.redirect(new URL("/dashboard", req.url));
+  if (matchesAny(pathname, GESTOR_ROUTES) && session.role === "VENDEDOR") {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   return NextResponse.next();
-}, { clockSkewInMs: 180_000 });
+}
 
 export const config = {
   matcher: [

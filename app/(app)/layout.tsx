@@ -1,4 +1,4 @@
-import { currentUser } from "@clerk/nextjs/server";
+import { currentUser } from "@/lib/auth/server";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { AppSidebar } from "./AppSidebar";
@@ -9,7 +9,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const user = await currentUser();
   if (!user) redirect("/sign-in");
 
-  // Verifica onboarding pelo DB (não depende de Clerk JWT claims desatualizados)
+  // Verifica onboarding pelo DB (não depende do JWT da sessão, que pode estar desatualizado)
   const profile = await prisma.profile.findUnique({
     where: { id: user.id },
     select: { onboarded: true, role: true, name: true },
@@ -59,7 +59,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex flex-col md:flex-row h-dvh bg-gray-950 text-white overflow-hidden">
       <OneSignalInit userId={user.id} />
-      <AppSidebar nav={NAV} profileName={profile.name ?? user.firstName ?? ""} email={user.emailAddresses[0]?.emailAddress ?? ""} />
+      <AppSidebar nav={NAV} profileName={profile.name} email={user.emailAddresses[0]?.emailAddress ?? ""} />
       <main className="flex-1 overflow-y-auto">{children}</main>
     </div>
   );

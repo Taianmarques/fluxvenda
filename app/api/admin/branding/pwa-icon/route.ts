@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { generatePwaIconVariants } from "@/lib/branding";
 import { z } from "zod";
