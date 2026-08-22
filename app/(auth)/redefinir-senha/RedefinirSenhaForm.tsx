@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
+import { AuthLogo } from "@/app/AuthLogo";
 
 export function RedefinirSenhaForm({ token }: { token: string }) {
   const [password, setPassword] = useState("");
@@ -34,10 +34,10 @@ export function RedefinirSenhaForm({ token }: { token: string }) {
 
   if (!token) {
     return (
-      <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center px-4">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 text-gray-900 flex items-center justify-center px-4">
         <div className="w-full max-w-sm text-center space-y-4">
-          <p className="text-gray-300">Link inválido. Peça uma nova redefinição de senha.</p>
-          <Link href="/esqueci-senha" className="text-blue-400 hover:text-blue-300 transition-colors">
+          <p className="text-gray-600">Link inválido. Peça uma nova redefinição de senha.</p>
+          <Link href="/esqueci-senha" className="text-blue-600 hover:text-blue-700 transition-colors">
             Esqueci minha senha
           </Link>
         </div>
@@ -46,32 +46,32 @@ export function RedefinirSenhaForm({ token }: { token: string }) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 text-gray-900 flex items-center justify-center px-4">
       <form onSubmit={submit} className="w-full max-w-sm space-y-6">
         <div className="text-center space-y-2">
-          <Image src="/logoflux.png" alt="FluxVenda" width={200} height={50} className="mx-auto" priority />
-          <h1 className="text-2xl font-bold">Definir nova senha</h1>
+          <AuthLogo />
+          <p className="text-lg font-bold text-gray-900 pt-2">Definir nova senha</p>
         </div>
 
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4">
+        <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-6 space-y-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-300">Nova senha</label>
+            <label className="text-sm font-medium text-gray-700">Nova senha</label>
             <input
               type="password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-950 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+              className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
               placeholder="Mínimo 8 caracteres, com letra e número"
             />
           </div>
 
-          {error && <p className="text-red-400 text-sm">{error}</p>}
+          {error && <p className="text-red-600 text-sm">{error}</p>}
 
           <button
             type="submit"
             disabled={saving}
-            className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl font-bold transition-colors"
+            className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl font-bold text-white transition-colors"
           >
             {saving ? "Salvando..." : "Salvar nova senha"}
           </button>

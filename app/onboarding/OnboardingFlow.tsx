@@ -3,8 +3,10 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SEGMENTS, SUBSEGMENTS } from "@/lib/segments";
+import { AuthLogo } from "@/app/AuthLogo";
 
 const TEAM_SIZES = ["1-5", "6-15", "16-50", "51-200", "200+"];
+const PAGE_BG = "min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 text-gray-900";
 
 type Step = "role" | "company" | "vendedor" | "funcionario" | "membro";
 type BusinessModel = "B2B" | "B2C";
@@ -21,12 +23,12 @@ const COMPANY_COPY: Record<Exclude<OnboardingVariant, "membro">, { title: string
   plataforma: {
     title: "Dados da sua empresa",
     subtitle: "Essas informações personalizam o diagnóstico e os cenários de treino para a realidade da sua empresa.",
-    button: "🏢 Criar empresa e acessar painel",
+    button: "Criar empresa e acessar painel",
   },
   generic: {
     title: "Dados da sua empresa",
     subtitle: "Essas informações personalizam o diagnóstico e os cenários de treino para a realidade da sua empresa.",
-    button: "🏢 Criar empresa e acessar painel",
+    button: "Criar empresa e acessar painel",
   },
 };
 
@@ -133,21 +135,22 @@ function OnboardingForm({ variant, teamName, memberDestino, memberRole }: { vari
   // ── STEP: membro convidado (já entrou na equipe pelo link) — só confirmar ─
   if (step === "membro") {
     return (
-      <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center px-4">
+      <div className={`${PAGE_BG} flex items-center justify-center px-4`}>
         <div className="w-full max-w-lg space-y-8">
           <div className="text-center space-y-2">
-            <p className="text-gray-400 text-sm">Bem-vindo(a) à equipe</p>
-            <h1 className="text-3xl font-bold">{teamName ?? "Sua equipe"}</h1>
-            <p className="text-gray-400">Só falta um passo pra começar a atender.</p>
+            <AuthLogo />
+            <p className="text-gray-500 text-sm pt-2">Bem-vindo(a) à equipe</p>
+            <p className="text-3xl font-bold text-gray-900">{teamName ?? "Sua equipe"}</p>
+            <p className="text-gray-500">Só falta um passo pra começar a atender.</p>
           </div>
 
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4">
-            {error && <p className="text-red-400 text-sm">{error}</p>}
+          <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-6 space-y-4">
+            {error && <p className="text-red-600 text-sm">{error}</p>}
 
             <button
               onClick={submit}
               disabled={saving}
-              className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl font-bold text-lg transition-colors"
+              className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl font-bold text-lg text-white transition-colors"
             >
               {saving ? "Entrando..." : memberDestino === "/crm" ? "Concluir e abrir o CRM" : "Concluir e acessar"}
             </button>
@@ -160,26 +163,26 @@ function OnboardingForm({ variant, teamName, memberDestino, memberRole }: { vari
   // ── STEP: escolha de role (pulado no fluxo do CRM) ──────────────────────
   if (step === "role") {
     return (
-      <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center px-4">
+      <div className={`${PAGE_BG} flex items-center justify-center px-4 py-10`}>
         <div className="w-full max-w-lg space-y-8">
           <div className="text-center space-y-2">
-            <p className="text-4xl">👋</p>
-            <h1 className="text-3xl font-bold">Bem-vindo(a)!</h1>
-            <p className="text-gray-400">Qual é o seu papel na empresa?</p>
+            <AuthLogo />
+            <p className="text-3xl font-bold text-gray-900 pt-2">Bem-vindo(a)!</p>
+            <p className="text-gray-500">Qual é o seu papel na empresa?</p>
           </div>
 
           <div className="grid grid-cols-1 gap-4">
             {/* GESTOR */}
             <button onClick={() => { setRole("GESTOR"); setStep("company"); }}
-              className="p-6 rounded-2xl border border-gray-700 hover:border-blue-500 bg-gray-900 hover:bg-blue-950/20 text-left transition-all group">
+              className="p-6 rounded-2xl border border-gray-200 hover:border-blue-400 bg-white hover:bg-blue-50/60 shadow-sm text-left transition-all group">
               <div className="flex items-start gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-blue-900/40 border border-blue-700 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">🏢</div>
+                <div className="w-14 h-14 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">🏢</div>
                 <div>
-                  <p className="text-lg font-bold">Sou Gestor / Diretor</p>
-                  <p className="text-gray-400 text-sm mt-1">Gerencio uma equipe de vendas. Vou cadastrar minha empresa e convidar meu time.</p>
+                  <p className="text-lg font-bold text-gray-900">Sou Gestor / Diretor</p>
+                  <p className="text-gray-500 text-sm mt-1">Gerencio uma equipe de vendas. Vou cadastrar minha empresa e convidar meu time.</p>
                   <div className="flex gap-2 mt-3 flex-wrap">
                     {["Dashboard da equipe", "Convites", "Relatórios"].map(t => (
-                      <span key={t} className="text-xs px-2 py-0.5 bg-blue-900/40 text-blue-300 rounded-full border border-blue-800">{t}</span>
+                      <span key={t} className="text-xs px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full border border-blue-200">{t}</span>
                     ))}
                   </div>
                 </div>
@@ -188,15 +191,15 @@ function OnboardingForm({ variant, teamName, memberDestino, memberRole }: { vari
 
             {/* VENDEDOR */}
             <button onClick={() => { setRole("VENDEDOR"); setStep("vendedor"); }}
-              className="p-6 rounded-2xl border border-gray-700 hover:border-green-500 bg-gray-900 hover:bg-green-950/20 text-left transition-all group">
+              className="p-6 rounded-2xl border border-gray-200 hover:border-green-400 bg-white hover:bg-green-50/60 shadow-sm text-left transition-all group">
               <div className="flex items-start gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-green-900/40 border border-green-700 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">🎯</div>
+                <div className="w-14 h-14 rounded-2xl bg-green-50 border border-green-200 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">🎯</div>
                 <div>
-                  <p className="text-lg font-bold">Sou Vendedor(a)</p>
-                  <p className="text-gray-400 text-sm mt-1">Faço parte de uma equipe de vendas ou quero me desenvolver de forma individual.</p>
+                  <p className="text-lg font-bold text-gray-900">Sou Vendedor(a)</p>
+                  <p className="text-gray-500 text-sm mt-1">Faço parte de uma equipe de vendas ou quero me desenvolver de forma individual.</p>
                   <div className="flex gap-2 mt-3 flex-wrap">
                     {["Treinamentos", "Simulações", "Ranking"].map(t => (
-                      <span key={t} className="text-xs px-2 py-0.5 bg-green-900/40 text-green-300 rounded-full border border-green-800">{t}</span>
+                      <span key={t} className="text-xs px-2 py-0.5 bg-green-50 text-green-700 rounded-full border border-green-200">{t}</span>
                     ))}
                   </div>
                 </div>
@@ -205,15 +208,15 @@ function OnboardingForm({ variant, teamName, memberDestino, memberRole }: { vari
 
             {/* FUNCIONARIO */}
             <button onClick={() => { setRole("FUNCIONARIO"); setStep("funcionario"); }}
-              className="p-6 rounded-2xl border border-gray-700 hover:border-orange-500 bg-gray-900 hover:bg-orange-950/20 text-left transition-all group">
+              className="p-6 rounded-2xl border border-gray-200 hover:border-orange-400 bg-white hover:bg-orange-50/60 shadow-sm text-left transition-all group">
               <div className="flex items-start gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-orange-900/40 border border-orange-700 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">🪪</div>
+                <div className="w-14 h-14 rounded-2xl bg-orange-50 border border-orange-200 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">🪪</div>
                 <div>
-                  <p className="text-lg font-bold">Sou Funcionário</p>
-                  <p className="text-gray-400 text-sm mt-1">Recebi um convite para acessar a plataforma. Vou inserir meu código de acesso.</p>
+                  <p className="text-lg font-bold text-gray-900">Sou Funcionário</p>
+                  <p className="text-gray-500 text-sm mt-1">Recebi um convite para acessar a plataforma. Vou inserir meu código de acesso.</p>
                   <div className="flex gap-2 mt-3 flex-wrap">
                     {["Acesso via convite", "Treinamentos", "Simulações"].map(t => (
-                      <span key={t} className="text-xs px-2 py-0.5 bg-orange-900/40 text-orange-300 rounded-full border border-orange-800">{t}</span>
+                      <span key={t} className="text-xs px-2 py-0.5 bg-orange-50 text-orange-700 rounded-full border border-orange-200">{t}</span>
                     ))}
                   </div>
                 </div>
@@ -234,41 +237,45 @@ function OnboardingForm({ variant, teamName, memberDestino, memberRole }: { vari
     const copy = COMPANY_COPY[variant === "membro" ? "generic" : variant];
 
     return (
-      <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center p-6">
+      <div className={`${PAGE_BG} flex items-center justify-center p-6 py-10`}>
         <div className="w-full max-w-xl space-y-7">
+
+          <div className="text-center">
+            <AuthLogo size={32} />
+          </div>
 
           {variant !== "crm" && (
             <div className="flex items-center gap-3">
-              <button onClick={() => setStep("role")} className="text-gray-500 hover:text-white transition-colors">← Voltar</button>
-              <div className="flex-1 h-1 bg-gray-800 rounded-full overflow-hidden">
+              <button onClick={() => setStep("role")} className="text-gray-400 hover:text-gray-700 transition-colors">← Voltar</button>
+              <div className="flex-1 h-1 bg-gray-200 rounded-full overflow-hidden">
                 <div className="h-full w-2/3 bg-blue-500 rounded-full" />
               </div>
-              <span className="text-xs text-gray-500">2/2</span>
+              <span className="text-xs text-gray-400">2/2</span>
             </div>
           )}
 
           <div>
-            <p className="text-2xl font-bold">{copy.title}</p>
-            <p className="text-gray-400 text-sm mt-1">{copy.subtitle}</p>
+            <p className="text-2xl font-bold text-gray-900">{copy.title}</p>
+            <p className="text-gray-500 text-sm mt-1">{copy.subtitle}</p>
           </div>
 
-          <div className="space-y-6">
+          <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-6 space-y-6">
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300">Nome da empresa *</label>
+              <label className="text-sm font-medium text-gray-700">Nome da empresa *</label>
               <input value={companyName} onChange={e => setCompanyName(e.target.value)}
                 placeholder="Ex: VendaMais Soluções Ltda"
-                className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors" />
+                className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors" />
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300">Modelo de negócio *</label>
+              <label className="text-sm font-medium text-gray-700">Modelo de negócio *</label>
               <div className="grid grid-cols-2 gap-3">
                 {(["B2B", "B2C"] as BusinessModel[]).map(bm => (
                   <button key={bm} type="button" onClick={() => setBusinessModel(bm)}
-                    className={`p-4 rounded-xl border text-left transition-all ${businessModel === bm ? "border-blue-500 bg-blue-950/40" : "border-gray-700 hover:border-gray-600 bg-gray-900"}`}>
-                    <p className={`font-bold text-lg ${businessModel === bm ? "text-blue-300" : "text-white"}`}>{bm}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
+                    className={`p-4 rounded-xl border text-left transition-all ${businessModel === bm ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300 bg-white"}`}>
+                    <p className={`font-bold text-lg ${businessModel === bm ? "text-blue-700" : "text-gray-900"}`}>{bm}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
                       {bm === "B2B" ? "Vende para outras empresas" : "Vende para consumidor final"}
                     </p>
                   </button>
@@ -278,29 +285,29 @@ function OnboardingForm({ variant, teamName, memberDestino, memberRole }: { vari
 
             {variant === "generic" && (
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-300">O que vocês contrataram? *</label>
+                <label className="text-sm font-medium text-gray-700">O que vocês contrataram? *</label>
                 <div className="grid grid-cols-2 gap-3">
                   {([
                     { key: "CRM" as const, title: "CRM", desc: "Agente de WhatsApp com IA + atendimento" },
                     { key: "PLATAFORMA" as const, title: "Plataforma", desc: "Scanner, trilhas, simulações e treinamento" },
                   ]).map(p => (
                     <button key={p.key} type="button" onClick={() => toggleProduct(p.key)}
-                      className={`p-4 rounded-xl border text-left transition-all ${products.has(p.key) ? "border-blue-500 bg-blue-950/40" : "border-gray-700 hover:border-gray-600 bg-gray-900"}`}>
-                      <p className={`font-bold ${products.has(p.key) ? "text-blue-300" : "text-white"}`}>{p.title}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{p.desc}</p>
+                      className={`p-4 rounded-xl border text-left transition-all ${products.has(p.key) ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300 bg-white"}`}>
+                      <p className={`font-bold ${products.has(p.key) ? "text-blue-700" : "text-gray-900"}`}>{p.title}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{p.desc}</p>
                     </button>
                   ))}
                 </div>
-                <p className="text-xs text-gray-500">Pode marcar os dois — dá pra ajustar depois com o suporte.</p>
+                <p className="text-xs text-gray-400">Pode marcar os dois — dá pra ajustar depois com o suporte.</p>
               </div>
             )}
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300">Segmento de mercado *</label>
+              <label className="text-sm font-medium text-gray-700">Segmento de mercado *</label>
               <div className="flex flex-wrap gap-2">
                 {SEGMENTS.map(s => (
                   <button key={s} type="button" onClick={() => handleSegmentChange(s)}
-                    className={`px-4 py-2 rounded-full text-sm border transition-all ${segment === s ? "border-blue-500 bg-blue-950/40 text-blue-300" : "border-gray-700 text-gray-400 hover:border-gray-500"}`}>
+                    className={`px-4 py-2 rounded-full text-sm border transition-all ${segment === s ? "border-blue-500 bg-blue-50 text-blue-700" : "border-gray-300 text-gray-600 hover:border-gray-400"}`}>
                     {s}
                   </button>
                 ))}
@@ -309,11 +316,11 @@ function OnboardingForm({ variant, teamName, memberDestino, memberRole }: { vari
 
             {variant !== "crm" && segment && subsegments.length > 0 && (
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-300">Categoria dentro de {segment} *</label>
+                <label className="text-sm font-medium text-gray-700">Categoria dentro de {segment} *</label>
                 <div className="grid grid-cols-2 gap-2">
                   {subsegments.map(sub => (
                     <button key={sub} type="button" onClick={() => setSubsegment(sub)}
-                      className={`px-3 py-2.5 rounded-xl text-sm border text-left transition-all ${subsegment === sub ? "border-blue-500 bg-blue-950/40 text-blue-300" : "border-gray-700 text-gray-400 hover:border-gray-500 bg-gray-900/50"}`}>
+                      className={`px-3 py-2.5 rounded-xl text-sm border text-left transition-all ${subsegment === sub ? "border-blue-500 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-600 hover:border-gray-300 bg-white"}`}>
                       {sub}
                     </button>
                   ))}
@@ -322,11 +329,11 @@ function OnboardingForm({ variant, teamName, memberDestino, memberRole }: { vari
             )}
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300">Tamanho da equipe de vendas *</label>
+              <label className="text-sm font-medium text-gray-700">Tamanho da equipe de vendas *</label>
               <div className="flex flex-wrap gap-2">
                 {TEAM_SIZES.map(t => (
                   <button key={t} type="button" onClick={() => setTeamSize(t)}
-                    className={`px-4 py-2 rounded-full text-sm border transition-all ${teamSize === t ? "border-blue-500 bg-blue-950/40 text-blue-300" : "border-gray-700 text-gray-400 hover:border-gray-500"}`}>
+                    className={`px-4 py-2 rounded-full text-sm border transition-all ${teamSize === t ? "border-blue-500 bg-blue-50 text-blue-700" : "border-gray-300 text-gray-600 hover:border-gray-400"}`}>
                     {t} pessoas
                   </button>
                 ))}
@@ -334,19 +341,19 @@ function OnboardingForm({ variant, teamName, memberDestino, memberRole }: { vari
             </div>
 
             {segment && businessModel && (variant === "crm" || subsegment) && (
-              <div className="bg-blue-950/20 border border-blue-800/50 rounded-xl p-4 space-y-1">
-                <p className="text-xs font-semibold text-blue-400 uppercase tracking-wider">Perfil da empresa</p>
-                <p className="text-sm text-gray-200">
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-1">
+                <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider">Perfil da empresa</p>
+                <p className="text-sm text-gray-700">
                   <span className="font-semibold">{businessModel}</span> • {segment}{subsegment ? ` / ${subsegment}` : ""}
                 </p>
                 <p className="text-xs text-gray-500">O diagnóstico e os treinamentos serão personalizados para este perfil.</p>
               </div>
             )}
 
-            {error && <p className="text-red-400 text-sm">{error}</p>}
+            {error && <p className="text-red-600 text-sm">{error}</p>}
 
             <button onClick={submit} disabled={!canNext || saving}
-              className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl font-bold text-lg transition-colors">
+              className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl font-bold text-lg text-white transition-colors">
               {saving ? "Criando empresa..." : copy.button}
             </button>
           </div>
@@ -359,28 +366,32 @@ function OnboardingForm({ variant, teamName, memberDestino, memberRole }: { vari
   if (step === "vendedor") {
     const canNext = vendSegment;
     return (
-      <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center px-4">
+      <div className={`${PAGE_BG} flex items-center justify-center px-4 py-10`}>
         <div className="w-full max-w-lg space-y-7">
+          <div className="text-center">
+            <AuthLogo size={32} />
+          </div>
+
           <div className="flex items-center gap-3">
-            <button onClick={() => setStep("role")} className="text-gray-500 hover:text-white transition-colors">← Voltar</button>
-            <div className="flex-1 h-1 bg-gray-800 rounded-full overflow-hidden">
+            <button onClick={() => setStep("role")} className="text-gray-400 hover:text-gray-700 transition-colors">← Voltar</button>
+            <div className="flex-1 h-1 bg-gray-200 rounded-full overflow-hidden">
               <div className="h-full w-2/3 bg-green-500 rounded-full" />
             </div>
-            <span className="text-xs text-gray-500">2/2</span>
+            <span className="text-xs text-gray-400">2/2</span>
           </div>
 
           <div>
-            <p className="text-2xl font-bold">Seu perfil de vendas</p>
-            <p className="text-gray-400 text-sm mt-1">Personalizamos o conteúdo e os desafios para o seu segmento.</p>
+            <p className="text-2xl font-bold text-gray-900">Seu perfil de vendas</p>
+            <p className="text-gray-500 text-sm mt-1">Personalizamos o conteúdo e os desafios para o seu segmento.</p>
           </div>
 
-          <div className="space-y-5">
+          <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-6 space-y-5">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300">Seu segmento de atuação *</label>
+              <label className="text-sm font-medium text-gray-700">Seu segmento de atuação *</label>
               <div className="flex flex-wrap gap-2">
                 {SEGMENTS.map(s => (
                   <button key={s} type="button" onClick={() => setVendSegment(s)}
-                    className={`px-4 py-2 rounded-full text-sm border transition-all ${vendSegment === s ? "border-green-500 bg-green-950/40 text-green-300" : "border-gray-700 text-gray-400 hover:border-gray-500"}`}>
+                    className={`px-4 py-2 rounded-full text-sm border transition-all ${vendSegment === s ? "border-green-500 bg-green-50 text-green-700" : "border-gray-300 text-gray-600 hover:border-gray-400"}`}>
                     {s}
                   </button>
                 ))}
@@ -388,18 +399,18 @@ function OnboardingForm({ variant, teamName, memberDestino, memberRole }: { vari
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300">Código de convite da equipe <span className="text-gray-500">(opcional)</span></label>
+              <label className="text-sm font-medium text-gray-700">Código de convite da equipe <span className="text-gray-400">(opcional)</span></label>
               <input value={inviteCode} onChange={e => setInviteCode(e.target.value)}
                 placeholder="Cole o código que seu gestor te enviou"
-                className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500 transition-colors font-mono text-sm" />
-              <p className="text-xs text-gray-500">Se não tiver agora, pode entrar em uma equipe depois pelo link do seu gestor.</p>
+                className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-colors font-mono text-sm" />
+              <p className="text-xs text-gray-400">Se não tiver agora, pode entrar em uma equipe depois pelo link do seu gestor.</p>
             </div>
 
-            {error && <p className="text-red-400 text-sm">{error}</p>}
+            {error && <p className="text-red-600 text-sm">{error}</p>}
 
             <button onClick={submit} disabled={!canNext || saving}
-              className="w-full py-4 bg-green-600 hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl font-bold text-lg transition-colors">
-              {saving ? "Salvando..." : "🎯 Começar treinamento"}
+              className="w-full py-4 bg-green-600 hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl font-bold text-lg text-white transition-colors">
+              {saving ? "Salvando..." : "Começar treinamento"}
             </button>
           </div>
         </div>
@@ -411,36 +422,40 @@ function OnboardingForm({ variant, teamName, memberDestino, memberRole }: { vari
   if (step === "funcionario") {
     const canNext = inviteCode.trim().length > 0;
     return (
-      <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center px-4">
+      <div className={`${PAGE_BG} flex items-center justify-center px-4 py-10`}>
         <div className="w-full max-w-lg space-y-7">
+          <div className="text-center">
+            <AuthLogo size={32} />
+          </div>
+
           <div className="flex items-center gap-3">
-            <button onClick={() => setStep("role")} className="text-gray-500 hover:text-white transition-colors">← Voltar</button>
-            <div className="flex-1 h-1 bg-gray-800 rounded-full overflow-hidden">
+            <button onClick={() => setStep("role")} className="text-gray-400 hover:text-gray-700 transition-colors">← Voltar</button>
+            <div className="flex-1 h-1 bg-gray-200 rounded-full overflow-hidden">
               <div className="h-full w-2/3 bg-orange-500 rounded-full" />
             </div>
-            <span className="text-xs text-gray-500">2/2</span>
+            <span className="text-xs text-gray-400">2/2</span>
           </div>
 
           <div>
-            <p className="text-2xl font-bold">Insira seu código de acesso</p>
-            <p className="text-gray-400 text-sm mt-1">Você recebeu um código de convite do seu gestor. Cole ele abaixo para acessar a plataforma.</p>
+            <p className="text-2xl font-bold text-gray-900">Insira seu código de acesso</p>
+            <p className="text-gray-500 text-sm mt-1">Você recebeu um código de convite do seu gestor. Cole ele abaixo para acessar a plataforma.</p>
           </div>
 
-          <div className="space-y-5">
+          <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-6 space-y-5">
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300">Código de convite *</label>
+              <label className="text-sm font-medium text-gray-700">Código de convite *</label>
               <input value={inviteCode} onChange={e => setInviteCode(e.target.value)}
                 placeholder="Cole o código que seu gestor te enviou"
-                className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 transition-colors font-mono text-sm" />
-              <p className="text-xs text-gray-500">Peça o código de acesso para o responsável pela sua equipe.</p>
+                className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-colors font-mono text-sm" />
+              <p className="text-xs text-gray-400">Peça o código de acesso para o responsável pela sua equipe.</p>
             </div>
 
-            {error && <p className="text-red-400 text-sm">{error}</p>}
+            {error && <p className="text-red-600 text-sm">{error}</p>}
 
             <button onClick={submit} disabled={!canNext || saving}
-              className="w-full py-4 bg-orange-600 hover:bg-orange-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl font-bold text-lg transition-colors">
-              {saving ? "Verificando código..." : "🪪 Acessar plataforma"}
+              className="w-full py-4 bg-orange-600 hover:bg-orange-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl font-bold text-lg text-white transition-colors">
+              {saving ? "Verificando código..." : "Acessar plataforma"}
             </button>
           </div>
         </div>
