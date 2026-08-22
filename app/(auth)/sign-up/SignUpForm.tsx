@@ -1,10 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
+import { AuthLogo } from "@/app/AuthLogo";
 
 type Step = "form" | "code";
+
+const inputClass =
+  "w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors";
+const labelClass = "text-sm font-medium text-gray-700";
+const cardClass = "bg-white border border-gray-200 shadow-sm rounded-2xl p-6 space-y-4";
 
 export function SignUpForm({ redirectUrl }: { redirectUrl: string }) {
   const [step, setStep] = useState<Step>("form");
@@ -87,108 +92,108 @@ export function SignUpForm({ redirectUrl }: { redirectUrl: string }) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 text-gray-900 flex items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center space-y-2">
-          <Image src="/logoflux.png" alt="FluxVenda" width={200} height={50} className="mx-auto" priority />
-          <p className="text-gray-400 text-sm">Comece a usar a FluxVenda</p>
+          <AuthLogo />
+          <p className="text-gray-500 text-sm">Comece a usar a FluxVenda</p>
         </div>
 
         {step === "form" ? (
-          <form onSubmit={sendCode} className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4">
+          <form onSubmit={sendCode} className={cardClass}>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300">Nome</label>
+              <label className={labelClass}>Nome</label>
               <input
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-950 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+                className={inputClass}
                 placeholder="Seu nome"
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300">E-mail</label>
+              <label className={labelClass}>E-mail</label>
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-950 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+                className={inputClass}
                 placeholder="voce@empresa.com"
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300">WhatsApp</label>
+              <label className={labelClass}>WhatsApp</label>
               <input
                 type="tel"
                 required
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-950 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+                className={inputClass}
                 placeholder="(11) 99999-9999"
               />
               <p className="text-xs text-gray-500">Vamos mandar um código de verificação por lá.</p>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300">Senha</label>
+              <label className={labelClass}>Senha</label>
               <input
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-950 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+                className={inputClass}
                 placeholder="Mínimo 8 caracteres, com letra e número"
               />
             </div>
 
-            {error && <p className="text-red-400 text-sm">{error}</p>}
+            {error && <p className="text-red-600 text-sm">{error}</p>}
 
             <button
               type="submit"
               disabled={saving}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl font-bold transition-colors"
+              className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl font-bold text-white transition-colors"
             >
               {saving ? "Enviando código..." : "Continuar"}
             </button>
 
-            <p className="text-sm text-center text-gray-400">
+            <p className="text-sm text-center text-gray-500">
               Já tem conta?{" "}
-              <Link href="/sign-in" className="text-blue-400 hover:text-blue-300 transition-colors">
+              <Link href="/sign-in" className="text-blue-600 hover:text-blue-700 transition-colors">
                 Entrar
               </Link>
             </p>
           </form>
         ) : (
-          <form onSubmit={verifyCode} className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4">
+          <form onSubmit={verifyCode} className={cardClass}>
             <div className="space-y-1">
-              <p className="text-sm text-gray-300">
-                Mandamos um código de 6 dígitos pro WhatsApp <span className="font-medium text-white">{phone}</span>.
+              <p className="text-sm text-gray-600">
+                Mandamos um código de 6 dígitos pro WhatsApp <span className="font-medium text-gray-900">{phone}</span>.
               </p>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300">Código de verificação</label>
+              <label className={labelClass}>Código de verificação</label>
               <input
                 required
                 inputMode="numeric"
                 maxLength={6}
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                className="w-full px-4 py-3 bg-gray-950 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors text-center text-2xl tracking-[0.5em] font-mono"
+                className={`${inputClass} text-center text-2xl tracking-[0.5em] font-mono`}
                 placeholder="000000"
               />
             </div>
 
-            {error && <p className="text-red-400 text-sm">{error}</p>}
-            {resendMessage && <p className="text-green-400 text-sm">{resendMessage}</p>}
+            {error && <p className="text-red-600 text-sm">{error}</p>}
+            {resendMessage && <p className="text-green-600 text-sm">{resendMessage}</p>}
 
             <button
               type="submit"
               disabled={saving || code.length !== 6}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl font-bold transition-colors"
+              className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl font-bold text-white transition-colors"
             >
               {saving ? "Confirmando..." : "Confirmar código"}
             </button>
@@ -197,7 +202,7 @@ export function SignUpForm({ redirectUrl }: { redirectUrl: string }) {
               <button
                 type="button"
                 onClick={() => { setStep("form"); setError(""); setResendMessage(""); }}
-                className="text-gray-400 hover:text-white transition-colors"
+                className="text-gray-500 hover:text-gray-900 transition-colors"
               >
                 ← Voltar
               </button>
@@ -205,7 +210,7 @@ export function SignUpForm({ redirectUrl }: { redirectUrl: string }) {
                 type="button"
                 onClick={resendCode}
                 disabled={saving}
-                className="text-blue-400 hover:text-blue-300 transition-colors disabled:opacity-50"
+                className="text-blue-600 hover:text-blue-700 transition-colors disabled:opacity-50"
               >
                 Reenviar código
               </button>
