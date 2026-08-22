@@ -38,7 +38,7 @@ export function SignInForm({ redirectUrl, initialNotice }: { redirectUrl: string
   }
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 text-gray-900 flex items-center justify-center px-4">
       <form onSubmit={submit} className="w-full max-w-sm space-y-6">
         <div className="text-center space-y-2">
           <AuthLogo />
