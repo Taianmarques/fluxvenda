@@ -2,10 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChevronDown, CheckCircle2, Circle } from "lucide-react";
 import type { ChecklistStep, ChecklistStepKey } from "@/lib/crm-onboarding";
 
-export function GettingStartedChecklist({ steps, name }: { steps: ChecklistStep[]; name: string }) {
+// dismissHref: se informado, "Dispensar" navega pra lá em vez de só esconder o card no
+// lugar — usado na página de boas-vindas standalone, que ficaria em branco sem isso.
+export function GettingStartedChecklist({ steps, name, dismissHref }: { steps: ChecklistStep[]; name: string; dismissHref?: string }) {
+  const router = useRouter();
   const firstOpenKey = steps.find(s => !s.done)?.key ?? null;
   const [openKey, setOpenKey] = useState<ChecklistStepKey | null>(firstOpenKey);
 
@@ -13,6 +17,11 @@ export function GettingStartedChecklist({ steps, name }: { steps: ChecklistStep[
   const allDone = doneCount === steps.length;
   const [dismissed, setDismissed] = useState(false);
   if (allDone && dismissed) return null;
+
+  function handleDismiss() {
+    if (dismissHref) router.push(dismissHref);
+    else setDismissed(true);
+  }
 
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 md:p-6 space-y-5">
@@ -28,7 +37,7 @@ export function GettingStartedChecklist({ steps, name }: { steps: ChecklistStep[
           </p>
         </div>
         {allDone && (
-          <button onClick={() => setDismissed(true)} className="text-xs text-gray-500 hover:text-gray-300 transition-colors flex-shrink-0">
+          <button onClick={handleDismiss} className="text-xs text-gray-500 hover:text-gray-300 transition-colors flex-shrink-0">
             Dispensar
           </button>
         )}
