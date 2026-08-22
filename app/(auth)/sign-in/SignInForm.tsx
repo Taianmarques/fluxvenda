@@ -42,7 +42,12 @@ export function SignInForm({ redirectUrl, initialNotice }: { redirectUrl: string
       <form onSubmit={submit} className="w-full max-w-sm space-y-6">
         <div className="text-center space-y-2">
           <Image src="/logoflux.png" alt="FluxVenda" width={200} height={50} className="mx-auto" priority />
-          <p className="text-gray-400 text-sm">Acesse sua conta FluxVenda</p>
+          <p className="text-gray-400 text-sm">
+            Acesse sua conta ou{" "}
+            <Link href="/sign-up" className="text-blue-400 hover:text-blue-300 transition-colors">
+              experimente grátis por 7 dias
+            </Link>
+          </p>
         </div>
 
         {notice && <p className="text-green-400 text-sm text-center">{notice}</p>}
