@@ -16,7 +16,7 @@ const COMPANY_COPY: Record<Exclude<OnboardingVariant, "membro">, { title: string
   crm: {
     title: "Configure sua empresa",
     subtitle: "Essas informações preparam o agente de WhatsApp e o CRM da sua equipe. Seu teste grátis de 7 dias começa assim que você criar a empresa.",
-    button: "💬 Começar teste grátis de 7 dias",
+    button: "Começar teste grátis de 7 dias",
   },
   plataforma: {
     title: "Dados da sua empresa",
@@ -234,8 +234,8 @@ function OnboardingForm({ variant, teamName, memberDestino, memberRole }: { vari
     const copy = COMPANY_COPY[variant === "membro" ? "generic" : variant];
 
     return (
-      <div className="min-h-screen bg-gray-950 text-white p-6">
-        <div className="max-w-xl mx-auto space-y-7">
+      <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center p-6">
+        <div className="w-full max-w-xl space-y-7">
 
           {variant !== "crm" && (
             <div className="flex items-center gap-3">
