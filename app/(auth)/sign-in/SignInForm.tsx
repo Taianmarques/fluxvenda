@@ -44,7 +44,7 @@ export function SignInForm({ redirectUrl, initialNotice }: { redirectUrl: string
           <Image src="/logoflux.png" alt="FluxVenda" width={200} height={50} className="mx-auto" priority />
           <p className="text-gray-400 text-sm">
             Acesse sua conta ou{" "}
-            <Link href="/sign-up" className="text-blue-400 hover:text-blue-300 transition-colors">
+            <Link href="/sign-up?product=crm" className="text-blue-400 hover:text-blue-300 transition-colors">
               experimente grátis por 7 dias
             </Link>
           </p>
@@ -103,7 +103,7 @@ export function SignInForm({ redirectUrl, initialNotice }: { redirectUrl: string
             <Link href="/esqueci-senha" className="text-gray-400 hover:text-white transition-colors">
               Esqueci minha senha
             </Link>
-            <Link href="/sign-up" className="text-blue-400 hover:text-blue-300 transition-colors">
+            <Link href="/sign-up?product=crm" className="text-blue-400 hover:text-blue-300 transition-colors">
               Criar conta
             </Link>
           </div>
