@@ -75,7 +75,7 @@ export function GettingStartedChecklist({ steps, name, dismissHref }: { steps: C
                   <p className="text-sm text-gray-500">{step.description}</p>
                   <Link
                     href={step.href}
-                    className="inline-block bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-2 text-sm font-medium transition-colors"
+                    className="inline-block bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-4 py-2 text-sm font-medium transition-colors"
                   >
                     {step.cta}
                   </Link>
