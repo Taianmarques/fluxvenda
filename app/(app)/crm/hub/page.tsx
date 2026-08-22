@@ -5,8 +5,9 @@ import Link from "next/link";
 import { LayoutGrid, ArrowLeft, Plus } from "lucide-react";
 import { listMyAgentConfigs } from "@/lib/team";
 import { getInstanceStatus } from "@/lib/whatsapp";
+import { buildCrmChecklist } from "@/lib/crm-onboarding";
 import { HubClient, type HubAgent } from "./HubClient";
-import { NovoAgenteCard } from "./NovoAgenteCard";
+import { GettingStartedChecklist } from "./GettingStartedChecklist";
 
 // Hub de agentes de IA: catálogo dos "funcionários virtuais" da empresa —
 // o que cada um faz, status e ativação com um clique.
@@ -14,38 +15,65 @@ export default async function HubPage() {
   const user = await currentUser();
   if (!user) redirect("/sign-in");
 
-  const result = await listMyAgentConfigs(user.id);
-  if (!result || result.configs.length === 0) {
+  const [result, profile] = await Promise.all([
+    listMyAgentConfigs(user.id),
+    prisma.profile.findUnique({ where: { id: user.id }, select: { name: true } }),
+  ]);
+  if (!result) redirect("/crm");
+
+  const { configs, isManager, teamId } = result;
+  const firstName = (profile?.name ?? "").split(" ")[0] || "tudo bem";
+
+  const [team, teamMemberCount, instagramConnections, pipelines] = await Promise.all([
+    prisma.team.findUniqueOrThrow({ where: { id: teamId }, select: { crmTrialEndsAt: true, productsOwned: true } }),
+    prisma.teamMember.count({ where: { teamId } }),
+    prisma.instagramConnection.findMany({
+      where: { agentConfigId: { in: configs.map(c => c.id) } },
+      select: { agentConfigId: true, instagramUsername: true },
+    }),
+    prisma.pipeline.findMany({
+      where: { agentConfigId: { in: configs.map(c => c.id) } },
+      select: {
+        agentConfigId: true, name: true, agenteInstrucoes: true,
+        stages: { select: { name: true, color: true, agenteInstrucoes: true, followupDelaysMinutes: true }, orderBy: { order: "asc" } },
+      },
+    }),
+  ]);
+
+  const checklist = isManager ? buildCrmChecklist({
+    configs,
+    instagramAgentIds: new Set(instagramConnections.map(c => c.agentConfigId)),
+    pipelines,
+    teamMemberCount,
+    team,
+  }) : null;
+
+  if (configs.length === 0) {
     return (
-      <div className="min-h-full bg-gray-950 text-white p-6 flex items-center justify-center">
-        <div className="max-w-md w-full space-y-6">
-          <div className="text-center space-y-3">
-            <LayoutGrid size={48} className="mx-auto text-blue-400" />
-            <h1 className="text-2xl font-bold">Nenhum agente ainda</h1>
-            <p className="text-gray-400">
-              {result?.isManager
-                ? "Crie o primeiro agente para montar sua equipe de IA."
-                : "Peça ao gestor da equipe para criar o primeiro agente de IA."}
+      <div className="min-h-full bg-gray-950 text-white p-4 md:p-6 overflow-y-auto h-full">
+        <div className="max-w-3xl mx-auto space-y-5 py-6">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
+              <LayoutGrid size={26} className="text-blue-400" /> Hub de agentes de IA
+            </h1>
+            <p className="text-sm text-gray-500 mt-1">
+              {isManager
+                ? "Comece conectando um canal — o resto você organiza no seu ritmo."
+                : "Peça ao gestor da equipe para conectar o primeiro canal."}
             </p>
           </div>
-          {result?.isManager && <NovoAgenteCard />}
+          {checklist && <GettingStartedChecklist steps={checklist} name={firstName} />}
         </div>
       </div>
     );
   }
-
-  const { configs, isManager } = result;
   const ids = configs.map(c => c.id);
   const d7 = new Date(Date.now() - 7 * 86400000);
   const d30 = new Date(Date.now() - 30 * 86400000);
   const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
   const amanha = new Date(hoje.getTime() + 86400000);
 
-  const [igConnections, convCounts, orderStats, apptCounts, cobrancaCounts, feedbackStats, waStatuses] = await Promise.all([
-    prisma.instagramConnection.findMany({
-      where: { agentConfigId: { in: ids } },
-      select: { agentConfigId: true, instagramUsername: true },
-    }),
+  const [convCounts, orderStats, apptCounts, cobrancaCounts, feedbackStats, waStatuses] = await Promise.all([
     prisma.conversation.groupBy({
       by: ["agentConfigId"],
       where: { agentConfigId: { in: ids }, updatedAt: { gte: d7 } },
@@ -79,7 +107,7 @@ export default async function HubPage() {
     )),
   ]);
 
-  const igByAgent = new Map(igConnections.map(i => [i.agentConfigId, i.instagramUsername ?? ""]));
+  const igByAgent = new Map(instagramConnections.map(i => [i.agentConfigId, i.instagramUsername ?? ""]));
   const convByAgent = new Map(convCounts.map(c => [c.agentConfigId, c._count.id]));
   const orderByAgent = new Map(orderStats.map(o => [o.agentConfigId, { count: o._count.id, valor: (o._sum.total ?? 0) + (o._sum.deliveryFee ?? 0) }]));
   const apptByAgent = new Map(apptCounts.map(a => [a.agentConfigId, a._count.id]));
@@ -133,6 +161,8 @@ export default async function HubPage() {
             </Link>
           )}
         </div>
+
+        {checklist && <GettingStartedChecklist steps={checklist} name={firstName} />}
 
         <HubClient agents={agents} isManager={isManager} />
       </div>
