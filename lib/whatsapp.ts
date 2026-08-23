@@ -233,7 +233,9 @@ export async function registerAgentWebhook(token: string, webhookUrl: string): P
       url: webhookUrl,
       enabled: true,
       events: ["messages"],
-      excludeMessages: ["wasSentByApi", "isGroupYes"],
+      // "isGroupYes" excluído antes de existir a aba Grupos no CRM — removido pra grupo do
+      // WhatsApp chegar no webhook (ver isGroup em lib/whatsapp-inbound.ts).
+      excludeMessages: ["wasSentByApi"],
       addUrlEvents: false,
       addUrlTypesMessages: false,
     }),
