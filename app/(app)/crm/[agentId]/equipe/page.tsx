@@ -43,7 +43,7 @@ async function EquipeCrmPageContent({ params }: { params: Promise<{ agentId: str
     include: {
       manager: { select: { id: true, name: true, email: true } },
       members: {
-        include: { profile: { select: { id: true, name: true, email: true } } },
+        include: { profile: { select: { id: true, name: true, email: true, phone: true } } },
         orderBy: { joinedAt: "asc" },
       },
       departamentos: { orderBy: { createdAt: "asc" }, select: { id: true, nome: true, descricao: true } },
@@ -66,9 +66,11 @@ async function EquipeCrmPageContent({ params }: { params: Promise<{ agentId: str
         profileId: m.profile.id,
         name: m.profile.name,
         email: m.profile.email,
+        phone: m.profile.phone,
         joinedAt: m.joinedAt.toISOString(),
         departamentoId: m.departamentoId,
         accessProfileId: m.accessProfileId,
+        active: m.active,
       }))}
       departamentos={team.departamentos}
       perfis={team.crmAccessProfiles}

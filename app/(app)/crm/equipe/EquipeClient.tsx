@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { UserPlus, Copy, Check, Crown, User, Trash2, MessageCircle, Building2, Plus, X, Shield, Pencil, ChevronDown } from "lucide-react";
+import { UserPlus, Copy, Check, Crown, User, Trash2, MessageCircle, Building2, Plus, X, Shield, Pencil, ChevronDown, Ban, RotateCcw } from "lucide-react";
 import { CRM_CATEGORIES } from "@/lib/crm-nav-config";
 
 type Membro = {
@@ -10,9 +10,11 @@ type Membro = {
   profileId: string;
   name: string;
   email: string;
+  phone: string | null;
   joinedAt: string;
   departamentoId: string | null;
   accessProfileId: string | null;
+  active: boolean;
 };
 
 type Departamento = { id: string; nome: string; descricao: string };
@@ -58,6 +60,17 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
   const [perfilNome, setPerfilNome] = useState("");
   const [salvandoPerfil, setSalvandoPerfil] = useState(false);
   const [expandedPerfilId, setExpandedPerfilId] = useState<string | null>(null);
+
+  // Editar membro
+  const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
+  const [editNome, setEditNome] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editTelefone, setEditTelefone] = useState("");
+  const [salvandoEdicao, setSalvandoEdicao] = useState(false);
+  const [erroEdicao, setErroEdicao] = useState("");
+
+  // Inativar/reativar membro
+  const [togglingActiveId, setTogglingActiveId] = useState<string | null>(null);
 
   async function handleCriarDepartamento() {
     if (!depNome.trim()) return;
@@ -181,6 +194,55 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
       router.refresh();
     } finally {
       setSalvandoMembro(false);
+    }
+  }
+
+  function startEdit(m: Membro) {
+    setEditingMemberId(m.memberId);
+    setEditNome(m.name);
+    setEditEmail(m.email);
+    setEditTelefone(m.phone ?? "");
+    setErroEdicao("");
+  }
+
+  function cancelEdit() {
+    setEditingMemberId(null);
+    setErroEdicao("");
+  }
+
+  async function handleSalvarEdicao(memberId: string) {
+    if (!editNome.trim() || !editEmail.trim()) return;
+    setSalvandoEdicao(true);
+    setErroEdicao("");
+    try {
+      const res = await fetch(`/api/equipe/membros/${memberId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editNome.trim(), email: editEmail.trim(), phone: editTelefone.trim() || null }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErroEdicao(data.error ?? "Não foi possível salvar.");
+        return;
+      }
+      setEditingMemberId(null);
+      router.refresh();
+    } finally {
+      setSalvandoEdicao(false);
+    }
+  }
+
+  async function handleToggleAtivo(m: Membro) {
+    setTogglingActiveId(m.memberId);
+    try {
+      const res = await fetch(`/api/equipe/membros/${m.memberId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active: !m.active }),
+      });
+      if (res.ok) router.refresh();
+    } finally {
+      setTogglingActiveId(null);
     }
   }
 
@@ -513,57 +575,116 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
               </div>
 
               {/* Atendentes */}
-              {members.map(m => (
-                <div key={m.memberId} className="flex items-center gap-3 px-5 py-3 flex-wrap">
-                  <div className="w-9 h-9 rounded-full bg-blue-900/40 text-blue-400 flex items-center justify-center flex-shrink-0">
-                    <User size={15} />
+              {members.map(m => {
+                const editing = editingMemberId === m.memberId;
+                return (
+                  <div key={m.memberId} className={`px-5 py-3 ${!m.active && !editing ? "opacity-60" : ""}`}>
+                    {editing ? (
+                      <div className="space-y-2">
+                        <input
+                          value={editNome}
+                          onChange={e => setEditNome(e.target.value)}
+                          placeholder="Nome"
+                          className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm"
+                        />
+                        <input
+                          value={editEmail}
+                          onChange={e => setEditEmail(e.target.value)}
+                          placeholder="E-mail"
+                          type="email"
+                          className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm"
+                        />
+                        <input
+                          value={editTelefone}
+                          onChange={e => setEditTelefone(e.target.value)}
+                          placeholder="WhatsApp (opcional)"
+                          type="tel"
+                          className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm"
+                        />
+                        {erroEdicao && <p className="text-xs text-red-400">{erroEdicao}</p>}
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleSalvarEdicao(m.memberId)}
+                            disabled={salvandoEdicao || !editNome.trim() || !editEmail.trim()}
+                            className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium"
+                          >
+                            {salvandoEdicao ? "Salvando..." : "Salvar"}
+                          </button>
+                          <button onClick={cancelEdit} className="text-xs text-gray-400 hover:text-gray-200 px-2">Cancelar</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <div className="w-9 h-9 rounded-full bg-blue-900/40 text-blue-400 flex items-center justify-center flex-shrink-0">
+                          <User size={15} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate flex items-center gap-1.5">
+                            {m.name} {m.profileId === currentUserId && <span className="text-gray-500 font-normal">(você)</span>}
+                            {!m.active && (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-red-900/40 text-red-300 border border-red-800/50">
+                                Inativo
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-xs text-gray-500 truncate">
+                            {m.email} · entrou em {new Date(m.joinedAt).toLocaleDateString("pt-BR")}
+                          </p>
+                        </div>
+                        {isManager && departamentos.length > 0 ? (
+                          <select
+                            value={m.departamentoId ?? ""}
+                            onChange={e => handleSetDepartamento(m.memberId, e.target.value)}
+                            className="text-xs bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 flex-shrink-0 max-w-[130px]"
+                            title="Departamento do atendente"
+                          >
+                            <option value="">Sem departamento</option>
+                            {departamentos.map(d => <option key={d.id} value={d.id}>{d.nome}</option>)}
+                          </select>
+                        ) : (
+                          <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-blue-900/40 text-blue-300 border border-blue-800/50 flex-shrink-0">
+                            {departamentos.find(d => d.id === m.departamentoId)?.nome ?? "Atendente"}
+                          </span>
+                        )}
+                        {isManager && perfis.length > 0 && (
+                          <select
+                            value={m.accessProfileId ?? ""}
+                            onChange={e => handleSetPerfil(m.memberId, e.target.value)}
+                            className="text-xs bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 flex-shrink-0 max-w-[130px]"
+                            title="Perfil de acesso no CRM"
+                          >
+                            <option value="">Acesso total</option>
+                            {perfis.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                          </select>
+                        )}
+                        {isManager && (
+                          <div className="flex items-center gap-2.5 flex-shrink-0">
+                            <button onClick={() => startEdit(m)} title="Editar membro" className="text-gray-600 hover:text-gray-300">
+                              <Pencil size={15} />
+                            </button>
+                            <button
+                              onClick={() => handleToggleAtivo(m)}
+                              disabled={togglingActiveId === m.memberId}
+                              title={m.active ? "Inativar" : "Reativar"}
+                              className={`disabled:opacity-50 ${m.active ? "text-gray-600 hover:text-amber-400" : "text-amber-400 hover:text-amber-300"}`}
+                            >
+                              {m.active ? <Ban size={15} /> : <RotateCcw size={15} />}
+                            </button>
+                            <button
+                              onClick={() => handleRemove(m)}
+                              disabled={removing === m.memberId}
+                              title="Excluir da equipe"
+                              className="text-gray-600 hover:text-red-400 disabled:opacity-50"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {m.name} {m.profileId === currentUserId && <span className="text-gray-500 font-normal">(você)</span>}
-                    </p>
-                    <p className="text-xs text-gray-500 truncate">
-                      {m.email} · entrou em {new Date(m.joinedAt).toLocaleDateString("pt-BR")}
-                    </p>
-                  </div>
-                  {isManager && departamentos.length > 0 ? (
-                    <select
-                      value={m.departamentoId ?? ""}
-                      onChange={e => handleSetDepartamento(m.memberId, e.target.value)}
-                      className="text-xs bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 flex-shrink-0 max-w-[130px]"
-                      title="Departamento do atendente"
-                    >
-                      <option value="">Sem departamento</option>
-                      {departamentos.map(d => <option key={d.id} value={d.id}>{d.nome}</option>)}
-                    </select>
-                  ) : (
-                    <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-blue-900/40 text-blue-300 border border-blue-800/50 flex-shrink-0">
-                      {departamentos.find(d => d.id === m.departamentoId)?.nome ?? "Atendente"}
-                    </span>
-                  )}
-                  {isManager && perfis.length > 0 && (
-                    <select
-                      value={m.accessProfileId ?? ""}
-                      onChange={e => handleSetPerfil(m.memberId, e.target.value)}
-                      className="text-xs bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 flex-shrink-0 max-w-[130px]"
-                      title="Perfil de acesso no CRM"
-                    >
-                      <option value="">Acesso total</option>
-                      {perfis.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
-                    </select>
-                  )}
-                  {isManager && (
-                    <button
-                      onClick={() => handleRemove(m)}
-                      disabled={removing === m.memberId}
-                      title="Remover da equipe"
-                      className="text-gray-600 hover:text-red-400 disabled:opacity-50 flex-shrink-0"
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  )}
-                </div>
-              ))}
+                );
+              })}
 
               {members.length === 0 && (
                 <p className="text-sm text-gray-500 px-5 py-6 text-center">

@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { getSessionPayload } from "./session";
+import { getSessionPayload, deleteSession } from "./session";
 
 // Checagem "otimista" (só o cookie, sem ir no banco) — pra layouts/pages que só
 // precisam saber se tem alguém logado e qual o profileId/role.
@@ -25,5 +25,13 @@ export const getCurrentProfile = cache(async () => {
   const session = await verifySession();
   const profile = await prisma.profile.findUnique({ where: { id: session.profileId } });
   if (!profile) redirect("/sign-in");
+
+  // Membro desativado pelo gestor — derruba a sessão na hora, sem esperar expirar.
+  const membership = await prisma.teamMember.findUnique({ where: { profileId: profile.id }, select: { active: true } });
+  if (membership && !membership.active) {
+    await deleteSession();
+    redirect("/sign-in");
+  }
+
   return profile;
 });

@@ -559,6 +559,10 @@ model TeamMember {
   accessProfileId String?
   accessProfile   CrmAccessProfile? @relation(fields: [accessProfileId], references: [id], onDelete: SetNull)
 
+  // Inativo = mantém no time (histórico, departamento, perfil) mas perde o login —
+  // diferente de excluir, que apaga o vínculo com a equipe de vez.
+  active Boolean @default(true)
+
   @@unique([teamId, profileId])
 }
 

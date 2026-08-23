@@ -31,6 +31,11 @@ export async function POST(req: NextRequest) {
     const valid = await verifyPassword(password, profile.passwordHash);
     if (!valid) return NextResponse.json({ error: INVALID }, { status: 401 });
 
+    const membership = await prisma.teamMember.findUnique({ where: { profileId: profile.id } });
+    if (membership && !membership.active) {
+      return NextResponse.json({ error: "Seu acesso foi desativado. Fale com o gestor da equipe." }, { status: 401 });
+    }
+
     await createSession(profile.id, profile.role, profile.onboarded);
 
     return NextResponse.json({ ok: true, onboarded: profile.onboarded });
