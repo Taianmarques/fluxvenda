@@ -37,9 +37,6 @@ export type CrmCategoryDef = {
 };
 
 export const CRM_CATEGORIES: CrmCategoryDef[] = [
-  { key: "dashboards", label: "Dashboards", variant: "accordion", pages: [
-    { key: "dashboards", label: "Visão Geral", suffix: "/dashboards", icon: LayoutDashboard },
-  ] },
   { key: "atendimento", label: "Atendimento", variant: "accordion", pages: [
     { key: "mensagens", label: "Mensagens", suffix: "", icon: MessageCircle },
     { key: "aovivo", label: "Ao vivo", suffix: "/aovivo", icon: Radio, managerOnly: true },
@@ -49,6 +46,9 @@ export const CRM_CATEGORIES: CrmCategoryDef[] = [
     { key: "pipeline", label: "Pipeline", suffix: "/pipeline", icon: KanbanSquare },
     { key: "vendas", label: "Vendas", suffix: "/vendas", icon: Wallet },
     { key: "comercio", label: "Produtos", suffix: "/comercio", icon: ShoppingCart },
+  ] },
+  { key: "dashboards", label: "Dashboards", variant: "accordion", pages: [
+    { key: "dashboards", label: "Visão Geral", suffix: "/dashboards", icon: LayoutDashboard },
   ] },
   { key: "marketing", label: "Marketing", variant: "flyout", pages: [
     { key: "campanhas", label: "Campanhas", suffix: "/campanhas", icon: Megaphone, managerOnly: true },

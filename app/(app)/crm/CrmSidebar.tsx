@@ -209,7 +209,13 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo 
   const ACCORDION_CATEGORIES = CATEGORIES.filter(c => c.variant === "accordion" && c.items.length > 1);
   const FLYOUT_CATEGORIES = CATEGORIES.filter(c => c.variant === "flyout" && c.items.length > 1);
 
-  const FLAT_NAV: NavItem[] = [...(isManager ? [HUB_ITEM] : []), ...CATEGORIES.flatMap(c => c.items)];
+  // Ordem do menu mobile acompanha o desktop: Atendimento/Vendas primeiro, Hub de IA e
+  // Visão Geral logo depois, resto por último.
+  const FLAT_NAV: NavItem[] = [
+    ...CATEGORIES.filter(c => c.key === "atendimento" || c.key === "vendas").flatMap(c => c.items),
+    ...(isManager ? [HUB_ITEM] : []),
+    ...CATEGORIES.filter(c => c.key !== "atendimento" && c.key !== "vendas").flatMap(c => c.items),
+  ];
 
   // Categorias abertas no menu desktop — a que contém a página atual abre sozinha; as demais
   // o usuário abre/fecha manualmente, e várias podem ficar abertas ao mesmo tempo.
@@ -334,30 +340,33 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo 
       )}
 
       <nav className={`flex-1 overflow-y-auto py-4 space-y-0.5 ${collapsed ? "px-2" : "px-3"}`}>
-        {/* Hub fica fixo no topo, fora de qualquer categoria — só pro gestor */}
-        {isManager && (() => {
-          const active = isActive(HUB_ITEM);
-          return (
-            <>
-              <Link
-                href={HUB_ITEM.href}
-                onClick={() => { if (pathname !== HUB_ITEM.href) setNavigatingTo(HUB_ITEM.href); }}
-                title={collapsed ? HUB_ITEM.label : undefined}
-                className={`flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium border-l-2 transition-colors ${
-                  collapsed ? "justify-center px-0" : "px-3"
-                } ${active ? "text-white bg-blue-500/10 border-blue-500" : "text-gray-400 border-transparent hover:text-white hover:bg-white/5"}`}
-              >
-                <HUB_ITEM.icon size={17} className={active ? "text-blue-400" : ""} />
-                {!collapsed && HUB_ITEM.label}
-              </Link>
-              <div className="border-t border-gray-800 my-2" />
-            </>
-          );
-        })()}
-
         {collapsed
           ? (
             <>
+              {ACCORDION_CATEGORIES.map(cat => (
+                <CategoryFlyout key={cat.key} label={cat.label} icon={CATEGORY_ICONS[cat.key]} items={cat.items} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} collapsed />
+              ))}
+
+              {/* Hub de IA e Visão Geral ficam abaixo de Atendimento e Vendas — só pro gestor */}
+              {isManager && (() => {
+                const active = isActive(HUB_ITEM);
+                return (
+                  <>
+                    <div className="border-t border-gray-800 my-2" />
+                    <Link
+                      href={HUB_ITEM.href}
+                      onClick={() => { if (pathname !== HUB_ITEM.href) setNavigatingTo(HUB_ITEM.href); }}
+                      title={HUB_ITEM.label}
+                      className={`flex items-center justify-center py-2.5 rounded-xl transition-colors ${
+                        active ? "text-white bg-blue-500/10" : "text-gray-400 hover:text-white hover:bg-white/5"
+                      }`}
+                    >
+                      <HUB_ITEM.icon size={17} className={active ? "text-blue-400" : ""} />
+                    </Link>
+                  </>
+                );
+              })()}
+
               {SINGLE_ITEM_CATEGORIES.map(cat => {
                 const item = cat.items[0];
                 const active = isActive(item);
@@ -375,13 +384,38 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo 
                   </Link>
                 );
               })}
-              {[...ACCORDION_CATEGORIES, ...FLYOUT_CATEGORIES].map(cat => (
+
+              {FLYOUT_CATEGORIES.map(cat => (
                 <CategoryFlyout key={cat.key} label={cat.label} icon={CATEGORY_ICONS[cat.key]} items={cat.items} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} collapsed />
               ))}
             </>
           )
           : (
             <>
+              {ACCORDION_CATEGORIES.map(cat => (
+                <CategoryAccordion key={cat.key} cat={cat} isOpen={openCategories.has(cat.key)} onToggle={toggleCategory} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} />
+              ))}
+
+              {/* Hub de IA e Visão Geral ficam abaixo de Atendimento e Vendas — só pro gestor */}
+              {isManager && (() => {
+                const active = isActive(HUB_ITEM);
+                return (
+                  <>
+                    <div className="border-t border-gray-800 my-2" />
+                    <Link
+                      href={HUB_ITEM.href}
+                      onClick={() => { if (pathname !== HUB_ITEM.href) setNavigatingTo(HUB_ITEM.href); }}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium border-l-2 transition-colors ${
+                        active ? "text-white bg-blue-500/10 border-blue-500" : "text-gray-400 border-transparent hover:text-white hover:bg-white/5"
+                      }`}
+                    >
+                      <HUB_ITEM.icon size={17} className={active ? "text-blue-400" : ""} />
+                      {HUB_ITEM.label}
+                    </Link>
+                  </>
+                );
+              })()}
+
               {SINGLE_ITEM_CATEGORIES.map(cat => {
                 const item = cat.items[0];
                 const active = isActive(item);
@@ -399,10 +433,6 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo 
                   </Link>
                 );
               })}
-
-              {ACCORDION_CATEGORIES.map(cat => (
-                <CategoryAccordion key={cat.key} cat={cat} isOpen={openCategories.has(cat.key)} onToggle={toggleCategory} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} />
-              ))}
 
               {FLYOUT_CATEGORIES.map(cat => (
                 <CategoryFlyout key={cat.key} label={cat.label} icon={CATEGORY_ICONS[cat.key]} items={cat.items} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} />
