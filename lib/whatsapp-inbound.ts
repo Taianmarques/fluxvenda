@@ -1229,6 +1229,10 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
   // Canal pausado só pra IA (independente de "active", que desliga o canal inteiro) — a
   // mensagem já foi salva acima, só não gera resposta automática
   if (config.whatsappAiPaused) return;
+  // Agente ainda não configurado (sem systemPrompt) — conectar o canal não exige configurar
+  // o agente primeiro (ver checklist de início do CRM). A conversa aparece normal na caixa
+  // de entrada pro atendente responder na mão; só a IA não tem o que usar pra responder.
+  if (!config.systemPrompt) return;
 
   // Debounce: aguarda antes de chamar a IA para contextualizar mensagens enviadas em partes.
   // Se outra mensagem do mesmo contato chegar nesse intervalo, ela é salva no banco e esta

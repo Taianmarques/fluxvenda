@@ -158,8 +158,6 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
     }
   }
 
-  if (!config.systemPrompt) { console.log("[ig-msg] no systemPrompt, dropping"); return; }
-
   // Usa "ig_" como prefixo para distinguir de números de WhatsApp no campo contactNumber
   const contactNumber = `ig_${senderIgsid}`;
 
@@ -199,6 +197,9 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
   // mensagem já foi salva acima (aparece no chat normalmente), só não gera resposta automática
   if (conversation.humanTakeover) return;
   if (config.instagramAiPaused) return;
+  // Agente ainda não configurado (sem systemPrompt) — conectar o canal não exige configurar
+  // o agente primeiro. A mensagem já foi salva acima; só a IA não tem o que usar pra responder.
+  if (!config.systemPrompt) return;
 
   // Debounce: aguarda mensagens em partes antes de responder
   const debounceMs = Number(process.env.MESSAGE_DEBOUNCE_MS ?? "8000");

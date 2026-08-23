@@ -35,8 +35,11 @@ export async function POST(req: NextRequest) {
   }
   const isGroup = Boolean(message.isGroup);
 
+  // Conectar o canal não exige ter configurado o agente antes (systemPrompt pode estar
+  // vazio) — a mensagem entra na caixa do CRM normalmente, só a IA não responde sozinha
+  // sem prompt (ver o gate em processIncomingMessage, lib/whatsapp-inbound.ts).
   const config = await prisma.agentConfig.findFirst({ where: { uazapiToken: token, active: true } });
-  if (!config || !config.systemPrompt || !config.uazapiToken) {
+  if (!config || !config.uazapiToken) {
     return NextResponse.json({ ok: true });
   }
 
