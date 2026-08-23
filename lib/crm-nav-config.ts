@@ -37,12 +37,12 @@ export type CrmCategoryDef = {
 };
 
 export const CRM_CATEGORIES: CrmCategoryDef[] = [
-  { key: "atendimento", label: "Atendimento", variant: "accordion", pages: [
+  { key: "atendimento", label: "Atendimento", variant: "flyout", pages: [
     { key: "mensagens", label: "Mensagens", suffix: "", icon: MessageCircle },
     { key: "aovivo", label: "Ao vivo", suffix: "/aovivo", icon: Radio, managerOnly: true },
     { key: "agenda", label: "Agenda", suffix: "/agenda", icon: Calendar },
   ] },
-  { key: "vendas", label: "Vendas", variant: "accordion", pages: [
+  { key: "vendas", label: "Vendas", variant: "flyout", pages: [
     { key: "pipeline", label: "Pipeline", suffix: "/pipeline", icon: KanbanSquare },
     { key: "vendas", label: "Vendas", suffix: "/vendas", icon: Wallet },
     { key: "comercio", label: "Produtos", suffix: "/comercio", icon: ShoppingCart },
