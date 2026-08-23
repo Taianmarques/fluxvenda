@@ -203,8 +203,11 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo 
     }))
     .filter(cat => cat.items.length > 0);
 
-  const ACCORDION_CATEGORIES = CATEGORIES.filter(c => c.variant === "accordion");
-  const FLYOUT_CATEGORIES = CATEGORIES.filter(c => c.variant === "flyout");
+  // Categoria com um único item visível (ex: "Dashboards" só com "Visão Geral") vira link
+  // direto — sem cabeçalho de categoria pra abrir, que ficaria redundante com o próprio item.
+  const SINGLE_ITEM_CATEGORIES = CATEGORIES.filter(c => c.items.length === 1);
+  const ACCORDION_CATEGORIES = CATEGORIES.filter(c => c.variant === "accordion" && c.items.length > 1);
+  const FLYOUT_CATEGORIES = CATEGORIES.filter(c => c.variant === "flyout" && c.items.length > 1);
 
   const FLAT_NAV: NavItem[] = [...(isManager ? [HUB_ITEM] : []), ...CATEGORIES.flatMap(c => c.items)];
 
@@ -353,11 +356,50 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo 
         })()}
 
         {collapsed
-          ? CATEGORIES.map(cat => (
-              <CategoryFlyout key={cat.key} label={cat.label} icon={CATEGORY_ICONS[cat.key]} items={cat.items} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} collapsed />
-            ))
+          ? (
+            <>
+              {SINGLE_ITEM_CATEGORIES.map(cat => {
+                const item = cat.items[0];
+                const active = isActive(item);
+                return (
+                  <Link
+                    key={cat.key}
+                    href={item.href}
+                    onClick={() => { if (pathname !== item.href) setNavigatingTo(item.href); }}
+                    title={item.label}
+                    className={`flex items-center justify-center py-2.5 rounded-xl transition-colors ${
+                      active ? "text-white bg-blue-500/10" : "text-gray-400 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    <item.icon size={17} className={active ? "text-blue-400" : ""} />
+                  </Link>
+                );
+              })}
+              {[...ACCORDION_CATEGORIES, ...FLYOUT_CATEGORIES].map(cat => (
+                <CategoryFlyout key={cat.key} label={cat.label} icon={CATEGORY_ICONS[cat.key]} items={cat.items} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} collapsed />
+              ))}
+            </>
+          )
           : (
             <>
+              {SINGLE_ITEM_CATEGORIES.map(cat => {
+                const item = cat.items[0];
+                const active = isActive(item);
+                return (
+                  <Link
+                    key={cat.key}
+                    href={item.href}
+                    onClick={() => { if (pathname !== item.href) setNavigatingTo(item.href); }}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium border-l-2 transition-colors ${
+                      active ? "text-white bg-blue-500/10 border-blue-500" : "text-gray-400 border-transparent hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    <item.icon size={16} className={active ? "text-blue-400" : ""} />
+                    {item.label}
+                  </Link>
+                );
+              })}
+
               {ACCORDION_CATEGORIES.map(cat => (
                 <CategoryAccordion key={cat.key} cat={cat} isOpen={openCategories.has(cat.key)} onToggle={toggleCategory} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} />
               ))}
