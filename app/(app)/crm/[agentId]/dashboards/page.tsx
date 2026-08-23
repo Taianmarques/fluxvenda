@@ -76,9 +76,9 @@ async function DashboardsPageContent({ params, searchParams }: {
           <p className="text-gray-400 mt-1">{DESCRIPTIONS[view]}</p>
         </div>
 
-        <div className="flex items-center justify-end gap-3 flex-wrap">
-          {view === "vendas" && <DateRangePicker from={from.toISOString()} to={to.toISOString()} />}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <DashboardTabs agentId={agentId} activeView={view} />
+          {view === "vendas" && <DateRangePicker from={from.toISOString()} to={to.toISOString()} />}
         </div>
 
         {view === "vendas" && <VendasTab agentId={agentId} config={config} from={from} to={to} />}
