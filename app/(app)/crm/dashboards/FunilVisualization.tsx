@@ -62,7 +62,7 @@ function Fatia({ wTop, wBot, color, count, label, sub, labelSide }: {
   );
 }
 
-export function FunilClient({ pipelines, leads, opportunities, compras, feedbacks, agentId }: {
+export function FunilVisualization({ pipelines, leads, opportunities, compras, feedbacks, agentId }: {
   pipelines: FunilPipeline[];
   leads: FunilLead[];
   opportunities: FunilOpp[];
@@ -151,115 +151,105 @@ export function FunilClient({ pipelines, leads, opportunities, compras, feedback
   const taxaRecompra = dados.compraram > 0 ? (dados.recompraram / dados.compraram) * 100 : 0;
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-950 text-white p-4 md:p-6">
-      <div className="max-w-3xl mx-auto space-y-5">
-        <div>
-          <p className="text-gray-400 text-sm">Atendimento</p>
-          <h1 className="text-2xl md:text-3xl font-bold mt-1 flex items-center gap-2">
-            <Filter size={26} className="text-blue-400" /> Funil
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">Ampulheta: aquisição em cima, venda no meio, retenção e expansão embaixo.</p>
-        </div>
+    <div className="max-w-3xl mx-auto space-y-5">
+      {/* Origem */}
+      <div className="grid grid-cols-3 gap-2">
+        {([
+          { key: "todos", label: "Todos", icon: Users, desc: "toda a base" },
+          { key: "inbound", label: "Inbound", icon: Inbox, desc: "chegaram pelos canais" },
+          { key: "outbound", label: "Outbound", icon: Megaphone, desc: "vieram da prospecção" },
+        ] as const).map(o => (
+          <button
+            key={o.key}
+            onClick={() => setOrigem(o.key)}
+            className={`rounded-xl border p-3 text-left transition-colors ${
+              origem === o.key ? "border-blue-500 bg-blue-500/10" : "border-gray-800 bg-gray-900 hover:border-gray-600"
+            }`}
+          >
+            <p className="text-sm font-semibold flex items-center gap-1.5"><o.icon size={14} /> {o.label}</p>
+            <p className="text-[10px] text-gray-500 mt-0.5">{o.desc}</p>
+          </button>
+        ))}
+      </div>
 
-        {/* Origem */}
-        <div className="grid grid-cols-3 gap-2">
-          {([
-            { key: "todos", label: "Todos", icon: Users, desc: "toda a base" },
-            { key: "inbound", label: "Inbound", icon: Inbox, desc: "chegaram pelos canais" },
-            { key: "outbound", label: "Outbound", icon: Megaphone, desc: "vieram da prospecção" },
-          ] as const).map(o => (
-            <button
-              key={o.key}
-              onClick={() => setOrigem(o.key)}
-              className={`rounded-xl border p-3 text-left transition-colors ${
-                origem === o.key ? "border-blue-500 bg-blue-500/10" : "border-gray-800 bg-gray-900 hover:border-gray-600"
-              }`}
-            >
-              <p className="text-sm font-semibold flex items-center gap-1.5"><o.icon size={14} /> {o.label}</p>
-              <p className="text-[10px] text-gray-500 mt-0.5">{o.desc}</p>
-            </button>
-          ))}
-        </div>
-
-        {/* Resumo + seletor */}
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          {pipelines.length > 1 ? (
-            <select
-              value={pipelineId}
-              onChange={e => setPipelineId(e.target.value)}
-              className="bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-sm font-medium"
-            >
-              {pipelines.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          ) : (
-            <p className="text-sm font-medium text-gray-400">{pipeline?.name ?? "Sem pipeline"}</p>
-          )}
-          <p className="text-xs text-gray-500">
-            Lead → cliente: <span className="font-bold text-green-400">{conversaoGeral.toFixed(1)}%</span>
-            {" · "}Recompra: <span className="font-bold text-blue-400">{taxaRecompra.toFixed(0)}%</span>
-            {" · "}Receita: <span className="font-bold text-green-400">{brl(dados.receitaTotal)}</span>
-          </p>
-        </div>
-
-        {!pipeline ? (
-          <div className="bg-gray-900 border border-dashed border-gray-700 rounded-2xl p-10 text-center">
-            <Filter size={36} className="mx-auto text-gray-600 mb-3" />
-            <p className="font-medium text-gray-400">Nenhum pipeline criado</p>
-            <Link href={`/crm/${agentId}/pipeline`} className="text-sm text-blue-400 hover:text-blue-300 mt-1 inline-block">
-              Criar no Pipeline →
-            </Link>
-          </div>
+      {/* Resumo + seletor */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        {pipelines.length > 1 ? (
+          <select
+            value={pipelineId}
+            onChange={e => setPipelineId(e.target.value)}
+            className="bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-sm font-medium"
+          >
+            {pipelines.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
         ) : (
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 md:p-8">
-            {/* Triângulo invertido — aquisição */}
-            <div>
-              {linhasTopo.map((linha, i) => (
-                <Fatia
-                  key={linha.id}
-                  wTop={wTopo(i)}
-                  wBot={wTopo(i + 1)}
-                  color={AZUL}
-                  count={linha.count}
-                  label={linha.nome}
-                  sub={linha.sub}
-                  labelSide="right"
-                />
-              ))}
-            </div>
-
-            {/* Venda / Conversão */}
-            <div className="my-3 flex items-center gap-3">
-              <div className="flex-1 border-t border-dashed border-gray-600" />
-              <span className="text-xs font-semibold text-gray-300">
-                Venda / Conversão
-                <span className="text-gray-500 font-normal"> — {dados.ganhos} ganho{dados.ganhos === 1 ? "" : "s"}{dados.ganhoValor > 0 ? ` · ${brl(dados.ganhoValor)}` : ""}</span>
-              </span>
-              <div className="flex-1 border-t border-dashed border-gray-600" />
-            </div>
-
-            {/* Pirâmide — retenção e expansão */}
-            <div>
-              {linhasBaixo.map((linha, i) => (
-                <Fatia
-                  key={linha.id}
-                  wTop={wBaixo(i)}
-                  wBot={wBaixo(i + 1)}
-                  color={VERDE}
-                  count={linha.count}
-                  label={linha.nome}
-                  sub={linha.sub}
-                  labelSide="left"
-                />
-              ))}
-            </div>
-          </div>
+          <p className="text-sm font-medium text-gray-400">{pipeline?.name ?? "Sem pipeline"}</p>
         )}
-
-        <p className="text-xs text-gray-600">
-          Descoberta → decisão nas etapas do seu pipeline; depois da venda, a base verde mostra retenção (compraram),
-          satisfação (pós-venda), lealdade (recompra) e indicação (fiéis). Inbound = chegou pelos canais; Outbound = prospecção ativa.
+        <p className="text-xs text-gray-500">
+          Lead → cliente: <span className="font-bold text-green-400">{conversaoGeral.toFixed(1)}%</span>
+          {" · "}Recompra: <span className="font-bold text-blue-400">{taxaRecompra.toFixed(0)}%</span>
+          {" · "}Receita: <span className="font-bold text-green-400">{brl(dados.receitaTotal)}</span>
         </p>
       </div>
+
+      {!pipeline ? (
+        <div className="bg-gray-900 border border-dashed border-gray-700 rounded-2xl p-10 text-center">
+          <Filter size={36} className="mx-auto text-gray-600 mb-3" />
+          <p className="font-medium text-gray-400">Nenhum pipeline criado</p>
+          <Link href={`/crm/${agentId}/pipeline`} className="text-sm text-blue-400 hover:text-blue-300 mt-1 inline-block">
+            Criar no Pipeline →
+          </Link>
+        </div>
+      ) : (
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 md:p-8">
+          {/* Triângulo invertido — aquisição */}
+          <div>
+            {linhasTopo.map((linha, i) => (
+              <Fatia
+                key={linha.id}
+                wTop={wTopo(i)}
+                wBot={wTopo(i + 1)}
+                color={AZUL}
+                count={linha.count}
+                label={linha.nome}
+                sub={linha.sub}
+                labelSide="right"
+              />
+            ))}
+          </div>
+
+          {/* Venda / Conversão */}
+          <div className="my-3 flex items-center gap-3">
+            <div className="flex-1 border-t border-dashed border-gray-600" />
+            <span className="text-xs font-semibold text-gray-300">
+              Venda / Conversão
+              <span className="text-gray-500 font-normal"> — {dados.ganhos} ganho{dados.ganhos === 1 ? "" : "s"}{dados.ganhoValor > 0 ? ` · ${brl(dados.ganhoValor)}` : ""}</span>
+            </span>
+            <div className="flex-1 border-t border-dashed border-gray-600" />
+          </div>
+
+          {/* Pirâmide — retenção e expansão */}
+          <div>
+            {linhasBaixo.map((linha, i) => (
+              <Fatia
+                key={linha.id}
+                wTop={wBaixo(i)}
+                wBot={wBaixo(i + 1)}
+                color={VERDE}
+                count={linha.count}
+                label={linha.nome}
+                sub={linha.sub}
+                labelSide="left"
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      <p className="text-xs text-gray-600">
+        Descoberta → decisão nas etapas do seu pipeline; depois da venda, a base verde mostra retenção (compraram),
+        satisfação (pós-venda), lealdade (recompra) e indicação (fiéis). Inbound = chegou pelos canais; Outbound = prospecção ativa.
+      </p>
     </div>
   );
 }

@@ -9,14 +9,16 @@ import { VisaoGeralTab } from "../../dashboards/VisaoGeralTab";
 import { AgendamentosTab } from "../../dashboards/AgendamentosTab";
 import { VendasTab } from "../../dashboards/VendasTab";
 import { MeuDesempenhoTab } from "../../dashboards/MeuDesempenhoTab";
+import { FunilTab } from "../../dashboards/FunilTab";
 
-const VIEWS: DashboardView[] = ["visaogeral", "agendamentos", "vendas", "meudesempenho"];
+const VIEWS: DashboardView[] = ["vendas", "visaogeral", "agendamentos", "meudesempenho", "funil"];
 
 const DESCRIPTIONS: Record<DashboardView, string> = {
+  vendas: "Desempenho comercial no período, comparado ao período anterior de mesma duração.",
   visaogeral: "Resumo de atendimento, equipe, leads e vendas dos últimos 30 dias.",
   agendamentos: "Volume, status e desempenho dos agendamentos feitos pelo agente.",
-  vendas: "Desempenho comercial no período, comparado ao período anterior de mesma duração.",
   meudesempenho: "Seus negócios e carteira de clientes — meta e negócios do mês atual.",
+  funil: "Ampulheta: aquisição em cima, venda no meio, retenção e expansão embaixo.",
 };
 
 export default function DashboardsPage(props: {
@@ -39,7 +41,7 @@ async function DashboardsPageContent({ params, searchParams }: {
 
   const { agentId } = await params;
   const sp = await searchParams;
-  const view: DashboardView = VIEWS.includes(sp.view as DashboardView) ? (sp.view as DashboardView) : "visaogeral";
+  const view: DashboardView = VIEWS.includes(sp.view as DashboardView) ? (sp.view as DashboardView) : "vendas";
 
   const result = await getAgentConfigWithRole(user.id, agentId);
   const config = result?.config;
@@ -71,10 +73,11 @@ async function DashboardsPageContent({ params, searchParams }: {
           <DashboardTabs agentId={agentId} activeView={view} />
         </div>
 
+        {view === "vendas" && <VendasTab agentId={agentId} config={config} searchParams={sp} />}
         {view === "visaogeral" && <VisaoGeralTab agentId={agentId} config={config} />}
         {view === "agendamentos" && <AgendamentosTab agentId={agentId} config={config} />}
-        {view === "vendas" && <VendasTab agentId={agentId} config={config} searchParams={sp} />}
         {view === "meudesempenho" && <MeuDesempenhoTab agentId={agentId} config={config} userId={user.id} />}
+        {view === "funil" && <FunilTab agentId={agentId} config={config} />}
       </div>
     </div>
   );

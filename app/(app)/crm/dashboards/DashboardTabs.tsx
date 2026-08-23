@@ -1,15 +1,16 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { LayoutDashboard, CalendarCheck, BarChart3, User, type LucideIcon } from "lucide-react";
+import { LayoutDashboard, CalendarCheck, BarChart3, User, Filter, type LucideIcon } from "lucide-react";
 
-export type DashboardView = "visaogeral" | "agendamentos" | "vendas" | "meudesempenho";
+export type DashboardView = "vendas" | "visaogeral" | "agendamentos" | "meudesempenho" | "funil";
 
 const TABS: { key: DashboardView; label: string; icon: LucideIcon }[] = [
+  { key: "vendas", label: "Vendas", icon: BarChart3 },
   { key: "visaogeral", label: "Visão Geral", icon: LayoutDashboard },
   { key: "agendamentos", label: "Agendamentos", icon: CalendarCheck },
-  { key: "vendas", label: "Vendas", icon: BarChart3 },
   { key: "meudesempenho", label: "Meu Desempenho", icon: User },
+  { key: "funil", label: "Funil", icon: Filter },
 ];
 
 // Alterna o "tipo" de dashboard exibido dentro da mesma página, via ?view= — troca a

@@ -1,6 +1,6 @@
 import {
   MessageCircle, KanbanSquare, Calendar, Wallet, ShoppingCart, Landmark, Target,
-  Wifi, GitBranch, Briefcase, Zap, Filter, UserPlus, ClipboardCheck, Radio,
+  Wifi, GitBranch, Briefcase, Zap, UserPlus, ClipboardCheck, Radio,
   Megaphone, Phone, Coins, BookUser, BookOpen, LayoutDashboard, Goal, MessageSquareText, ThumbsDown, type LucideIcon,
 } from "lucide-react";
 
@@ -8,14 +8,14 @@ import {
 // por página) e pela UI de perfis de acesso em EquipeClient (checklist), pra nunca ficar
 // dessincronizada entre essas três coisas.
 //
-// "dashboards" cobre as 4 visões (Visão Geral/Agendamentos/Vendas/Meu Desempenho) numa página
-// só, com abas internas (?view=) em vez de 4 entradas de menu — ver app/(app)/crm/dashboards/.
+// "dashboards" cobre as 5 visões (Vendas/Visão Geral/Agendamentos/Meu Desempenho/Funil) numa
+// página só, com abas internas (?view=) em vez de 5 entradas de menu — ver app/(app)/crm/dashboards/.
 export type CrmPageKey =
   | "mensagens" | "aovivo"
   | "dashboards"
   | "pipeline" | "agenda" | "vendas" | "comercio"
   | "campanhas" | "ligacoes" | "prospeccao"
-  | "cobranca" | "funil" | "carteira" | "contatos"
+  | "cobranca" | "carteira" | "contatos"
   | "automacao" | "condicoes"
   | "canais" | "equipe" | "auditoria" | "creditos" | "conhecimento" | "metas" | "mensagensrapidas" | "motivosperda";
 
@@ -58,7 +58,6 @@ export const CRM_CATEGORIES: CrmCategoryDef[] = [
   ] },
   { key: "gestao", label: "Gestão", variant: "flyout", pages: [
     { key: "cobranca", label: "Cobranças", suffix: "/cobranca", icon: Landmark },
-    { key: "funil", label: "Funil", suffix: "/funil", icon: Filter },
     { key: "carteira", label: "Carteira", suffix: "/carteira", icon: Briefcase },
     { key: "contatos", label: "Contatos", suffix: "/contatos", icon: BookUser },
   ] },
