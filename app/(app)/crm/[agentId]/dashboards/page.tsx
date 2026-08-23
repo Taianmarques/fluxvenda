@@ -10,6 +10,8 @@ import { AgendamentosTab } from "../../dashboards/AgendamentosTab";
 import { VendasTab } from "../../dashboards/VendasTab";
 import { MeuDesempenhoTab } from "../../dashboards/MeuDesempenhoTab";
 import { FunilTab } from "../../dashboards/FunilTab";
+import { DateRangePicker } from "../../dashboards/DateRangePicker";
+import { DAY_MS } from "../../dashboards/dashboard-utils";
 
 const VIEWS: DashboardView[] = ["vendas", "visaogeral", "agendamentos", "meudesempenho", "funil"];
 
@@ -61,19 +63,25 @@ async function DashboardsPageContent({ params, searchParams }: {
     );
   }
 
+  const now = new Date();
+  const to = sp.to ? new Date(`${sp.to}T23:59:59.999`) : now;
+  const from = sp.from ? new Date(`${sp.from}T00:00:00`) : new Date(to.getTime() - 29 * DAY_MS);
+
   return (
     <div className="h-full overflow-y-auto bg-gray-950 text-white p-6">
       <div className="max-w-6xl mx-auto space-y-6">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <p className="text-gray-400 text-sm">CRM</p>
-            <h1 className="text-3xl font-bold mt-1 flex items-center gap-2"><LayoutDashboard size={28} className="text-blue-400" /> Dashboards</h1>
-            <p className="text-gray-400 mt-1">{DESCRIPTIONS[view]}</p>
-          </div>
+        <div>
+          <p className="text-gray-400 text-sm">CRM</p>
+          <h1 className="text-3xl font-bold mt-1 flex items-center gap-2"><LayoutDashboard size={28} className="text-blue-400" /> Dashboards</h1>
+          <p className="text-gray-400 mt-1">{DESCRIPTIONS[view]}</p>
+        </div>
+
+        <div className="flex items-center justify-end gap-3 flex-wrap">
+          {view === "vendas" && <DateRangePicker from={from.toISOString()} to={to.toISOString()} />}
           <DashboardTabs agentId={agentId} activeView={view} />
         </div>
 
-        {view === "vendas" && <VendasTab agentId={agentId} config={config} searchParams={sp} />}
+        {view === "vendas" && <VendasTab agentId={agentId} config={config} from={from} to={to} />}
         {view === "visaogeral" && <VisaoGeralTab agentId={agentId} config={config} />}
         {view === "agendamentos" && <AgendamentosTab agentId={agentId} config={config} />}
         {view === "meudesempenho" && <MeuDesempenhoTab agentId={agentId} config={config} userId={user.id} />}

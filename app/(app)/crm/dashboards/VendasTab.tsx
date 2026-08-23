@@ -3,7 +3,6 @@ import { BarChart3, Wallet, TrendingUp, TrendingDown, Handshake, Users, KanbanSq
 import { prisma } from "@/lib/prisma";
 import type { AgentConfig } from "@/app/generated/prisma/client";
 import { DailyWonLostChart, AttendantDonutChart, GaugeChart } from "./DashboardCharts";
-import { DateRangePicker } from "./DateRangePicker";
 import { formatBRL, DAY_MS } from "./dashboard-utils";
 
 function pctChange(current: number, previous: number): number | null {
@@ -22,14 +21,13 @@ function ChangeBadge({ pct }: { pct: number | null }) {
   );
 }
 
-export async function VendasTab({ agentId, config, searchParams }: {
+export async function VendasTab({ agentId, config, from, to }: {
   agentId: string;
   config: AgentConfig;
-  searchParams: { from?: string; to?: string };
+  from: Date;
+  to: Date;
 }) {
   const now = new Date();
-  const to = searchParams.to ? new Date(`${searchParams.to}T23:59:59.999`) : now;
-  const from = searchParams.from ? new Date(`${searchParams.from}T00:00:00`) : new Date(to.getTime() - 29 * DAY_MS);
   const periodDays = Math.max(1, Math.round((to.getTime() - from.getTime()) / DAY_MS) + 1);
   const prevTo = new Date(from.getTime() - DAY_MS);
   const prevFrom = new Date(prevTo.getTime() - (periodDays - 1) * DAY_MS);
@@ -209,10 +207,6 @@ export async function VendasTab({ agentId, config, searchParams }: {
 
   return (
     <>
-      <div className="flex justify-end">
-        <DateRangePicker from={from.toISOString()} to={to.toISOString()} />
-      </div>
-
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {kpis.map(k => (
           <div key={k.label} className="bg-gray-900 border border-gray-800 rounded-2xl p-5 min-w-0">
