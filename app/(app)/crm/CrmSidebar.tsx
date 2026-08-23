@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { ArrowLeft, ChevronDown, LayoutGrid, Megaphone, TrendingUp, Zap, Settings, Headset, ShoppingBag, PanelLeftClose, PanelLeftOpen, Building2, LayoutDashboard, type LucideIcon } from "lucide-react";
+import { ArrowLeft, ChevronDown, Bot, Megaphone, TrendingUp, Zap, Settings, Headset, ShoppingBag, PanelLeftClose, PanelLeftOpen, Building2, LayoutDashboard, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { CRM_CATEGORIES, type CrmPageDef, type CrmPageKey } from "@/lib/crm-nav-config";
 import { NotificationsButton } from "./NotificationsButton";
@@ -183,7 +183,7 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo 
   // abas continuam visíveis, mas apontam pro Hub, onde o primeiro agente é criado.
   const agentPath = (suffix: string) => agentId ? `/crm/${agentId}${suffix}` : "/crm/hub";
 
-  const HUB_ITEM: NavItem = { href: "/crm/hub", label: "Hub de IA", icon: LayoutGrid, isHub: true };
+  const HUB_ITEM: NavItem = { href: "/crm/hub", label: "Hub de IA", icon: Bot, isHub: true };
 
   // Com perfil de acesso atribuído (allowedPages != null), só aparece o que está marcado —
   // inclusive as páginas managerOnly (aovivo/campanhas/auditoria) somem, já que nem são
