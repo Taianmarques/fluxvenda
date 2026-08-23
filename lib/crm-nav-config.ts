@@ -44,7 +44,6 @@ export const CRM_CATEGORIES: CrmCategoryDef[] = [
     { key: "mensagens", label: "Mensagens", suffix: "", icon: MessageCircle },
     { key: "aovivo", label: "Ao vivo", suffix: "/aovivo", icon: Radio, managerOnly: true },
     { key: "agenda", label: "Agenda", suffix: "/agenda", icon: Calendar },
-    { key: "auditoria", label: "Auditoria", suffix: "/auditoria", icon: ClipboardCheck, managerOnly: true },
   ] },
   { key: "vendas", label: "Vendas", variant: "accordion", pages: [
     { key: "pipeline", label: "Pipeline", suffix: "/pipeline", icon: KanbanSquare },
@@ -60,6 +59,7 @@ export const CRM_CATEGORIES: CrmCategoryDef[] = [
     { key: "cobranca", label: "Cobranças", suffix: "/cobranca", icon: Landmark },
     { key: "carteira", label: "Carteira", suffix: "/carteira", icon: Briefcase },
     { key: "contatos", label: "Contatos", suffix: "/contatos", icon: BookUser },
+    { key: "auditoria", label: "Auditoria", suffix: "/auditoria", icon: ClipboardCheck, managerOnly: true },
   ] },
   { key: "automacao", label: "Automação", variant: "flyout", pages: [
     { key: "automacao", label: "Automação", suffix: "/automacao", icon: Zap },
