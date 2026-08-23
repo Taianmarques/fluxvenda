@@ -41,6 +41,12 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
   const [erroMembro, setErroMembro] = useState("");
   const [sucessoMembro, setSucessoMembro] = useState("");
 
+  // Acordeon: só uma seção aberta por vez, pra página não ficar gigante
+  const [openSection, setOpenSection] = useState<"departamentos" | "perfis" | "membros" | null>("membros");
+  function toggleSection(key: "departamentos" | "perfis" | "membros") {
+    setOpenSection(s => (s === key ? null : key));
+  }
+
   // Departamentos
   const [showNovoDep, setShowNovoDep] = useState(false);
   const [depNome, setDepNome] = useState("");
@@ -291,166 +297,186 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
         )}
 
         {/* Departamentos */}
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div>
-              <p className="font-semibold text-sm flex items-center gap-1.5"><Building2 size={15} className="text-blue-400" /> Departamentos</p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                A IA transfere a conversa para o departamento certo com base na descrição do que cada um atende.
-              </p>
-            </div>
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+          <div className="flex items-center justify-between gap-3 p-5 flex-wrap">
+            <button onClick={() => toggleSection("departamentos")} className="flex-1 min-w-0 flex items-center gap-3 text-left">
+              <ChevronDown size={16} className={`text-gray-500 flex-shrink-0 transition-transform ${openSection === "departamentos" ? "rotate-180" : ""}`} />
+              <div className="min-w-0">
+                <p className="font-semibold text-sm flex items-center gap-1.5">
+                  <Building2 size={15} className="text-blue-400" /> Departamentos
+                  <span className="text-gray-500 font-normal">({departamentos.length})</span>
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5 truncate">
+                  A IA transfere a conversa para o departamento certo com base na descrição do que cada um atende.
+                </p>
+              </div>
+            </button>
             {isManager && (
               <button
-                onClick={() => setShowNovoDep(s => !s)}
-                className="flex items-center gap-1 text-xs font-medium text-blue-400 hover:text-blue-300 border border-blue-800/50 hover:border-blue-600/50 rounded-lg px-3 py-1.5 transition-colors"
+                onClick={() => { setShowNovoDep(s => !s); setOpenSection("departamentos"); }}
+                className="flex items-center gap-1 text-xs font-medium text-blue-400 hover:text-blue-300 border border-blue-800/50 hover:border-blue-600/50 rounded-lg px-3 py-1.5 transition-colors flex-shrink-0"
               >
                 <Plus size={12} /> Novo departamento
               </button>
             )}
           </div>
 
-          {showNovoDep && isManager && (
-            <div className="bg-gray-950 border border-gray-800 rounded-xl p-3 space-y-2">
-              <input
-                value={depNome}
-                onChange={e => setDepNome(e.target.value)}
-                placeholder="Nome (ex: Financeiro, Suporte, Vendas...)"
-                className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm"
-                maxLength={40}
-              />
-              <input
-                value={depDescricao}
-                onChange={e => setDepDescricao(e.target.value)}
-                placeholder="O que esse setor atende (a IA usa isso pra decidir a transferência)"
-                className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm"
-                maxLength={300}
-              />
-              <div className="flex gap-2">
-                <button onClick={handleCriarDepartamento} disabled={salvandoDep || !depNome.trim()} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium">
-                  {salvandoDep ? "Criando..." : "Criar"}
-                </button>
-                <button onClick={() => setShowNovoDep(false)} className="text-xs text-gray-400 hover:text-gray-200 px-2">Cancelar</button>
-              </div>
-            </div>
-          )}
-
-          {departamentos.length === 0 ? (
-            <p className="text-xs text-gray-600">Nenhum departamento ainda. Sem departamentos, a IA não oferece transferência por setor.</p>
-          ) : (
-            <div className="space-y-1.5">
-              {departamentos.map(d => (
-                <div key={d.id} className="flex items-center gap-3 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2.5">
-                  <Building2 size={14} className="text-gray-500 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">{d.nome}</p>
-                    {d.descricao && <p className="text-xs text-gray-500 truncate">{d.descricao}</p>}
-                  </div>
-                  <span className="text-[10px] text-gray-500 flex-shrink-0">
-                    {members.filter(m => m.departamentoId === d.id).length} membro{members.filter(m => m.departamentoId === d.id).length === 1 ? "" : "s"}
-                  </span>
-                  {isManager && (
-                    <button onClick={() => handleExcluirDepartamento(d)} className="text-gray-600 hover:text-red-400 flex-shrink-0">
-                      <X size={13} />
+          {openSection === "departamentos" && (
+            <div className="px-5 pb-5 space-y-3">
+              {showNovoDep && isManager && (
+                <div className="bg-gray-950 border border-gray-800 rounded-xl p-3 space-y-2">
+                  <input
+                    value={depNome}
+                    onChange={e => setDepNome(e.target.value)}
+                    placeholder="Nome (ex: Financeiro, Suporte, Vendas...)"
+                    className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm"
+                    maxLength={40}
+                  />
+                  <input
+                    value={depDescricao}
+                    onChange={e => setDepDescricao(e.target.value)}
+                    placeholder="O que esse setor atende (a IA usa isso pra decidir a transferência)"
+                    className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm"
+                    maxLength={300}
+                  />
+                  <div className="flex gap-2">
+                    <button onClick={handleCriarDepartamento} disabled={salvandoDep || !depNome.trim()} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium">
+                      {salvandoDep ? "Criando..." : "Criar"}
                     </button>
-                  )}
+                    <button onClick={() => setShowNovoDep(false)} className="text-xs text-gray-400 hover:text-gray-200 px-2">Cancelar</button>
+                  </div>
                 </div>
-              ))}
+              )}
+
+              {departamentos.length === 0 ? (
+                <p className="text-xs text-gray-600">Nenhum departamento ainda. Sem departamentos, a IA não oferece transferência por setor.</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {departamentos.map(d => (
+                    <div key={d.id} className="flex items-center gap-3 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2.5">
+                      <Building2 size={14} className="text-gray-500 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">{d.nome}</p>
+                        {d.descricao && <p className="text-xs text-gray-500 truncate">{d.descricao}</p>}
+                      </div>
+                      <span className="text-[10px] text-gray-500 flex-shrink-0">
+                        {members.filter(m => m.departamentoId === d.id).length} membro{members.filter(m => m.departamentoId === d.id).length === 1 ? "" : "s"}
+                      </span>
+                      {isManager && (
+                        <button onClick={() => handleExcluirDepartamento(d)} className="text-gray-600 hover:text-red-400 flex-shrink-0">
+                          <X size={13} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
 
         {/* Perfis de acesso */}
         {isManager && (
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div>
-                <p className="font-semibold text-sm flex items-center gap-1.5"><Shield size={15} className="text-blue-400" /> Perfis de acesso</p>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  Escolha quais páginas do CRM cada perfil enxerga. Membro sem perfil atribuído mantém acesso total.
-                </p>
-              </div>
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+            <div className="flex items-center justify-between gap-3 p-5 flex-wrap">
+              <button onClick={() => toggleSection("perfis")} className="flex-1 min-w-0 flex items-center gap-3 text-left">
+                <ChevronDown size={16} className={`text-gray-500 flex-shrink-0 transition-transform ${openSection === "perfis" ? "rotate-180" : ""}`} />
+                <div className="min-w-0">
+                  <p className="font-semibold text-sm flex items-center gap-1.5">
+                    <Shield size={15} className="text-blue-400" /> Perfis de acesso
+                    <span className="text-gray-500 font-normal">({perfis.length})</span>
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5 truncate">
+                    Escolha quais páginas do CRM cada perfil enxerga. Membro sem perfil atribuído mantém acesso total.
+                  </p>
+                </div>
+              </button>
               <button
-                onClick={() => setShowNovoPerfil(s => !s)}
-                className="flex items-center gap-1 text-xs font-medium text-blue-400 hover:text-blue-300 border border-blue-800/50 hover:border-blue-600/50 rounded-lg px-3 py-1.5 transition-colors"
+                onClick={() => { setShowNovoPerfil(s => !s); setOpenSection("perfis"); }}
+                className="flex items-center gap-1 text-xs font-medium text-blue-400 hover:text-blue-300 border border-blue-800/50 hover:border-blue-600/50 rounded-lg px-3 py-1.5 transition-colors flex-shrink-0"
               >
                 <Plus size={12} /> Novo perfil
               </button>
             </div>
 
-            {showNovoPerfil && (
-              <div className="bg-gray-950 border border-gray-800 rounded-xl p-3 space-y-2">
-                <input
-                  value={perfilNome}
-                  onChange={e => setPerfilNome(e.target.value)}
-                  placeholder="Nome (ex: Atendente, Financeiro...)"
-                  className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm"
-                  maxLength={40}
-                />
-                <div className="flex gap-2">
-                  <button onClick={handleCriarPerfil} disabled={salvandoPerfil || !perfilNome.trim()} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium">
-                    {salvandoPerfil ? "Criando..." : "Criar"}
-                  </button>
-                  <button onClick={() => setShowNovoPerfil(false)} className="text-xs text-gray-400 hover:text-gray-200 px-2">Cancelar</button>
-                </div>
-              </div>
-            )}
-
-            {perfis.length === 0 ? (
-              <p className="text-xs text-gray-600">Nenhum perfil ainda. Sem perfis, todos os membros têm acesso total ao CRM.</p>
-            ) : (
-              <div className="space-y-1.5">
-                {perfis.map(p => {
-                  const membrosCount = members.filter(m => m.accessProfileId === p.id).length;
-                  const expanded = expandedPerfilId === p.id;
-                  return (
-                    <div key={p.id} className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2.5">
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => setExpandedPerfilId(expanded ? null : p.id)}
-                          className="flex-1 min-w-0 flex items-center gap-2 text-left"
-                        >
-                          <ChevronDown size={13} className={`text-gray-500 flex-shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`} />
-                          <span className="text-sm font-medium truncate">{p.nome}</span>
-                          <span className="text-[10px] text-gray-500 flex-shrink-0">{p.allowedPages.length} página{p.allowedPages.length === 1 ? "" : "s"}</span>
-                        </button>
-                        <span className="text-[10px] text-gray-500 flex-shrink-0">
-                          {membrosCount} membro{membrosCount === 1 ? "" : "s"}
-                        </span>
-                        <button onClick={() => handleRenomearPerfil(p)} className="text-gray-600 hover:text-gray-300 flex-shrink-0">
-                          <Pencil size={13} />
-                        </button>
-                        <button onClick={() => handleExcluirPerfil(p)} className="text-gray-600 hover:text-red-400 flex-shrink-0">
-                          <X size={13} />
-                        </button>
-                      </div>
-
-                      {expanded && (
-                        <div className="mt-3 pt-3 border-t border-gray-800 grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
-                          {CRM_CATEGORIES.map(cat => {
-                            const pages = cat.pages.filter(pg => !pg.managerOnly);
-                            if (pages.length === 0) return null;
-                            return (
-                              <div key={cat.key} className="space-y-1">
-                                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{cat.label}</p>
-                                {pages.map(pg => (
-                                  <label key={pg.key} className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
-                                    <input
-                                      type="checkbox"
-                                      checked={p.allowedPages.includes(pg.key)}
-                                      onChange={() => handleTogglePagina(p, pg.key)}
-                                      className="rounded border-gray-700 bg-gray-900"
-                                    />
-                                    {pg.label}
-                                  </label>
-                                ))}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
+            {openSection === "perfis" && (
+              <div className="px-5 pb-5 space-y-3">
+                {showNovoPerfil && (
+                  <div className="bg-gray-950 border border-gray-800 rounded-xl p-3 space-y-2">
+                    <input
+                      value={perfilNome}
+                      onChange={e => setPerfilNome(e.target.value)}
+                      placeholder="Nome (ex: Atendente, Financeiro...)"
+                      className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm"
+                      maxLength={40}
+                    />
+                    <div className="flex gap-2">
+                      <button onClick={handleCriarPerfil} disabled={salvandoPerfil || !perfilNome.trim()} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium">
+                        {salvandoPerfil ? "Criando..." : "Criar"}
+                      </button>
+                      <button onClick={() => setShowNovoPerfil(false)} className="text-xs text-gray-400 hover:text-gray-200 px-2">Cancelar</button>
                     </div>
-                  );
-                })}
+                  </div>
+                )}
+
+                {perfis.length === 0 ? (
+                  <p className="text-xs text-gray-600">Nenhum perfil ainda. Sem perfis, todos os membros têm acesso total ao CRM.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {perfis.map(p => {
+                      const membrosCount = members.filter(m => m.accessProfileId === p.id).length;
+                      const expanded = expandedPerfilId === p.id;
+                      return (
+                        <div key={p.id} className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2.5">
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => setExpandedPerfilId(expanded ? null : p.id)}
+                              className="flex-1 min-w-0 flex items-center gap-2 text-left"
+                            >
+                              <ChevronDown size={13} className={`text-gray-500 flex-shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`} />
+                              <span className="text-sm font-medium truncate">{p.nome}</span>
+                              <span className="text-[10px] text-gray-500 flex-shrink-0">{p.allowedPages.length} página{p.allowedPages.length === 1 ? "" : "s"}</span>
+                            </button>
+                            <span className="text-[10px] text-gray-500 flex-shrink-0">
+                              {membrosCount} membro{membrosCount === 1 ? "" : "s"}
+                            </span>
+                            <button onClick={() => handleRenomearPerfil(p)} className="text-gray-600 hover:text-gray-300 flex-shrink-0">
+                              <Pencil size={13} />
+                            </button>
+                            <button onClick={() => handleExcluirPerfil(p)} className="text-gray-600 hover:text-red-400 flex-shrink-0">
+                              <X size={13} />
+                            </button>
+                          </div>
+
+                          {expanded && (
+                            <div className="mt-3 pt-3 border-t border-gray-800 grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
+                              {CRM_CATEGORIES.map(cat => {
+                                const pages = cat.pages.filter(pg => !pg.managerOnly);
+                                if (pages.length === 0) return null;
+                                return (
+                                  <div key={cat.key} className="space-y-1">
+                                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{cat.label}</p>
+                                    {pages.map(pg => (
+                                      <label key={pg.key} className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
+                                        <input
+                                          type="checkbox"
+                                          checked={p.allowedPages.includes(pg.key)}
+                                          onChange={() => handleTogglePagina(p, pg.key)}
+                                          className="rounded border-gray-700 bg-gray-900"
+                                        />
+                                        {pg.label}
+                                      </label>
+                                    ))}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -458,85 +484,94 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
 
         {/* Lista de membros */}
         <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-          <p className="font-semibold p-5 pb-3">
-            Membros <span className="text-gray-500 font-normal text-sm">({members.length + 1})</span>
-          </p>
-          <div className="divide-y divide-gray-800">
-            {/* Gestor */}
-            <div className="flex items-center gap-3 px-5 py-3">
-              <div className="w-9 h-9 rounded-full bg-amber-900/40 text-amber-400 flex items-center justify-center flex-shrink-0">
-                <Crown size={15} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">
-                  {manager.name} {manager.id === currentUserId && <span className="text-gray-500 font-normal">(você)</span>}
-                </p>
-                <p className="text-xs text-gray-500 truncate">{manager.email}</p>
-              </div>
-              <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-900/40 text-amber-300 border border-amber-800/50 flex-shrink-0">
-                Gestor
-              </span>
-            </div>
+          <button
+            onClick={() => toggleSection("membros")}
+            className="w-full flex items-center justify-between gap-3 p-5 text-left hover:bg-gray-800/40 transition-colors"
+          >
+            <p className="font-semibold">
+              Membros <span className="text-gray-500 font-normal text-sm">({members.length + 1})</span>
+            </p>
+            <ChevronDown size={16} className={`text-gray-500 flex-shrink-0 transition-transform ${openSection === "membros" ? "rotate-180" : ""}`} />
+          </button>
 
-            {/* Atendentes */}
-            {members.map(m => (
-              <div key={m.memberId} className="flex items-center gap-3 px-5 py-3 flex-wrap">
-                <div className="w-9 h-9 rounded-full bg-blue-900/40 text-blue-400 flex items-center justify-center flex-shrink-0">
-                  <User size={15} />
+          {openSection === "membros" && (
+            <div className="divide-y divide-gray-800 border-t border-gray-800">
+              {/* Gestor */}
+              <div className="flex items-center gap-3 px-5 py-3">
+                <div className="w-9 h-9 rounded-full bg-amber-900/40 text-amber-400 flex items-center justify-center flex-shrink-0">
+                  <Crown size={15} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">
-                    {m.name} {m.profileId === currentUserId && <span className="text-gray-500 font-normal">(você)</span>}
+                    {manager.name} {manager.id === currentUserId && <span className="text-gray-500 font-normal">(você)</span>}
                   </p>
-                  <p className="text-xs text-gray-500 truncate">
-                    {m.email} · entrou em {new Date(m.joinedAt).toLocaleDateString("pt-BR")}
-                  </p>
+                  <p className="text-xs text-gray-500 truncate">{manager.email}</p>
                 </div>
-                {isManager && departamentos.length > 0 ? (
-                  <select
-                    value={m.departamentoId ?? ""}
-                    onChange={e => handleSetDepartamento(m.memberId, e.target.value)}
-                    className="text-xs bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 flex-shrink-0 max-w-[130px]"
-                    title="Departamento do atendente"
-                  >
-                    <option value="">Sem departamento</option>
-                    {departamentos.map(d => <option key={d.id} value={d.id}>{d.nome}</option>)}
-                  </select>
-                ) : (
-                  <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-blue-900/40 text-blue-300 border border-blue-800/50 flex-shrink-0">
-                    {departamentos.find(d => d.id === m.departamentoId)?.nome ?? "Atendente"}
-                  </span>
-                )}
-                {isManager && perfis.length > 0 && (
-                  <select
-                    value={m.accessProfileId ?? ""}
-                    onChange={e => handleSetPerfil(m.memberId, e.target.value)}
-                    className="text-xs bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 flex-shrink-0 max-w-[130px]"
-                    title="Perfil de acesso no CRM"
-                  >
-                    <option value="">Acesso total</option>
-                    {perfis.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
-                  </select>
-                )}
-                {isManager && (
-                  <button
-                    onClick={() => handleRemove(m)}
-                    disabled={removing === m.memberId}
-                    title="Remover da equipe"
-                    className="text-gray-600 hover:text-red-400 disabled:opacity-50 flex-shrink-0"
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                )}
+                <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-900/40 text-amber-300 border border-amber-800/50 flex-shrink-0">
+                  Gestor
+                </span>
               </div>
-            ))}
 
-            {members.length === 0 && (
-              <p className="text-sm text-gray-500 px-5 py-6 text-center">
-                Nenhum atendente ainda — envie o link de convite acima para adicionar o primeiro.
-              </p>
-            )}
-          </div>
+              {/* Atendentes */}
+              {members.map(m => (
+                <div key={m.memberId} className="flex items-center gap-3 px-5 py-3 flex-wrap">
+                  <div className="w-9 h-9 rounded-full bg-blue-900/40 text-blue-400 flex items-center justify-center flex-shrink-0">
+                    <User size={15} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {m.name} {m.profileId === currentUserId && <span className="text-gray-500 font-normal">(você)</span>}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate">
+                      {m.email} · entrou em {new Date(m.joinedAt).toLocaleDateString("pt-BR")}
+                    </p>
+                  </div>
+                  {isManager && departamentos.length > 0 ? (
+                    <select
+                      value={m.departamentoId ?? ""}
+                      onChange={e => handleSetDepartamento(m.memberId, e.target.value)}
+                      className="text-xs bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 flex-shrink-0 max-w-[130px]"
+                      title="Departamento do atendente"
+                    >
+                      <option value="">Sem departamento</option>
+                      {departamentos.map(d => <option key={d.id} value={d.id}>{d.nome}</option>)}
+                    </select>
+                  ) : (
+                    <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-blue-900/40 text-blue-300 border border-blue-800/50 flex-shrink-0">
+                      {departamentos.find(d => d.id === m.departamentoId)?.nome ?? "Atendente"}
+                    </span>
+                  )}
+                  {isManager && perfis.length > 0 && (
+                    <select
+                      value={m.accessProfileId ?? ""}
+                      onChange={e => handleSetPerfil(m.memberId, e.target.value)}
+                      className="text-xs bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 flex-shrink-0 max-w-[130px]"
+                      title="Perfil de acesso no CRM"
+                    >
+                      <option value="">Acesso total</option>
+                      {perfis.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                    </select>
+                  )}
+                  {isManager && (
+                    <button
+                      onClick={() => handleRemove(m)}
+                      disabled={removing === m.memberId}
+                      title="Remover da equipe"
+                      className="text-gray-600 hover:text-red-400 disabled:opacity-50 flex-shrink-0"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  )}
+                </div>
+              ))}
+
+              {members.length === 0 && (
+                <p className="text-sm text-gray-500 px-5 py-6 text-center">
+                  Nenhum atendente ainda — envie o link de convite acima para adicionar o primeiro.
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         <p className="text-xs text-gray-600">
