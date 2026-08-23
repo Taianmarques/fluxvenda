@@ -1,11 +1,17 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { getAgentConfigWithRole } from "@/lib/team";
+import { z } from "zod";
+
+const schema = z.object({
+  motivoPerdaId: z.string().nullable().optional(),
+});
 
 // Marca a negociação como perdida: move pro estágio "Perdido" do pipeline atual, se existir
 // (mesmo padrão do "ganho", que move pro "Fechado" — sem XP, perder negociação não pontua).
-export async function POST(_req: Request, { params }: { params: Promise<{ id: string; oppId: string }> }) {
+// motivoPerdaId é opcional pra não travar quem ainda não tem motivos cadastrados.
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string; oppId: string }> }) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -18,6 +24,15 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   const { config, isManager } = result;
   if (!isManager && conversation.assignedToId && conversation.assignedToId !== userId) {
     return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
+  }
+
+  const body = schema.safeParse(await req.json().catch(() => ({})));
+  if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
+  const { motivoPerdaId } = body.data;
+
+  if (motivoPerdaId) {
+    const motivo = await prisma.motivoPerda.findFirst({ where: { id: motivoPerdaId, agentConfigId: config.id } });
+    if (!motivo) return NextResponse.json({ error: "Motivo de perda inválido" }, { status: 400 });
   }
 
   const opportunity = await prisma.opportunity.findFirst({
@@ -37,7 +52,11 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
   const updated = await prisma.opportunity.update({
     where: { id: oppId },
-    data: { lostAt: new Date(), ...(lostStage && { stageId: lostStage.id, stageEnteredAt: new Date() }) },
+    data: {
+      lostAt: new Date(),
+      motivoPerdaId: motivoPerdaId || null,
+      ...(lostStage && { stageId: lostStage.id, stageEnteredAt: new Date() }),
+    },
   });
 
   return NextResponse.json({ opportunity: updated });

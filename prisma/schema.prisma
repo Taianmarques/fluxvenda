@@ -836,6 +836,7 @@ model AgentConfig {
   carteiraTouches      CarteiraTouch[]
   automacoes           Automacao[]
   campanhas            Campanha[]
+  motivosPerda         MotivoPerda[]
 
   @@index([teamId])
 }
@@ -1494,7 +1495,25 @@ model Opportunity {
   wonAt     DateTime? // quando foi marcada como ganha (null = ainda em negociação)
   lostAt    DateTime? // quando foi marcada como perdida
 
+  motivoPerdaId String?
+  motivoPerda   MotivoPerda? @relation(fields: [motivoPerdaId], references: [id], onDelete: SetNull)
+
   tasks OpportunityTask[]
+}
+
+// Motivo de perda configurável (ex: "Preço", "Escolheu concorrente", "Sem resposta") —
+// escolhido pelo atendente ao marcar uma negociação como perdida, pra virar relatório
+// em vez de texto livre solto. Gerenciado em Configurações > Motivos de perda.
+model MotivoPerda {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  agentConfigId String
+  agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id], onDelete: Cascade)
+
+  nome String
+
+  oportunidades Opportunity[]
 }
 
 // Tarefa/checklist de uma oportunidade — ex: "ligar até sexta", "enviar proposta"

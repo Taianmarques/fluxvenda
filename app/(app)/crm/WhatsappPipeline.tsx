@@ -36,6 +36,7 @@ export type PipelineOpportunity = {
   dealValue: number;
   wonAt: string | null;
   lostAt: string | null;
+  motivoPerdaNome: string | null;
   createdAt: string;
   stageEnteredAt: string;
   lastMessage: string | null;
@@ -208,7 +209,9 @@ function Card({
           <p className={`text-[9.5px] font-medium uppercase tracking-wide truncate ${t.cardSecondary}`}>Vendedor · {opp.assignedToName}</p>
         ) : <span />}
         {opp.lostAt && (
-          <span className="text-[9px] font-bold uppercase tracking-wide text-red-400 flex-shrink-0">Perdida</span>
+          <span className="text-[9px] font-bold uppercase tracking-wide text-red-400 flex-shrink-0" title={opp.motivoPerdaNome ?? undefined}>
+            Perdida{opp.motivoPerdaNome ? ` · ${opp.motivoPerdaNome}` : ""}
+          </span>
         )}
       </div>
 
@@ -512,7 +515,7 @@ function Column({
 }
 
 export function WhatsappPipeline({
-  agentId, pipelineId, stages, leadStatuses, opportunities, theme, attendants, onSelectConversation, onStagesChange, onLeadStatusesChange, onOpportunitiesChange,
+  agentId, pipelineId, stages, leadStatuses, opportunities, theme, attendants, motivosPerda, onSelectConversation, onStagesChange, onLeadStatusesChange, onOpportunitiesChange,
 }: {
   agentId: string;
   pipelineId: string;
@@ -521,12 +524,14 @@ export function WhatsappPipeline({
   opportunities: PipelineOpportunity[];
   theme: PipelineTheme;
   attendants: Attendant[];
+  motivosPerda: { id: string; nome: string }[];
   onSelectConversation: (id: string) => void;
   onStagesChange: () => void;
   onLeadStatusesChange: () => void;
   onOpportunitiesChange: () => void;
 }) {
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [perdaOppId, setPerdaOppId] = useState<string | null>(null);
   const [chatConversationId, setChatConversationId] = useState<string | null>(null);
   const [newStageName, setNewStageName] = useState("");
   const [localOpportunities, setLocalOpportunities] = useState(opportunities);
@@ -588,13 +593,24 @@ export function WhatsappPipeline({
     setLocalOpportunities(prev => prev.map(o => o.id === oppId ? { ...o, wonAt: data.opportunity.wonAt, stageId: data.opportunity.stageId } : o));
   }
 
-  async function handleMarcarPerda(oppId: string) {
-    const opp = localOpportunities.find(o => o.id === oppId);
-    if (!opp) return;
-    const res = await fetch(`/api/ferramentas/whatsapp/conversas/${opp.conversationId}/oportunidades/${oppId}/perda`, { method: "POST" });
+  function handleMarcarPerda(oppId: string) {
+    setPerdaOppId(oppId);
+  }
+
+  async function confirmarPerda(motivoPerdaId: string | null) {
+    const oppId = perdaOppId;
+    const opp = oppId ? localOpportunities.find(o => o.id === oppId) : null;
+    if (!oppId || !opp) return;
+    setPerdaOppId(null);
+    const res = await fetch(`/api/ferramentas/whatsapp/conversas/${opp.conversationId}/oportunidades/${oppId}/perda`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ motivoPerdaId }),
+    });
     const data = await res.json();
     if (!res.ok) { alert(data.error ?? "Não foi possível marcar como perda."); return; }
-    setLocalOpportunities(prev => prev.map(o => o.id === oppId ? { ...o, lostAt: data.opportunity.lostAt, stageId: data.opportunity.stageId } : o));
+    const motivoNome = motivosPerda.find(m => m.id === motivoPerdaId)?.nome ?? null;
+    setLocalOpportunities(prev => prev.map(o => o.id === oppId ? { ...o, lostAt: data.opportunity.lostAt, stageId: data.opportunity.stageId, motivoPerdaNome: motivoNome } : o));
   }
 
   async function handleTransfer(conversationId: string, attendantId: string) {
@@ -725,6 +741,41 @@ export function WhatsappPipeline({
         onClose={() => setChatConversationId(null)}
         dark={theme === "dark"}
       />
+    )}
+    {perdaOppId && (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setPerdaOppId(null)}>
+        <div
+          onClick={e => e.stopPropagation()}
+          className={`w-80 rounded-2xl border p-4 space-y-3 ${theme === "dark" ? "bg-gray-900 border-gray-800 text-white" : "bg-white border-gray-200 text-gray-900"}`}
+        >
+          <p className="text-sm font-semibold">Motivo da perda</p>
+          {motivosPerda.length === 0 ? (
+            <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
+              Nenhum motivo cadastrado ainda — configure em Configurações &gt; Motivos de perda.
+            </p>
+          ) : (
+            <div className="space-y-1 max-h-60 overflow-y-auto">
+              {motivosPerda.map(m => (
+                <button
+                  key={m.id}
+                  onClick={() => confirmarPerda(m.id)}
+                  className={`w-full text-left text-sm px-3 py-2 rounded-xl border transition-colors ${theme === "dark" ? "border-gray-800 hover:border-red-700 hover:bg-red-950/20" : "border-gray-200 hover:border-red-300 hover:bg-red-50"}`}
+                >
+                  {m.nome}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="flex items-center justify-between pt-1">
+            <button onClick={() => setPerdaOppId(null)} className={`text-xs ${theme === "dark" ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-800"}`}>
+              Cancelar
+            </button>
+            <button onClick={() => confirmarPerda(null)} className="text-xs font-medium text-red-400 hover:text-red-300">
+              Marcar sem motivo específico
+            </button>
+          </div>
+        </div>
+      </div>
     )}
     </>
   );

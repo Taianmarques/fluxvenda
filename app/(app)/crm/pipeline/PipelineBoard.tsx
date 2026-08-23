@@ -36,6 +36,7 @@ export function PipelineBoard({
   const [renameValue, setRenameValue] = useState("");
 
   const [attendants, setAttendants] = useState<Attendant[]>([]);
+  const [motivosPerda, setMotivosPerda] = useState<{ id: string; nome: string }[]>([]);
   const [filters, setFilters] = useState<PipelineFilters>(EMPTY_PIPELINE_FILTERS);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -43,6 +44,10 @@ export function PipelineBoard({
     fetch(`/api/agentes/${agentId}/atendentes`)
       .then(res => res.json())
       .then(data => { if (data.attendants) setAttendants(data.attendants); })
+      .catch(() => {});
+    fetch(`/api/agentes/${agentId}/motivos-perda`)
+      .then(res => res.json())
+      .then(data => { if (data.motivos) setMotivosPerda(data.motivos); })
       .catch(() => {});
   }, [agentId]);
 
@@ -316,6 +321,7 @@ export function PipelineBoard({
           onLeadStatusesChange={refreshLeadStatuses}
           onOpportunitiesChange={refreshOpportunities}
           attendants={attendants}
+          motivosPerda={motivosPerda}
         />
       )}
     </div>

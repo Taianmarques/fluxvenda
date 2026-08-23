@@ -29,6 +29,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ agentId
           assignedTo: { select: { name: true } },
         },
       },
+      motivoPerda: { select: { nome: true } },
     },
   });
 
@@ -59,6 +60,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ agentId
       dealValue: o.dealValue,
       wonAt: o.wonAt,
       lostAt: o.lostAt,
+      motivoPerdaNome: o.motivoPerda?.nome ?? null,
       createdAt: o.createdAt,
       stageEnteredAt: o.stageEnteredAt,
       updatedAt: o.updatedAt,
