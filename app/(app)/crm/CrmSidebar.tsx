@@ -351,19 +351,16 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo 
               {isManager && (() => {
                 const active = isActive(HUB_ITEM);
                 return (
-                  <>
-                    <div className="border-t border-gray-800 my-2" />
-                    <Link
-                      href={HUB_ITEM.href}
-                      onClick={() => { if (pathname !== HUB_ITEM.href) setNavigatingTo(HUB_ITEM.href); }}
-                      title={HUB_ITEM.label}
-                      className={`flex items-center justify-center py-2.5 rounded-xl transition-colors ${
-                        active ? "text-white bg-blue-500/10" : "text-gray-400 hover:text-white hover:bg-white/5"
-                      }`}
-                    >
-                      <HUB_ITEM.icon size={17} className={active ? "text-blue-400" : ""} />
-                    </Link>
-                  </>
+                  <Link
+                    href={HUB_ITEM.href}
+                    onClick={() => { if (pathname !== HUB_ITEM.href) setNavigatingTo(HUB_ITEM.href); }}
+                    title={HUB_ITEM.label}
+                    className={`flex items-center justify-center py-2.5 rounded-xl transition-colors ${
+                      active ? "text-white bg-blue-500/10" : "text-gray-400 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    <HUB_ITEM.icon size={17} className={active ? "text-blue-400" : ""} />
+                  </Link>
                 );
               })()}
 
@@ -400,19 +397,16 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo 
               {isManager && (() => {
                 const active = isActive(HUB_ITEM);
                 return (
-                  <>
-                    <div className="border-t border-gray-800 my-2" />
-                    <Link
-                      href={HUB_ITEM.href}
-                      onClick={() => { if (pathname !== HUB_ITEM.href) setNavigatingTo(HUB_ITEM.href); }}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium border-l-2 transition-colors ${
-                        active ? "text-white bg-blue-500/10 border-blue-500" : "text-gray-400 border-transparent hover:text-white hover:bg-white/5"
-                      }`}
-                    >
-                      <HUB_ITEM.icon size={17} className={active ? "text-blue-400" : ""} />
-                      {HUB_ITEM.label}
-                    </Link>
-                  </>
+                  <Link
+                    href={HUB_ITEM.href}
+                    onClick={() => { if (pathname !== HUB_ITEM.href) setNavigatingTo(HUB_ITEM.href); }}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium border-l-2 transition-colors ${
+                      active ? "text-white bg-blue-500/10 border-blue-500" : "text-gray-400 border-transparent hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    <HUB_ITEM.icon size={17} className={active ? "text-blue-400" : ""} />
+                    {HUB_ITEM.label}
+                  </Link>
                 );
               })()}
 
