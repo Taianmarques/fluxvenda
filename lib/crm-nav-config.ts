@@ -1,15 +1,18 @@
 import {
   MessageCircle, KanbanSquare, Calendar, Wallet, ShoppingCart, Landmark, Target,
   Wifi, GitBranch, Briefcase, Zap, Filter, UserPlus, ClipboardCheck, Radio,
-  Megaphone, Phone, Coins, BookUser, BookOpen, LayoutDashboard, CalendarCheck, BarChart3, Goal, User, MessageSquareText, ThumbsDown, type LucideIcon,
+  Megaphone, Phone, Coins, BookUser, BookOpen, LayoutDashboard, Goal, MessageSquareText, ThumbsDown, type LucideIcon,
 } from "lucide-react";
 
 // Fonte única das páginas do CRM — usada pelo CrmSidebar (menu), CrmPageGate (bloqueio
 // por página) e pela UI de perfis de acesso em EquipeClient (checklist), pra nunca ficar
 // dessincronizada entre essas três coisas.
+//
+// "dashboards" cobre as 4 visões (Visão Geral/Agendamentos/Vendas/Meu Desempenho) numa página
+// só, com abas internas (?view=) em vez de 4 entradas de menu — ver app/(app)/crm/dashboards/.
 export type CrmPageKey =
   | "mensagens" | "aovivo"
-  | "dashboards" | "agendamentos" | "vendasavancado" | "meudesempenho"
+  | "dashboards"
   | "pipeline" | "agenda" | "vendas" | "comercio"
   | "campanhas" | "ligacoes" | "prospeccao"
   | "cobranca" | "funil" | "carteira" | "contatos"
@@ -36,9 +39,6 @@ export type CrmCategoryDef = {
 export const CRM_CATEGORIES: CrmCategoryDef[] = [
   { key: "dashboards", label: "Dashboards", variant: "accordion", pages: [
     { key: "dashboards", label: "Visão Geral", suffix: "/dashboards", icon: LayoutDashboard },
-    { key: "agendamentos", label: "Agendamentos", suffix: "/agendamentos", icon: CalendarCheck },
-    { key: "vendasavancado", label: "Vendas", suffix: "/vendas-avancado", icon: BarChart3 },
-    { key: "meudesempenho", label: "Meu Desempenho", suffix: "/meu-desempenho", icon: User },
   ] },
   { key: "atendimento", label: "Atendimento", variant: "accordion", pages: [
     { key: "mensagens", label: "Mensagens", suffix: "", icon: MessageCircle },

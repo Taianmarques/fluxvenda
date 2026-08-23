@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Calendar } from "lucide-react";
 
 const PRESETS = [
@@ -16,9 +16,14 @@ function toInputValue(iso: string): string {
 export function DateRangePicker({ from, to }: { from: string; to: string }) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
+  // Preserva outros parâmetros já na URL (ex: ?view=vendas) — só troca from/to
   function apply(newFrom: string, newTo: string) {
-    router.push(`${pathname}?from=${newFrom}&to=${newTo}`);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("from", newFrom);
+    params.set("to", newTo);
+    router.push(`${pathname}?${params.toString()}`);
   }
 
   function applyPreset(days: number) {
