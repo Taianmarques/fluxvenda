@@ -563,6 +563,10 @@ model TeamMember {
   // diferente de excluir, que apaga o vínculo com a equipe de vez.
   active Boolean @default(true)
 
+  // Co-gestor: mesmo nível de acesso do dono da equipe (Team.managerId) dentro do CRM —
+  // vê e administra tudo, não só o que foi atribuído a ele. Ver lib/team.ts#listMyAgentConfigs.
+  coManager Boolean @default(false)
+
   @@unique([teamId, profileId])
 }
 

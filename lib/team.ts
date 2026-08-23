@@ -2,18 +2,37 @@ import { prisma } from "@/lib/prisma";
 
 // Acha a equipe do usuário (dono via Team.managerId, ou atendente via TeamMember) e lista
 // TODOS os agentes de WhatsApp dessa equipe — uma equipe pode ter vários agentes simultâneos,
-// cada um com seu próprio número/CRM.
+// cada um com seu próprio número/CRM. Um membro marcado como coManager (ver EquipeClient)
+// também vira isManager: true — mesmo nível de acesso do dono, mas sem ser o dono de fato.
 export async function listMyAgentConfigs(userId: string) {
   const ownTeam = await prisma.team.findUnique({ where: { managerId: userId } });
   if (ownTeam) {
     const configs = await prisma.agentConfig.findMany({ where: { teamId: ownTeam.id }, orderBy: { createdAt: "asc" } });
-    return { isManager: true as const, teamId: ownTeam.id, configs };
+    return { isManager: true, teamId: ownTeam.id, configs };
   }
 
   const membership = await prisma.teamMember.findUnique({ where: { profileId: userId } });
   if (!membership) return null;
   const configs = await prisma.agentConfig.findMany({ where: { teamId: membership.teamId }, orderBy: { createdAt: "asc" } });
-  return { isManager: false as const, teamId: membership.teamId, configs };
+  return { isManager: membership.coManager, teamId: membership.teamId, configs };
+}
+
+// Diz se userId pode administrar a equipe (criar/editar/excluir departamentos, perfis,
+// membros) — dono literal (teamManagerId) ou membro marcado coManager. Usado nas rotas
+// de /api/equipe/*, que já têm o managerId da equipe em mãos (evita reconsultar o Team).
+export async function isTeamManager(userId: string, teamId: string, teamManagerId: string) {
+  if (teamManagerId === userId) return true;
+  const membership = await prisma.teamMember.findUnique({ where: { profileId: userId } });
+  return membership?.teamId === teamId && membership.coManager === true;
+}
+
+// Time onde o usuário administra — dono (Team.managerId) ou membro coManager. Usado nas
+// rotas que ainda não têm um Team/registro carregado pra checar via isTeamManager.
+export async function getManagedTeam(userId: string) {
+  const ownTeam = await prisma.team.findUnique({ where: { managerId: userId } });
+  if (ownTeam) return ownTeam;
+  const membership = await prisma.teamMember.findUnique({ where: { profileId: userId }, include: { team: true } });
+  return membership?.coManager ? membership.team : null;
 }
 
 // Valida que agentConfigId pertence à equipe do usuário (gestor ou atendente) e devolve o

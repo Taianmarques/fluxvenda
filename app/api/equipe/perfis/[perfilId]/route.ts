@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { CONFIGURABLE_PAGE_KEYS, type CrmPageKey } from "@/lib/crm-nav-config";
+import { isTeamManager } from "@/lib/team";
 
 const patchSchema = z.object({
   nome: z.string().min(1).max(40).optional(),
@@ -11,7 +12,7 @@ const patchSchema = z.object({
 
 async function assertManager(userId: string, perfilId: string) {
   const perfil = await prisma.crmAccessProfile.findUnique({ where: { id: perfilId }, include: { team: true } });
-  if (!perfil || perfil.team.managerId !== userId) return null;
+  if (!perfil || !(await isTeamManager(userId, perfil.teamId, perfil.team.managerId))) return null;
   return perfil;
 }
 

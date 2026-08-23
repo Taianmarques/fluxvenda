@@ -5,28 +5,30 @@ import { z } from "zod";
 import { generateToken, passwordResetExpiry } from "@/lib/auth/tokens";
 import { sendTeamMemberAddedEmail } from "@/lib/email";
 import { formatPhone, sendWhatsAppText, buildWelcomeMessage } from "@/lib/whatsapp";
+import { getManagedTeam } from "@/lib/team";
 
 const schema = z.object({
   name: z.string().trim().min(2, { message: "Informe o nome." }),
   email: z.string().email({ message: "E-mail inválido." }).trim().toLowerCase(),
   phone: z.string().trim().optional(),
+  coManager: z.boolean().optional(),
 });
 
-// Gestor adiciona um membro direto na equipe, sem precisar do link de convite — a pessoa
-// recebe um e-mail pra definir senha (ou só um aviso, se já tiver conta com senha).
+// Gestor (ou co-gestor) adiciona um membro direto na equipe, sem precisar do link de
+// convite — a pessoa recebe um e-mail pra definir senha (ou só um aviso, se já tiver conta).
 export async function POST(req: NextRequest) {
   try {
     const { userId } = await auth();
     if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const team = await prisma.team.findUnique({ where: { managerId: userId } });
+    const team = await getManagedTeam(userId);
     if (!team) return NextResponse.json({ error: "Só o gestor da equipe pode adicionar membros." }, { status: 403 });
 
     const body = schema.safeParse(await req.json());
     if (!body.success) {
       return NextResponse.json({ error: body.error.issues[0]?.message ?? "Dados inválidos" }, { status: 400 });
     }
-    const { name, email, phone } = body.data;
+    const { name, email, phone, coManager } = body.data;
 
     let profile = await prisma.profile.findUnique({ where: { email } });
 
@@ -71,7 +73,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    await prisma.teamMember.create({ data: { teamId: team.id, profileId: profile.id } });
+    await prisma.teamMember.create({ data: { teamId: team.id, profileId: profile.id, coManager: coManager ?? false } });
 
     sendTeamMemberAddedEmail(profile.email, profile.name, team.name, passwordResetToken).catch(() => {});
     if (formattedPhone) {

@@ -3,17 +3,14 @@ import { auth } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { CONFIGURABLE_PAGE_KEYS, type CrmPageKey } from "@/lib/crm-nav-config";
-
-async function getManagerTeam(userId: string) {
-  return prisma.team.findUnique({ where: { managerId: userId } });
-}
+import { getManagedTeam } from "@/lib/team";
 
 export async function GET(_req: NextRequest) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Gestor ou membro — resolve o time dos dois jeitos
-  const team = await getManagerTeam(userId)
+  // Gestor, co-gestor ou atendente — resolve o time dos jeitos possíveis
+  const team = await getManagedTeam(userId)
     ?? (await prisma.teamMember.findUnique({ where: { profileId: userId }, include: { team: true } }))?.team
     ?? null;
   if (!team) return NextResponse.json({ perfis: [] });
@@ -37,7 +34,7 @@ export async function POST(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const team = await getManagerTeam(userId);
+  const team = await getManagedTeam(userId);
   if (!team) return NextResponse.json({ error: "Só o gestor cria perfis de acesso" }, { status: 403 });
 
   const body = schema.safeParse(await req.json());

@@ -71,6 +71,7 @@ async function EquipeCrmPageContent({ params }: { params: Promise<{ agentId: str
         departamentoId: m.departamentoId,
         accessProfileId: m.accessProfileId,
         active: m.active,
+        coManager: m.coManager,
       }))}
       departamentos={team.departamentos}
       perfis={team.crmAccessProfiles}

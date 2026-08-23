@@ -2,31 +2,34 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { isTeamManager } from "@/lib/team";
 
 const patchSchema = z.object({
   departamentoId: z.string().nullable().optional(),
   accessProfileId: z.string().nullable().optional(),
   active: z.boolean().optional(),
+  coManager: z.boolean().optional(),
   name: z.string().trim().min(2, { message: "Informe o nome." }).optional(),
   email: z.string().trim().toLowerCase().email({ message: "E-mail inválido." }).optional(),
   phone: z.string().trim().optional().nullable(),
 });
 
-// Edita dados do membro (nome/e-mail/telefone), departamento, perfil de acesso e/ou
-// ativo/inativo — só o gestor. Inativo = mantém no time mas perde o login (não apaga nada).
+// Edita dados do membro (nome/e-mail/telefone), departamento, perfil de acesso, ativo/inativo
+// e/ou co-gestor — gestor ou co-gestor. Inativo = mantém no time mas perde o login (não apaga
+// nada). Co-gestor = mesmo nível de acesso do dono no CRM (ver lib/team.ts).
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ memberId: string }> }) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { memberId } = await params;
   const member = await prisma.teamMember.findUnique({ where: { id: memberId }, include: { team: true } });
-  if (!member || member.team.managerId !== userId) {
+  if (!member || !(await isTeamManager(userId, member.teamId, member.team.managerId))) {
     return NextResponse.json({ error: "Membro não encontrado" }, { status: 404 });
   }
 
   const body = patchSchema.safeParse(await req.json());
   if (!body.success) return NextResponse.json({ error: body.error.issues[0]?.message ?? "Dados inválidos" }, { status: 400 });
-  const { departamentoId, accessProfileId, active, name, email, phone } = body.data;
+  const { departamentoId, accessProfileId, active, coManager, name, email, phone } = body.data;
 
   if (departamentoId) {
     const dep = await prisma.departamento.findFirst({ where: { id: departamentoId, teamId: member.teamId } });
@@ -43,10 +46,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ me
     }
   }
 
-  const teamMemberData: { departamentoId?: string | null; accessProfileId?: string | null; active?: boolean } = {};
+  const teamMemberData: { departamentoId?: string | null; accessProfileId?: string | null; active?: boolean; coManager?: boolean } = {};
   if (departamentoId !== undefined) teamMemberData.departamentoId = departamentoId;
   if (accessProfileId !== undefined) teamMemberData.accessProfileId = accessProfileId;
   if (active !== undefined) teamMemberData.active = active;
+  if (coManager !== undefined) teamMemberData.coManager = coManager;
 
   const profileData: { name?: string; email?: string; phone?: string | null } = {};
   if (name !== undefined) profileData.name = name;
@@ -61,7 +65,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ me
   return NextResponse.json({ ok: true });
 }
 
-// Remove um membro da equipe — só o gestor da equipe pode.
+// Remove um membro da equipe — gestor ou co-gestor.
 // O perfil da pessoa continua existindo; ela apenas perde o acesso à equipe/CRM.
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ memberId: string }> }) {
   const { userId } = await auth();
@@ -69,7 +73,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
 
   const { memberId } = await params;
   const member = await prisma.teamMember.findUnique({ where: { id: memberId }, include: { team: true } });
-  if (!member || member.team.managerId !== userId) {
+  if (!member || !(await isTeamManager(userId, member.teamId, member.team.managerId))) {
     return NextResponse.json({ error: "Membro não encontrado" }, { status: 404 });
   }
 

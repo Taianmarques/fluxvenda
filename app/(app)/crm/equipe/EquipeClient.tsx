@@ -15,6 +15,7 @@ type Membro = {
   departamentoId: string | null;
   accessProfileId: string | null;
   active: boolean;
+  coManager: boolean;
 };
 
 type Departamento = { id: string; nome: string; descricao: string };
@@ -39,6 +40,7 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
   const [novoNome, setNovoNome] = useState("");
   const [novoEmail, setNovoEmail] = useState("");
   const [novoTelefone, setNovoTelefone] = useState("");
+  const [novoCoManager, setNovoCoManager] = useState(false);
   const [salvandoMembro, setSalvandoMembro] = useState(false);
   const [erroMembro, setErroMembro] = useState("");
   const [sucessoMembro, setSucessoMembro] = useState("");
@@ -66,6 +68,7 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
   const [editNome, setEditNome] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editTelefone, setEditTelefone] = useState("");
+  const [editCoManager, setEditCoManager] = useState(false);
   const [salvandoEdicao, setSalvandoEdicao] = useState(false);
   const [erroEdicao, setErroEdicao] = useState("");
 
@@ -178,7 +181,7 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
       const res = await fetch("/api/equipe/membros", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: novoNome.trim(), email: novoEmail.trim(), phone: novoTelefone.trim() || undefined }),
+        body: JSON.stringify({ name: novoNome.trim(), email: novoEmail.trim(), phone: novoTelefone.trim() || undefined, coManager: novoCoManager }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -190,7 +193,7 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
           ? `${novoNome.trim()} foi adicionado(a) — mandamos um e-mail pra definir a senha.`
           : `${novoNome.trim()} foi adicionado(a) à equipe.`
       );
-      setNovoNome(""); setNovoEmail(""); setNovoTelefone("");
+      setNovoNome(""); setNovoEmail(""); setNovoTelefone(""); setNovoCoManager(false);
       router.refresh();
     } finally {
       setSalvandoMembro(false);
@@ -202,6 +205,7 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
     setEditNome(m.name);
     setEditEmail(m.email);
     setEditTelefone(m.phone ?? "");
+    setEditCoManager(m.coManager);
     setErroEdicao("");
   }
 
@@ -218,7 +222,7 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
       const res = await fetch(`/api/equipe/membros/${memberId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: editNome.trim(), email: editEmail.trim(), phone: editTelefone.trim() || null }),
+        body: JSON.stringify({ name: editNome.trim(), email: editEmail.trim(), phone: editTelefone.trim() || null, coManager: editCoManager }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -341,6 +345,15 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
                   type="tel"
                   className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm"
                 />
+                <label className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={novoCoManager}
+                    onChange={e => setNovoCoManager(e.target.checked)}
+                    className="rounded border-gray-700 bg-gray-950"
+                  />
+                  Definir como gestor (administra a equipe e vê tudo, não só o que é atribuído a ele)
+                </label>
                 {erroMembro && <p className="text-xs text-red-400">{erroMembro}</p>}
                 {sucessoMembro && <p className="text-xs text-green-400">{sucessoMembro}</p>}
                 <button
@@ -351,7 +364,7 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
                   {salvandoMembro ? "Adicionando..." : "Adicionar à equipe"}
                 </button>
                 <p className="text-xs text-gray-600">
-                  A pessoa entra direto na equipe como atendente e recebe um e-mail pra definir a senha (ou só um aviso, se já tiver conta).
+                  A pessoa entra direto na equipe e recebe um e-mail pra definir a senha (ou só um aviso, se já tiver conta).
                 </p>
               </div>
             )}
@@ -601,6 +614,15 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
                           type="tel"
                           className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm"
                         />
+                        <label className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={editCoManager}
+                            onChange={e => setEditCoManager(e.target.checked)}
+                            className="rounded border-gray-700 bg-gray-950"
+                          />
+                          Gestor (administra a equipe e vê tudo, não só o que é atribuído a ele)
+                        </label>
                         {erroEdicao && <p className="text-xs text-red-400">{erroEdicao}</p>}
                         <div className="flex gap-2">
                           <button
@@ -621,6 +643,11 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate flex items-center gap-1.5">
                             {m.name} {m.profileId === currentUserId && <span className="text-gray-500 font-normal">(você)</span>}
+                            {m.coManager && (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-900/40 text-amber-300 border border-amber-800/50">
+                                Gestor
+                              </span>
+                            )}
                             {!m.active && (
                               <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-red-900/40 text-red-300 border border-red-800/50">
                                 Inativo
