@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  MessageCircle, Search, X, Trophy, Lock, Unlock, Bot, User, UserPlus, Users,
+  MessageCircle, Search, X, Trophy, Lock, Unlock, Bot, User, UserPlus, UserCheck, Users,
   FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap, StickyNote, ArrowRightLeft, HandCoins, CalendarClock, ListFilter, Instagram, ArrowLeft,
   Reply, Forward, ChevronDown, Package, ImageOff, Pin, Maximize2, Download,
 } from "lucide-react";
@@ -1397,13 +1397,24 @@ export function WhatsappInbox({
                     </div>
 
                     {detail.status !== "FINALIZADO" && (
-                      <button
-                        onClick={detail.humanTakeover ? handleRetomar : handleAceitar}
-                        title={detail.humanTakeover ? "Atendimento manual — clique para devolver ao agente de IA" : "Agente de IA respondendo — clique para assumir"}
-                        className={`p-2 rounded-lg ${detail.humanTakeover ? `${t.toggleInactive} hover:bg-black/10` : "bg-green-600 text-white"}`}
-                      >
-                        <Bot size={16} />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={handleAceitar}
+                          disabled={detail.humanTakeover}
+                          title={detail.humanTakeover ? "Atendimento manual — você já assumiu essa conversa" : "Aceitar conversa — assumir atendimento manual"}
+                          className={`p-2 rounded-lg disabled:cursor-default ${detail.humanTakeover ? "bg-green-600 text-white" : `${t.toggleInactive} hover:bg-black/10`}`}
+                        >
+                          <UserCheck size={16} />
+                        </button>
+                        <button
+                          onClick={handleRetomar}
+                          disabled={!detail.humanTakeover}
+                          title={!detail.humanTakeover ? "Agente de IA respondendo automaticamente" : "Devolver a conversa para o agente de IA"}
+                          className={`p-2 rounded-lg disabled:cursor-default ${!detail.humanTakeover ? "bg-green-600 text-white" : `${t.toggleInactive} hover:bg-black/10`}`}
+                        >
+                          <Bot size={16} />
+                        </button>
+                      </div>
                     )}
 
                     <button
