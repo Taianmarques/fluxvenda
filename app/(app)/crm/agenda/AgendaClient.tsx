@@ -1,7 +1,47 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Calendar, Users, Settings, ArrowLeft, ArrowRight, X } from "lucide-react";
+import { Calendar, Users, Settings, ArrowLeft, ArrowRight, X, Sun, Moon } from "lucide-react";
+
+type AgendaTheme = "dark" | "light";
+const THEME_STORAGE_KEY = "agenda-theme";
+
+const THEMES = {
+  dark: {
+    root: "bg-gray-950 text-white",
+    card: "bg-gray-900 border-gray-800",
+    innerCard: "bg-gray-950 border-gray-800",
+    input: "bg-gray-950 border-gray-800 text-white placeholder:text-gray-500",
+    border: "border-gray-800",
+    subtitle: "text-gray-400",
+    secondary: "text-gray-500",
+    muted: "text-gray-600",
+    pillButton: "bg-gray-800 hover:bg-gray-700 text-white",
+    pillBg: "bg-gray-800 hover:bg-gray-700",
+    navButton: "text-gray-400 hover:text-white bg-gray-900 border-gray-800",
+    toggleBar: "bg-gray-900 border-gray-800",
+    headerCellToday: "bg-blue-950/30",
+    gridLine: "border-gray-800/60",
+    hourLabel: "text-gray-500",
+  },
+  light: {
+    root: "bg-gray-50 text-gray-900",
+    card: "bg-white border-gray-200",
+    innerCard: "bg-gray-50 border-gray-200",
+    input: "bg-white border-gray-300 text-gray-900 placeholder:text-gray-400",
+    border: "border-gray-200",
+    subtitle: "text-gray-500",
+    secondary: "text-gray-500",
+    muted: "text-gray-400",
+    pillButton: "bg-gray-200 hover:bg-gray-300 text-gray-900",
+    pillBg: "bg-gray-200 hover:bg-gray-300",
+    navButton: "text-gray-600 hover:text-gray-900 bg-white border-gray-200",
+    toggleBar: "bg-white border-gray-200",
+    headerCellToday: "bg-blue-50",
+    gridLine: "border-gray-200",
+    hourLabel: "text-gray-400",
+  },
+} satisfies Record<AgendaTheme, Record<string, string>>;
 
 type AvailabilityRule = { dayOfWeek: number; start: string; end: string };
 type Appointment = {
@@ -27,7 +67,11 @@ function rulesFromAvailability(availability: AvailabilityRule[]): Record<number,
   return base;
 }
 
-function AvailabilityEditor({ rules, onChange }: { rules: Record<number, { enabled: boolean; start: string; end: string }>; onChange: (r: Record<number, { enabled: boolean; start: string; end: string }>) => void }) {
+function AvailabilityEditor({ rules, onChange, t }: {
+  rules: Record<number, { enabled: boolean; start: string; end: string }>;
+  onChange: (r: Record<number, { enabled: boolean; start: string; end: string }>) => void;
+  t: typeof THEMES["dark"];
+}) {
   return (
     <div className="space-y-2">
       {DIAS.map((dia, i) => (
@@ -43,13 +87,13 @@ function AvailabilityEditor({ rules, onChange }: { rules: Record<number, { enabl
           <input
             type="time" disabled={!rules[i].enabled} value={rules[i].start}
             onChange={e => onChange({ ...rules, [i]: { ...rules[i], start: e.target.value } })}
-            className="bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 text-sm disabled:opacity-40"
+            className={`border rounded-lg px-2 py-1.5 text-sm disabled:opacity-40 ${t.input}`}
           />
-          <span className="text-gray-500 text-sm">até</span>
+          <span className={`text-sm ${t.secondary}`}>até</span>
           <input
             type="time" disabled={!rules[i].enabled} value={rules[i].end}
             onChange={e => onChange({ ...rules, [i]: { ...rules[i], end: e.target.value } })}
-            className="bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 text-sm disabled:opacity-40"
+            className={`border rounded-lg px-2 py-1.5 text-sm disabled:opacity-40 ${t.input}`}
           />
         </div>
       ))}
@@ -61,7 +105,7 @@ function rulesToAvailability(rules: Record<number, { enabled: boolean; start: st
   return Object.entries(rules).filter(([, r]) => r.enabled).map(([day, r]) => ({ dayOfWeek: Number(day), start: r.start, end: r.end }));
 }
 
-function ProfessionalRow({ professional, onUpdated, onDeleted }: { professional: Professional; onUpdated: () => void; onDeleted: () => void }) {
+function ProfessionalRow({ professional, onUpdated, onDeleted, t }: { professional: Professional; onUpdated: () => void; onDeleted: () => void; t: typeof THEMES["dark"] }) {
   const [editing, setEditing] = useState(false);
   const [rules, setRules] = useState(() => rulesFromAvailability(professional.availability));
   const [phone, setPhone] = useState(professional.phone ?? "");
@@ -107,11 +151,11 @@ function ProfessionalRow({ professional, onUpdated, onDeleted }: { professional:
   }
 
   return (
-    <div className="bg-gray-950 border border-gray-800 rounded-xl p-3">
+    <div className={`border rounded-xl p-3 ${t.innerCard}`}>
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="min-w-0">
-          <p className={`text-sm font-medium ${!professional.active ? "text-gray-500 line-through" : ""}`}>{professional.name}</p>
-          {professional.phone && <p className="text-xs text-gray-500 font-mono">+{professional.phone}</p>}
+          <p className={`text-sm font-medium ${!professional.active ? `${t.secondary} line-through` : ""}`}>{professional.name}</p>
+          {professional.phone && <p className={`text-xs font-mono ${t.secondary}`}>+{professional.phone}</p>}
         </div>
         <div className="flex gap-2 text-xs flex-wrap">
           {professional.accessToken && (
@@ -120,27 +164,27 @@ function ProfessionalRow({ professional, onUpdated, onDeleted }: { professional:
             </button>
           )}
           <button onClick={() => setEditing(s => !s)} className="text-blue-400 hover:text-blue-300">Editar</button>
-          <button onClick={toggleActive} className="text-gray-400 hover:text-white">{professional.active ? "Desativar" : "Ativar"}</button>
+          <button onClick={toggleActive} className={`${t.subtitle} hover:opacity-80`}>{professional.active ? "Desativar" : "Ativar"}</button>
           <button onClick={remove} className="text-red-400 hover:text-red-300">Remover</button>
         </div>
       </div>
       {editing && (
         <div className="mt-3 space-y-3">
           <div>
-            <label className="text-xs text-gray-400 block mb-1">WhatsApp do profissional (recebe aviso de cada agendamento)</label>
+            <label className={`text-xs block mb-1 ${t.subtitle}`}>WhatsApp do profissional (recebe aviso de cada agendamento)</label>
             <input
               value={phone}
               onChange={e => setPhone(e.target.value)}
               placeholder="Ex: 5584999990000 (vazio = não notifica)"
-              className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+              className={`w-full border rounded-xl px-3 py-2 text-sm ${t.input}`}
             />
           </div>
-          <p className="text-xs text-gray-500">
+          <p className={`text-xs ${t.secondary}`}>
             Deixe os horários vazios para o profissional usar o horário de funcionamento da empresa.
             Se preencher, valem só os horários que estiverem dentro do funcionamento.
           </p>
-          <AvailabilityEditor rules={rules} onChange={setRules} />
-          <button onClick={save} disabled={saving} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium">
+          <AvailabilityEditor rules={rules} onChange={setRules} t={t} />
+          <button onClick={save} disabled={saving} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium text-white">
             {saving ? "Salvando..." : "Salvar"}
           </button>
         </div>
@@ -289,6 +333,20 @@ export function AgendaClient({
   agendaAccessToken?: string | null;
   bookingSlug?: string | null;
 }) {
+  const [theme, setTheme] = useState<AgendaTheme>("dark");
+  const t = THEMES[theme];
+
+  useEffect(() => {
+    const saved = localStorage.getItem(THEME_STORAGE_KEY);
+    if (saved === "light" || saved === "dark") setTheme(saved);
+  }, []);
+
+  function toggleTheme() {
+    const next: AgendaTheme = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    localStorage.setItem(THEME_STORAGE_KEY, next);
+  }
+
   const [showSettings, setShowSettings] = useState(false);
   const [showTeam, setShowTeam] = useState(false);
   const [schedulingEnabled, setSchedulingEnabled] = useState(initialSchedulingEnabled);
@@ -475,27 +533,27 @@ export function AgendaClient({
   });
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-950 text-white p-6">
+    <div className={`h-full overflow-y-auto p-6 ${t.root}`}>
       <div className="max-w-6xl mx-auto space-y-6">
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
-            <p className="text-gray-400 text-sm">Atendimento</p>
+            <p className={`text-sm ${t.subtitle}`}>Atendimento</p>
             <h1 className="text-3xl font-bold mt-1 flex items-center gap-2"><Calendar size={28} className="text-blue-400" /> Agenda</h1>
           </div>
-          <div className="flex gap-2">
-            <button onClick={() => setShowNewForm(s => !s)} className="bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-2.5 text-sm font-medium">
+          <div className="flex gap-2 flex-wrap items-center">
+            <button onClick={() => setShowNewForm(s => !s)} className="bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-4 py-2.5 text-sm font-medium">
               + Novo agendamento
             </button>
-            <button onClick={() => setShowTeam(s => !s)} className="bg-gray-800 hover:bg-gray-700 rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-1.5">
+            <button onClick={() => setShowTeam(s => !s)} className={`rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-1.5 ${t.pillButton}`}>
               <Users size={15} /> Serviços e profissionais
             </button>
-            <button onClick={() => setShowSettings(s => !s)} className="bg-gray-800 hover:bg-gray-700 rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-1.5">
+            <button onClick={() => setShowSettings(s => !s)} className={`rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-1.5 ${t.pillButton}`}>
               <Settings size={15} /> Configurar disponibilidade
             </button>
             {agendaAccessToken && (
               <button
                 onClick={copyClinicAgendaLink}
-                className="bg-gray-800 hover:bg-gray-700 rounded-xl px-4 py-2.5 text-sm font-medium text-purple-300"
+                className={`rounded-xl px-4 py-2.5 text-sm font-medium text-purple-400 ${t.pillBg}`}
                 title="Página PWA com todos os agendamentos, para acompanhar no celular"
               >
                 {agendaLinkCopied ? "Copiado!" : "Link da agenda geral"}
@@ -504,95 +562,102 @@ export function AgendaClient({
             {bookingSlug && (
               <button
                 onClick={copyBookingLink}
-                className="bg-gray-800 hover:bg-gray-700 rounded-xl px-4 py-2.5 text-sm font-medium text-blue-300"
+                className={`rounded-xl px-4 py-2.5 text-sm font-medium text-blue-400 ${t.pillBg}`}
                 title="Página pública onde o cliente escolhe o serviço e o horário sozinho"
               >
                 {bookingLinkCopied ? "Copiado!" : "Link de agendamento"}
               </button>
             )}
+            <button
+              onClick={toggleTheme}
+              title={theme === "dark" ? "Mudar para fundo claro" : "Mudar para fundo escuro"}
+              className={`p-2.5 rounded-xl ${t.pillButton}`}
+            >
+              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
           </div>
         </div>
 
         {showNewForm && (
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
+          <div className={`border rounded-2xl p-5 space-y-3 ${t.card}`}>
             <p className="font-semibold">Novo agendamento manual</p>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
-              <input type="time" value={newTime} onChange={e => setNewTime(e.target.value)} className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
-              <input placeholder="Nome do contato" value={newContactName} onChange={e => setNewContactName(e.target.value)} className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
-              <input placeholder="Número (com DDD)" value={newContactNumber} onChange={e => setNewContactNumber(e.target.value)} className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
+              <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} className={`border rounded-xl px-3 py-2 text-sm ${t.input}`} />
+              <input type="time" value={newTime} onChange={e => setNewTime(e.target.value)} className={`border rounded-xl px-3 py-2 text-sm ${t.input}`} />
+              <input placeholder="Nome do contato" value={newContactName} onChange={e => setNewContactName(e.target.value)} className={`border rounded-xl px-3 py-2 text-sm ${t.input}`} />
+              <input placeholder="Número (com DDD)" value={newContactNumber} onChange={e => setNewContactNumber(e.target.value)} className={`border rounded-xl px-3 py-2 text-sm ${t.input}`} />
             </div>
             {(professionals.length > 0 || services.length > 0) && (
               <div className="grid grid-cols-2 gap-3">
                 {professionals.length > 0 && (
-                  <select value={newProfessionalId} onChange={e => setNewProfessionalId(e.target.value)} className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm">
+                  <select value={newProfessionalId} onChange={e => setNewProfessionalId(e.target.value)} className={`border rounded-xl px-3 py-2 text-sm ${t.input}`}>
                     <option value="">Sem profissional específico</option>
                     {professionals.filter(p => p.active).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 )}
                 {services.length > 0 && (
-                  <select value={newServiceId} onChange={e => setNewServiceId(e.target.value)} className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm">
+                  <select value={newServiceId} onChange={e => setNewServiceId(e.target.value)} className={`border rounded-xl px-3 py-2 text-sm ${t.input}`}>
                     <option value="">Sem serviço específico</option>
                     {services.filter(s => s.active).map(s => <option key={s.id} value={s.id}>{s.name} ({s.durationMinutes}min)</option>)}
                   </select>
                 )}
               </div>
             )}
-            <input placeholder="Observações (opcional)" value={newNotes} onChange={e => setNewNotes(e.target.value)} className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
+            <input placeholder="Observações (opcional)" value={newNotes} onChange={e => setNewNotes(e.target.value)} className={`w-full border rounded-xl px-3 py-2 text-sm ${t.input}`} />
             {newError && <p className="text-sm text-red-400">{newError}</p>}
-            <button onClick={handleCreateAppointment} className="bg-green-700 hover:bg-green-600 rounded-xl px-4 py-2 text-sm font-medium">Salvar</button>
+            <button onClick={handleCreateAppointment} className="bg-green-700 hover:bg-green-600 text-white rounded-xl px-4 py-2 text-sm font-medium">Salvar</button>
           </div>
         )}
 
         {showTeam && (
           <div className="grid md:grid-cols-2 gap-4">
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
+            <div className={`border rounded-2xl p-5 space-y-3 ${t.card}`}>
               <p className="font-semibold">Profissionais</p>
-              <p className="text-xs text-gray-500">Cada profissional tem sua própria agenda. Se não cadastrar nenhum, o agendamento usa a disponibilidade geral configurada acima.</p>
+              <p className={`text-xs ${t.secondary}`}>Cada profissional tem sua própria agenda. Se não cadastrar nenhum, o agendamento usa a disponibilidade geral configurada acima.</p>
               <div className="space-y-2">
                 {professionals.map(p => (
-                  <ProfessionalRow key={p.id} professional={p} onUpdated={loadProfessionals} onDeleted={loadProfessionals} />
+                  <ProfessionalRow key={p.id} professional={p} onUpdated={loadProfessionals} onDeleted={loadProfessionals} t={t} />
                 ))}
               </div>
               <div className="flex gap-2 flex-wrap">
-                <input placeholder="Nome do profissional" value={newProfessionalName} onChange={e => setNewProfessionalName(e.target.value)} className="flex-1 min-w-[140px] bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
-                <input placeholder="WhatsApp (opcional)" value={newProfessionalPhone} onChange={e => setNewProfessionalPhone(e.target.value)} className="w-40 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
-                <button onClick={handleAddProfessional} className="bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-2 text-sm font-medium">Adicionar</button>
+                <input placeholder="Nome do profissional" value={newProfessionalName} onChange={e => setNewProfessionalName(e.target.value)} className={`flex-1 min-w-[140px] border rounded-xl px-3 py-2 text-sm ${t.input}`} />
+                <input placeholder="WhatsApp (opcional)" value={newProfessionalPhone} onChange={e => setNewProfessionalPhone(e.target.value)} className={`w-40 border rounded-xl px-3 py-2 text-sm ${t.input}`} />
+                <button onClick={handleAddProfessional} className="bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-4 py-2 text-sm font-medium">Adicionar</button>
               </div>
-              <p className="text-xs text-gray-600">Com o WhatsApp preenchido, o profissional recebe aviso de cada novo agendamento. O botão "Link da agenda" gera a página que ele pode adicionar à tela inicial do celular.</p>
+              <p className={`text-xs ${t.muted}`}>Com o WhatsApp preenchido, o profissional recebe aviso de cada novo agendamento. O botão "Link da agenda" gera a página que ele pode adicionar à tela inicial do celular.</p>
             </div>
 
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
+            <div className={`border rounded-2xl p-5 space-y-3 ${t.card}`}>
               <p className="font-semibold">Serviços</p>
-              <p className="text-xs text-gray-500">Cada serviço tem sua própria duração. Se não cadastrar nenhum, o agendamento usa a duração padrão configurada acima.</p>
+              <p className={`text-xs ${t.secondary}`}>Cada serviço tem sua própria duração. Se não cadastrar nenhum, o agendamento usa a duração padrão configurada acima.</p>
               <div className="space-y-2">
                 {services.map(s => (
-                  <div key={s.id} className="bg-gray-950 border border-gray-800 rounded-xl p-3 flex items-center justify-between gap-2">
-                    <p className={`text-sm font-medium ${!s.active ? "text-gray-500 line-through" : ""}`}>{s.name} <span className="text-gray-500 font-normal">({s.durationMinutes}min)</span></p>
+                  <div key={s.id} className={`border rounded-xl p-3 flex items-center justify-between gap-2 ${t.innerCard}`}>
+                    <p className={`text-sm font-medium ${!s.active ? `${t.secondary} line-through` : ""}`}>{s.name} <span className={`font-normal ${t.secondary}`}>({s.durationMinutes}min)</span></p>
                     <div className="flex gap-2 text-xs">
-                      <button onClick={() => handleToggleService(s)} className="text-gray-400 hover:text-white">{s.active ? "Desativar" : "Ativar"}</button>
+                      <button onClick={() => handleToggleService(s)} className={`${t.subtitle} hover:opacity-80`}>{s.active ? "Desativar" : "Ativar"}</button>
                       <button onClick={() => handleDeleteService(s)} className="text-red-400 hover:text-red-300">Remover</button>
                     </div>
                   </div>
                 ))}
               </div>
               <div className="flex gap-2">
-                <input placeholder="Nome do serviço" value={newServiceName} onChange={e => setNewServiceName(e.target.value)} className="flex-1 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
-                <input type="number" min={5} max={480} value={newServiceDuration} onChange={e => setNewServiceDuration(Math.max(5, Number(e.target.value)))} className="w-20 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
-                <button onClick={handleAddService} className="bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-2 text-sm font-medium">Adicionar</button>
+                <input placeholder="Nome do serviço" value={newServiceName} onChange={e => setNewServiceName(e.target.value)} className={`flex-1 border rounded-xl px-3 py-2 text-sm ${t.input}`} />
+                <input type="number" min={5} max={480} value={newServiceDuration} onChange={e => setNewServiceDuration(Math.max(5, Number(e.target.value)))} className={`w-20 border rounded-xl px-3 py-2 text-sm ${t.input}`} />
+                <button onClick={handleAddService} className="bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-4 py-2 text-sm font-medium">Adicionar</button>
               </div>
             </div>
           </div>
         )}
 
         {showSettings && (
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-4">
+          <div className={`border rounded-2xl p-5 space-y-4 ${t.card}`}>
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={schedulingEnabled} onChange={e => setSchedulingEnabled(e.target.checked)} className="w-4 h-4" />
               <span className="text-sm font-medium">Ativar agendamento automático pelo agente de IA</span>
             </label>
 
-            <div className="border border-gray-800 rounded-xl p-4 space-y-2">
+            <div className={`border rounded-xl p-4 space-y-2 ${t.border}`}>
               <p className="text-sm font-medium">Como a IA agenda pelo WhatsApp</p>
               <label className="flex items-start gap-3 cursor-pointer">
                 <input
@@ -604,7 +669,7 @@ export function AgendaClient({
                 />
                 <div>
                   <p className="text-sm">Por mensagem, na conversa</p>
-                  <p className="text-xs text-gray-500">A IA consulta os horários, oferece opções e confirma o agendamento dentro do próprio WhatsApp.</p>
+                  <p className={`text-xs ${t.secondary}`}>A IA consulta os horários, oferece opções e confirma o agendamento dentro do próprio WhatsApp.</p>
                 </div>
               </label>
               <label className="flex items-start gap-3 cursor-pointer">
@@ -617,74 +682,74 @@ export function AgendaClient({
                 />
                 <div>
                   <p className="text-sm">Enviando o link de agendamento</p>
-                  <p className="text-xs text-gray-500">A IA envia o link da página pública, onde o cliente escolhe serviço e horário sozinho e confirma na hora. Cancelamento pelo lembrete continua funcionando na conversa.</p>
+                  <p className={`text-xs ${t.secondary}`}>A IA envia o link da página pública, onde o cliente escolhe serviço e horário sozinho e confirma na hora. Cancelamento pelo lembrete continua funcionando na conversa.</p>
                 </div>
               </label>
             </div>
 
             <div>
-              <label className="text-sm text-gray-400 block mb-1">Duração de cada atendimento (minutos)</label>
+              <label className={`text-sm block mb-1 ${t.subtitle}`}>Duração de cada atendimento (minutos)</label>
               <input
                 type="number" min={5} max={480} value={slotDurationMinutes}
                 onChange={e => setSlotDurationMinutes(Math.max(5, Number(e.target.value)))}
-                className="w-32 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+                className={`w-32 border rounded-xl px-3 py-2 text-sm ${t.input}`}
               />
             </div>
 
             <div>
-              <label className="text-sm text-gray-400 block mb-1">Atendimentos simultâneos</label>
+              <label className={`text-sm block mb-1 ${t.subtitle}`}>Atendimentos simultâneos</label>
               <input
                 type="number" min={1} max={50} value={vagasSimultaneas}
                 onChange={e => setVagasSimultaneas(Math.min(50, Math.max(1, Number(e.target.value))))}
-                className="w-32 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+                className={`w-32 border rounded-xl px-3 py-2 text-sm ${t.input}`}
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className={`text-xs mt-1 ${t.secondary}`}>
                 Quantos clientes podem ser atendidos no mesmo horário quando não há profissionais cadastrados.
                 Ex: lava-jato com 3 vagas atende 3 carros ao mesmo tempo. Com profissionais, a capacidade é de 1 atendimento por profissional.
               </p>
             </div>
 
             <div>
-              <label className="text-sm text-gray-400 block mb-1">Enviar lembrete de confirmação quantas horas antes do compromisso</label>
+              <label className={`text-sm block mb-1 ${t.subtitle}`}>Enviar lembrete de confirmação quantas horas antes do compromisso</label>
               <input
                 type="number" min={1} max={168} value={appointmentReminderHours}
                 onChange={e => setAppointmentReminderHours(Math.max(1, Number(e.target.value)))}
-                className="w-32 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+                className={`w-32 border rounded-xl px-3 py-2 text-sm ${t.input}`}
               />
-              <p className="text-xs text-gray-500 mt-1">O agente pergunta se o cliente confirma presença. Se ele disser que não pode ir, a IA cancela e já oferece reagendar.</p>
+              <p className={`text-xs mt-1 ${t.secondary}`}>O agente pergunta se o cliente confirma presença. Se ele disser que não pode ir, a IA cancela e já oferece reagendar.</p>
             </div>
 
             <div>
-              <label className="text-sm text-gray-400 block mb-1">
-                Informações necessárias para o agendamento <span className="text-gray-600">(opcional)</span>
+              <label className={`text-sm block mb-1 ${t.subtitle}`}>
+                Informações necessárias para o agendamento <span className={t.muted}>(opcional)</span>
               </label>
               <textarea
                 value={requisitosAgendamento}
                 onChange={e => setRequisitosAgendamento(e.target.value)}
                 rows={3}
                 placeholder="Ex: nome completo, convênio, tipo de consulta, nome do pet e raça..."
-                className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+                className={`w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600 ${t.input}`}
                 maxLength={500}
               />
-              <p className="text-xs text-gray-500 mt-1">Depois que o cliente escolher a data e o horário, o agente envia uma mensagem pedindo essas informações — e só confirma o agendamento quando o cliente responder.</p>
+              <p className={`text-xs mt-1 ${t.secondary}`}>Depois que o cliente escolher a data e o horário, o agente envia uma mensagem pedindo essas informações — e só confirma o agendamento quando o cliente responder.</p>
             </div>
 
             <div>
-              <label className="text-sm text-gray-400 block mb-1">
-                O que NÃO fazer no agendamento <span className="text-gray-600">(opcional)</span>
+              <label className={`text-sm block mb-1 ${t.subtitle}`}>
+                O que NÃO fazer no agendamento <span className={t.muted}>(opcional)</span>
               </label>
               <textarea
                 value={restricoesAgendamento}
                 onChange={e => setRestricoesAgendamento(e.target.value)}
                 rows={3}
                 placeholder="Ex: não agendar para menores de 18 anos sem responsável, não aceitar agendamentos no mesmo dia, não remarcar mais de uma vez..."
-                className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+                className={`w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600 ${t.input}`}
                 maxLength={500}
               />
-              <p className="text-xs text-gray-500 mt-1">O agente vai seguir essas restrições durante toda a conversa de agendamento.</p>
+              <p className={`text-xs mt-1 ${t.secondary}`}>O agente vai seguir essas restrições durante toda a conversa de agendamento.</p>
             </div>
 
-            <div className="border border-gray-800 rounded-xl p-4 space-y-3">
+            <div className={`border rounded-xl p-4 space-y-3 ${t.border}`}>
               <label className="flex items-center gap-3 cursor-pointer">
                 <input
                   type="checkbox"
@@ -694,27 +759,27 @@ export function AgendaClient({
                 />
                 <div>
                   <p className="text-sm font-medium">Permitir atendimento especial fora do horário comercial</p>
-                  <p className="text-xs text-gray-500">Quando ativo, o agente informa ao cliente que é possível verificar um horário especial fora da disponibilidade normal.</p>
+                  <p className={`text-xs ${t.secondary}`}>Quando ativo, o agente informa ao cliente que é possível verificar um horário especial fora da disponibilidade normal.</p>
                 </div>
               </label>
               {atendimentoEspecialEnabled && (
                 <div>
-                  <label className="text-sm text-gray-400 block mb-1">
-                    Condições do atendimento especial <span className="text-gray-600">(opcional)</span>
+                  <label className={`text-sm block mb-1 ${t.subtitle}`}>
+                    Condições do atendimento especial <span className={t.muted}>(opcional)</span>
                   </label>
                   <textarea
                     value={atendimentoEspecialDescricao}
                     onChange={e => setAtendimentoEspecialDescricao(e.target.value)}
                     rows={2}
                     placeholder="Ex: somente emergências, sujeito a confirmação por telefone, taxa adicional de R$ 50..."
-                    className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+                    className={`w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600 ${t.input}`}
                     maxLength={500}
                   />
                 </div>
               )}
             </div>
 
-            <div className="border border-gray-800 rounded-xl p-4">
+            <div className={`border rounded-xl p-4 ${t.border}`}>
               <label className="flex items-center gap-3 cursor-pointer">
                 <input
                   type="checkbox"
@@ -724,14 +789,14 @@ export function AgendaClient({
                 />
                 <div>
                   <p className="text-sm font-medium">Perguntar com qual profissional o cliente quer agendar</p>
-                  <p className="text-xs text-gray-500">
+                  <p className={`text-xs ${t.secondary}`}>
                     Vale quando há mais de um profissional. Desligado: o agente oferece os horários de toda a equipe e o sistema atribui automaticamente a um profissional livre.
                   </p>
                 </div>
               </label>
             </div>
 
-            <div className="border border-gray-800 rounded-xl p-4">
+            <div className={`border rounded-xl p-4 ${t.border}`}>
               <label className="flex items-center gap-3 cursor-pointer">
                 <input
                   type="checkbox"
@@ -741,14 +806,14 @@ export function AgendaClient({
                 />
                 <div>
                   <p className="text-sm font-medium">Aceitar agendamentos até o horário de encerramento</p>
-                  <p className="text-xs text-gray-500">
+                  <p className={`text-xs ${t.secondary}`}>
                     Serviços longos podem começar perto do fechamento mesmo que terminem depois dele. Ex: funcionamento até 18h, serviço de 2h pode começar às 17h. Desligado: o serviço precisa terminar dentro do horário.
                   </p>
                 </div>
               </label>
             </div>
 
-            <div className="border border-gray-800 rounded-xl p-4 space-y-3">
+            <div className={`border rounded-xl p-4 space-y-3 ${t.border}`}>
               <label className="flex items-center gap-3 cursor-pointer">
                 <input
                   type="checkbox"
@@ -759,7 +824,7 @@ export function AgendaClient({
                 />
                 <div>
                   <p className="text-sm font-medium">Cobrar sinal para confirmar (Pix)</p>
-                  <p className="text-xs text-gray-500">
+                  <p className={`text-xs ${t.secondary}`}>
                     O cliente paga um Pix do valor abaixo na página pública pra confirmar o horário. Usa a conta Asaas
                     configurada em Comércio. Se o pagamento não cair em 30 minutos, o horário volta a ficar livre.
                     Pagamentos recebidos fora do prazo (horário já ocupado por outra pessoa) precisam de estorno manual no Asaas.
@@ -771,29 +836,29 @@ export function AgendaClient({
               )}
               {agendamentoCobrancaEnabled && hasAsaasApiKey && (
                 <div>
-                  <label className="text-sm text-gray-400 block mb-1">Valor do sinal (R$)</label>
+                  <label className={`text-sm block mb-1 ${t.subtitle}`}>Valor do sinal (R$)</label>
                   <input
                     type="number" min={0} step={0.01} value={agendamentoSinalValor}
                     onChange={e => setAgendamentoSinalValor(Math.max(0, Number(e.target.value)))}
-                    className="w-32 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+                    className={`w-32 border rounded-xl px-3 py-2 text-sm ${t.input}`}
                   />
                 </div>
               )}
             </div>
 
-            <div className="border border-gray-800 rounded-xl p-4 space-y-3">
+            <div className={`border rounded-xl p-4 space-y-3 ${t.border}`}>
               <div>
                 <p className="text-sm font-medium">Campos do agendamento pelo link</p>
-                <p className="text-xs text-gray-500">
+                <p className={`text-xs ${t.secondary}`}>
                   Nome e WhatsApp são sempre pedidos. Adicione campos extras que o cliente preenche antes de confirmar — as respostas aparecem nas observações do agendamento.
                 </p>
               </div>
               {bookingFormFields.length > 0 && (
                 <div className="space-y-1.5">
                   {bookingFormFields.map((f, i) => (
-                    <div key={i} className="flex items-center gap-3 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2">
+                    <div key={i} className={`flex items-center gap-3 border rounded-xl px-3 py-2 ${t.innerCard}`}>
                       <p className="flex-1 text-sm truncate">{f.label}</p>
-                      <label className="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer flex-shrink-0">
+                      <label className={`flex items-center gap-1.5 text-xs cursor-pointer flex-shrink-0 ${t.subtitle}`}>
                         <input
                           type="checkbox"
                           checked={f.obrigatorio}
@@ -804,7 +869,7 @@ export function AgendaClient({
                       </label>
                       <button
                         onClick={() => setBookingFormFields(fields => fields.filter((_, j) => j !== i))}
-                        className="text-gray-600 hover:text-red-400 text-xs flex-shrink-0"
+                        className={`hover:text-red-400 text-xs flex-shrink-0 ${t.muted}`}
                       >
                         Remover
                       </button>
@@ -819,7 +884,7 @@ export function AgendaClient({
                     onChange={e => setNewFieldLabel(e.target.value)}
                     placeholder="Ex: Convênio, Placa do carro, Nome do pet..."
                     maxLength={60}
-                    className="flex-1 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+                    className={`flex-1 border rounded-xl px-3 py-2 text-sm ${t.input}`}
                   />
                   <button
                     onClick={() => {
@@ -829,35 +894,35 @@ export function AgendaClient({
                       setNewFieldLabel("");
                     }}
                     disabled={!newFieldLabel.trim()}
-                    className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl px-4 py-2 text-sm font-medium"
+                    className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl px-4 py-2 text-sm font-medium"
                   >
                     Adicionar
                   </button>
                 </div>
               )}
-              <p className="text-xs text-gray-600">Lembre de clicar em Salvar abaixo pra aplicar as mudanças.</p>
+              <p className={`text-xs ${t.muted}`}>Lembre de clicar em Salvar abaixo pra aplicar as mudanças.</p>
             </div>
 
             <div>
-              <p className="text-sm text-gray-400 mb-2">
+              <p className={`text-sm mb-2 ${t.subtitle}`}>
                 Dias e horários de disponibilidade {professionals.length > 0 && <span className="text-xs">(usado só para quem não tem profissional atribuído)</span>}
               </p>
-              <AvailabilityEditor rules={rules} onChange={setRules} />
+              <AvailabilityEditor rules={rules} onChange={setRules} t={t} />
             </div>
 
-            <button onClick={handleSaveSettings} disabled={savingSettings} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl px-5 py-2 text-sm font-medium">
+            <button onClick={handleSaveSettings} disabled={savingSettings} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl px-5 py-2 text-sm font-medium">
               {savingSettings ? "Salvando..." : "Salvar configurações"}
             </button>
           </div>
         )}
 
         <div className="flex items-center justify-between">
-          <button onClick={() => setWeekStart(d => new Date(d.getTime() - 7 * 86400000))} className="text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-lg bg-gray-900 border border-gray-800 flex items-center gap-1.5"><ArrowLeft size={14} /> Semana anterior</button>
+          <button onClick={() => setWeekStart(d => new Date(d.getTime() - 7 * 86400000))} className={`text-sm px-3 py-1.5 rounded-lg border flex items-center gap-1.5 ${t.navButton}`}><ArrowLeft size={14} /> Semana anterior</button>
           <div className="flex items-center gap-3">
-            <p className="text-sm text-gray-400">{days[0].toLocaleDateString("pt-BR")} – {days[6].toLocaleDateString("pt-BR")}</p>
-            <button onClick={() => setWeekStart(startOfWeek(new Date()))} className="text-xs text-blue-400 hover:text-blue-300 px-2 py-1 rounded-lg border border-gray-800 bg-gray-900">Hoje</button>
+            <p className={`text-sm ${t.subtitle}`}>{days[0].toLocaleDateString("pt-BR")} – {days[6].toLocaleDateString("pt-BR")}</p>
+            <button onClick={() => setWeekStart(startOfWeek(new Date()))} className={`text-xs text-blue-400 hover:text-blue-300 px-2 py-1 rounded-lg border ${t.toggleBar}`}>Hoje</button>
           </div>
-          <button onClick={() => setWeekStart(d => new Date(d.getTime() + 7 * 86400000))} className="text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-lg bg-gray-900 border border-gray-800 flex items-center gap-1.5">Próxima semana <ArrowRight size={14} /></button>
+          <button onClick={() => setWeekStart(d => new Date(d.getTime() + 7 * 86400000))} className={`text-sm px-3 py-1.5 rounded-lg border flex items-center gap-1.5 ${t.navButton}`}>Próxima semana <ArrowRight size={14} /></button>
         </div>
 
         <WeekTimeline
@@ -866,36 +931,37 @@ export function AgendaClient({
           rules={rules}
           loading={loadingAppointments}
           onSelect={setSelectedAppointment}
+          t={t}
         />
       </div>
 
       {selectedAppointment && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setSelectedAppointment(null)}>
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 w-full max-w-sm space-y-3" onClick={e => e.stopPropagation()}>
+          <div className={`border rounded-2xl p-5 w-full max-w-sm space-y-3 ${t.card}`} onClick={e => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-xs text-gray-500 capitalize">
+                <p className={`text-xs capitalize ${t.secondary}`}>
                   {new Date(selectedAppointment.scheduledAt).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit" })}
                 </p>
                 <p className="text-lg font-semibold">
                   {new Date(selectedAppointment.scheduledAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                  <span className="text-sm text-gray-500 font-normal"> · {selectedAppointment.durationMinutes}min</span>
+                  <span className={`text-sm font-normal ${t.secondary}`}> · {selectedAppointment.durationMinutes}min</span>
                 </p>
               </div>
-              <button onClick={() => setSelectedAppointment(null)} className="text-gray-500 hover:text-white"><X size={18} /></button>
+              <button onClick={() => setSelectedAppointment(null)} className={`${t.secondary} hover:opacity-80`}><X size={18} /></button>
             </div>
             <span className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${STATUS_LABEL[selectedAppointment.status].color}`}>
               {STATUS_LABEL[selectedAppointment.status].label}
             </span>
             <div className="space-y-1">
               <p className="text-sm font-medium">{selectedAppointment.contactName || "Sem nome"}</p>
-              <p className="text-xs text-gray-500 font-mono">+{selectedAppointment.contactNumber}</p>
+              <p className={`text-xs font-mono ${t.secondary}`}>+{selectedAppointment.contactNumber}</p>
             </div>
             {(selectedAppointment.professional || selectedAppointment.service) && (
-              <p className="text-sm text-gray-300">{[selectedAppointment.service?.name, selectedAppointment.professional?.name].filter(Boolean).join(" · ")}</p>
+              <p className={`text-sm ${t.subtitle}`}>{[selectedAppointment.service?.name, selectedAppointment.professional?.name].filter(Boolean).join(" · ")}</p>
             )}
             {selectedAppointment.notes && (
-              <p className="text-sm text-gray-400 whitespace-pre-wrap">{selectedAppointment.notes}</p>
+              <p className={`text-sm whitespace-pre-wrap ${t.subtitle}`}>{selectedAppointment.notes}</p>
             )}
             {selectedAppointment.status === "CONFIRMADO" && (
               <button
@@ -913,13 +979,14 @@ export function AgendaClient({
 }
 
 function WeekTimeline({
-  days, appointments, rules, loading, onSelect,
+  days, appointments, rules, loading, onSelect, t,
 }: {
   days: Date[];
   appointments: Appointment[];
   rules: Record<number, { enabled: boolean; start: string; end: string }>;
   loading: boolean;
   onSelect: (a: Appointment) => void;
+  t: typeof THEMES["dark"];
 }) {
   const { startHour, endHour } = computeHourBounds(rules, appointments);
   const totalHeight = (endHour - startHour) * HOUR_HEIGHT;
@@ -930,7 +997,7 @@ function WeekTimeline({
   const showNowLine = nowMin >= startHour * 60 && nowMin <= endHour * 60;
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+    <div className={`border rounded-2xl overflow-hidden ${t.card}`}>
       <div className="overflow-x-auto">
         <div style={{ minWidth: 760 }}>
           <div className="grid" style={{ gridTemplateColumns: "48px repeat(7, 1fr)" }}>
@@ -938,23 +1005,23 @@ function WeekTimeline({
             {days.map((day, i) => {
               const isToday = fmtDate(day) === todayStr;
               return (
-                <div key={i} className={`text-center py-2 border-l border-gray-800 ${isToday ? "bg-blue-950/30" : ""}`}>
-                  <p className="text-xs font-semibold text-gray-300">{DIAS_ABREV[i]}</p>
-                  <p className={`text-sm ${isToday ? "text-blue-400 font-bold" : "text-gray-500"}`}>{day.getDate()}</p>
+                <div key={i} className={`text-center py-2 border-l ${t.border} ${isToday ? t.headerCellToday : ""}`}>
+                  <p className="text-xs font-semibold">{DIAS_ABREV[i]}</p>
+                  <p className={`text-sm ${isToday ? "text-blue-400 font-bold" : t.secondary}`}>{day.getDate()}</p>
                 </div>
               );
             })}
           </div>
 
           {loading ? (
-            <p className="text-xs text-gray-600 px-4 py-6">Carregando...</p>
+            <p className={`text-xs px-4 py-6 ${t.muted}`}>Carregando...</p>
           ) : (
             <div className="grid" style={{ gridTemplateColumns: "48px repeat(7, 1fr)" }}>
               <div className="relative" style={{ height: totalHeight }}>
                 {hours.map(h => (
                   <div
                     key={h}
-                    className="absolute right-1.5 text-[10px] text-gray-500 -translate-y-1/2"
+                    className={`absolute right-1.5 text-[10px] -translate-y-1/2 ${t.hourLabel}`}
                     style={{ top: (h - startHour) * HOUR_HEIGHT }}
                   >
                     {String(h).padStart(2, "0")}:00
@@ -966,9 +1033,9 @@ function WeekTimeline({
                 const isToday = dayStr === todayStr;
                 const dayAppointments = layoutDayAppointments(appointments.filter(a => fmtDate(new Date(a.scheduledAt)) === dayStr));
                 return (
-                  <div key={i} className="relative border-l border-gray-800" style={{ height: totalHeight }}>
+                  <div key={i} className={`relative border-l ${t.border}`} style={{ height: totalHeight }}>
                     {hours.slice(1, -1).map(h => (
-                      <div key={h} className="absolute left-0 right-0 border-t border-gray-800/60" style={{ top: (h - startHour) * HOUR_HEIGHT }} />
+                      <div key={h} className={`absolute left-0 right-0 border-t ${t.gridLine}`} style={{ top: (h - startHour) * HOUR_HEIGHT }} />
                     ))}
                     {isToday && showNowLine && (
                       <div className="absolute left-0 right-0 border-t-2 border-red-500 z-10" style={{ top: (nowMin - startHour * 60) / 60 * HOUR_HEIGHT }}>
