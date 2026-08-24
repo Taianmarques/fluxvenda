@@ -548,26 +548,8 @@ export function AgendaClient({
               <Users size={15} /> Serviços e profissionais
             </button>
             <button onClick={() => setShowSettings(s => !s)} className={`rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-1.5 ${t.pillButton}`}>
-              <Settings size={15} /> Configurar disponibilidade
+              <Settings size={15} /> Configurações
             </button>
-            {agendaAccessToken && (
-              <button
-                onClick={copyClinicAgendaLink}
-                className={`rounded-xl px-4 py-2.5 text-sm font-medium text-purple-400 ${t.pillBg}`}
-                title="Página PWA com todos os agendamentos, para acompanhar no celular"
-              >
-                {agendaLinkCopied ? "Copiado!" : "Link da agenda geral"}
-              </button>
-            )}
-            {bookingSlug && (
-              <button
-                onClick={copyBookingLink}
-                className={`rounded-xl px-4 py-2.5 text-sm font-medium text-blue-400 ${t.pillBg}`}
-                title="Página pública onde o cliente escolhe o serviço e o horário sozinho"
-              >
-                {bookingLinkCopied ? "Copiado!" : "Link de agendamento"}
-              </button>
-            )}
             <button
               onClick={toggleTheme}
               title={theme === "dark" ? "Mudar para fundo claro" : "Mudar para fundo escuro"}
@@ -652,6 +634,29 @@ export function AgendaClient({
 
         {showSettings && (
           <div className={`border rounded-2xl p-5 space-y-4 ${t.card}`}>
+            {(agendaAccessToken || bookingSlug) && (
+              <div className="flex gap-2 flex-wrap">
+                {agendaAccessToken && (
+                  <button
+                    onClick={copyClinicAgendaLink}
+                    className={`rounded-xl px-4 py-2.5 text-sm font-medium text-purple-400 ${t.pillBg}`}
+                    title="Página PWA com todos os agendamentos, para acompanhar no celular"
+                  >
+                    {agendaLinkCopied ? "Copiado!" : "Link da agenda geral"}
+                  </button>
+                )}
+                {bookingSlug && (
+                  <button
+                    onClick={copyBookingLink}
+                    className={`rounded-xl px-4 py-2.5 text-sm font-medium text-blue-400 ${t.pillBg}`}
+                    title="Página pública onde o cliente escolhe o serviço e o horário sozinho"
+                  >
+                    {bookingLinkCopied ? "Copiado!" : "Link de agendamento"}
+                  </button>
+                )}
+              </div>
+            )}
+
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={schedulingEnabled} onChange={e => setSchedulingEnabled(e.target.checked)} className="w-4 h-4" />
               <span className="text-sm font-medium">Ativar agendamento automático pelo agente de IA</span>
