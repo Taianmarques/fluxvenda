@@ -2,7 +2,49 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Radio, Clock, Bot, Instagram, MessageCircle } from "lucide-react";
+import { Radio, Clock, Bot, Instagram, MessageCircle, Sun, Moon } from "lucide-react";
+
+type AoVivoTheme = "dark" | "light";
+const THEME_STORAGE_KEY = "aovivo-theme";
+
+const THEMES = {
+  dark: {
+    root: "bg-gray-950 text-white",
+    headerBorder: "border-gray-800",
+    subtitle: "text-gray-500",
+    statLabel: "text-gray-400",
+    card: "border-gray-800 bg-gray-900",
+    cardHeaderBorder: "border-gray-800",
+    cardBadge: "bg-gray-800 text-gray-400",
+    innerCard: "bg-gray-950 border-gray-800",
+    innerCardHover: "hover:border-gray-600",
+    secondary: "text-gray-500",
+    muted: "text-gray-600",
+    pillButton: "bg-gray-900 border border-gray-800 hover:bg-gray-800",
+    destaqueCard: "border-red-800/60 bg-red-950/20",
+    destaqueBorder: "border-red-900/40",
+    destaqueBadge: "bg-red-900/50 text-red-300",
+    destaqueIcon: "bg-red-900/60 text-red-300",
+  },
+  light: {
+    root: "bg-gray-50 text-gray-900",
+    headerBorder: "border-gray-200",
+    subtitle: "text-gray-500",
+    statLabel: "text-gray-500",
+    card: "border-gray-200 bg-white",
+    cardHeaderBorder: "border-gray-200",
+    cardBadge: "bg-gray-200 text-gray-600",
+    innerCard: "bg-gray-50 border-gray-200",
+    innerCardHover: "hover:border-gray-400",
+    secondary: "text-gray-500",
+    muted: "text-gray-400",
+    pillButton: "bg-white border border-gray-200 hover:bg-gray-100",
+    destaqueCard: "border-red-300 bg-red-50",
+    destaqueBorder: "border-red-200",
+    destaqueBadge: "bg-red-100 text-red-600",
+    destaqueIcon: "bg-red-100 text-red-600",
+  },
+} satisfies Record<AoVivoTheme, Record<string, string>>;
 
 type Atendente = { id: string; name: string };
 
@@ -42,6 +84,19 @@ export function AoVivoClient({ agentId, atendentes }: { agentId: string; atenden
   const [loading, setLoading] = useState(true);
   const inFlightRef = useRef(false);
   const fingerprintRef = useRef("");
+  const [theme, setTheme] = useState<AoVivoTheme>("dark");
+  const t = THEMES[theme];
+
+  useEffect(() => {
+    const saved = localStorage.getItem(THEME_STORAGE_KEY);
+    if (saved === "light" || saved === "dark") setTheme(saved);
+  }, []);
+
+  function toggleTheme() {
+    const next: AoVivoTheme = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    localStorage.setItem(THEME_STORAGE_KEY, next);
+  }
 
   async function refresh(isPoll = false) {
     if (isPoll && inFlightRef.current) return;
@@ -104,17 +159,17 @@ export function AoVivoClient({ agentId, atendentes }: { agentId: string; atenden
     return (
       <Link
         href={`/crm/${agentId}?c=${c.id}`}
-        className={`block bg-gray-950 border rounded-xl p-3 hover:border-gray-600 transition-colors ${unread ? "border-blue-700/60" : "border-gray-800"}`}
+        className={`block border rounded-xl p-3 transition-colors ${t.innerCard} ${t.innerCardHover} ${unread ? "border-blue-700/60" : ""}`}
       >
         <div className="flex items-center justify-between gap-2">
           <p className="text-sm font-medium truncate flex items-center gap-1.5 min-w-0">
             {isIg ? <Instagram size={11} className="text-pink-400 flex-shrink-0" /> : <MessageCircle size={11} className="text-green-400 flex-shrink-0" />}
             <span className="truncate">{c.contactName || c.contactNumber.replace("ig_", "ID ")}</span>
           </p>
-          <span className="text-[10px] text-gray-500 flex-shrink-0">{hora(c.lastMessageAt ?? c.updatedAt)}</span>
+          <span className={`text-[10px] flex-shrink-0 ${t.secondary}`}>{hora(c.lastMessageAt ?? c.updatedAt)}</span>
         </div>
         <div className="flex items-center justify-between gap-2 mt-1">
-          <p className="text-xs text-gray-500 truncate">
+          <p className={`text-xs truncate ${t.secondary}`}>
             {c.lastMessageRole === "user" ? "" : c.lastMessageRole === "human" ? "Você: " : c.lastMessageRole === "assistant" ? "IA: " : ""}
             {c.lastMessage || "—"}
           </p>
@@ -137,10 +192,10 @@ export function AoVivoClient({ agentId, atendentes }: { agentId: string; atenden
   function Coluna({ titulo, cor, conversas: convs, destaque }: { titulo: string; cor: string; conversas: Conversa[]; destaque?: boolean }) {
     const unreadCount = convs.filter(naoLida).length;
     return (
-      <div className={`w-72 flex-shrink-0 flex flex-col rounded-2xl border max-h-full ${destaque ? "border-red-800/60 bg-red-950/20" : "border-gray-800 bg-gray-900"}`}>
-        <div className={`p-3 border-b flex items-center gap-2 flex-shrink-0 ${destaque ? "border-red-900/40" : "border-gray-800"}`}>
+      <div className={`w-72 flex-shrink-0 flex flex-col rounded-2xl border max-h-full ${destaque ? t.destaqueCard : t.card}`}>
+        <div className={`p-3 border-b flex items-center gap-2 flex-shrink-0 ${destaque ? t.destaqueBorder : t.cardHeaderBorder}`}>
           {destaque ? (
-            <span className="w-7 h-7 rounded-full bg-red-900/60 text-red-300 flex items-center justify-center flex-shrink-0">
+            <span className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${t.destaqueIcon}`}>
               <Clock size={13} />
             </span>
           ) : (
@@ -148,19 +203,19 @@ export function AoVivoClient({ agentId, atendentes }: { agentId: string; atenden
               {titulo.charAt(0).toUpperCase()}
             </span>
           )}
-          <p className={`flex-1 text-sm font-semibold truncate ${destaque ? "text-red-300" : ""}`}>{titulo}</p>
+          <p className={`flex-1 text-sm font-semibold truncate ${destaque ? "text-red-500" : ""}`}>{titulo}</p>
           {unreadCount > 0 && (
             <span className="text-[10px] font-bold bg-blue-600 text-white rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center">
               {unreadCount}
             </span>
           )}
-          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${destaque ? "bg-red-900/50 text-red-300" : "bg-gray-800 text-gray-400"}`}>
+          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${destaque ? t.destaqueBadge : t.cardBadge}`}>
             {convs.length}
           </span>
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[100px]">
           {convs.length === 0 ? (
-            <p className="text-xs text-gray-600 text-center py-6">Nenhum atendimento</p>
+            <p className={`text-xs text-center py-6 ${t.muted}`}>Nenhum atendimento</p>
           ) : (
             convs.map(c => <Card key={c.id} c={c} />)
           )}
@@ -170,25 +225,34 @@ export function AoVivoClient({ agentId, atendentes }: { agentId: string; atenden
   }
 
   return (
-    <div className="h-full flex flex-col bg-gray-950 text-white">
-      <div className="px-4 md:px-6 py-4 border-b border-gray-800 flex items-center justify-between gap-3 flex-wrap flex-shrink-0">
+    <div className={`h-full flex flex-col ${t.root}`}>
+      <div className={`px-4 md:px-6 py-4 border-b flex items-center justify-between gap-3 flex-wrap flex-shrink-0 ${t.headerBorder}`}>
         <div>
           <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
             <Radio size={22} className="text-red-400 animate-pulse" /> Ao vivo
           </h1>
-          <p className="text-xs text-gray-500 mt-0.5">Todos os atendimentos em andamento, por vendedor — atualiza em tempo real.</p>
+          <p className={`text-xs mt-0.5 ${t.subtitle}`}>Todos os atendimentos em andamento, por vendedor — atualiza em tempo real.</p>
         </div>
-        <div className="flex items-center gap-3 text-xs text-gray-400">
-          <span>{ativas.length} conversa{ativas.length === 1 ? "" : "s"} ativa{ativas.length === 1 ? "" : "s"}</span>
-          {totalNaoLidas > 0 && (
-            <span className="font-bold text-blue-400">{totalNaoLidas} não lida{totalNaoLidas === 1 ? "" : "s"}</span>
-          )}
+        <div className="flex items-center gap-3">
+          <div className={`flex items-center gap-3 text-xs ${t.statLabel}`}>
+            <span>{ativas.length} conversa{ativas.length === 1 ? "" : "s"} ativa{ativas.length === 1 ? "" : "s"}</span>
+            {totalNaoLidas > 0 && (
+              <span className="font-bold text-blue-400">{totalNaoLidas} não lida{totalNaoLidas === 1 ? "" : "s"}</span>
+            )}
+          </div>
+          <button
+            onClick={toggleTheme}
+            title={theme === "dark" ? "Mudar para fundo claro" : "Mudar para fundo escuro"}
+            className={`p-2 rounded-lg ${t.pillButton}`}
+          >
+            {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
         </div>
       </div>
 
       <div className="flex-1 overflow-x-auto overflow-y-hidden p-4">
         {loading ? (
-          <p className="text-sm text-gray-500 p-4">Carregando atendimentos...</p>
+          <p className={`text-sm p-4 ${t.secondary}`}>Carregando atendimentos...</p>
         ) : (
           <div className="flex gap-3 h-full">
             <Coluna titulo="Pendentes" cor="" conversas={pendentes} destaque />
