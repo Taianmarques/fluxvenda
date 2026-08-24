@@ -130,15 +130,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
   return NextResponse.json({ conversation });
 }
 
-const bulkStageSchema = z.object({
+const bulkSchema = z.object({
   conversationIds: z.array(z.string()).min(1).max(200),
-  stageId: z.string(),
+  acao: z.enum(["mover_etapa", "aceitar", "encerrar"]),
+  stageId: z.string().optional(),           // mover_etapa
+  motivo: z.string().max(200).optional(),   // encerrar
 });
 
-// Seleção múltipla no chat (Ativos/Pendentes/Finalizados) — move ou cria a oportunidade aberta
-// de cada conversa selecionada pra uma etapa específica, tudo de uma vez. Mesma regra de "achou
-// aberta move, senão cria com valor 0" que já existe em concluir_qualificacao_sdr, só que aqui é
-// disparado manualmente pelo atendente/gestor em várias conversas ao mesmo tempo.
+// Seleção múltipla no chat (Ativos/Pendentes/Finalizados) — três ações em lote de uma vez só:
+// mover pra etapa do pipeline, aceitar atendimento, ou encerrar. Mesma regra de acesso de
+// sempre (negadaParaAtendente) — atendente só mexe no que já é dele ou ainda não tem dono.
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -148,11 +149,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
   if (!result) return NextResponse.json({ error: "Agente não encontrado" }, { status: 404 });
   const { config, isManager } = result;
 
-  const body = bulkStageSchema.safeParse(await req.json());
+  const body = bulkSchema.safeParse(await req.json());
   if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
 
-  const stage = await prisma.pipelineStage.findFirst({ where: { id: body.data.stageId, pipeline: { agentConfigId: config.id } } });
-  if (!stage) return NextResponse.json({ error: "Etapa não encontrada" }, { status: 404 });
+  let stage: { id: string } | null = null;
+  if (body.data.acao === "mover_etapa") {
+    if (!body.data.stageId) return NextResponse.json({ error: "Etapa é obrigatória" }, { status: 400 });
+    stage = await prisma.pipelineStage.findFirst({ where: { id: body.data.stageId, pipeline: { agentConfigId: config.id } } });
+    if (!stage) return NextResponse.json({ error: "Etapa não encontrada" }, { status: 404 });
+  }
 
   // Só conversas desse agente que o usuário realmente pode mexer — ids de fora, de outro
   // atendente, ou de grupo sem visibilidade pra ele são ignorados silenciosamente.
@@ -163,13 +168,38 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
   const permitidas = isManager ? conversas : conversas.filter(c => !negadaParaAtendente(c, userId, config.iaLeadAttendantId));
 
   for (const conv of permitidas) {
-    const opp = conv.opportunities[0];
-    if (opp) {
-      if (opp.stageId !== stage.id) {
-        await prisma.opportunity.update({ where: { id: opp.id }, data: { stageId: stage.id, stageEnteredAt: new Date() } });
+    if (body.data.acao === "mover_etapa" && stage) {
+      const opp = conv.opportunities[0];
+      if (opp) {
+        if (opp.stageId !== stage.id) {
+          await prisma.opportunity.update({ where: { id: opp.id }, data: { stageId: stage.id, stageEnteredAt: new Date() } });
+        }
+      } else {
+        await prisma.opportunity.create({ data: { conversationId: conv.id, stageId: stage.id, stageEnteredAt: new Date(), dealValue: 0 } });
       }
-    } else {
-      await prisma.opportunity.create({ data: { conversationId: conv.id, stageId: stage.id, stageEnteredAt: new Date(), dealValue: 0 } });
+    } else if (body.data.acao === "aceitar") {
+      await prisma.conversation.update({
+        where: { id: conv.id },
+        data: { humanTakeover: true, status: "ATIVO", assignedToId: userId },
+      });
+    } else if (body.data.acao === "encerrar") {
+      // Encerrar uma conversa sem dono reivindica ela pra quem encerrou — mesma regra do
+      // encerramento individual (ver assumirAoEncerrar em conversas/[id]/route.ts)
+      const assumirAoEncerrar = !conv.assignedToId;
+      await prisma.conversation.update({
+        where: { id: conv.id },
+        data: {
+          status: "FINALIZADO",
+          ...(assumirAoEncerrar && { assignedToId: userId }),
+          motivoEncerramento: body.data.motivo ?? null,
+          encerradaEm: new Date(),
+        },
+      });
+      if (body.data.motivo) {
+        await prisma.message.create({
+          data: { conversationId: conv.id, role: "note", content: `Atendimento encerrado — motivo: ${body.data.motivo}.` },
+        });
+      }
     }
     emitChatEvent(config.id, conv.id);
   }

@@ -4,7 +4,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import {
   MessageCircle, Search, X, Lock, Unlock, Bot, User, UserPlus, Users, Eye,
   FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap, StickyNote, ArrowRightLeft, HandCoins, CalendarClock, ListFilter, Instagram, ArrowLeft,
-  Reply, Forward, ChevronDown, Package, ImageOff, Pin, Download, Maximize2, ListChecks, KanbanSquare,
+  Reply, Forward, ChevronDown, Package, ImageOff, Pin, Download, Maximize2, ListChecks, KanbanSquare, UserCheck, LogOut,
 } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { EmojiPicker } from "./EmojiPicker";
@@ -81,6 +81,8 @@ type Attachment = {
 };
 
 const MAX_ATTACHMENT_MB = 15;
+
+const MOTIVOS_ENCERRAMENTO = ["Venda concluída", "Dúvida resolvida", "Sem interesse", "Sem resposta", "Preço", "Comprou de concorrente", "Spam / engano", "Outro"];
 
 function detectMediaKind(mime: string): MediaKind {
   if (mime.startsWith("image/")) return "image";
@@ -407,6 +409,11 @@ export function WhatsappInbox({
   const [bulkPipelineId, setBulkPipelineId] = useState("");
   const [bulkStageId, setBulkStageId] = useState("");
   const [bulkMoving, setBulkMoving] = useState(false);
+  const [bulkAccepting, setBulkAccepting] = useState(false);
+  const [showBulkEncerrar, setShowBulkEncerrar] = useState(false);
+  const [bulkMotivoSelecionado, setBulkMotivoSelecionado] = useState("");
+  const [bulkMotivoObs, setBulkMotivoObs] = useState("");
+  const [bulkEncerrando, setBulkEncerrando] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId ?? initialConversations[0]?.id ?? null);
   // Mobile: alterna entre lista e conversa (no desktop as duas aparecem lado a lado)
   const [mobileChatOpen, setMobileChatOpen] = useState<boolean>(Boolean(initialSelectedId));
@@ -642,6 +649,7 @@ export function WhatsappInbox({
     setBulkSelectMode(s => !s);
     setBulkSelectedIds(new Set());
     setShowBulkStagePicker(false);
+    setShowBulkEncerrar(false);
   }
 
   function toggleBulkSelected(conversationId: string) {
@@ -667,7 +675,7 @@ export function WhatsappInbox({
       const res = await fetch(`/api/agentes/${agentId}/conversas`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationIds: Array.from(bulkSelectedIds), stageId: bulkStageId }),
+        body: JSON.stringify({ conversationIds: Array.from(bulkSelectedIds), acao: "mover_etapa", stageId: bulkStageId }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { alert(data.error ?? "Não foi possível mover as conversas."); return; }
@@ -677,6 +685,56 @@ export function WhatsappInbox({
       await refreshList();
     } finally {
       setBulkMoving(false);
+    }
+  }
+
+  async function handleBulkAceitar() {
+    if (bulkSelectedIds.size === 0 || bulkAccepting) return;
+    if (!confirm(`Aceitar atendimento de ${bulkSelectedIds.size} conversa(s) selecionada(s)?`)) return;
+    setBulkAccepting(true);
+    try {
+      const res = await fetch(`/api/agentes/${agentId}/conversas`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationIds: Array.from(bulkSelectedIds), acao: "aceitar" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { alert(data.error ?? "Não foi possível aceitar as conversas."); return; }
+      setBulkSelectMode(false);
+      setBulkSelectedIds(new Set());
+      await refreshList();
+    } finally {
+      setBulkAccepting(false);
+    }
+  }
+
+  function openBulkEncerrar() {
+    if (bulkSelectedIds.size === 0) return;
+    setBulkMotivoSelecionado("");
+    setBulkMotivoObs("");
+    setShowBulkEncerrar(true);
+  }
+
+  async function confirmarBulkEncerramento() {
+    if (bulkSelectedIds.size === 0 || !bulkMotivoSelecionado || bulkEncerrando) return;
+    const motivo = bulkMotivoSelecionado === "Outro" && bulkMotivoObs.trim()
+      ? `Outro: ${bulkMotivoObs.trim()}`
+      : bulkMotivoObs.trim() ? `${bulkMotivoSelecionado} — ${bulkMotivoObs.trim()}` : bulkMotivoSelecionado;
+    setBulkEncerrando(true);
+    try {
+      const res = await fetch(`/api/agentes/${agentId}/conversas`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationIds: Array.from(bulkSelectedIds), acao: "encerrar", motivo }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { alert(data.error ?? "Não foi possível encerrar as conversas."); return; }
+      setShowBulkEncerrar(false);
+      setBulkSelectMode(false);
+      setBulkSelectedIds(new Set());
+      await refreshList();
+    } finally {
+      setBulkEncerrando(false);
     }
   }
 
@@ -1348,6 +1406,20 @@ export function WhatsappInbox({
                       </>
                     )}
                   </div>
+                  <button
+                    onClick={handleBulkAceitar}
+                    disabled={bulkSelectedIds.size === 0 || bulkAccepting}
+                    className="flex items-center gap-1 text-xs font-medium bg-green-700 hover:bg-green-600 disabled:opacity-40 text-white rounded-lg px-2.5 py-1.5"
+                  >
+                    <UserCheck size={12} /> {bulkAccepting ? "Aceitando..." : "Aceitar"}
+                  </button>
+                  <button
+                    onClick={openBulkEncerrar}
+                    disabled={bulkSelectedIds.size === 0}
+                    className="flex items-center gap-1 text-xs font-medium bg-red-700 hover:bg-red-600 disabled:opacity-40 text-white rounded-lg px-2.5 py-1.5"
+                  >
+                    <LogOut size={12} /> Encerrar
+                  </button>
                 </div>
               </div>
             )}
@@ -2059,7 +2131,7 @@ export function WhatsappInbox({
               Qual o motivo do encerramento? Isso alimenta o relatório em Vendas.
             </p>
             <div className="space-y-1.5">
-              {["Venda concluída", "Dúvida resolvida", "Sem interesse", "Sem resposta", "Preço", "Comprou de concorrente", "Spam / engano", "Outro"].map(m => (
+              {MOTIVOS_ENCERRAMENTO.map(m => (
                 <label
                   key={m}
                   className={`flex items-center gap-2 rounded-xl border px-3 py-2 cursor-pointer text-sm transition-colors ${
@@ -2095,6 +2167,60 @@ export function WhatsappInbox({
                 className="text-sm font-medium bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white rounded-xl px-4 py-2"
               >
                 {encerrando ? "Encerrando..." : "Encerrar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de encerramento em lote */}
+      {showBulkEncerrar && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className={`w-full max-w-sm rounded-2xl border p-5 space-y-4 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}>
+            <div className="flex items-center justify-between">
+              <p className="font-semibold">Encerrar {bulkSelectedIds.size} atendimento{bulkSelectedIds.size === 1 ? "" : "s"}</p>
+              <button onClick={() => setShowBulkEncerrar(false)} className="text-gray-500 hover:text-gray-300"><X size={16} /></button>
+            </div>
+            <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+              Qual o motivo do encerramento? Isso alimenta o relatório em Vendas.
+            </p>
+            <div className="space-y-1.5">
+              {MOTIVOS_ENCERRAMENTO.map(m => (
+                <label
+                  key={m}
+                  className={`flex items-center gap-2 rounded-xl border px-3 py-2 cursor-pointer text-sm transition-colors ${
+                    bulkMotivoSelecionado === m
+                      ? "border-blue-500 bg-blue-500/10"
+                      : theme === "dark" ? "border-gray-800 hover:border-gray-600" : "border-gray-200 hover:border-gray-400"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="motivo-encerramento-lote"
+                    checked={bulkMotivoSelecionado === m}
+                    onChange={() => setBulkMotivoSelecionado(m)}
+                    className="w-3.5 h-3.5"
+                  />
+                  {m}
+                </label>
+              ))}
+            </div>
+            <textarea
+              value={bulkMotivoObs}
+              onChange={e => setBulkMotivoObs(e.target.value)}
+              rows={2}
+              maxLength={150}
+              placeholder={bulkMotivoSelecionado === "Outro" ? "Descreva o motivo..." : "Observação (opcional)"}
+              className={`w-full rounded-xl border px-3 py-2 text-sm resize-none focus:outline-none ${theme === "dark" ? "bg-gray-950 border-gray-800" : "bg-gray-50 border-gray-200"}`}
+            />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowBulkEncerrar(false)} className="text-sm text-gray-400 hover:text-gray-200 px-3 py-2">Cancelar</button>
+              <button
+                onClick={confirmarBulkEncerramento}
+                disabled={!bulkMotivoSelecionado || (bulkMotivoSelecionado === "Outro" && !bulkMotivoObs.trim()) || bulkEncerrando}
+                className="text-sm font-medium bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white rounded-xl px-4 py-2"
+              >
+                {bulkEncerrando ? "Encerrando..." : "Encerrar"}
               </button>
             </div>
           </div>
