@@ -1,8 +1,7 @@
 import { currentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { LayoutGrid, ArrowLeft, Plus } from "lucide-react";
+import { LayoutGrid } from "lucide-react";
 import { listMyAgentConfigs } from "@/lib/team";
 import { getInstanceStatus } from "@/lib/whatsapp";
 import { HubClient, type HubAgent } from "./HubClient";
@@ -108,31 +107,5 @@ export default async function HubPage() {
     },
   }));
 
-  return (
-    <div className="min-h-full bg-gray-950 text-white p-4 md:p-6 overflow-y-auto h-full">
-      <div className="max-w-5xl mx-auto space-y-5">
-        <div className="flex items-start justify-between flex-wrap gap-3">
-          <div>
-            <Link href="/dashboard" className="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1 w-fit">
-              <ArrowLeft size={12} /> Plataforma
-            </Link>
-            <h1 className="text-2xl md:text-3xl font-bold mt-1 flex items-center gap-2">
-              <LayoutGrid size={26} className="text-blue-400" /> Hub de agentes de IA
-            </h1>
-            <p className="text-sm text-gray-500 mt-1">Sua equipe virtual: ligue e desligue cada agente conforme a operação precisa.</p>
-          </div>
-          {isManager && (
-            <Link
-              href={`/crm/${configs[0].id}/canais`}
-              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-2.5 text-sm font-medium"
-            >
-              <Plus size={15} /> Novo número
-            </Link>
-          )}
-        </div>
-
-        <HubClient agents={agents} isManager={isManager} />
-      </div>
-    </div>
-  );
+  return <HubClient agents={agents} isManager={isManager} />;
 }

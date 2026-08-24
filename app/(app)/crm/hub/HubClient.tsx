@@ -1,11 +1,62 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Headset, Calendar, ShoppingCart, Landmark, Target,
-  MessageCircle, Instagram, Settings, ChevronRight, HeartHandshake, RefreshCw,
+  MessageCircle, Instagram, Settings, ChevronRight, ChevronDown, HeartHandshake, RefreshCw,
+  LayoutGrid, ArrowLeft, Plus, Sun, Moon,
 } from "lucide-react";
+
+type HubTheme = "dark" | "light";
+const THEME_STORAGE_KEY = "hub-theme";
+
+const THEMES = {
+  dark: {
+    root: "bg-gray-950 text-white",
+    backLink: "text-gray-500 hover:text-gray-300",
+    subtitle: "text-gray-500",
+    selectorBar: "bg-gray-900 border-gray-800",
+    input: "bg-gray-950 border-gray-800 text-white",
+    pillButton: "bg-gray-900 border border-gray-800 hover:bg-gray-800",
+    badgeActive: "bg-green-900/40 text-green-300 border-green-800/50",
+    badgeInactive: "bg-gray-800 text-gray-400 border-gray-700",
+    badgeWaOn: "bg-green-900/30 text-green-300 border-green-800/50",
+    badgeIgOn: "bg-purple-900/30 text-purple-300 border-purple-800/50",
+    badgeChannelOff: "bg-gray-800/60 text-gray-500 border-gray-700",
+    manageLink: "border-gray-700 text-gray-400 hover:text-white hover:border-gray-500",
+    cardOn: "bg-gray-900 border-blue-900/60",
+    cardOff: "bg-gray-900/50 border-gray-800",
+    iconOn: "bg-blue-600/20 text-blue-400",
+    iconOff: "bg-gray-800 text-gray-600",
+    statusOn: "text-green-400",
+    statusOff: "text-gray-600",
+    desc: "text-gray-400",
+    secondary: "text-gray-500",
+  },
+  light: {
+    root: "bg-gray-50 text-gray-900",
+    backLink: "text-gray-500 hover:text-gray-700",
+    subtitle: "text-gray-500",
+    selectorBar: "bg-white border-gray-200",
+    input: "bg-white border-gray-300 text-gray-900",
+    pillButton: "bg-white border border-gray-200 hover:bg-gray-100",
+    badgeActive: "bg-green-50 text-green-700 border-green-200",
+    badgeInactive: "bg-gray-200 text-gray-600 border-gray-300",
+    badgeWaOn: "bg-green-50 text-green-700 border-green-200",
+    badgeIgOn: "bg-purple-50 text-purple-700 border-purple-200",
+    badgeChannelOff: "bg-gray-100 text-gray-400 border-gray-200",
+    manageLink: "border-gray-300 text-gray-500 hover:text-gray-900 hover:border-gray-400",
+    cardOn: "bg-white border-blue-300",
+    cardOff: "bg-white/60 border-gray-200",
+    iconOn: "bg-blue-50 text-blue-600",
+    iconOff: "bg-gray-200 text-gray-400",
+    statusOn: "text-green-600",
+    statusOff: "text-gray-400",
+    desc: "text-gray-600",
+    secondary: "text-gray-500",
+  },
+} satisfies Record<HubTheme, Record<string, string>>;
 
 export type HubAgent = {
   id: string;
@@ -32,6 +83,28 @@ export function HubClient({ agents, isManager }: { agents: HubAgent[]; isManager
   const [selectedId, setSelectedId] = useState(agents[0].id);
   const [overrides, setOverrides] = useState<Record<string, Partial<Record<ModuloKey, boolean>>>>({});
   const [saving, setSaving] = useState<string | null>(null);
+  const [theme, setTheme] = useState<HubTheme>("dark");
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set(["atendimento"]));
+  const t = THEMES[theme];
+
+  useEffect(() => {
+    const saved = localStorage.getItem(THEME_STORAGE_KEY);
+    if (saved === "light" || saved === "dark") setTheme(saved);
+  }, []);
+
+  function toggleTheme() {
+    const next: HubTheme = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    localStorage.setItem(THEME_STORAGE_KEY, next);
+  }
+
+  function toggleSection(key: string) {
+    setOpenSections(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }
 
   const agent = agents.find(a => a.id === selectedId) ?? agents[0];
   const flag = (key: ModuloKey): boolean => overrides[agent.id]?.[key] ?? agent[key];
@@ -120,104 +193,143 @@ export function HubClient({ agents, isManager }: { agents: HubAgent[]; isManager
   ];
 
   return (
-    <div className="space-y-5">
-      {/* Seletor de número + canais */}
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3 min-w-0">
-          {agents.length > 1 ? (
-            <select
-              value={selectedId}
-              onChange={e => setSelectedId(e.target.value)}
-              className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm font-medium"
+    <div className={`min-h-full p-4 md:p-6 overflow-y-auto h-full ${t.root}`}>
+      <div className="max-w-5xl mx-auto space-y-5">
+        <div className="flex items-start justify-between flex-wrap gap-3">
+          <div>
+            <Link href="/dashboard" className={`text-xs flex items-center gap-1 w-fit ${t.backLink}`}>
+              <ArrowLeft size={12} /> Plataforma
+            </Link>
+            <h1 className="text-2xl md:text-3xl font-bold mt-1 flex items-center gap-2">
+              <LayoutGrid size={26} className="text-blue-400" /> Hub de agentes de IA
+            </h1>
+            <p className={`text-sm mt-1 ${t.subtitle}`}>Sua equipe virtual: ligue e desligue cada agente conforme a operação precisa.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {isManager && (
+              <Link
+                href={`/crm/${agents[0].id}/canais`}
+                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-4 py-2.5 text-sm font-medium"
+              >
+                <Plus size={15} /> Novo número
+              </Link>
+            )}
+            <button
+              onClick={toggleTheme}
+              title={theme === "dark" ? "Mudar para fundo claro" : "Mudar para fundo escuro"}
+              className={`p-2.5 rounded-xl ${t.pillButton}`}
             >
-              {agents.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
-            </select>
-          ) : (
-            <p className="font-semibold">{agent.nome}</p>
-          )}
-          <span className={`text-[10px] font-semibold px-2 py-1 rounded-full border flex-shrink-0 ${
-            agent.active ? "bg-green-900/40 text-green-300 border-green-800/50" : "bg-gray-800 text-gray-400 border-gray-700"
-          }`}>
-            {agent.active ? "Ativo" : "Pausado"}
-          </span>
+              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+          </div>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <span className={`text-xs px-2.5 py-1 rounded-full border flex items-center gap-1.5 ${
-            agent.waConnected ? "bg-green-900/30 text-green-300 border-green-800/50" : "bg-gray-800/60 text-gray-500 border-gray-700"
-          }`}>
-            <MessageCircle size={11} /> WhatsApp
-          </span>
-          <span className={`text-xs px-2.5 py-1 rounded-full border flex items-center gap-1.5 ${
-            agent.igUsername !== null ? "bg-purple-900/30 text-purple-300 border-purple-800/50" : "bg-gray-800/60 text-gray-500 border-gray-700"
-          }`}>
-            <Instagram size={11} /> {agent.igUsername ? `@${agent.igUsername}` : "Instagram"}
-          </span>
-          <Link
-            href={`/crm/${agent.id}/canais`}
-            className="text-xs px-2.5 py-1 rounded-full border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 transition-colors"
-          >
-            Gerenciar canais
-          </Link>
-        </div>
-      </div>
 
-      {/* Catálogo de agentes de IA */}
-      <div className="grid md:grid-cols-2 gap-4">
-        {AGENTES_IA.map(a => {
-          const isAtendimento = a.key === "atendimento";
-          const ligado = isAtendimento ? agent.active && agent.configured : flag(a.key as ModuloKey);
-
-          return (
-            <div
-              key={a.key}
-              className={`rounded-2xl border p-5 space-y-3 transition-colors ${
-                ligado ? "bg-gray-900 border-blue-900/60" : "bg-gray-900/50 border-gray-800"
-              }`}
+        {/* Seletor de número + canais */}
+        <div className={`border rounded-2xl p-4 flex items-center justify-between gap-3 flex-wrap ${t.selectorBar}`}>
+          <div className="flex items-center gap-3 min-w-0">
+            {agents.length > 1 ? (
+              <select
+                value={selectedId}
+                onChange={e => setSelectedId(e.target.value)}
+                className={`border rounded-xl px-3 py-2 text-sm font-medium ${t.input}`}
+              >
+                {agents.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
+              </select>
+            ) : (
+              <p className="font-semibold">{agent.nome}</p>
+            )}
+            <span className={`text-[10px] font-semibold px-2 py-1 rounded-full border flex-shrink-0 ${
+              agent.active ? t.badgeActive : t.badgeInactive
+            }`}>
+              {agent.active ? "Ativo" : "Pausado"}
+            </span>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <span className={`text-xs px-2.5 py-1 rounded-full border flex items-center gap-1.5 ${
+              agent.waConnected ? t.badgeWaOn : t.badgeChannelOff
+            }`}>
+              <MessageCircle size={11} /> WhatsApp
+            </span>
+            <span className={`text-xs px-2.5 py-1 rounded-full border flex items-center gap-1.5 ${
+              agent.igUsername !== null ? t.badgeIgOn : t.badgeChannelOff
+            }`}>
+              <Instagram size={11} /> {agent.igUsername ? `@${agent.igUsername}` : "Instagram"}
+            </span>
+            <Link
+              href={`/crm/${agent.id}/canais`}
+              className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${t.manageLink}`}
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                    ligado ? "bg-blue-600/20 text-blue-400" : "bg-gray-800 text-gray-600"
-                  }`}>
-                    <a.icon size={19} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-semibold text-sm">{a.nome}</p>
-                    <p className={`text-[11px] ${ligado ? "text-green-400" : "text-gray-600"}`}>
-                      {ligado ? "Trabalhando" : (isAtendimento && !agent.configured ? "Precisa ser configurado" : "Desligado")}
-                    </p>
+              Gerenciar canais
+            </Link>
+          </div>
+        </div>
+
+        {/* Catálogo de agentes de IA, em acordeão */}
+        <div className="space-y-3">
+          {AGENTES_IA.map(a => {
+            const isAtendimento = a.key === "atendimento";
+            const ligado = isAtendimento ? agent.active && agent.configured : flag(a.key as ModuloKey);
+            const open = openSections.has(a.key);
+
+            return (
+              <div
+                key={a.key}
+                className={`rounded-2xl border overflow-hidden transition-colors ${ligado ? t.cardOn : t.cardOff}`}
+              >
+                <div className="flex items-center justify-between gap-3 p-4">
+                  <button
+                    onClick={() => toggleSection(a.key)}
+                    className="flex items-center gap-3 min-w-0 flex-1 text-left"
+                  >
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${ligado ? t.iconOn : t.iconOff}`}>
+                      <a.icon size={19} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-sm">{a.nome}</p>
+                      <p className={`text-[11px] ${ligado ? t.statusOn : t.statusOff}`}>
+                        {ligado ? "Trabalhando" : (isAtendimento && !agent.configured ? "Precisa ser configurado" : "Desligado")}
+                      </p>
+                    </div>
+                  </button>
+
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {/* Toggle (atendimento se controla pela pág. de config/canais) */}
+                    {!isAtendimento && isManager && (
+                      <button
+                        onClick={() => toggleModulo(a.key as ModuloKey)}
+                        disabled={saving === a.key}
+                        aria-label={ligado ? `Desligar ${a.nome}` : `Ligar ${a.nome}`}
+                        className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ${ligado ? "bg-blue-600" : "bg-gray-700"} disabled:opacity-50`}
+                      >
+                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${ligado ? "translate-x-4" : "translate-x-0"}`} />
+                      </button>
+                    )}
+                    <button onClick={() => toggleSection(a.key)} aria-label={open ? "Recolher" : "Expandir"}>
+                      <ChevronDown size={16} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+                    </button>
                   </div>
                 </div>
 
-                {/* Toggle (atendimento se controla pela pág. de config/canais) */}
-                {!isAtendimento && isManager && (
-                  <button
-                    onClick={() => toggleModulo(a.key as ModuloKey)}
-                    disabled={saving === a.key}
-                    aria-label={ligado ? `Desligar ${a.nome}` : `Ligar ${a.nome}`}
-                    className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ${ligado ? "bg-blue-600" : "bg-gray-700"} disabled:opacity-50`}
-                  >
-                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${ligado ? "translate-x-4" : "translate-x-0"}`} />
-                  </button>
+                {open && (
+                  <div className="px-4 pb-4 pl-[68px] space-y-2">
+                    <p className={`text-xs leading-relaxed ${t.desc}`}>{a.desc}</p>
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      {a.metrica && ligado
+                        ? <p className={`text-[11px] ${t.secondary}`}>{a.metrica}</p>
+                        : <span />}
+                      <Link
+                        href={a.configHref}
+                        className="text-xs font-medium text-blue-400 hover:text-blue-300 flex items-center gap-0.5 flex-shrink-0"
+                      >
+                        <Settings size={11} /> Configurar <ChevronRight size={12} />
+                      </Link>
+                    </div>
+                  </div>
                 )}
               </div>
-
-              <p className="text-xs text-gray-400 leading-relaxed">{a.desc}</p>
-
-              <div className="flex items-center justify-between gap-2 pt-1">
-                {a.metrica && ligado
-                  ? <p className="text-[11px] text-gray-500">{a.metrica}</p>
-                  : <span />}
-                <Link
-                  href={a.configHref}
-                  className="text-xs font-medium text-blue-400 hover:text-blue-300 flex items-center gap-0.5 flex-shrink-0"
-                >
-                  <Settings size={11} /> Configurar <ChevronRight size={12} />
-                </Link>
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </div>
   );
