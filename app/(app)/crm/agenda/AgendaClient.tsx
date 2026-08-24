@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Calendar, Users, Settings, ArrowLeft, ArrowRight } from "lucide-react";
+import { Calendar, Users, Settings, ArrowLeft, ArrowRight, X } from "lucide-react";
 
 type AvailabilityRule = { dayOfWeek: number; start: string; end: string };
 type Appointment = {
@@ -170,6 +170,100 @@ function fmtDate(d: Date): string {
   return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")}`;
 }
 
+const HOUR_HEIGHT = 56; // px por hora na grade
+const DEFAULT_START_HOUR = 7;
+const DEFAULT_END_HOUR = 21;
+
+const STATUS_BLOCK: Record<string, string> = {
+  CONFIRMADO: "bg-green-700/80 border-green-500 hover:bg-green-600/80",
+  CANCELADO: "bg-red-900/60 border-red-700 hover:bg-red-800/60 opacity-70",
+  CONCLUIDO: "bg-gray-700/70 border-gray-600 hover:bg-gray-600/70",
+  AGUARDANDO_PAGAMENTO: "bg-yellow-700/70 border-yellow-500 hover:bg-yellow-600/70",
+};
+
+function toMinutes(hhmm: string): number {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + (m || 0);
+}
+
+function computeHourBounds(
+  rules: Record<number, { enabled: boolean; start: string; end: string }>,
+  appointments: Appointment[]
+): { startHour: number; endHour: number } {
+  let minMin = DEFAULT_START_HOUR * 60;
+  let maxMin = DEFAULT_END_HOUR * 60;
+  for (let i = 0; i < 7; i++) {
+    if (rules[i]?.enabled) {
+      minMin = Math.min(minMin, toMinutes(rules[i].start));
+      maxMin = Math.max(maxMin, toMinutes(rules[i].end));
+    }
+  }
+  for (const a of appointments) {
+    const start = new Date(a.scheduledAt);
+    const startMin = start.getHours() * 60 + start.getMinutes();
+    minMin = Math.min(minMin, startMin);
+    maxMin = Math.max(maxMin, startMin + a.durationMinutes);
+  }
+  return {
+    startHour: Math.max(0, Math.floor(minMin / 60)),
+    endHour: Math.min(24, Math.ceil(maxMin / 60)),
+  };
+}
+
+type LaidOutAppointment = Appointment & { startMin: number; endMin: number; col: number; cols: number };
+
+function layoutDayAppointments(appointments: Appointment[]): LaidOutAppointment[] {
+  const sorted = [...appointments]
+    .map(a => {
+      const start = new Date(a.scheduledAt);
+      const startMin = start.getHours() * 60 + start.getMinutes();
+      return { ...a, startMin, endMin: startMin + a.durationMinutes, col: 0, cols: 1 };
+    })
+    .sort((a, b) => a.startMin - b.startMin);
+
+  const result: LaidOutAppointment[] = [];
+  let cluster: LaidOutAppointment[] = [];
+  let clusterEnd = -Infinity;
+
+  function flush() {
+    if (cluster.length === 0) return;
+    const colEnds: number[] = [];
+    for (const ev of cluster) {
+      let placed = false;
+      for (let c = 0; c < colEnds.length; c++) {
+        if (ev.startMin >= colEnds[c]) {
+          ev.col = c;
+          colEnds[c] = ev.endMin;
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        ev.col = colEnds.length;
+        colEnds.push(ev.endMin);
+      }
+    }
+    const cols = colEnds.length;
+    for (const ev of cluster) {
+      ev.cols = cols;
+      result.push(ev);
+    }
+    cluster = [];
+  }
+
+  for (const ev of sorted) {
+    if (cluster.length > 0 && ev.startMin >= clusterEnd) {
+      flush();
+      clusterEnd = -Infinity;
+    }
+    cluster.push(ev);
+    clusterEnd = Math.max(clusterEnd, ev.endMin);
+  }
+  flush();
+
+  return result;
+}
+
 export function AgendaClient({
   agentId, initialSchedulingEnabled, initialSlotDurationMinutes, initialAvailability, initialAppointmentReminderHours, initialRequisitosAgendamento, initialRestricoesAgendamento, initialAtendimentoEspecialEnabled, initialAtendimentoEspecialDescricao,
   initialAskProfessionalEnabled, initialSchedulingViaLink, initialAgendarAteEncerramento, initialVagasSimultaneas,
@@ -243,6 +337,7 @@ export function AgendaClient({
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loadingAppointments, setLoadingAppointments] = useState(true);
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
 
   const [showNewForm, setShowNewForm] = useState(false);
   const [newDate, setNewDate] = useState("");
@@ -758,48 +853,153 @@ export function AgendaClient({
 
         <div className="flex items-center justify-between">
           <button onClick={() => setWeekStart(d => new Date(d.getTime() - 7 * 86400000))} className="text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-lg bg-gray-900 border border-gray-800 flex items-center gap-1.5"><ArrowLeft size={14} /> Semana anterior</button>
-          <p className="text-sm text-gray-400">{days[0].toLocaleDateString("pt-BR")} – {days[6].toLocaleDateString("pt-BR")}</p>
+          <div className="flex items-center gap-3">
+            <p className="text-sm text-gray-400">{days[0].toLocaleDateString("pt-BR")} – {days[6].toLocaleDateString("pt-BR")}</p>
+            <button onClick={() => setWeekStart(startOfWeek(new Date()))} className="text-xs text-blue-400 hover:text-blue-300 px-2 py-1 rounded-lg border border-gray-800 bg-gray-900">Hoje</button>
+          </div>
           <button onClick={() => setWeekStart(d => new Date(d.getTime() + 7 * 86400000))} className="text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-lg bg-gray-900 border border-gray-800 flex items-center gap-1.5">Próxima semana <ArrowRight size={14} /></button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
-          {days.map((day, i) => {
-            const dayStr = fmtDate(day);
-            const dayAppointments = appointments.filter(a => fmtDate(new Date(a.scheduledAt)) === dayStr);
-            const isToday = fmtDate(day) === fmtDate(new Date());
-            return (
-              <div key={i} className={`bg-gray-900 border rounded-2xl p-3 min-h-[160px] ${isToday ? "border-blue-600" : "border-gray-800"}`}>
-                <p className="text-xs font-semibold text-gray-300">{DIAS_ABREV[i]}</p>
-                <p className="text-xs text-gray-500 mb-2">{day.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}</p>
-                {loadingAppointments ? (
-                  <p className="text-xs text-gray-600">Carregando...</p>
-                ) : dayAppointments.length === 0 ? (
-                  <p className="text-xs text-gray-600">—</p>
-                ) : (
-                  <div className="space-y-1.5">
+        <WeekTimeline
+          days={days}
+          appointments={appointments}
+          rules={rules}
+          loading={loadingAppointments}
+          onSelect={setSelectedAppointment}
+        />
+      </div>
+
+      {selectedAppointment && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setSelectedAppointment(null)}>
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 w-full max-w-sm space-y-3" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="text-xs text-gray-500 capitalize">
+                  {new Date(selectedAppointment.scheduledAt).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit" })}
+                </p>
+                <p className="text-lg font-semibold">
+                  {new Date(selectedAppointment.scheduledAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                  <span className="text-sm text-gray-500 font-normal"> · {selectedAppointment.durationMinutes}min</span>
+                </p>
+              </div>
+              <button onClick={() => setSelectedAppointment(null)} className="text-gray-500 hover:text-white"><X size={18} /></button>
+            </div>
+            <span className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${STATUS_LABEL[selectedAppointment.status].color}`}>
+              {STATUS_LABEL[selectedAppointment.status].label}
+            </span>
+            <div className="space-y-1">
+              <p className="text-sm font-medium">{selectedAppointment.contactName || "Sem nome"}</p>
+              <p className="text-xs text-gray-500 font-mono">+{selectedAppointment.contactNumber}</p>
+            </div>
+            {(selectedAppointment.professional || selectedAppointment.service) && (
+              <p className="text-sm text-gray-300">{[selectedAppointment.service?.name, selectedAppointment.professional?.name].filter(Boolean).join(" · ")}</p>
+            )}
+            {selectedAppointment.notes && (
+              <p className="text-sm text-gray-400 whitespace-pre-wrap">{selectedAppointment.notes}</p>
+            )}
+            {selectedAppointment.status === "CONFIRMADO" && (
+              <button
+                onClick={() => { handleCancel(selectedAppointment.id); setSelectedAppointment(null); }}
+                className="text-sm text-red-400 hover:text-red-300 border border-red-900/50 rounded-lg px-3 py-1.5"
+              >
+                Cancelar agendamento
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WeekTimeline({
+  days, appointments, rules, loading, onSelect,
+}: {
+  days: Date[];
+  appointments: Appointment[];
+  rules: Record<number, { enabled: boolean; start: string; end: string }>;
+  loading: boolean;
+  onSelect: (a: Appointment) => void;
+}) {
+  const { startHour, endHour } = computeHourBounds(rules, appointments);
+  const totalHeight = (endHour - startHour) * HOUR_HEIGHT;
+  const hours = Array.from({ length: endHour - startHour + 1 }, (_, i) => startHour + i);
+  const todayStr = fmtDate(new Date());
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const showNowLine = nowMin >= startHour * 60 && nowMin <= endHour * 60;
+
+  return (
+    <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+      <div className="overflow-x-auto">
+        <div style={{ minWidth: 760 }}>
+          <div className="grid" style={{ gridTemplateColumns: "48px repeat(7, 1fr)" }}>
+            <div />
+            {days.map((day, i) => {
+              const isToday = fmtDate(day) === todayStr;
+              return (
+                <div key={i} className={`text-center py-2 border-l border-gray-800 ${isToday ? "bg-blue-950/30" : ""}`}>
+                  <p className="text-xs font-semibold text-gray-300">{DIAS_ABREV[i]}</p>
+                  <p className={`text-sm ${isToday ? "text-blue-400 font-bold" : "text-gray-500"}`}>{day.getDate()}</p>
+                </div>
+              );
+            })}
+          </div>
+
+          {loading ? (
+            <p className="text-xs text-gray-600 px-4 py-6">Carregando...</p>
+          ) : (
+            <div className="grid" style={{ gridTemplateColumns: "48px repeat(7, 1fr)" }}>
+              <div className="relative" style={{ height: totalHeight }}>
+                {hours.map(h => (
+                  <div
+                    key={h}
+                    className="absolute right-1.5 text-[10px] text-gray-500 -translate-y-1/2"
+                    style={{ top: (h - startHour) * HOUR_HEIGHT }}
+                  >
+                    {String(h).padStart(2, "0")}:00
+                  </div>
+                ))}
+              </div>
+              {days.map((day, i) => {
+                const dayStr = fmtDate(day);
+                const isToday = dayStr === todayStr;
+                const dayAppointments = layoutDayAppointments(appointments.filter(a => fmtDate(new Date(a.scheduledAt)) === dayStr));
+                return (
+                  <div key={i} className="relative border-l border-gray-800" style={{ height: totalHeight }}>
+                    {hours.slice(1, -1).map(h => (
+                      <div key={h} className="absolute left-0 right-0 border-t border-gray-800/60" style={{ top: (h - startHour) * HOUR_HEIGHT }} />
+                    ))}
+                    {isToday && showNowLine && (
+                      <div className="absolute left-0 right-0 border-t-2 border-red-500 z-10" style={{ top: (nowMin - startHour * 60) / 60 * HOUR_HEIGHT }}>
+                        <div className="w-1.5 h-1.5 rounded-full bg-red-500 -mt-[3px] -ml-0.5" />
+                      </div>
+                    )}
                     {dayAppointments.map(a => {
-                      const st = STATUS_LABEL[a.status];
+                      const top = (a.startMin - startHour * 60) / 60 * HOUR_HEIGHT;
+                      const height = Math.max((a.endMin - a.startMin) / 60 * HOUR_HEIGHT, 18);
+                      const widthPct = 100 / a.cols;
                       return (
-                        <div key={a.id} className="bg-gray-950 border border-gray-800 rounded-lg p-2">
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="text-xs font-medium">{new Date(a.scheduledAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
-                            <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${st.color}`}>{st.label}</span>
-                          </div>
-                          <p className="text-xs text-gray-300 truncate mt-0.5">{a.contactName || a.contactNumber}</p>
-                          {(a.professional || a.service) && (
-                            <p className="text-[10px] text-gray-500 truncate">{[a.service?.name, a.professional?.name].filter(Boolean).join(" · ")}</p>
+                        <button
+                          key={a.id}
+                          onClick={() => onSelect(a)}
+                          className={`absolute rounded-md border text-left px-1.5 overflow-hidden ${STATUS_BLOCK[a.status]}`}
+                          style={{ top, height, left: `${a.col * widthPct}%`, width: `calc(${widthPct}% - 2px)` }}
+                        >
+                          <p className="text-[10px] font-semibold leading-tight truncate">
+                            {new Date(a.scheduledAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} {a.contactName || a.contactNumber}
+                          </p>
+                          {height > 32 && (a.professional || a.service) && (
+                            <p className="text-[9px] text-gray-200/80 truncate">{[a.service?.name, a.professional?.name].filter(Boolean).join(" · ")}</p>
                           )}
-                          {a.status === "CONFIRMADO" && (
-                            <button onClick={() => handleCancel(a.id)} className="text-[10px] text-red-400 hover:text-red-300 mt-1">Cancelar</button>
-                          )}
-                        </div>
+                        </button>
                       );
                     })}
                   </div>
-                )}
-              </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>
