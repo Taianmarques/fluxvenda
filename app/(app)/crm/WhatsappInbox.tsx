@@ -1365,9 +1365,10 @@ export function WhatsappInbox({
                     <button
                       onClick={openBulkStagePicker}
                       disabled={bulkSelectedIds.size === 0}
-                      className="flex items-center gap-1 text-xs font-medium bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white rounded-lg px-2.5 py-1.5"
+                      title="Mover pra etapa"
+                      className="flex items-center justify-center bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white rounded-lg p-1.5"
                     >
-                      <KanbanSquare size={12} /> Mover pra etapa
+                      <KanbanSquare size={14} />
                     </button>
                     {showBulkStagePicker && (
                       <>
@@ -1409,16 +1410,18 @@ export function WhatsappInbox({
                   <button
                     onClick={handleBulkAceitar}
                     disabled={bulkSelectedIds.size === 0 || bulkAccepting}
-                    className="flex items-center gap-1 text-xs font-medium bg-green-700 hover:bg-green-600 disabled:opacity-40 text-white rounded-lg px-2.5 py-1.5"
+                    title="Aceitar atendimento"
+                    className="flex items-center justify-center bg-green-700 hover:bg-green-600 disabled:opacity-40 text-white rounded-lg p-1.5"
                   >
-                    <UserCheck size={12} /> {bulkAccepting ? "Aceitando..." : "Aceitar"}
+                    <UserCheck size={14} />
                   </button>
                   <button
                     onClick={openBulkEncerrar}
                     disabled={bulkSelectedIds.size === 0}
-                    className="flex items-center gap-1 text-xs font-medium bg-red-700 hover:bg-red-600 disabled:opacity-40 text-white rounded-lg px-2.5 py-1.5"
+                    title="Encerrar"
+                    className="flex items-center justify-center bg-red-700 hover:bg-red-600 disabled:opacity-40 text-white rounded-lg p-1.5"
                   >
-                    <LogOut size={12} /> Encerrar
+                    <LogOut size={14} />
                   </button>
                 </div>
               </div>
