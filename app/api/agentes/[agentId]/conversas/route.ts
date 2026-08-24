@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getAgentConfigWithRole, negadaParaAtendente } from "@/lib/team";
+import { emitChatEvent } from "@/lib/realtime";
 import { Prisma } from "@/app/generated/prisma/client";
 import { z } from "zod";
 
@@ -127,4 +128,51 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
     data: { agentConfigId: config.id, contactNumber: numero, contactName: nome?.trim() || null, assignedToId: userId },
   });
   return NextResponse.json({ conversation });
+}
+
+const bulkStageSchema = z.object({
+  conversationIds: z.array(z.string()).min(1).max(200),
+  stageId: z.string(),
+});
+
+// Seleção múltipla no chat (Ativos/Pendentes/Finalizados) — move ou cria a oportunidade aberta
+// de cada conversa selecionada pra uma etapa específica, tudo de uma vez. Mesma regra de "achou
+// aberta move, senão cria com valor 0" que já existe em concluir_qualificacao_sdr, só que aqui é
+// disparado manualmente pelo atendente/gestor em várias conversas ao mesmo tempo.
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { agentId } = await params;
+  const result = await getAgentConfigWithRole(userId, agentId);
+  if (!result) return NextResponse.json({ error: "Agente não encontrado" }, { status: 404 });
+  const { config, isManager } = result;
+
+  const body = bulkStageSchema.safeParse(await req.json());
+  if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
+
+  const stage = await prisma.pipelineStage.findFirst({ where: { id: body.data.stageId, pipeline: { agentConfigId: config.id } } });
+  if (!stage) return NextResponse.json({ error: "Etapa não encontrada" }, { status: 404 });
+
+  // Só conversas desse agente que o usuário realmente pode mexer — ids de fora, de outro
+  // atendente, ou de grupo sem visibilidade pra ele são ignorados silenciosamente.
+  const conversas = await prisma.conversation.findMany({
+    where: { id: { in: body.data.conversationIds }, agentConfigId: config.id },
+    include: { opportunities: { where: { wonAt: null }, orderBy: { createdAt: "desc" }, take: 1 } },
+  });
+  const permitidas = isManager ? conversas : conversas.filter(c => !negadaParaAtendente(c, userId, config.iaLeadAttendantId));
+
+  for (const conv of permitidas) {
+    const opp = conv.opportunities[0];
+    if (opp) {
+      if (opp.stageId !== stage.id) {
+        await prisma.opportunity.update({ where: { id: opp.id }, data: { stageId: stage.id, stageEnteredAt: new Date() } });
+      }
+    } else {
+      await prisma.opportunity.create({ data: { conversationId: conv.id, stageId: stage.id, stageEnteredAt: new Date(), dealValue: 0 } });
+    }
+    emitChatEvent(config.id, conv.id);
+  }
+
+  return NextResponse.json({ ok: true, afetados: permitidas.length });
 }

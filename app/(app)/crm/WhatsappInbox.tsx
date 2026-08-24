@@ -4,7 +4,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import {
   MessageCircle, Search, X, Lock, Unlock, Bot, User, UserPlus, Users, Eye,
   FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap, StickyNote, ArrowRightLeft, HandCoins, CalendarClock, ListFilter, Instagram, ArrowLeft,
-  Reply, Forward, ChevronDown, Package, ImageOff, Pin, Download, Maximize2,
+  Reply, Forward, ChevronDown, Package, ImageOff, Pin, Download, Maximize2, ListChecks, KanbanSquare,
 } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { EmojiPicker } from "./EmojiPicker";
@@ -35,6 +35,7 @@ type ConversationSummary = {
 };
 
 type Attendant = { id: string; name: string; isManager: boolean };
+type PipelineOption = { id: string; name: string; stages: { id: string; name: string }[] };
 
 function formatBRL(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -397,6 +398,15 @@ export function WhatsappInbox({
   const [conversations, setConversations] = useState(initialConversations);
   const [leadStatuses, setLeadStatuses] = useState(initialLeadStatuses);
   const [attendants, setAttendants] = useState<Attendant[]>([]);
+  // Seleção múltipla na lista (Ativos/Pendentes/Finalizados) — ação em lote: mover pra
+  // pipeline/etapa
+  const [bulkSelectMode, setBulkSelectMode] = useState(false);
+  const [bulkSelectedIds, setBulkSelectedIds] = useState<Set<string>>(new Set());
+  const [pipelines, setPipelines] = useState<PipelineOption[]>([]);
+  const [showBulkStagePicker, setShowBulkStagePicker] = useState(false);
+  const [bulkPipelineId, setBulkPipelineId] = useState("");
+  const [bulkStageId, setBulkStageId] = useState("");
+  const [bulkMoving, setBulkMoving] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId ?? initialConversations[0]?.id ?? null);
   // Mobile: alterna entre lista e conversa (no desktop as duas aparecem lado a lado)
   const [mobileChatOpen, setMobileChatOpen] = useState<boolean>(Boolean(initialSelectedId));
@@ -494,6 +504,10 @@ export function WhatsappInbox({
     fetch(`/api/agentes/${agentId}/atendentes`)
       .then(res => res.json())
       .then(data => { if (data.attendants) setAttendants(data.attendants); })
+      .catch(() => {});
+    fetch(`/api/agentes/${agentId}/pipelines`)
+      .then(res => res.json())
+      .then(data => setPipelines(data.pipelines ?? []))
       .catch(() => {});
     refreshQuickReplies();
   }, []);
@@ -622,6 +636,48 @@ export function WhatsappInbox({
       body: JSON.stringify({ pinned: !pinned }),
     });
     refreshList();
+  }
+
+  function toggleBulkSelectMode() {
+    setBulkSelectMode(s => !s);
+    setBulkSelectedIds(new Set());
+    setShowBulkStagePicker(false);
+  }
+
+  function toggleBulkSelected(conversationId: string) {
+    setBulkSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(conversationId)) next.delete(conversationId); else next.add(conversationId);
+      return next;
+    });
+  }
+
+  function openBulkStagePicker() {
+    if (bulkSelectedIds.size === 0) return;
+    const firstPipeline = pipelines[0];
+    setBulkPipelineId(firstPipeline?.id ?? "");
+    setBulkStageId(firstPipeline?.stages[0]?.id ?? "");
+    setShowBulkStagePicker(true);
+  }
+
+  async function handleBulkMoveStage() {
+    if (!bulkStageId || bulkSelectedIds.size === 0 || bulkMoving) return;
+    setBulkMoving(true);
+    try {
+      const res = await fetch(`/api/agentes/${agentId}/conversas`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationIds: Array.from(bulkSelectedIds), stageId: bulkStageId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { alert(data.error ?? "Não foi possível mover as conversas."); return; }
+      setShowBulkStagePicker(false);
+      setBulkSelectMode(false);
+      setBulkSelectedIds(new Set());
+      await refreshList();
+    } finally {
+      setBulkMoving(false);
+    }
   }
 
   async function handleToggleGroupVisibility(profileId: string) {
@@ -1226,8 +1282,75 @@ export function WhatsappInbox({
                 >
                   <UserPlus size={14} />
                 </button>
+                {statusFilter !== "grupos" && (
+                  <button
+                    onClick={toggleBulkSelectMode}
+                    title="Selecionar conversas"
+                    className={`p-2 rounded-lg flex-shrink-0 ${bulkSelectMode ? "bg-blue-600 text-white" : `${t.toggleBar} ${t.toggleInactive}`}`}
+                  >
+                    <ListChecks size={14} />
+                  </button>
+                )}
               </div>
             </div>
+            {bulkSelectMode && (
+              <div className={`px-3 py-2 border-b flex items-center justify-between gap-2 flex-shrink-0 ${t.sidebar} ${theme === "dark" ? "bg-gray-900/60" : "bg-gray-50"}`}>
+                <p className={`text-xs ${t.listSecondary}`}>{bulkSelectedIds.size} selecionada{bulkSelectedIds.size === 1 ? "" : "s"}</p>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setBulkSelectedIds(new Set(filteredConversations.map(c => c.id)))}
+                    className="text-xs text-blue-400 hover:text-blue-300 px-1.5"
+                  >
+                    Marcar todas
+                  </button>
+                  <div className="relative">
+                    <button
+                      onClick={openBulkStagePicker}
+                      disabled={bulkSelectedIds.size === 0}
+                      className="flex items-center gap-1 text-xs font-medium bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white rounded-lg px-2.5 py-1.5"
+                    >
+                      <KanbanSquare size={12} /> Mover pra etapa
+                    </button>
+                    {showBulkStagePicker && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setShowBulkStagePicker(false)} />
+                        <div className={`absolute z-20 top-full right-0 mt-1 w-64 rounded-xl border shadow-xl p-3 space-y-2 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}>
+                          <p className="text-xs font-semibold">Mover {bulkSelectedIds.size} conversa{bulkSelectedIds.size === 1 ? "" : "s"} pra etapa</p>
+                          {pipelines.length > 1 && (
+                            <select
+                              value={bulkPipelineId}
+                              onChange={e => {
+                                const pid = e.target.value;
+                                setBulkPipelineId(pid);
+                                setBulkStageId(pipelines.find(p => p.id === pid)?.stages[0]?.id ?? "");
+                              }}
+                              className={`w-full text-xs rounded-lg px-2 py-1.5 border focus:outline-none ${theme === "dark" ? "bg-gray-950 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+                            >
+                              {pipelines.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                          )}
+                          <select
+                            value={bulkStageId}
+                            onChange={e => setBulkStageId(e.target.value)}
+                            className={`w-full text-xs rounded-lg px-2 py-1.5 border focus:outline-none ${theme === "dark" ? "bg-gray-950 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+                          >
+                            {pipelines.find(p => p.id === bulkPipelineId)?.stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                          </select>
+                          {pipelines.length === 0 && <p className="text-xs text-gray-500">Nenhum pipeline configurado ainda.</p>}
+                          <button
+                            onClick={handleBulkMoveStage}
+                            disabled={bulkMoving || !bulkStageId}
+                            className="w-full text-xs font-medium bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg py-1.5"
+                          >
+                            {bulkMoving ? "Movendo..." : "Confirmar"}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1.5">
               {filteredConversations.length === 0 ? (
                 <p className={`text-sm p-4 ${t.listSecondary}`}>{search ? "Nenhuma conversa encontrada." : "Nenhuma conversa nessa aba."}</p>
@@ -1240,16 +1363,31 @@ export function WhatsappInbox({
                   const isIg = isIgContact(c.contactNumber);
                   const statusColor = leadStatuses.find(s => s.id === c.leadStatusId)?.color;
                   const unread = c.unreadCount > 0;
+                  const bulkSelected = bulkSelectedIds.has(c.id);
+                  function cardClick() {
+                    if (bulkSelectMode) { toggleBulkSelected(c.id); return; }
+                    setSelectedId(c.id);
+                    setMobileChatOpen(true);
+                  }
                   return (
                   <div
                     key={c.id}
                     role="button"
                     tabIndex={0}
-                    onClick={() => { setSelectedId(c.id); setMobileChatOpen(true); }}
-                    onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { setSelectedId(c.id); setMobileChatOpen(true); } }}
-                    className={`w-full text-left px-3.5 py-3 rounded-xl border transition-colors cursor-pointer flex items-start gap-2.5 ${selectedId === c.id ? t.cardBgSelected : t.cardBg} ${statusColor ? "border-l-4" : ""}`}
+                    onClick={cardClick}
+                    onKeyDown={e => { if (e.key === "Enter" || e.key === " ") cardClick(); }}
+                    className={`w-full text-left px-3.5 py-3 rounded-xl border transition-colors cursor-pointer flex items-start gap-2.5 ${bulkSelected ? "border-blue-500" : selectedId === c.id ? t.cardBgSelected : t.cardBg} ${statusColor ? "border-l-4" : ""}`}
                     style={statusColor ? { borderLeftColor: statusColor } : undefined}
                   >
+                    {bulkSelectMode && (
+                      <input
+                        type="checkbox"
+                        checked={bulkSelected}
+                        onChange={() => toggleBulkSelected(c.id)}
+                        onClick={e => e.stopPropagation()}
+                        className="mt-1.5 flex-shrink-0 rounded"
+                      />
+                    )}
                     <div className="relative flex-shrink-0 mt-0.5">
                       {c.isGroup ? (
                         <div className="w-9 h-9 rounded-full bg-gray-700 flex items-center justify-center">
