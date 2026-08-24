@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Calendar, Users, Settings, ArrowLeft, ArrowRight, X, Sun, Moon } from "lucide-react";
+import { Calendar, Users, Settings, ArrowLeft, ArrowRight, X, Sun, Moon, ChevronDown } from "lucide-react";
 
 type AgendaTheme = "dark" | "light";
 const THEME_STORAGE_KEY = "agenda-theme";
@@ -65,6 +65,28 @@ function rulesFromAvailability(availability: AvailabilityRule[]): Record<number,
     base[i] = found ? { enabled: true, start: found.start, end: found.end } : { enabled: false, start: "09:00", end: "18:00" };
   }
   return base;
+}
+
+function SettingsSection({ title, subtitle, open, onToggle, t, children }: {
+  title: string;
+  subtitle?: string;
+  open: boolean;
+  onToggle: () => void;
+  t: typeof THEMES["dark"];
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={`border rounded-xl overflow-hidden ${t.border}`}>
+      <button type="button" onClick={onToggle} className={`w-full flex items-center justify-between gap-3 px-4 py-3 text-left ${t.pillBg}`}>
+        <div>
+          <p className="text-sm font-medium">{title}</p>
+          {subtitle && <p className={`text-xs mt-0.5 ${t.secondary}`}>{subtitle}</p>}
+        </div>
+        <ChevronDown size={16} className={`flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && <div className="p-4 space-y-4">{children}</div>}
+    </div>
+  );
 }
 
 function AvailabilityEditor({ rules, onChange, t }: {
@@ -349,6 +371,14 @@ export function AgendaClient({
 
   const [showSettings, setShowSettings] = useState(false);
   const [showTeam, setShowTeam] = useState(false);
+  const [openSettingsSections, setOpenSettingsSections] = useState<Set<string>>(new Set(["modo"]));
+  function toggleSettingsSection(key: string) {
+    setOpenSettingsSections(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }
   const [schedulingEnabled, setSchedulingEnabled] = useState(initialSchedulingEnabled);
   const [slotDurationMinutes, setSlotDurationMinutes] = useState(initialSlotDurationMinutes);
   const [appointmentReminderHours, setAppointmentReminderHours] = useState(initialAppointmentReminderHours);
@@ -657,267 +687,312 @@ export function AgendaClient({
               </div>
             )}
 
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={schedulingEnabled} onChange={e => setSchedulingEnabled(e.target.checked)} className="w-4 h-4" />
-              <span className="text-sm font-medium">Ativar agendamento automático pelo agente de IA</span>
-            </label>
-
-            <div className={`border rounded-xl p-4 space-y-2 ${t.border}`}>
-              <p className="text-sm font-medium">Como a IA agenda pelo WhatsApp</p>
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="radio"
-                  name="modoAgendamento"
-                  checked={!schedulingViaLink}
-                  onChange={() => setSchedulingViaLink(false)}
-                  className="w-4 h-4 mt-0.5"
-                />
-                <div>
-                  <p className="text-sm">Por mensagem, na conversa</p>
-                  <p className={`text-xs ${t.secondary}`}>A IA consulta os horários, oferece opções e confirma o agendamento dentro do próprio WhatsApp.</p>
-                </div>
+            <SettingsSection
+              title="Como funciona o agendamento"
+              subtitle="Ativar pela IA e escolher o modo de atendimento"
+              open={openSettingsSections.has("modo")}
+              onToggle={() => toggleSettingsSection("modo")}
+              t={t}
+            >
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={schedulingEnabled} onChange={e => setSchedulingEnabled(e.target.checked)} className="w-4 h-4" />
+                <span className="text-sm font-medium">Ativar agendamento automático pelo agente de IA</span>
               </label>
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="radio"
-                  name="modoAgendamento"
-                  checked={schedulingViaLink}
-                  onChange={() => setSchedulingViaLink(true)}
-                  className="w-4 h-4 mt-0.5"
-                />
-                <div>
-                  <p className="text-sm">Enviando o link de agendamento</p>
-                  <p className={`text-xs ${t.secondary}`}>A IA envia o link da página pública, onde o cliente escolhe serviço e horário sozinho e confirma na hora. Cancelamento pelo lembrete continua funcionando na conversa.</p>
-                </div>
-              </label>
-            </div>
 
-            <div>
-              <label className={`text-sm block mb-1 ${t.subtitle}`}>Duração de cada atendimento (minutos)</label>
-              <input
-                type="number" min={5} max={480} value={slotDurationMinutes}
-                onChange={e => setSlotDurationMinutes(Math.max(5, Number(e.target.value)))}
-                className={`w-32 border rounded-xl px-3 py-2 text-sm ${t.input}`}
-              />
-            </div>
-
-            <div>
-              <label className={`text-sm block mb-1 ${t.subtitle}`}>Atendimentos simultâneos</label>
-              <input
-                type="number" min={1} max={50} value={vagasSimultaneas}
-                onChange={e => setVagasSimultaneas(Math.min(50, Math.max(1, Number(e.target.value))))}
-                className={`w-32 border rounded-xl px-3 py-2 text-sm ${t.input}`}
-              />
-              <p className={`text-xs mt-1 ${t.secondary}`}>
-                Quantos clientes podem ser atendidos no mesmo horário quando não há profissionais cadastrados.
-                Ex: lava-jato com 3 vagas atende 3 carros ao mesmo tempo. Com profissionais, a capacidade é de 1 atendimento por profissional.
-              </p>
-            </div>
-
-            <div>
-              <label className={`text-sm block mb-1 ${t.subtitle}`}>Enviar lembrete de confirmação quantas horas antes do compromisso</label>
-              <input
-                type="number" min={1} max={168} value={appointmentReminderHours}
-                onChange={e => setAppointmentReminderHours(Math.max(1, Number(e.target.value)))}
-                className={`w-32 border rounded-xl px-3 py-2 text-sm ${t.input}`}
-              />
-              <p className={`text-xs mt-1 ${t.secondary}`}>O agente pergunta se o cliente confirma presença. Se ele disser que não pode ir, a IA cancela e já oferece reagendar.</p>
-            </div>
-
-            <div>
-              <label className={`text-sm block mb-1 ${t.subtitle}`}>
-                Informações necessárias para o agendamento <span className={t.muted}>(opcional)</span>
-              </label>
-              <textarea
-                value={requisitosAgendamento}
-                onChange={e => setRequisitosAgendamento(e.target.value)}
-                rows={3}
-                placeholder="Ex: nome completo, convênio, tipo de consulta, nome do pet e raça..."
-                className={`w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600 ${t.input}`}
-                maxLength={500}
-              />
-              <p className={`text-xs mt-1 ${t.secondary}`}>Depois que o cliente escolher a data e o horário, o agente envia uma mensagem pedindo essas informações — e só confirma o agendamento quando o cliente responder.</p>
-            </div>
-
-            <div>
-              <label className={`text-sm block mb-1 ${t.subtitle}`}>
-                O que NÃO fazer no agendamento <span className={t.muted}>(opcional)</span>
-              </label>
-              <textarea
-                value={restricoesAgendamento}
-                onChange={e => setRestricoesAgendamento(e.target.value)}
-                rows={3}
-                placeholder="Ex: não agendar para menores de 18 anos sem responsável, não aceitar agendamentos no mesmo dia, não remarcar mais de uma vez..."
-                className={`w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600 ${t.input}`}
-                maxLength={500}
-              />
-              <p className={`text-xs mt-1 ${t.secondary}`}>O agente vai seguir essas restrições durante toda a conversa de agendamento.</p>
-            </div>
-
-            <div className={`border rounded-xl p-4 space-y-3 ${t.border}`}>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={atendimentoEspecialEnabled}
-                  onChange={e => setAtendimentoEspecialEnabled(e.target.checked)}
-                  className="w-4 h-4"
-                />
-                <div>
-                  <p className="text-sm font-medium">Permitir atendimento especial fora do horário comercial</p>
-                  <p className={`text-xs ${t.secondary}`}>Quando ativo, o agente informa ao cliente que é possível verificar um horário especial fora da disponibilidade normal.</p>
-                </div>
-              </label>
-              {atendimentoEspecialEnabled && (
-                <div>
-                  <label className={`text-sm block mb-1 ${t.subtitle}`}>
-                    Condições do atendimento especial <span className={t.muted}>(opcional)</span>
-                  </label>
-                  <textarea
-                    value={atendimentoEspecialDescricao}
-                    onChange={e => setAtendimentoEspecialDescricao(e.target.value)}
-                    rows={2}
-                    placeholder="Ex: somente emergências, sujeito a confirmação por telefone, taxa adicional de R$ 50..."
-                    className={`w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600 ${t.input}`}
-                    maxLength={500}
-                  />
-                </div>
-              )}
-            </div>
-
-            <div className={`border rounded-xl p-4 ${t.border}`}>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={askProfessionalEnabled}
-                  onChange={e => setAskProfessionalEnabled(e.target.checked)}
-                  className="w-4 h-4"
-                />
-                <div>
-                  <p className="text-sm font-medium">Perguntar com qual profissional o cliente quer agendar</p>
-                  <p className={`text-xs ${t.secondary}`}>
-                    Vale quando há mais de um profissional. Desligado: o agente oferece os horários de toda a equipe e o sistema atribui automaticamente a um profissional livre.
-                  </p>
-                </div>
-              </label>
-            </div>
-
-            <div className={`border rounded-xl p-4 ${t.border}`}>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={agendarAteEncerramento}
-                  onChange={e => setAgendarAteEncerramento(e.target.checked)}
-                  className="w-4 h-4"
-                />
-                <div>
-                  <p className="text-sm font-medium">Aceitar agendamentos até o horário de encerramento</p>
-                  <p className={`text-xs ${t.secondary}`}>
-                    Serviços longos podem começar perto do fechamento mesmo que terminem depois dele. Ex: funcionamento até 18h, serviço de 2h pode começar às 17h. Desligado: o serviço precisa terminar dentro do horário.
-                  </p>
-                </div>
-              </label>
-            </div>
-
-            <div className={`border rounded-xl p-4 space-y-3 ${t.border}`}>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={agendamentoCobrancaEnabled}
-                  disabled={!hasAsaasApiKey}
-                  onChange={e => setAgendamentoCobrancaEnabled(e.target.checked)}
-                  className="w-4 h-4 disabled:opacity-50"
-                />
-                <div>
-                  <p className="text-sm font-medium">Cobrar sinal para confirmar (Pix)</p>
-                  <p className={`text-xs ${t.secondary}`}>
-                    O cliente paga um Pix do valor abaixo na página pública pra confirmar o horário. Usa a conta Asaas
-                    configurada em Comércio. Se o pagamento não cair em 30 minutos, o horário volta a ficar livre.
-                    Pagamentos recebidos fora do prazo (horário já ocupado por outra pessoa) precisam de estorno manual no Asaas.
-                  </p>
-                </div>
-              </label>
-              {!hasAsaasApiKey && (
-                <p className="text-xs text-amber-400">Configure a chave da API do Asaas na aba Comércio antes de ativar.</p>
-              )}
-              {agendamentoCobrancaEnabled && hasAsaasApiKey && (
-                <div>
-                  <label className={`text-sm block mb-1 ${t.subtitle}`}>Valor do sinal (R$)</label>
+              <div className={`border rounded-xl p-4 space-y-2 ${t.border}`}>
+                <p className="text-sm font-medium">Como a IA agenda pelo WhatsApp</p>
+                <label className="flex items-start gap-3 cursor-pointer">
                   <input
-                    type="number" min={0} step={0.01} value={agendamentoSinalValor}
-                    onChange={e => setAgendamentoSinalValor(Math.max(0, Number(e.target.value)))}
-                    className={`w-32 border rounded-xl px-3 py-2 text-sm ${t.input}`}
+                    type="radio"
+                    name="modoAgendamento"
+                    checked={!schedulingViaLink}
+                    onChange={() => setSchedulingViaLink(false)}
+                    className="w-4 h-4 mt-0.5"
                   />
-                </div>
-              )}
-            </div>
+                  <div>
+                    <p className="text-sm">Por mensagem, na conversa</p>
+                    <p className={`text-xs ${t.secondary}`}>A IA consulta os horários, oferece opções e confirma o agendamento dentro do próprio WhatsApp.</p>
+                  </div>
+                </label>
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="modoAgendamento"
+                    checked={schedulingViaLink}
+                    onChange={() => setSchedulingViaLink(true)}
+                    className="w-4 h-4 mt-0.5"
+                  />
+                  <div>
+                    <p className="text-sm">Enviando o link de agendamento</p>
+                    <p className={`text-xs ${t.secondary}`}>A IA envia o link da página pública, onde o cliente escolhe serviço e horário sozinho e confirma na hora. Cancelamento pelo lembrete continua funcionando na conversa.</p>
+                  </div>
+                </label>
+              </div>
+            </SettingsSection>
 
-            <div className={`border rounded-xl p-4 space-y-3 ${t.border}`}>
+            <SettingsSection
+              title="Duração e capacidade"
+              subtitle="Tempo de cada atendimento, vagas simultâneas e lembretes"
+              open={openSettingsSections.has("duracao")}
+              onToggle={() => toggleSettingsSection("duracao")}
+              t={t}
+            >
               <div>
-                <p className="text-sm font-medium">Campos do agendamento pelo link</p>
+                <label className={`text-sm block mb-1 ${t.subtitle}`}>Duração de cada atendimento (minutos)</label>
+                <input
+                  type="number" min={5} max={480} value={slotDurationMinutes}
+                  onChange={e => setSlotDurationMinutes(Math.max(5, Number(e.target.value)))}
+                  className={`w-32 border rounded-xl px-3 py-2 text-sm ${t.input}`}
+                />
+              </div>
+
+              <div>
+                <label className={`text-sm block mb-1 ${t.subtitle}`}>Atendimentos simultâneos</label>
+                <input
+                  type="number" min={1} max={50} value={vagasSimultaneas}
+                  onChange={e => setVagasSimultaneas(Math.min(50, Math.max(1, Number(e.target.value))))}
+                  className={`w-32 border rounded-xl px-3 py-2 text-sm ${t.input}`}
+                />
+                <p className={`text-xs mt-1 ${t.secondary}`}>
+                  Quantos clientes podem ser atendidos no mesmo horário quando não há profissionais cadastrados.
+                  Ex: lava-jato com 3 vagas atende 3 carros ao mesmo tempo. Com profissionais, a capacidade é de 1 atendimento por profissional.
+                </p>
+              </div>
+
+              <div>
+                <label className={`text-sm block mb-1 ${t.subtitle}`}>Enviar lembrete de confirmação quantas horas antes do compromisso</label>
+                <input
+                  type="number" min={1} max={168} value={appointmentReminderHours}
+                  onChange={e => setAppointmentReminderHours(Math.max(1, Number(e.target.value)))}
+                  className={`w-32 border rounded-xl px-3 py-2 text-sm ${t.input}`}
+                />
+                <p className={`text-xs mt-1 ${t.secondary}`}>O agente pergunta se o cliente confirma presença. Se ele disser que não pode ir, a IA cancela e já oferece reagendar.</p>
+              </div>
+
+              <div className={`border rounded-xl p-4 ${t.border}`}>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={agendarAteEncerramento}
+                    onChange={e => setAgendarAteEncerramento(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  <div>
+                    <p className="text-sm font-medium">Aceitar agendamentos até o horário de encerramento</p>
+                    <p className={`text-xs ${t.secondary}`}>
+                      Serviços longos podem começar perto do fechamento mesmo que terminem depois dele. Ex: funcionamento até 18h, serviço de 2h pode começar às 17h. Desligado: o serviço precisa terminar dentro do horário.
+                    </p>
+                  </div>
+                </label>
+              </div>
+            </SettingsSection>
+
+            <SettingsSection
+              title="Regras para a IA"
+              subtitle="Informações pedidas, restrições e atendimento especial"
+              open={openSettingsSections.has("regras")}
+              onToggle={() => toggleSettingsSection("regras")}
+              t={t}
+            >
+              <div>
+                <label className={`text-sm block mb-1 ${t.subtitle}`}>
+                  Informações necessárias para o agendamento <span className={t.muted}>(opcional)</span>
+                </label>
+                <textarea
+                  value={requisitosAgendamento}
+                  onChange={e => setRequisitosAgendamento(e.target.value)}
+                  rows={3}
+                  placeholder="Ex: nome completo, convênio, tipo de consulta, nome do pet e raça..."
+                  className={`w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600 ${t.input}`}
+                  maxLength={500}
+                />
+                <p className={`text-xs mt-1 ${t.secondary}`}>Depois que o cliente escolher a data e o horário, o agente envia uma mensagem pedindo essas informações — e só confirma o agendamento quando o cliente responder.</p>
+              </div>
+
+              <div>
+                <label className={`text-sm block mb-1 ${t.subtitle}`}>
+                  O que NÃO fazer no agendamento <span className={t.muted}>(opcional)</span>
+                </label>
+                <textarea
+                  value={restricoesAgendamento}
+                  onChange={e => setRestricoesAgendamento(e.target.value)}
+                  rows={3}
+                  placeholder="Ex: não agendar para menores de 18 anos sem responsável, não aceitar agendamentos no mesmo dia, não remarcar mais de uma vez..."
+                  className={`w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600 ${t.input}`}
+                  maxLength={500}
+                />
+                <p className={`text-xs mt-1 ${t.secondary}`}>O agente vai seguir essas restrições durante toda a conversa de agendamento.</p>
+              </div>
+
+              <div className={`border rounded-xl p-4 space-y-3 ${t.border}`}>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={atendimentoEspecialEnabled}
+                    onChange={e => setAtendimentoEspecialEnabled(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  <div>
+                    <p className="text-sm font-medium">Permitir atendimento especial fora do horário comercial</p>
+                    <p className={`text-xs ${t.secondary}`}>Quando ativo, o agente informa ao cliente que é possível verificar um horário especial fora da disponibilidade normal.</p>
+                  </div>
+                </label>
+                {atendimentoEspecialEnabled && (
+                  <div>
+                    <label className={`text-sm block mb-1 ${t.subtitle}`}>
+                      Condições do atendimento especial <span className={t.muted}>(opcional)</span>
+                    </label>
+                    <textarea
+                      value={atendimentoEspecialDescricao}
+                      onChange={e => setAtendimentoEspecialDescricao(e.target.value)}
+                      rows={2}
+                      placeholder="Ex: somente emergências, sujeito a confirmação por telefone, taxa adicional de R$ 50..."
+                      className={`w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600 ${t.input}`}
+                      maxLength={500}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className={`border rounded-xl p-4 ${t.border}`}>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={askProfessionalEnabled}
+                    onChange={e => setAskProfessionalEnabled(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  <div>
+                    <p className="text-sm font-medium">Perguntar com qual profissional o cliente quer agendar</p>
+                    <p className={`text-xs ${t.secondary}`}>
+                      Vale quando há mais de um profissional. Desligado: o agente oferece os horários de toda a equipe e o sistema atribui automaticamente a um profissional livre.
+                    </p>
+                  </div>
+                </label>
+              </div>
+            </SettingsSection>
+
+            <SettingsSection
+              title="Cobrança de sinal (Pix)"
+              subtitle="Exigir pagamento para confirmar o horário"
+              open={openSettingsSections.has("cobranca")}
+              onToggle={() => toggleSettingsSection("cobranca")}
+              t={t}
+            >
+              <div className="space-y-3">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={agendamentoCobrancaEnabled}
+                    disabled={!hasAsaasApiKey}
+                    onChange={e => setAgendamentoCobrancaEnabled(e.target.checked)}
+                    className="w-4 h-4 disabled:opacity-50"
+                  />
+                  <div>
+                    <p className="text-sm font-medium">Cobrar sinal para confirmar (Pix)</p>
+                    <p className={`text-xs ${t.secondary}`}>
+                      O cliente paga um Pix do valor abaixo na página pública pra confirmar o horário. Usa a conta Asaas
+                      configurada em Comércio. Se o pagamento não cair em 30 minutos, o horário volta a ficar livre.
+                      Pagamentos recebidos fora do prazo (horário já ocupado por outra pessoa) precisam de estorno manual no Asaas.
+                    </p>
+                  </div>
+                </label>
+                {!hasAsaasApiKey && (
+                  <p className="text-xs text-amber-400">Configure a chave da API do Asaas na aba Comércio antes de ativar.</p>
+                )}
+                {agendamentoCobrancaEnabled && hasAsaasApiKey && (
+                  <div>
+                    <label className={`text-sm block mb-1 ${t.subtitle}`}>Valor do sinal (R$)</label>
+                    <input
+                      type="number" min={0} step={0.01} value={agendamentoSinalValor}
+                      onChange={e => setAgendamentoSinalValor(Math.max(0, Number(e.target.value)))}
+                      className={`w-32 border rounded-xl px-3 py-2 text-sm ${t.input}`}
+                    />
+                  </div>
+                )}
+              </div>
+            </SettingsSection>
+
+            <SettingsSection
+              title="Campos do formulário"
+              subtitle="Perguntas extras na página pública de agendamento"
+              open={openSettingsSections.has("campos")}
+              onToggle={() => toggleSettingsSection("campos")}
+              t={t}
+            >
+              <div className="space-y-3">
                 <p className={`text-xs ${t.secondary}`}>
                   Nome e WhatsApp são sempre pedidos. Adicione campos extras que o cliente preenche antes de confirmar — as respostas aparecem nas observações do agendamento.
                 </p>
+                {bookingFormFields.length > 0 && (
+                  <div className="space-y-1.5">
+                    {bookingFormFields.map((f, i) => (
+                      <div key={i} className={`flex items-center gap-3 border rounded-xl px-3 py-2 ${t.innerCard}`}>
+                        <p className="flex-1 text-sm truncate">{f.label}</p>
+                        <label className={`flex items-center gap-1.5 text-xs cursor-pointer flex-shrink-0 ${t.subtitle}`}>
+                          <input
+                            type="checkbox"
+                            checked={f.obrigatorio}
+                            onChange={e => setBookingFormFields(fields => fields.map((x, j) => j === i ? { ...x, obrigatorio: e.target.checked } : x))}
+                            className="w-3.5 h-3.5"
+                          />
+                          Obrigatório
+                        </label>
+                        <button
+                          onClick={() => setBookingFormFields(fields => fields.filter((_, j) => j !== i))}
+                          className={`hover:text-red-400 text-xs flex-shrink-0 ${t.muted}`}
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {bookingFormFields.length < 10 && (
+                  <div className="flex gap-2">
+                    <input
+                      value={newFieldLabel}
+                      onChange={e => setNewFieldLabel(e.target.value)}
+                      placeholder="Ex: Convênio, Placa do carro, Nome do pet..."
+                      maxLength={60}
+                      className={`flex-1 border rounded-xl px-3 py-2 text-sm ${t.input}`}
+                    />
+                    <button
+                      onClick={() => {
+                        const label = newFieldLabel.trim();
+                        if (!label) return;
+                        setBookingFormFields(fields => [...fields, { label, obrigatorio: true }]);
+                        setNewFieldLabel("");
+                      }}
+                      disabled={!newFieldLabel.trim()}
+                      className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl px-4 py-2 text-sm font-medium"
+                    >
+                      Adicionar
+                    </button>
+                  </div>
+                )}
               </div>
-              {bookingFormFields.length > 0 && (
-                <div className="space-y-1.5">
-                  {bookingFormFields.map((f, i) => (
-                    <div key={i} className={`flex items-center gap-3 border rounded-xl px-3 py-2 ${t.innerCard}`}>
-                      <p className="flex-1 text-sm truncate">{f.label}</p>
-                      <label className={`flex items-center gap-1.5 text-xs cursor-pointer flex-shrink-0 ${t.subtitle}`}>
-                        <input
-                          type="checkbox"
-                          checked={f.obrigatorio}
-                          onChange={e => setBookingFormFields(fields => fields.map((x, j) => j === i ? { ...x, obrigatorio: e.target.checked } : x))}
-                          className="w-3.5 h-3.5"
-                        />
-                        Obrigatório
-                      </label>
-                      <button
-                        onClick={() => setBookingFormFields(fields => fields.filter((_, j) => j !== i))}
-                        className={`hover:text-red-400 text-xs flex-shrink-0 ${t.muted}`}
-                      >
-                        Remover
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {bookingFormFields.length < 10 && (
-                <div className="flex gap-2">
-                  <input
-                    value={newFieldLabel}
-                    onChange={e => setNewFieldLabel(e.target.value)}
-                    placeholder="Ex: Convênio, Placa do carro, Nome do pet..."
-                    maxLength={60}
-                    className={`flex-1 border rounded-xl px-3 py-2 text-sm ${t.input}`}
-                  />
-                  <button
-                    onClick={() => {
-                      const label = newFieldLabel.trim();
-                      if (!label) return;
-                      setBookingFormFields(fields => [...fields, { label, obrigatorio: true }]);
-                      setNewFieldLabel("");
-                    }}
-                    disabled={!newFieldLabel.trim()}
-                    className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl px-4 py-2 text-sm font-medium"
-                  >
-                    Adicionar
-                  </button>
-                </div>
-              )}
-              <p className={`text-xs ${t.muted}`}>Lembre de clicar em Salvar abaixo pra aplicar as mudanças.</p>
-            </div>
+            </SettingsSection>
 
-            <div>
-              <p className={`text-sm mb-2 ${t.subtitle}`}>
+            <SettingsSection
+              title="Disponibilidade"
+              subtitle="Dias e horários em que o agendamento fica aberto"
+              open={openSettingsSections.has("disponibilidade")}
+              onToggle={() => toggleSettingsSection("disponibilidade")}
+              t={t}
+            >
+              <p className={`text-sm ${t.subtitle}`}>
                 Dias e horários de disponibilidade {professionals.length > 0 && <span className="text-xs">(usado só para quem não tem profissional atribuído)</span>}
               </p>
               <AvailabilityEditor rules={rules} onChange={setRules} t={t} />
-            </div>
+            </SettingsSection>
 
-            <button onClick={handleSaveSettings} disabled={savingSettings} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl px-5 py-2 text-sm font-medium">
-              {savingSettings ? "Salvando..." : "Salvar configurações"}
-            </button>
+            <div className="flex items-center gap-3">
+              <button onClick={handleSaveSettings} disabled={savingSettings} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl px-5 py-2 text-sm font-medium">
+                {savingSettings ? "Salvando..." : "Salvar configurações"}
+              </button>
+              <p className={`text-xs ${t.muted}`}>Lembre de clicar em Salvar depois de mudar qualquer campo acima.</p>
+            </div>
           </div>
         )}
 
