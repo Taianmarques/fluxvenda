@@ -186,7 +186,7 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo 
   // abas continuam visíveis, mas apontam pro Hub, onde o primeiro agente é criado.
   const agentPath = (suffix: string) => agentId ? `/crm/${agentId}${suffix}` : "/crm/hub";
 
-  const HUB_ITEM: NavItem = { href: "/crm/hub", label: "Hub de IA", icon: Bot, isHub: true };
+  const HUB_ITEM: NavItem = { href: "/crm/hub", label: "Agentes de IA", icon: Bot, isHub: true };
   // Página de boas-vindas/checklist promovida a aba fixa — só pro gestor (dono da conta),
   // que é quem completa os passos de configuração inicial da equipe.
   const INICIO_ITEM: NavItem = { href: "/crm/hub/inicio", label: "Início", icon: Home };

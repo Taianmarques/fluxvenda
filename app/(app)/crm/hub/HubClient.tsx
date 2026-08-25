@@ -201,7 +201,7 @@ export function HubClient({ agents, isManager }: { agents: HubAgent[]; isManager
               <ArrowLeft size={12} /> Plataforma
             </Link>
             <h1 className="text-2xl md:text-3xl font-bold mt-1 flex items-center gap-2">
-              <LayoutGrid size={26} className="text-blue-400" /> Hub de agentes de IA
+              <LayoutGrid size={26} className="text-blue-400" /> Agentes de IA
             </h1>
             <p className={`text-sm mt-1 ${t.subtitle}`}>Sua equipe virtual: ligue e desligue cada agente conforme a operação precisa.</p>
           </div>

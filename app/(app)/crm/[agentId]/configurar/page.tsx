@@ -30,7 +30,7 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
       <div className="min-h-screen bg-gray-950 text-white p-6">
         <div className="max-w-3xl mx-auto space-y-6">
           <div>
-            <Link href="/crm/hub" className="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1 w-fit"><ArrowLeft size={12} /> Hub de IA</Link>
+            <Link href="/crm/hub" className="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1 w-fit"><ArrowLeft size={12} /> Agentes de IA</Link>
             <h1 className="text-3xl font-bold mt-2 flex items-center gap-2"><Bot size={28} className="text-blue-400" /> Agente de Atendimento</h1>
             <p className="text-gray-400 mt-1">Configure seu agente de IA antes de conectar os canais (WhatsApp ou Instagram) — a conexão é o último passo.</p>
           </div>
@@ -74,7 +74,7 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
       <div className="min-h-screen bg-gray-950 text-white p-6">
         <div className="max-w-2xl mx-auto space-y-6">
           <div>
-            <Link href="/crm/hub" className="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1 w-fit"><ArrowLeft size={12} /> Hub de IA</Link>
+            <Link href="/crm/hub" className="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1 w-fit"><ArrowLeft size={12} /> Agentes de IA</Link>
             <h1 className="text-2xl font-bold mt-2 flex items-center gap-2"><Smartphone size={24} className="text-blue-400" /> Conecte um canal</h1>
             <p className="text-gray-400 mt-1">{config.nome} já está configurado. Escaneie o QR code com o WhatsApp do número <span className="text-gray-300">{config.uazapiInstance}</span>, conecte pela API oficial da Meta, ou conecte o Instagram se preferir.</p>
           </div>
@@ -117,7 +117,7 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
       <div className="max-w-4xl mx-auto space-y-8">
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
-            <Link href="/crm/hub" className="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1 w-fit"><ArrowLeft size={12} /> Hub de IA</Link>
+            <Link href="/crm/hub" className="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1 w-fit"><ArrowLeft size={12} /> Agentes de IA</Link>
             <h1 className="text-3xl font-bold mt-2 flex items-center gap-2"><Bot size={28} className="text-blue-400" /> {config.nome}</h1>
             <p className="text-gray-400 mt-1">
               Agente de atendimento conectado {[

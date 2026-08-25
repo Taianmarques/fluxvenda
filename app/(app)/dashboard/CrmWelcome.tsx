@@ -56,7 +56,7 @@ export function CrmWelcome({ firstName, agentCount }: { firstName: string; agent
         >
           <span className="w-11 h-11 rounded-xl bg-blue-900/40 text-blue-400 flex items-center justify-center"><LayoutGrid size={20} /></span>
           <div>
-            <p className="font-semibold flex items-center gap-1">Hub de agentes <ArrowRight size={14} className="text-gray-600" /></p>
+            <p className="font-semibold flex items-center gap-1">Agentes de IA <ArrowRight size={14} className="text-gray-600" /></p>
             <p className="text-sm text-gray-500 mt-0.5">Acompanhe métricas e ligue/desligue cada agente.</p>
           </div>
         </Link>
