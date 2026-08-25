@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  ArrowLeft, ArrowRight, Bot, SlidersHorizontal, Sparkles, Building2, Tag, Clock, FileText, Shuffle, Phone, BookOpen, BarChart3, ChevronRight, MessageCircle,
+  ArrowLeft, ArrowRight, Bot, SlidersHorizontal, Sparkles, Building2, Tag, Clock, Shuffle, Phone, BookOpen, BarChart3, ChevronRight, MessageCircle,
   type LucideIcon,
 } from "lucide-react";
 import { AgentActions } from "./AgentActions";
@@ -18,7 +18,7 @@ import { InstrucoesPanel } from "./InstrucoesPanel";
 import { TestAgentChat } from "./TestAgentChat";
 
 type Section =
-  | "agente" | "basico" | "personalidade" | "sobre-empresa" | "comercial" | "followup" | "instrucoes"
+  | "agente" | "basico" | "personalidade" | "sobre-empresa" | "comercial" | "followup"
   | "distribuicao" | "telefonia" | "conhecimento" | "analytics";
 
 const SECTIONS: { key: Section; label: string; icon: LucideIcon }[] = [
@@ -28,7 +28,6 @@ const SECTIONS: { key: Section; label: string; icon: LucideIcon }[] = [
   { key: "sobre-empresa", label: "Sobre a empresa", icon: Building2 },
   { key: "comercial", label: "Configuração comercial", icon: Tag },
   { key: "followup", label: "Follow-up", icon: Clock },
-  { key: "instrucoes", label: "Instruções", icon: FileText },
   { key: "distribuicao", label: "Distribuição", icon: Shuffle },
   { key: "telefonia", label: "Telefonia", icon: Phone },
   { key: "conhecimento", label: "Conhecimento", icon: BookOpen },
@@ -186,7 +185,7 @@ export function AgentSettingsShell({
         )}
 
         {section === "personalidade" && (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <SectionHeader title="Personalidade" desc="Nome, tom de voz e uso de emojis nas respostas do agente." />
             <PersonalidadePanel
               agentId={agentId}
@@ -194,6 +193,12 @@ export function AgentSettingsShell({
               initialTom={whatsappAgentConfig.tom}
               initialEmojiEnabled={whatsappAgentConfig.emojiEnabled}
             />
+
+            <div>
+              <h3 className="text-sm font-semibold text-gray-300">Instruções</h3>
+              <p className="text-xs text-gray-500 mt-0.5 mb-3">Defina como o agente deve se comportar, responder e tomar decisões.</p>
+              <InstrucoesPanel agentId={agentId} initialInstrucoesExtras={whatsappAgentConfig.instrucoesExtras} />
+            </div>
           </div>
         )}
 
@@ -231,13 +236,6 @@ export function AgentSettingsShell({
               initialFollowupEnabled={whatsappAgentConfig.followupEnabled}
               initialFollowupDelaysMinutes={whatsappAgentConfig.followupDelaysMinutes}
             />
-          </div>
-        )}
-
-        {section === "instrucoes" && (
-          <div className="space-y-4">
-            <SectionHeader title="Instruções" desc="Defina como o agente deve se comportar, responder e tomar decisões." />
-            <InstrucoesPanel agentId={agentId} initialInstrucoesExtras={whatsappAgentConfig.instrucoesExtras} />
           </div>
         )}
 
