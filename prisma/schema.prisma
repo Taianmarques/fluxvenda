@@ -709,6 +709,23 @@ model AgentConfig {
   leadDistributionMode LeadDistributionMode @default(MANUAL)
   lastAssignedToId     String? // último atendente que recebeu um lead no rodízio/IA — marca a posição da fila
 
+  // Quem a IA atende quando está ligada — critérios opcionais, sem efeito quando vazios/false.
+  // A mensagem sempre é salva (escuta ativa); os critérios só decidem se a IA GERA resposta
+  // automática agora — quando excluem, dispara a mesma notificação de humanTakeover pra equipe
+  // não perder a mensagem.
+  iaIgnoraAtribuidos        Boolean @default(false) // true = não responde conversa que já tem vendedor
+  iaNiveisCarteiraExcluidos Json    @default("[]")   // ["A","B","C","INATIVO","PERDIDO"] — nível manual/importado, não o calculado automático
+
+  // Transferência automática pra humano quando o cliente pede foto/imagem (a IA não consegue
+  // enviar mídia) — expõe a tool transferir_atendente_foto só quando ativo.
+  transferirAoPedirFoto Boolean @default(false)
+
+  // Vendedor que recebe os leads que a IA transfere (hoje só transferirAoPedirFoto) — só entra
+  // em ação se a conversa ainda não tem dono, nunca rouba de quem já assumiu.
+  // null/"" = segue leadDistributionMode normalmente; "RODIZIO" = alterna entre os atendentes
+  // da equipe; um profileId = sempre esse vendedor.
+  iaLeadAttendantId String?
+
   // Quando ativo, mensagens manuais de atendentes saem no WhatsApp assinadas com o nome de quem mandou
   signatureEnabled Boolean @default(false)
   emojiEnabled     Boolean @default(false) // permite que o agente de IA use emojis nas respostas

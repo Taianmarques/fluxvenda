@@ -60,11 +60,19 @@ type WhatsappAgentConfig = {
   agentSignatureEnabled: boolean;
 };
 
+type DistribuicaoConfig = {
+  leadDistributionMode: string;
+  iaIgnoraAtribuidos: boolean;
+  transferirAoPedirFoto: boolean;
+  iaLeadAttendantId: string | null;
+  iaNiveisCarteiraExcluidos: string[];
+};
+
 export function AgentSettingsShell({
   agentId, nome, active, connectedLabel,
   conversasHoje, conversasSemana, totalConversas,
   appUrl, cloudConfigProps,
-  leadDistributionMode,
+  distribuicaoConfig,
   phoneConfig,
   segmento, whatsappAgentConfig,
   whatsappAiPaused, instagramAiPaused,
@@ -78,7 +86,7 @@ export function AgentSettingsShell({
   totalConversas: number;
   appUrl: string;
   cloudConfigProps: React.ComponentProps<typeof WhatsappCloudConnect>["initialConfig"];
-  leadDistributionMode: React.ComponentProps<typeof DistribuicaoClient>["initialMode"];
+  distribuicaoConfig: DistribuicaoConfig;
   phoneConfig: React.ComponentProps<typeof PhoneAgentClient>["initialConfig"];
   segmento?: { segmento: string; subsegmento: string };
   whatsappAgentConfig: WhatsappAgentConfig;
@@ -238,7 +246,14 @@ export function AgentSettingsShell({
         {section === "distribuicao" && (
           <div className="space-y-4">
             <SectionHeader title="Distribuição" desc="Como as conversas são atribuídas aos atendentes da equipe." />
-            <DistribuicaoClient agentId={agentId} initialMode={leadDistributionMode} />
+            <DistribuicaoClient
+              agentId={agentId}
+              initialMode={distribuicaoConfig.leadDistributionMode}
+              initialIaIgnoraAtribuidos={distribuicaoConfig.iaIgnoraAtribuidos}
+              initialTransferirAoPedirFoto={distribuicaoConfig.transferirAoPedirFoto}
+              initialIaLeadAttendantId={distribuicaoConfig.iaLeadAttendantId}
+              initialIaNiveisCarteiraExcluidos={distribuicaoConfig.iaNiveisCarteiraExcluidos}
+            />
           </div>
         )}
 

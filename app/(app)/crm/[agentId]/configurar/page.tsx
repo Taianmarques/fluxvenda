@@ -128,7 +128,13 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
           totalConversas={totalConversas}
           appUrl={appUrl}
           cloudConfigProps={cloudConfigProps}
-          leadDistributionMode={config.leadDistributionMode}
+          distribuicaoConfig={{
+            leadDistributionMode: config.leadDistributionMode,
+            iaIgnoraAtribuidos: config.iaIgnoraAtribuidos,
+            transferirAoPedirFoto: config.transferirAoPedirFoto,
+            iaLeadAttendantId: config.iaLeadAttendantId,
+            iaNiveisCarteiraExcluidos: config.iaNiveisCarteiraExcluidos as unknown as string[],
+          }}
           phoneConfig={{
             phoneEnabled: config.phoneEnabled,
             whatsappVoiceEnabled: config.whatsappVoiceEnabled,

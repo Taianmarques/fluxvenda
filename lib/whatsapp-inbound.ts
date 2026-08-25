@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import {
   runAgent, runAgentWithImage, runAgentWithTools, classifyLeadQualified,
   SCHEDULING_TOOLS, COMMERCE_TOOLS, BILLING_TOOLS, PROSPECTING_TOOLS, POSVENDA_TOOLS, PIPELINE_TOOLS, DEPARTAMENTO_TOOLS,
-  PREVENDA_VEICULO_TOOLS,
+  PREVENDA_VEICULO_TOOLS, TRANSFERIR_FOTO_TOOLS,
 } from "@/lib/agent-engine";
 import { textToSpeech } from "@/lib/elevenlabs";
 import { logTokenUsage, isOverQuota } from "@/lib/token-usage";
@@ -391,6 +391,34 @@ Conduza a conversa de forma natural — não pareça um questionário. Quando ti
 Notas anteriores: ${prospect.notas || "nenhuma"}.`;
 }
 
+// Decide se a IA deve gerar resposta automática pra essa conversa — critérios opcionais e
+// configuráveis por agente, todos "desligados" (sem filtrar nada) quando vazios. Independe de
+// humanTakeover/isGroup/whatsappAiPaused (checados antes desta função); a mensagem já foi salva
+// no banco de qualquer forma (escuta ativa), isso só decide se a IA GERA uma resposta agora.
+function shouldAiHandle(config: AgentConfigFull, conversation: { assignedToId: string | null; nivelCarteira: string | null }): boolean {
+  if (config.iaIgnoraAtribuidos && conversation.assignedToId) return false;
+
+  // Só considera o nível MANUAL/importado (nivelCarteira null = "automático", não replicamos
+  // aqui o cálculo por recorrência/ticket/recência que só existe na tela de Carteira) — uma
+  // conversa sem override explícito nunca é excluída por este critério.
+  const niveisExcluidos = Array.isArray(config.iaNiveisCarteiraExcluidos) ? config.iaNiveisCarteiraExcluidos as string[] : [];
+  if (conversation.nivelCarteira && niveisExcluidos.includes(conversation.nivelCarteira)) return false;
+
+  return true;
+}
+
+// Vendedor que recebe os handoffs originados pela IA (hoje só transferirAoPedirFoto) — só entra
+// em ação se a conversa ainda não tem dono, nunca rouba de quem já assumiu. iaLeadAttendantId:
+// null/"" mantém o comportamento padrão (respeita leadDistributionMode); "RODIZIO" alterna entre
+// os atendentes da equipe (mesmo rodízio usado em leadDistributionMode); um profileId fixa
+// sempre esse vendedor.
+async function resolveHandoffAssignee(config: AgentConfigFull, conversationId: string, currentAssignedToId: string | null): Promise<string | null> {
+  if (currentAssignedToId) return currentAssignedToId;
+  if (!config.iaLeadAttendantId) return null;
+  if (config.iaLeadAttendantId === "RODIZIO") return assignNextAttendant(config.id, config.teamId, conversationId);
+  return config.iaLeadAttendantId;
+}
+
 function makeExecuteTool(agentConfigId: string, conversationId: string, contactName: string | undefined, contactNumber: string, adapter: ChannelAdapter) {
   async function resolveProfessional(name?: string) {
     if (!name) return null;
@@ -710,6 +738,24 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       emitChatEvent(agentConfigId, conversationId);
 
       return `Conversa transferida para "${dep.nome}"${assignedName ? ` (atendente: ${assignedName})` : ""}. Na SUA RESPOSTA, avise o cliente com naturalidade que o setor vai atendê-lo em instantes. Depois desta mensagem você para de responder — o atendimento é humano a partir daqui.`;
+    }
+
+    if (name === "transferir_atendente_foto") {
+      const motivo = typeof args?.motivo === "string" ? args.motivo.trim() : "";
+      const current = await prisma.conversation.findUnique({ where: { id: conversationId }, select: { assignedToId: true } });
+      const assignedToId = await resolveHandoffAssignee(config, conversationId, current?.assignedToId ?? null);
+
+      await prisma.conversation.update({
+        where: { id: conversationId },
+        data: { humanTakeover: true, status: "ATIVO", ...(assignedToId ? { assignedToId } : {}) },
+      });
+      await prisma.message.create({
+        data: { conversationId, role: "note", content: `Transferida pela IA — cliente pediu foto/imagem.${motivo ? ` ${motivo}` : ""}` },
+      });
+      emitChatEvent(agentConfigId, conversationId);
+      notifyHumanTakeoverMessage(config, conversationId, assignedToId, contactName ?? contactNumber, motivo || "Cliente pediu foto/imagem de um produto.").catch(() => {});
+
+      return "Conversa transferida pra um atendente humano. Na SUA RESPOSTA, avise o cliente com naturalidade que alguém vai te mandar a foto em instantes. Depois desta mensagem você para de responder — o atendimento é humano a partir daqui.";
     }
 
     if (name === "registrar_veiculo_interesse") {
@@ -1239,10 +1285,12 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
     await assignNextAttendant(config.id, config.teamId, conversation.id);
   }
 
-  // Atendente humano assumiu essa conversa — apenas registra a mensagem, sem o agente
-  // responder. Aqui a IA não avisa ninguém respondendo, então dispara web push pro
-  // atendente responsável (ou pra equipe toda, se a conversa ainda não tem dono).
-  if (conversation.humanTakeover) {
+  // Atendente humano assumiu essa conversa, ou um critério de "quem a IA atende" excluiu essa
+  // conversa (já tem vendedor / nível da carteira) — apenas registra a mensagem, sem o agente
+  // responder. Em ambos os casos dispara web push pro atendente responsável (ou pra equipe
+  // toda, se a conversa ainda não tem dono) — ninguém deve ficar sem saber que chegou
+  // mensagem só porque a IA decidiu não responder.
+  if (conversation.humanTakeover || !shouldAiHandle(config, conversation)) {
     notifyHumanTakeoverMessage(config, conversation.id, conversation.assignedToId, conversation.contactName ?? contactNumber, text).catch(() => {});
     return;
   }
@@ -1357,6 +1405,7 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
     ...(config.posVendaEnabled ? POSVENDA_TOOLS : []),
     ...(config.pipelineAutoAvancar ? PIPELINE_TOOLS : []),
     ...(departamentos.length > 0 ? DEPARTAMENTO_TOOLS : []),
+    ...(config.transferirAoPedirFoto ? TRANSFERIR_FOTO_TOOLS : []),
     ...(isProspect ? PROSPECTING_TOOLS : []),
     // Pré-vendas de veículos: transferir_vendedor_veiculo não é opcional (é o mecanismo de
     // saída do fluxo) — cada etapa de coleta liga/desliga independente.
