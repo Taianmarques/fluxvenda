@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  ArrowLeft, ArrowRight, Bot, SlidersHorizontal, Sparkles, Building2, Tag, Clock, Shuffle, Phone, BookOpen, BarChart3, ChevronRight, MessageCircle,
+  ArrowLeft, ArrowRight, Bot, SlidersHorizontal, Sparkles, Building2, Tag, Clock, Shuffle, Phone, BookOpen, BarChart3, ChevronRight, ChevronDown, MessageCircle,
   type LucideIcon,
 } from "lucide-react";
 import { AgentActions } from "./AgentActions";
@@ -91,6 +91,7 @@ export function AgentSettingsShell({
   instagramAiPaused: boolean;
 }) {
   const [section, setSection] = useState<Section>("agente");
+  const [instrucoesOpen, setInstrucoesOpen] = useState(false);
 
   const stats = [
     { label: "Conversas (hoje)", value: conversasHoje },
@@ -195,9 +196,22 @@ export function AgentSettingsShell({
             />
 
             <div>
-              <h3 className="text-sm font-semibold text-gray-300">Instruções</h3>
-              <p className="text-xs text-gray-500 mt-0.5 mb-3">Defina como o agente deve se comportar, responder e tomar decisões.</p>
-              <InstrucoesPanel agentId={agentId} initialInstrucoesExtras={whatsappAgentConfig.instrucoesExtras} />
+              <button
+                type="button"
+                onClick={() => setInstrucoesOpen(o => !o)}
+                className="w-full flex items-center justify-between gap-3 text-left"
+              >
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-300">Instruções</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">Defina como o agente deve se comportar, responder e tomar decisões.</p>
+                </div>
+                <ChevronDown size={16} className={`flex-shrink-0 text-gray-400 transition-transform ${instrucoesOpen ? "rotate-180" : ""}`} />
+              </button>
+              {instrucoesOpen && (
+                <div className="mt-3">
+                  <InstrucoesPanel agentId={agentId} initialInstrucoesExtras={whatsappAgentConfig.instrucoesExtras} />
+                </div>
+              )}
             </div>
           </div>
         )}
