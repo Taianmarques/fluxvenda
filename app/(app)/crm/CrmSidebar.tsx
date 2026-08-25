@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { ArrowLeft, ChevronDown, Bot, Megaphone, TrendingUp, Zap, Settings, Headset, ShoppingBag, PanelLeftClose, PanelLeftOpen, Building2, LayoutDashboard, type LucideIcon } from "lucide-react";
+import { ArrowLeft, ChevronDown, Bot, Megaphone, TrendingUp, Zap, Settings, Headset, ShoppingBag, PanelLeftClose, PanelLeftOpen, Building2, LayoutDashboard, Home, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { CRM_CATEGORIES, type CrmPageDef, type CrmPageKey } from "@/lib/crm-nav-config";
 import { NotificationsButton } from "./NotificationsButton";
@@ -175,6 +175,9 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo 
   // aparecer destacado, senão todas ficam "ativas" ao mesmo tempo.
   function isActive(item: { href: string; isHub?: boolean }) {
     const target = navigatingTo ?? pathname;
+    // "/crm/hub/inicio" tem aba própria (Início) — não pode acender "Hub de IA" junto, senão
+    // os dois ficam destacados ao mesmo tempo (startsWith("/crm/hub") também bate em inicio).
+    if (item.isHub && target.startsWith("/crm/hub/inicio")) return false;
     if (!agentId) return Boolean(item.isHub) && target.startsWith("/crm/hub");
     return item.href === `/crm/${agentId}` ? target === item.href : target.startsWith(item.href);
   }
@@ -184,6 +187,9 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo 
   const agentPath = (suffix: string) => agentId ? `/crm/${agentId}${suffix}` : "/crm/hub";
 
   const HUB_ITEM: NavItem = { href: "/crm/hub", label: "Hub de IA", icon: Bot, isHub: true };
+  // Página de boas-vindas/checklist promovida a aba fixa — só pro gestor (dono da conta),
+  // que é quem completa os passos de configuração inicial da equipe.
+  const INICIO_ITEM: NavItem = { href: "/crm/hub/inicio", label: "Início", icon: Home };
 
   // Com perfil de acesso atribuído (allowedPages != null), só aparece o que está marcado —
   // inclusive as páginas managerOnly (aovivo/campanhas/auditoria) somem, já que nem são
@@ -213,7 +219,7 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo 
   // Visão Geral logo depois, resto por último.
   const FLAT_NAV: NavItem[] = [
     ...CATEGORIES.filter(c => c.key === "atendimento" || c.key === "vendas").flatMap(c => c.items),
-    ...(isManager ? [HUB_ITEM] : []),
+    ...(isManager ? [INICIO_ITEM, HUB_ITEM] : []),
     ...CATEGORIES.filter(c => c.key !== "atendimento" && c.key !== "vendas").flatMap(c => c.items),
   ];
 
@@ -347,22 +353,23 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo 
                 <CategoryFlyout key={cat.key} label={cat.label} icon={CATEGORY_ICONS[cat.key]} items={cat.items} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} collapsed />
               ))}
 
-              {/* Hub de IA e Visão Geral ficam abaixo de Atendimento e Vendas — só pro gestor */}
-              {isManager && (() => {
-                const active = isActive(HUB_ITEM);
+              {/* Início e Hub de IA ficam abaixo de Atendimento e Vendas — só pro gestor */}
+              {isManager && [INICIO_ITEM, HUB_ITEM].map(navItem => {
+                const active = isActive(navItem);
                 return (
                   <Link
-                    href={HUB_ITEM.href}
-                    onClick={() => { if (pathname !== HUB_ITEM.href) setNavigatingTo(HUB_ITEM.href); }}
-                    title={HUB_ITEM.label}
+                    key={navItem.href}
+                    href={navItem.href}
+                    onClick={() => { if (pathname !== navItem.href) setNavigatingTo(navItem.href); }}
+                    title={navItem.label}
                     className={`flex items-center justify-center py-2.5 rounded-xl transition-colors ${
                       active ? "text-white bg-blue-500/10" : "text-gray-400 hover:text-white hover:bg-white/5"
                     }`}
                   >
-                    <HUB_ITEM.icon size={17} className={active ? "text-blue-400" : ""} />
+                    <navItem.icon size={17} className={active ? "text-blue-400" : ""} />
                   </Link>
                 );
-              })()}
+              })}
 
               {SINGLE_ITEM_CATEGORIES.map(cat => {
                 const item = cat.items[0];
@@ -393,22 +400,23 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo 
                 <CategoryAccordion key={cat.key} cat={cat} isOpen={openCategories.has(cat.key)} onToggle={toggleCategory} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} />
               ))}
 
-              {/* Hub de IA e Visão Geral ficam abaixo de Atendimento e Vendas — só pro gestor */}
-              {isManager && (() => {
-                const active = isActive(HUB_ITEM);
+              {/* Início e Hub de IA ficam abaixo de Atendimento e Vendas — só pro gestor */}
+              {isManager && [INICIO_ITEM, HUB_ITEM].map(navItem => {
+                const active = isActive(navItem);
                 return (
                   <Link
-                    href={HUB_ITEM.href}
-                    onClick={() => { if (pathname !== HUB_ITEM.href) setNavigatingTo(HUB_ITEM.href); }}
+                    key={navItem.href}
+                    href={navItem.href}
+                    onClick={() => { if (pathname !== navItem.href) setNavigatingTo(navItem.href); }}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium border-l-2 transition-colors ${
                       active ? "text-white bg-blue-500/10 border-blue-500" : "text-gray-400 border-transparent hover:text-white hover:bg-white/5"
                     }`}
                   >
-                    <HUB_ITEM.icon size={17} className={active ? "text-blue-400" : ""} />
-                    {HUB_ITEM.label}
+                    <navItem.icon size={17} className={active ? "text-blue-400" : ""} />
+                    {navItem.label}
                   </Link>
                 );
-              })()}
+              })}
 
               {SINGLE_ITEM_CATEGORIES.map(cat => {
                 const item = cat.items[0];
