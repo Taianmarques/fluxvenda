@@ -190,7 +190,7 @@ export function AgentSettingsShell({
                 className="w-full flex items-center justify-between gap-3 text-left"
               >
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-300">Telefonia</h3>
+                  <h3 className="text-sm font-semibold text-gray-300">Áudio e voz</h3>
                   <p className="text-xs text-gray-500 mt-0.5">Ligações de voz do agente — número, gravação e a voz usada nas respostas em áudio.</p>
                 </div>
                 <ChevronDown size={16} className={`flex-shrink-0 text-gray-400 transition-transform ${telefoniaOpen ? "rotate-180" : ""}`} />
