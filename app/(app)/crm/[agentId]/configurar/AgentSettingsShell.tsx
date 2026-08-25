@@ -3,11 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  ArrowLeft, ArrowRight, Bot, SlidersHorizontal, Sparkles, Building2, Tag, Clock, Smartphone, Shuffle, Phone, BookOpen, BarChart3, ChevronRight, MessageCircle,
+  ArrowLeft, ArrowRight, Bot, SlidersHorizontal, Sparkles, Building2, Tag, Clock, Shuffle, Phone, BookOpen, BarChart3, ChevronRight, MessageCircle,
   type LucideIcon,
 } from "lucide-react";
 import { AgentActions } from "./AgentActions";
-import { WhatsappCloudConnect } from "./WhatsappCloudConnect";
 import { DistribuicaoClient } from "./DistribuicaoClient";
 import { PhoneAgentClient } from "./PhoneAgentClient";
 import { ConfiguracoesBasicasPanel } from "./ConfiguracoesBasicasPanel";
@@ -19,7 +18,7 @@ import { TestAgentChat } from "./TestAgentChat";
 
 type Section =
   | "agente" | "basico" | "personalidade" | "sobre-empresa" | "comercial" | "followup"
-  | "canais" | "distribuicao" | "telefonia" | "conhecimento" | "analytics";
+  | "distribuicao" | "telefonia" | "conhecimento" | "analytics";
 
 const SECTIONS: { key: Section; label: string; icon: LucideIcon }[] = [
   { key: "agente", label: "O Agente", icon: Bot },
@@ -28,7 +27,6 @@ const SECTIONS: { key: Section; label: string; icon: LucideIcon }[] = [
   { key: "sobre-empresa", label: "Sobre a empresa", icon: Building2 },
   { key: "comercial", label: "Configuração comercial", icon: Tag },
   { key: "followup", label: "Follow-up", icon: Clock },
-  { key: "canais", label: "Canais", icon: Smartphone },
   { key: "distribuicao", label: "Distribuição", icon: Shuffle },
   { key: "telefonia", label: "Telefonia", icon: Phone },
   { key: "conhecimento", label: "Conhecimento", icon: BookOpen },
@@ -71,7 +69,6 @@ type DistribuicaoConfig = {
 export function AgentSettingsShell({
   agentId, nome, active, connectedLabel,
   conversasHoje, conversasSemana, totalConversas,
-  appUrl, cloudConfigProps,
   distribuicaoConfig,
   phoneConfig,
   segmento, whatsappAgentConfig,
@@ -84,8 +81,6 @@ export function AgentSettingsShell({
   conversasHoje: number;
   conversasSemana: number;
   totalConversas: number;
-  appUrl: string;
-  cloudConfigProps: React.ComponentProps<typeof WhatsappCloudConnect>["initialConfig"];
   distribuicaoConfig: DistribuicaoConfig;
   phoneConfig: React.ComponentProps<typeof PhoneAgentClient>["initialConfig"];
   segmento?: { segmento: string; subsegmento: string };
@@ -233,13 +228,6 @@ export function AgentSettingsShell({
               initialFollowupEnabled={whatsappAgentConfig.followupEnabled}
               initialFollowupDelaysMinutes={whatsappAgentConfig.followupDelaysMinutes}
             />
-          </div>
-        )}
-
-        {section === "canais" && (
-          <div className="space-y-4">
-            <SectionHeader title="Canais" desc="Conexão do agente com o WhatsApp (QR code ou API oficial da Meta)." />
-            <WhatsappCloudConnect agentId={agentId} appUrl={appUrl} initialConfig={cloudConfigProps} />
           </div>
         )}
 

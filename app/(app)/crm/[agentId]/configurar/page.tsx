@@ -126,8 +126,6 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
           conversasHoje={conversasHoje}
           conversasSemana={conversasSemana}
           totalConversas={totalConversas}
-          appUrl={appUrl}
-          cloudConfigProps={cloudConfigProps}
           distribuicaoConfig={{
             leadDistributionMode: config.leadDistributionMode,
             iaIgnoraAtribuidos: config.iaIgnoraAtribuidos,
