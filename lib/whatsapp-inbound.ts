@@ -1166,6 +1166,31 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
   };
 }
 
+// Reforça no runtime (não precisa regenerar o systemPrompt de cada agente) o formato de
+// bolhas curtas que sendBubbledText (abaixo) depois divide por \n\n e manda uma de cada vez.
+const BUBBLE_INSTRUCTION = `
+
+FORMATO DA RESPOSTA — MENSAGENS CURTAS (BOLHAS):
+Você está conversando pelo WhatsApp. Escreva como uma pessoa mandando várias mensagens seguidas, nunca um texto único e longo.
+- Cada bolha deve ter no máximo 2-3 linhas curtas.
+- Separe bolhas diferentes com uma linha em branco (\\n\\n) — cada bloco separado por linha em branco vira uma mensagem separada de verdade.
+- Faça apenas UMA pergunta por resposta e pare, esperando o cliente responder, mesmo que o pedido tenha vários itens (ex: se precisa do nome e do telefone, pergunte só o nome primeiro; só peça o telefone depois que o cliente responder).`;
+
+// Manda a resposta da IA em várias mensagens curtas (bolhas) em vez de um texto único —
+// o system prompt instrui o modelo a separar cada bolha por linha em branco (\n\n), aqui só
+// dividimos por isso e mandamos uma de cada vez, com um delay curto simulando digitação
+// humana. Retorna o id do provedor da ÚLTIMA bolha (é o que fica disponível pra citação).
+async function sendBubbledText(adapter: ChannelAdapter, phone: string, text: string): Promise<string | null> {
+  const bubbles = text.split(/\n{2,}/).map(b => b.trim()).filter(Boolean);
+  if (bubbles.length === 0) return null;
+  let providerId: string | null = null;
+  for (let i = 0; i < bubbles.length; i++) {
+    if (i > 0) await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 500));
+    providerId = await adapter.sendText(phone, bubbles[i]);
+  }
+  return providerId;
+}
+
 const SESSION_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export async function processIncomingMessage(config: AgentConfigFull, msg: IncomingMessage, adapter: ChannelAdapter, opts?: { enforceSessionWindow?: boolean }): Promise<void> {
@@ -1372,7 +1397,7 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
   // Conhecimento entra no activeSystemPrompt (e não no extraContext) porque os três
   // caminhos de resposta (tools, texto puro e imagem) consomem o system prompt
   const conhecimentoContext = await buildConhecimentoContext(config.id);
-  const activeSystemPrompt = config.systemPrompt + emojiInstruction + stageInstruction + conhecimentoContext;
+  const activeSystemPrompt = config.systemPrompt + BUBBLE_INSTRUCTION + emojiInstruction + stageInstruction + conhecimentoContext;
 
   if (await isOverQuota(config.teamId)) {
     await adapter.sendText(contactNumber, "Serviço de IA temporariamente indisponível. Por favor, aguarde ou entre em contato com nossa equipe.");
@@ -1436,10 +1461,10 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
       providerId = await adapter.sendMedia(contactNumber, "audio", audioBuffer.toString("base64"));
     } catch (err) {
       console.error("[whatsapp-inbound] erro ao enviar áudio ElevenLabs, caindo para texto:", err);
-      providerId = await adapter.sendText(contactNumber, reply);
+      providerId = await sendBubbledText(adapter, contactNumber, reply);
     }
   } else {
-    providerId = await adapter.sendText(contactNumber, reply);
+    providerId = await sendBubbledText(adapter, contactNumber, reply);
   }
 
   // Guarda o id do provedor pra resposta da IA poder ser citada depois (pelo cliente ou pelo atendente)
