@@ -4,13 +4,13 @@ import Link from "next/link";
 import { LayoutDashboard } from "lucide-react";
 import { getAgentConfigWithRole } from "@/lib/team";
 import { CrmPageGate } from "@/app/(app)/crm/CrmPageGate";
-import { DashboardTabs, type DashboardView } from "../../dashboards/DashboardTabs";
+import { type DashboardView } from "../../dashboards/DashboardTabs";
 import { VisaoGeralTab } from "../../dashboards/VisaoGeralTab";
 import { AgendamentosTab } from "../../dashboards/AgendamentosTab";
 import { VendasTab } from "../../dashboards/VendasTab";
 import { MeuDesempenhoTab } from "../../dashboards/MeuDesempenhoTab";
 import { FunilTab } from "../../dashboards/FunilTab";
-import { DateRangePicker } from "../../dashboards/DateRangePicker";
+import { DashboardsShell } from "../../dashboards/DashboardsShell";
 import { DAY_MS } from "../../dashboards/dashboard-utils";
 
 const VIEWS: DashboardView[] = ["vendas", "visaogeral", "agendamentos", "meudesempenho", "funil"];
@@ -68,25 +68,12 @@ async function DashboardsPageContent({ params, searchParams }: {
   const from = sp.from ? new Date(`${sp.from}T00:00:00`) : new Date(to.getTime() - 29 * DAY_MS);
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-950 text-white p-6">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div>
-          <p className="text-gray-400 text-sm">CRM</p>
-          <h1 className="text-3xl font-bold mt-1 flex items-center gap-2"><LayoutDashboard size={28} className="text-blue-400" /> Dashboards</h1>
-          <p className="text-gray-400 mt-1">{DESCRIPTIONS[view]}</p>
-        </div>
-
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <DashboardTabs agentId={agentId} activeView={view} />
-          {view === "vendas" && <DateRangePicker from={from.toISOString()} to={to.toISOString()} />}
-        </div>
-
-        {view === "vendas" && <VendasTab agentId={agentId} config={config} from={from} to={to} />}
-        {view === "visaogeral" && <VisaoGeralTab agentId={agentId} config={config} />}
-        {view === "agendamentos" && <AgendamentosTab agentId={agentId} config={config} />}
-        {view === "meudesempenho" && <MeuDesempenhoTab agentId={agentId} config={config} userId={user.id} />}
-        {view === "funil" && <FunilTab agentId={agentId} config={config} />}
-      </div>
-    </div>
+    <DashboardsShell agentId={agentId} view={view} description={DESCRIPTIONS[view]} from={from.toISOString()} to={to.toISOString()}>
+      {view === "vendas" && <VendasTab agentId={agentId} config={config} from={from} to={to} />}
+      {view === "visaogeral" && <VisaoGeralTab agentId={agentId} config={config} />}
+      {view === "agendamentos" && <AgendamentosTab agentId={agentId} config={config} />}
+      {view === "meudesempenho" && <MeuDesempenhoTab agentId={agentId} config={config} userId={user.id} />}
+      {view === "funil" && <FunilTab agentId={agentId} config={config} />}
+    </DashboardsShell>
   );
 }
