@@ -140,7 +140,7 @@ function CategoryFlyout({ label, icon: Icon, items, isActive, pathname, onNaviga
   );
 }
 
-export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo }: {
+export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo, hasPlataforma }: {
   agentId: string;
   agents: { id: string; nome: string }[];
   // null = acesso total (gestor, ou membro sem perfil atribuído)
@@ -149,6 +149,8 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo 
   isManager: boolean;
   // Logo customizada pelo Super Admin (data URI) — null = usa o ícone padrão
   menuLogo?: string | null;
+  // Link "Plataforma B2B" só aparece se o Super Admin ativou o módulo PLATAFORMA pra essa equipe
+  hasPlataforma: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -457,16 +459,18 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo 
           {collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
           {!collapsed && "Recolher menu"}
         </button>
-        <Link
-          href="/dashboard"
-          title={collapsed ? "Plataforma B2B" : undefined}
-          className={`flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-colors ${
-            collapsed ? "justify-center px-0" : "px-3"
-          }`}
-        >
-          <ArrowLeft size={17} />
-          {!collapsed && "Plataforma B2B"}
-        </Link>
+        {hasPlataforma && (
+          <Link
+            href="/dashboard"
+            title={collapsed ? "Plataforma B2B" : undefined}
+            className={`flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-colors ${
+              collapsed ? "justify-center px-0" : "px-3"
+            }`}
+          >
+            <ArrowLeft size={17} />
+            {!collapsed && "Plataforma B2B"}
+          </Link>
+        )}
       </div>
     </aside>
     </>
