@@ -21,23 +21,23 @@ type InitialConfig = {
   emojiEnabled: boolean;
 } | null;
 
-type DelayUnit = "horas" | "minutos";
-type DelayRow = { value: number; unit: DelayUnit };
+export type DelayUnit = "horas" | "minutos";
+export type DelayRow = { value: number; unit: DelayUnit };
 
-function minutesToRow(minutes: number): DelayRow {
+export function minutesToRow(minutes: number): DelayRow {
   return minutes % 60 === 0 ? { value: minutes / 60, unit: "horas" } : { value: minutes, unit: "minutos" };
 }
 
-function rowToMinutes(row: DelayRow): number {
+export function rowToMinutes(row: DelayRow): number {
   return row.unit === "horas" ? row.value * 60 : row.value;
 }
 
-function formatDelay(minutes: number): string {
+export function formatDelay(minutes: number): string {
   if (minutes % 60 === 0) return `${minutes / 60}h`;
   return `${minutes}min`;
 }
 
-function FollowupDelaysEditor({
+export function FollowupDelaysEditor({
   followupDelays, onAdd, onRemove, onUpdate,
 }: {
   followupDelays: DelayRow[];

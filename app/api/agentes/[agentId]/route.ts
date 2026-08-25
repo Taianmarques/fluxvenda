@@ -18,18 +18,23 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ age
   return NextResponse.json({ config });
 }
 
+// Todos os campos são opcionais — a tela de configurar agente virou várias seções
+// independentes (Personalidade, Sobre a empresa, Configuração comercial, Follow-up...),
+// cada uma salvando só os campos que edita. Campo omitido = mantém o valor atual (ver
+// merge com `existing` abaixo); NUNCA usar .default() aqui, senão um PATCH parcial
+// zeraria os campos que a seção que está salvando nem mostra.
 const schema = z.object({
-  nome: z.string().min(1),
-  tom: z.enum(["FORMAL", "PROXIMO", "CONSULTIVO"]),
-  servicos: z.array(z.string()).default([]),
-  objecoes: z.array(z.string()).default([]),
-  horario: z.string().default(""),
-  descricaoEmpresa: z.string().default(""),
-  precos: z.string().default(""),
-  enderecoContato: z.string().default(""),
-  followupEnabled: z.boolean().default(true),
-  followupDelaysMinutes: z.array(z.number().int().min(1).max(43200)).max(10).default([1440]),
-  emojiEnabled: z.boolean().default(false),
+  nome: z.string().min(1).optional(),
+  tom: z.enum(["FORMAL", "PROXIMO", "CONSULTIVO"]).optional(),
+  servicos: z.array(z.string()).optional(),
+  objecoes: z.array(z.string()).optional(),
+  horario: z.string().optional(),
+  descricaoEmpresa: z.string().optional(),
+  precos: z.string().optional(),
+  enderecoContato: z.string().optional(),
+  followupEnabled: z.boolean().optional(),
+  followupDelaysMinutes: z.array(z.number().int().min(1).max(43200)).max(10).optional(),
+  emojiEnabled: z.boolean().optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {
@@ -42,11 +47,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
 
   const body = schema.safeParse(await req.json());
   if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
+  const d = body.data;
 
-  const {
-    nome, tom, servicos, objecoes, horario, descricaoEmpresa, precos, enderecoContato,
-    followupEnabled, followupDelaysMinutes, emojiEnabled,
-  } = body.data;
+  // Valor efetivo = o que veio no PATCH, ou o que já estava salvo — assim uma seção que só
+  // manda "nome" não sobrescreve servicos/objecoes/etc com vazio
+  const nome = d.nome ?? existing.nome;
+  const tom = d.tom ?? existing.tom;
+  const servicos = d.servicos ?? existing.servicos;
+  const objecoes = d.objecoes ?? existing.objecoes;
+  const horario = d.horario ?? existing.horario;
+  const descricaoEmpresa = d.descricaoEmpresa ?? existing.descricaoEmpresa;
+  const precos = d.precos ?? existing.precos;
+  const enderecoContato = d.enderecoContato ?? existing.enderecoContato;
 
   const team = await prisma.team.findUnique({ where: { id: existing.teamId } });
 
@@ -66,8 +78,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
   const config = await prisma.agentConfig.update({
     where: { id: agentId },
     data: {
-      nome, tom, servicos, objecoes, horario, descricaoEmpresa, precos, enderecoContato,
-      systemPrompt, followupEnabled, followupDelaysMinutes, emojiEnabled,
+      nome, tom, servicos, objecoes, horario, descricaoEmpresa, precos, enderecoContato, systemPrompt,
+      ...(d.followupEnabled !== undefined && { followupEnabled: d.followupEnabled }),
+      ...(d.followupDelaysMinutes !== undefined && { followupDelaysMinutes: d.followupDelaysMinutes }),
+      ...(d.emojiEnabled !== undefined && { emojiEnabled: d.emojiEnabled }),
     },
   });
 

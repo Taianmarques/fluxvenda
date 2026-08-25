@@ -142,8 +142,7 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
           }}
           segmento={{ segmento: config.segmento, subsegmento: config.subsegmento }}
           whatsappAgentConfig={{
-            nome: config.nome, tom: config.tom, servicos: config.servicos, objecoes: config.objecoes,
-            horario: config.horario, uazapiInstance: config.uazapiInstance, isConfigured: Boolean(config.systemPrompt),
+            nome: config.nome, tom: config.tom, servicos: config.servicos, objecoes: config.objecoes, horario: config.horario,
             descricaoEmpresa: config.descricaoEmpresa, precos: config.precos, enderecoContato: config.enderecoContato,
             followupEnabled: config.followupEnabled, followupDelaysMinutes: config.followupDelaysMinutes as unknown as number[], emojiEnabled: config.emojiEnabled,
           }}

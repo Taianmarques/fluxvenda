@@ -3,20 +3,29 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  ArrowLeft, ArrowRight, Bot, Sparkles, Smartphone, Shuffle, Phone, BookOpen, BarChart3, ChevronRight, MessageCircle,
+  ArrowLeft, ArrowRight, Bot, Sparkles, Building2, Tag, Clock, Smartphone, Shuffle, Phone, BookOpen, BarChart3, ChevronRight, MessageCircle,
   type LucideIcon,
 } from "lucide-react";
 import { AgentActions } from "./AgentActions";
 import { WhatsappCloudConnect } from "./WhatsappCloudConnect";
 import { DistribuicaoClient } from "./DistribuicaoClient";
 import { PhoneAgentClient } from "./PhoneAgentClient";
-import { WhatsappAgentClient } from "./WhatsappAgentClient";
+import { PersonalidadePanel } from "./PersonalidadePanel";
+import { SobreEmpresaPanel } from "./SobreEmpresaPanel";
+import { ConfiguracaoComercialPanel } from "./ConfiguracaoComercialPanel";
+import { FollowupPanel } from "./FollowupPanel";
+import { TestAgentChat } from "./TestAgentChat";
 
-type Section = "agente" | "comportamento" | "canais" | "distribuicao" | "telefonia" | "conhecimento" | "analytics";
+type Section =
+  | "agente" | "personalidade" | "sobre-empresa" | "comercial" | "followup"
+  | "canais" | "distribuicao" | "telefonia" | "conhecimento" | "analytics";
 
 const SECTIONS: { key: Section; label: string; icon: LucideIcon }[] = [
   { key: "agente", label: "O Agente", icon: Bot },
-  { key: "comportamento", label: "Comportamento", icon: Sparkles },
+  { key: "personalidade", label: "Personalidade", icon: Sparkles },
+  { key: "sobre-empresa", label: "Sobre a empresa", icon: Building2 },
+  { key: "comercial", label: "Configuração comercial", icon: Tag },
+  { key: "followup", label: "Follow-up", icon: Clock },
   { key: "canais", label: "Canais", icon: Smartphone },
   { key: "distribuicao", label: "Distribuição", icon: Shuffle },
   { key: "telefonia", label: "Telefonia", icon: Phone },
@@ -32,6 +41,20 @@ function SectionHeader({ title, desc }: { title: string; desc: string }) {
     </div>
   );
 }
+
+type WhatsappAgentConfig = {
+  nome: string;
+  tom: string;
+  servicos: string[];
+  objecoes: string[];
+  horario: string;
+  descricaoEmpresa: string;
+  precos: string;
+  enderecoContato: string;
+  followupEnabled: boolean;
+  followupDelaysMinutes: number[];
+  emojiEnabled: boolean;
+};
 
 export function AgentSettingsShell({
   agentId, nome, active, connectedLabel,
@@ -52,8 +75,8 @@ export function AgentSettingsShell({
   cloudConfigProps: React.ComponentProps<typeof WhatsappCloudConnect>["initialConfig"];
   leadDistributionMode: React.ComponentProps<typeof DistribuicaoClient>["initialMode"];
   phoneConfig: React.ComponentProps<typeof PhoneAgentClient>["initialConfig"];
-  segmento: React.ComponentProps<typeof WhatsappAgentClient>["segmento"];
-  whatsappAgentConfig: React.ComponentProps<typeof WhatsappAgentClient>["initialConfig"];
+  segmento?: { segmento: string; subsegmento: string };
+  whatsappAgentConfig: WhatsappAgentConfig;
 }) {
   const [section, setSection] = useState<Section>("agente");
 
@@ -132,13 +155,57 @@ export function AgentSettingsShell({
               </div>
               <AgentActions agentId={agentId} active={active} />
             </div>
+
+            <TestAgentChat agentId={agentId} />
           </div>
         )}
 
-        {section === "comportamento" && (
+        {section === "personalidade" && (
           <div className="space-y-4">
-            <SectionHeader title="Comportamento" desc="Personalidade, informações da empresa e follow-up automático do agente." />
-            <WhatsappAgentClient agentId={agentId} segmento={segmento} initialConfig={whatsappAgentConfig} />
+            <SectionHeader title="Personalidade" desc="Nome, tom de voz e uso de emojis nas respostas do agente." />
+            <PersonalidadePanel
+              agentId={agentId}
+              initialNome={whatsappAgentConfig.nome}
+              initialTom={whatsappAgentConfig.tom}
+              initialEmojiEnabled={whatsappAgentConfig.emojiEnabled}
+            />
+          </div>
+        )}
+
+        {section === "sobre-empresa" && (
+          <div className="space-y-4">
+            <SectionHeader title="Sobre a empresa" desc="O que o agente sabe sobre o seu negócio para responder sem inventar." />
+            <SobreEmpresaPanel
+              agentId={agentId}
+              segmento={segmento}
+              initialDescricaoEmpresa={whatsappAgentConfig.descricaoEmpresa}
+              initialEnderecoContato={whatsappAgentConfig.enderecoContato}
+            />
+          </div>
+        )}
+
+        {section === "comercial" && (
+          <div className="space-y-4">
+            <SectionHeader title="Configuração comercial" desc="Serviços, preços, objeções comuns e horário de atendimento." />
+            <ConfiguracaoComercialPanel
+              agentId={agentId}
+              segmento={segmento}
+              initialServicos={whatsappAgentConfig.servicos}
+              initialPrecos={whatsappAgentConfig.precos}
+              initialObjecoes={whatsappAgentConfig.objecoes}
+              initialHorario={whatsappAgentConfig.horario}
+            />
+          </div>
+        )}
+
+        {section === "followup" && (
+          <div className="space-y-4">
+            <SectionHeader title="Follow-up" desc="Retomada automática quando o contato não responde." />
+            <FollowupPanel
+              agentId={agentId}
+              initialFollowupEnabled={whatsappAgentConfig.followupEnabled}
+              initialFollowupDelaysMinutes={whatsappAgentConfig.followupDelaysMinutes}
+            />
           </div>
         )}
 
