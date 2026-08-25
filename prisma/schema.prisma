@@ -65,6 +65,7 @@ model Profile {
   assignedConversations Conversation[] @relation("AssignedConversations")
   scheduledMessages ScheduledMessage[]
   opportunityTasks OpportunityTask[]
+  treinoExemplosCriados TreinoExemplo[]
 }
 
 // Cadastro "em espera" enquanto o código de verificação do WhatsApp não é
@@ -731,6 +732,11 @@ model AgentConfig {
   // pro gestor detalhar persona, objetivo, tom, restrições e exemplos que o wizard não cobre.
   instrucoesExtras String @default("")
 
+  // Treino (RAG por exemplo, ver TreinoExemplo): quantos exemplos entram no prompt e a
+  // similaridade de cosseno mínima pra considerar um exemplo relevante o suficiente
+  treinoSimilaridadeMinima Float @default(0.5)
+  treinoMaxExemplos        Int   @default(2)
+
   // Quando ativo, mensagens manuais de atendentes saem no WhatsApp assinadas com o nome de quem mandou
   signatureEnabled Boolean @default(false)
   emojiEnabled     Boolean @default(false) // permite que o agente de IA use emojis nas respostas
@@ -865,6 +871,7 @@ model AgentConfig {
   automacoes           Automacao[]
   campanhas            Campanha[]
   motivosPerda         MotivoPerda[]
+  treinoExemplos       TreinoExemplo[]
 
   @@index([teamId])
 }
@@ -1425,6 +1432,33 @@ model ConhecimentoItem {
   titulo   String
   conteudo String  @db.Text
   active   Boolean @default(true)
+
+  @@index([agentConfigId])
+}
+
+// Exemplo de atendimento simulado, usado como RAG (retrieval por similaridade de embedding)
+// pra guiar a IA em conversas reais — em vez de fine-tuning. Cadastrado pelo gestor: um
+// cenário curto + uma conversa de exemplo em turnos cliente/assistente. O embedding é
+// calculado a partir de "cenario + primeira fala do cliente" e comparado, em tempo de
+// resposta, contra o embedding da mensagem real do cliente (ver lib/embeddings.ts).
+model TreinoExemplo {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agentConfigId String
+  agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id], onDelete: Cascade)
+
+  cenario String // título curto do cenário, ex: "Cliente pede foto do produto"
+  turnos  Json   // array de { role: "user" | "assistant", content: string }, em ordem
+
+  // Embedding de "cenario + primeira fala do cliente" (text-embedding-3-small, 1536 dims) —
+  // null até o cálculo terminar; falha na chamada da OpenAI não impede salvar o exemplo,
+  // só deixa sem embedding (não entra no retrieval até ser reprocessado)
+  embedding Json?
+
+  createdById String
+  createdBy   Profile @relation(fields: [createdById], references: [id], onDelete: Cascade)
 
   @@index([agentConfigId])
 }

@@ -38,6 +38,8 @@ const schema = z.object({
   responseDelaySeconds: z.number().int().min(0).max(60).optional(),
   agentSignatureEnabled: z.boolean().optional(),
   instrucoesExtras: z.string().max(4000).optional(),
+  treinoSimilaridadeMinima: z.number().min(0).max(1).optional(),
+  treinoMaxExemplos: z.number().int().min(0).max(10).optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {
@@ -88,6 +90,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
       ...(d.responseDelaySeconds !== undefined && { responseDelaySeconds: d.responseDelaySeconds }),
       ...(d.agentSignatureEnabled !== undefined && { agentSignatureEnabled: d.agentSignatureEnabled }),
       ...(d.instrucoesExtras !== undefined && { instrucoesExtras: d.instrucoesExtras }),
+      ...(d.treinoSimilaridadeMinima !== undefined && { treinoSimilaridadeMinima: d.treinoSimilaridadeMinima }),
+      ...(d.treinoMaxExemplos !== undefined && { treinoMaxExemplos: d.treinoMaxExemplos }),
     },
   });
 

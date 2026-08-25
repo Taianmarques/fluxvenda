@@ -19,6 +19,7 @@ import { notifyOrderWebhook } from "@/lib/order-webhook";
 import { notifyProfessionalOfAppointment } from "@/lib/appointment-notify";
 import { notifyUsers } from "@/lib/onesignal";
 import { emitChatEvent } from "@/lib/realtime";
+import { generateEmbedding, cosineSimilarity } from "@/lib/embeddings";
 
 type AgentConfigFull = NonNullable<Awaited<ReturnType<typeof prisma.agentConfig.findFirst>>>;
 
@@ -146,6 +147,45 @@ async function buildConhecimentoContext(agentConfigId: string): Promise<string> 
   if (blocks.length === 0) return "";
 
   return `\n\nBASE DE CONHECIMENTO DA EMPRESA (use estas informações para responder com precisão; se a resposta estiver aqui, prefira ela a inventar):\n${blocks.join("\n")}`;
+}
+
+// Treino por exemplo (RAG): busca, por similaridade de cosseno de embedding, os exemplos de
+// atendimento simulado (tela Treino) mais parecidos com a mensagem atual do cliente — usado
+// como referência em vez de fine-tuning. Nunca trava a resposta se a chamada de embedding da
+// OpenAI falhar; nesse caso só entra sem exemplos.
+async function buildTreinoContext(config: AgentConfigFull, mensagemCliente: string): Promise<string> {
+  if (!mensagemCliente.trim()) return "";
+
+  const todos = await prisma.treinoExemplo.findMany({
+    where: { agentConfigId: config.id },
+    select: { cenario: true, turnos: true, embedding: true },
+  });
+  const exemplos = todos.filter(
+    (e): e is typeof e & { embedding: number[] } => Array.isArray(e.embedding) && e.embedding.length > 0
+  );
+  if (exemplos.length === 0) return "";
+
+  let embeddingMsg: number[];
+  try {
+    embeddingMsg = await generateEmbedding(mensagemCliente);
+  } catch (err) {
+    console.error("[treino] erro ao gerar embedding da mensagem do cliente:", err);
+    return "";
+  }
+
+  const relevantes = exemplos
+    .map(e => ({ cenario: e.cenario, turnos: e.turnos as { role: string; content: string }[], score: cosineSimilarity(embeddingMsg, e.embedding) }))
+    .filter(e => e.score >= config.treinoSimilaridadeMinima)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, Math.max(0, config.treinoMaxExemplos));
+  if (relevantes.length === 0) return "";
+
+  const blocks = relevantes.map(e => {
+    const linhas = e.turnos.map(t => `${t.role === "user" ? "Cliente" : "Assistente"}: ${t.content}`).join("\n");
+    return `--- ${e.cenario} ---\n${linhas}`;
+  });
+
+  return `\n\nEXEMPLOS DE ATENDIMENTOS REAIS PARECIDOS COM A SITUAÇÃO ATUAL (adapte ao contexto, não copie literalmente se não encaixar):\n${blocks.join("\n\n")}`;
 }
 
 // Lista os departamentos humanos e ensina o agente a transferir quando o assunto exigir
@@ -1452,7 +1492,8 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
   // Conhecimento entra no activeSystemPrompt (e não no extraContext) porque os três
   // caminhos de resposta (tools, texto puro e imagem) consomem o system prompt
   const conhecimentoContext = await buildConhecimentoContext(config.id);
-  const activeSystemPrompt = config.systemPrompt + BUBBLE_INSTRUCTION + emojiInstruction + instrucoesExtrasBlock + stageInstruction + conhecimentoContext;
+  const treinoContext = await buildTreinoContext(config, text);
+  const activeSystemPrompt = config.systemPrompt + BUBBLE_INSTRUCTION + emojiInstruction + instrucoesExtrasBlock + stageInstruction + conhecimentoContext + treinoContext;
 
   if (await isOverQuota(config.teamId)) {
     await adapter.sendText(contactNumber, "Serviço de IA temporariamente indisponível. Por favor, aguarde ou entre em contato com nossa equipe.");
