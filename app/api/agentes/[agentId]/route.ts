@@ -37,6 +37,7 @@ const schema = z.object({
   emojiEnabled: z.boolean().optional(),
   responseDelaySeconds: z.number().int().min(0).max(60).optional(),
   agentSignatureEnabled: z.boolean().optional(),
+  instrucoesExtras: z.string().max(4000).optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {
@@ -86,6 +87,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
       ...(d.emojiEnabled !== undefined && { emojiEnabled: d.emojiEnabled }),
       ...(d.responseDelaySeconds !== undefined && { responseDelaySeconds: d.responseDelaySeconds }),
       ...(d.agentSignatureEnabled !== undefined && { agentSignatureEnabled: d.agentSignatureEnabled }),
+      ...(d.instrucoesExtras !== undefined && { instrucoesExtras: d.instrucoesExtras }),
     },
   });
 

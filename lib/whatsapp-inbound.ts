@@ -1443,10 +1443,16 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
     }
   }
 
+  // Instruções extras (aba "Instruções" na tela de configurar agente) — texto livre do
+  // gestor, anexado por cima do systemPrompt gerado pelo wizard, nunca o substitui.
+  const instrucoesExtrasBlock = config.instrucoesExtras?.trim()
+    ? `\n\nINSTRUÇÕES ADICIONAIS DO GESTOR:\n${config.instrucoesExtras.trim()}`
+    : "";
+
   // Conhecimento entra no activeSystemPrompt (e não no extraContext) porque os três
   // caminhos de resposta (tools, texto puro e imagem) consomem o system prompt
   const conhecimentoContext = await buildConhecimentoContext(config.id);
-  const activeSystemPrompt = config.systemPrompt + BUBBLE_INSTRUCTION + emojiInstruction + stageInstruction + conhecimentoContext;
+  const activeSystemPrompt = config.systemPrompt + BUBBLE_INSTRUCTION + emojiInstruction + instrucoesExtrasBlock + stageInstruction + conhecimentoContext;
 
   if (await isOverQuota(config.teamId)) {
     await adapter.sendText(contactNumber, "Serviço de IA temporariamente indisponível. Por favor, aguarde ou entre em contato com nossa equipe.");
