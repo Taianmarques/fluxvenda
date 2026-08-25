@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  ArrowLeft, ArrowRight, Bot, SlidersHorizontal, Sparkles, Building2, Tag, Clock, Shuffle, Phone, BookOpen, BarChart3, ChevronRight, ChevronDown, MessageCircle,
+  ArrowLeft, ArrowRight, Bot, SlidersHorizontal, Sparkles, Building2, Tag, Clock, Shuffle, BookOpen, BarChart3, ChevronRight, ChevronDown, MessageCircle,
   type LucideIcon,
 } from "lucide-react";
 import { AgentActions } from "./AgentActions";
@@ -19,7 +19,7 @@ import { TestAgentChat } from "./TestAgentChat";
 
 type Section =
   | "agente" | "basico" | "personalidade" | "sobre-empresa" | "comercial" | "followup"
-  | "distribuicao" | "telefonia" | "conhecimento" | "analytics";
+  | "distribuicao" | "conhecimento" | "analytics";
 
 const SECTIONS: { key: Section; label: string; icon: LucideIcon }[] = [
   { key: "agente", label: "O Agente", icon: Bot },
@@ -29,7 +29,6 @@ const SECTIONS: { key: Section; label: string; icon: LucideIcon }[] = [
   { key: "comercial", label: "Configuração comercial", icon: Tag },
   { key: "followup", label: "Follow-up", icon: Clock },
   { key: "distribuicao", label: "Distribuição", icon: Shuffle },
-  { key: "telefonia", label: "Telefonia", icon: Phone },
   { key: "conhecimento", label: "Conhecimento", icon: BookOpen },
   { key: "analytics", label: "Analytics", icon: BarChart3 },
 ];
@@ -92,6 +91,7 @@ export function AgentSettingsShell({
 }) {
   const [section, setSection] = useState<Section>("agente");
   const [instrucoesOpen, setInstrucoesOpen] = useState(false);
+  const [telefoniaOpen, setTelefoniaOpen] = useState(false);
 
   const stats = [
     { label: "Conversas (hoje)", value: conversasHoje },
@@ -174,7 +174,7 @@ export function AgentSettingsShell({
         )}
 
         {section === "basico" && (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <SectionHeader title="Configurações básicas" desc="Delay das respostas, modo somente leitura e assinatura do agente." />
             <ConfiguracoesBasicasPanel
               agentId={agentId}
@@ -182,6 +182,25 @@ export function AgentSettingsShell({
               initialReadOnly={whatsappAiPaused && instagramAiPaused}
               initialAgentSignatureEnabled={whatsappAgentConfig.agentSignatureEnabled}
             />
+
+            <div>
+              <button
+                type="button"
+                onClick={() => setTelefoniaOpen(o => !o)}
+                className="w-full flex items-center justify-between gap-3 text-left"
+              >
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-300">Telefonia</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">Ligações de voz do agente — número, gravação e a voz usada nas respostas em áudio.</p>
+                </div>
+                <ChevronDown size={16} className={`flex-shrink-0 text-gray-400 transition-transform ${telefoniaOpen ? "rotate-180" : ""}`} />
+              </button>
+              {telefoniaOpen && (
+                <div className="mt-3">
+                  <PhoneAgentClient agentId={agentId} initialConfig={phoneConfig} />
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -264,13 +283,6 @@ export function AgentSettingsShell({
               initialIaLeadAttendantId={distribuicaoConfig.iaLeadAttendantId}
               initialIaNiveisCarteiraExcluidos={distribuicaoConfig.iaNiveisCarteiraExcluidos}
             />
-          </div>
-        )}
-
-        {section === "telefonia" && (
-          <div className="space-y-4">
-            <SectionHeader title="Telefonia" desc="Ligações de voz do agente — número, gravação e a voz usada nas respostas em áudio." />
-            <PhoneAgentClient agentId={agentId} initialConfig={phoneConfig} />
           </div>
         )}
 
