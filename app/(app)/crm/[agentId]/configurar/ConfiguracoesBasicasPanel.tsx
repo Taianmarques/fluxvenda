@@ -4,18 +4,16 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 export function ConfiguracoesBasicasPanel({
-  agentId, initialResponseDelaySeconds, initialReadOnly, initialEmojiEnabled, initialAgentSignatureEnabled,
+  agentId, initialResponseDelaySeconds, initialReadOnly, initialAgentSignatureEnabled,
 }: {
   agentId: string;
   initialResponseDelaySeconds: number;
   initialReadOnly: boolean;
-  initialEmojiEnabled: boolean;
   initialAgentSignatureEnabled: boolean;
 }) {
   const router = useRouter();
   const [responseDelaySeconds, setResponseDelaySeconds] = useState(initialResponseDelaySeconds);
   const [readOnly, setReadOnly] = useState(initialReadOnly);
-  const [emojiEnabled, setEmojiEnabled] = useState(initialEmojiEnabled);
   const [agentSignatureEnabled, setAgentSignatureEnabled] = useState(initialAgentSignatureEnabled);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -34,7 +32,7 @@ export function ConfiguracoesBasicasPanel({
         fetch(`/api/agentes/${agentId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ responseDelaySeconds, emojiEnabled, agentSignatureEnabled }),
+          body: JSON.stringify({ responseDelaySeconds, agentSignatureEnabled }),
         }),
         fetch(`/api/agentes/${agentId}/pausar-ia`, {
           method: "PATCH",
@@ -70,14 +68,6 @@ export function ConfiguracoesBasicasPanel({
         <div>
           <span className="text-sm font-medium block">Modo somente leitura</span>
           <span className="text-xs text-gray-500">O agente para de responder automaticamente no WhatsApp e no Instagram — as mensagens continuam chegando e sendo salvas normalmente, só a resposta da IA fica pausada.</span>
-        </div>
-      </label>
-
-      <label className="flex items-start gap-3 cursor-pointer border-t border-gray-800 pt-4">
-        <input type="checkbox" checked={emojiEnabled} onChange={e => { setEmojiEnabled(e.target.checked); markDirty(); }} className="w-4 h-4 mt-0.5" />
-        <div>
-          <span className="text-sm font-medium block">Usar emojis</span>
-          <span className="text-xs text-gray-500">Permite que o agente use emojis nas respostas, deixando o tom mais amigável e expressivo.</span>
         </div>
       </label>
 

@@ -10,15 +10,17 @@ const TOM_OPTIONS = [
 ];
 
 export function PersonalidadePanel({
-  agentId, initialNome, initialTom,
+  agentId, initialNome, initialTom, initialEmojiEnabled,
 }: {
   agentId: string;
   initialNome: string;
   initialTom: string;
+  initialEmojiEnabled: boolean;
 }) {
   const router = useRouter();
   const [nome, setNome] = useState(initialNome);
   const [tom, setTom] = useState(initialTom);
+  const [emojiEnabled, setEmojiEnabled] = useState(initialEmojiEnabled);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
@@ -31,7 +33,7 @@ export function PersonalidadePanel({
       const res = await fetch(`/api/agentes/${agentId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nome, tom }),
+        body: JSON.stringify({ nome, tom, emojiEnabled }),
       });
       if (!res.ok) throw new Error();
       setSaved(true);
@@ -67,6 +69,26 @@ export function PersonalidadePanel({
               <p className="text-xs text-gray-500 mt-0.5">{o.description}</p>
             </button>
           ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="text-sm text-gray-400 block mb-2">Emojis nas respostas</label>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => { setEmojiEnabled(false); setSaved(false); }}
+            className={`text-left p-3 rounded-xl border text-sm ${!emojiEnabled ? "border-blue-600 bg-blue-950/30" : "border-gray-800 hover:border-gray-700"}`}
+          >
+            <p className="font-medium">Sem emojis</p>
+            <p className="text-xs text-gray-500 mt-0.5">Texto limpo, postura profissional</p>
+          </button>
+          <button
+            onClick={() => { setEmojiEnabled(true); setSaved(false); }}
+            className={`text-left p-3 rounded-xl border text-sm ${emojiEnabled ? "border-blue-600 bg-blue-950/30" : "border-gray-800 hover:border-gray-700"}`}
+          >
+            <p className="font-medium">Com emojis</p>
+            <p className="text-xs text-gray-500 mt-0.5">Tom mais amigável e expressivo</p>
+          </button>
         </div>
       </div>
 

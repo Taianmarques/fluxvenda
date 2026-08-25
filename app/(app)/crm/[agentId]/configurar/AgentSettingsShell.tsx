@@ -169,12 +169,11 @@ export function AgentSettingsShell({
 
         {section === "basico" && (
           <div className="space-y-4">
-            <SectionHeader title="Configurações básicas" desc="Delay das respostas, modo somente leitura, emojis e assinatura do agente." />
+            <SectionHeader title="Configurações básicas" desc="Delay das respostas, modo somente leitura e assinatura do agente." />
             <ConfiguracoesBasicasPanel
               agentId={agentId}
               initialResponseDelaySeconds={whatsappAgentConfig.responseDelaySeconds}
               initialReadOnly={whatsappAiPaused && instagramAiPaused}
-              initialEmojiEnabled={whatsappAgentConfig.emojiEnabled}
               initialAgentSignatureEnabled={whatsappAgentConfig.agentSignatureEnabled}
             />
           </div>
@@ -182,11 +181,12 @@ export function AgentSettingsShell({
 
         {section === "personalidade" && (
           <div className="space-y-4">
-            <SectionHeader title="Personalidade" desc="Nome e tom de voz do agente." />
+            <SectionHeader title="Personalidade" desc="Nome, tom de voz e uso de emojis nas respostas do agente." />
             <PersonalidadePanel
               agentId={agentId}
               initialNome={whatsappAgentConfig.nome}
               initialTom={whatsappAgentConfig.tom}
+              initialEmojiEnabled={whatsappAgentConfig.emojiEnabled}
             />
           </div>
         )}
