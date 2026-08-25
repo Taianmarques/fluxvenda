@@ -5,14 +5,18 @@ import { ThumbsUp, Trash2 } from "lucide-react";
 
 export type Opportunity = { id: string; title: string | null; dealValue: number; wonAt: string | null };
 
+type PipelineStage = { id: string; name: string };
+type Pipeline = { id: string; name: string; stages: PipelineStage[] };
+
 function formatBRL(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 export function OpportunitiesPanel({
-  conversationId, opportunities, onChange, onClose, dark,
+  conversationId, agentId, opportunities, onChange, onClose, dark,
 }: {
   conversationId: string;
+  agentId: string;
   opportunities: Opportunity[];
   onChange: () => void;
   onClose: () => void;
@@ -23,6 +27,9 @@ export function OpportunitiesPanel({
   const [title, setTitle] = useState("");
   const [value, setValue] = useState("");
   const [saving, setSaving] = useState(false);
+  const [pipelines, setPipelines] = useState<Pipeline[]>([]);
+  const [pipelineId, setPipelineId] = useState("");
+  const [stageId, setStageId] = useState("");
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -32,6 +39,32 @@ export function OpportunitiesPanel({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [onClose]);
 
+  // Pipeline/etapa só carregam quando o form abre — evita fetch em toda conversa que tem
+  // oportunidade, já que a maioria nunca chega a abrir "Nova oportunidade"
+  useEffect(() => {
+    if (!showForm || pipelines.length > 0) return;
+    fetch(`/api/agentes/${agentId}/pipelines`)
+      .then(res => res.json())
+      .then(data => {
+        const list: Pipeline[] = data.pipelines ?? [];
+        setPipelines(list);
+        const first = list[0];
+        if (first) {
+          setPipelineId(first.id);
+          setStageId(first.stages[0]?.id ?? "");
+        }
+      })
+      .catch(() => {});
+  }, [showForm, pipelines.length, agentId]);
+
+  const selectedPipeline = pipelines.find(p => p.id === pipelineId);
+
+  function handlePipelineChange(newPipelineId: string) {
+    setPipelineId(newPipelineId);
+    const pipeline = pipelines.find(p => p.id === newPipelineId);
+    setStageId(pipeline?.stages[0]?.id ?? "");
+  }
+
   async function handleCreate() {
     const dealValue = Number(value.replace(",", "."));
     if (!Number.isFinite(dealValue) || dealValue <= 0) return;
@@ -40,7 +73,7 @@ export function OpportunitiesPanel({
       await fetch(`/api/ferramentas/whatsapp/conversas/${conversationId}/oportunidades`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: title.trim() || null, dealValue }),
+        body: JSON.stringify({ title: title.trim() || null, dealValue, stageId: stageId || null }),
       });
       setTitle(""); setValue(""); setShowForm(false);
       onChange();
@@ -117,6 +150,24 @@ export function OpportunitiesPanel({
               placeholder="Valor, ex: 1500,00"
               className={`w-full text-xs rounded-lg px-2 py-1.5 border focus:outline-none ${dark ? "bg-gray-950 border-gray-700 text-white placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900 placeholder:text-gray-400"}`}
             />
+            {pipelines.length > 1 && (
+              <select
+                value={pipelineId}
+                onChange={e => handlePipelineChange(e.target.value)}
+                className={`w-full text-xs rounded-lg px-2 py-1.5 border focus:outline-none ${dark ? "bg-gray-950 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+              >
+                {pipelines.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            )}
+            {selectedPipeline && selectedPipeline.stages.length > 0 && (
+              <select
+                value={stageId}
+                onChange={e => setStageId(e.target.value)}
+                className={`w-full text-xs rounded-lg px-2 py-1.5 border focus:outline-none ${dark ? "bg-gray-950 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+              >
+                {selectedPipeline.stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            )}
             <div className="flex gap-1.5">
               <button onClick={handleCreate} disabled={saving} className="flex-1 text-xs font-medium bg-green-700 hover:bg-green-600 disabled:opacity-50 text-white rounded-lg py-1.5">
                 Salvar
