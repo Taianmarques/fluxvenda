@@ -1,11 +1,22 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ShoppingCart, Settings, Copy, Image as ImageIcon, ExternalLink, Check, ArrowLeft } from "lucide-react";
+import { ShoppingCart, Settings, Copy, Image as ImageIcon, ExternalLink, Check, ArrowLeft, Sun, Moon } from "lucide-react";
 import { parseCsv, parseCsvPrice, downloadCsvTemplate } from "@/lib/csv-parser";
 
 const MAX_PHOTO_MB = 2;
+
+type ComercioTheme = "dark" | "light";
+const THEME_STORAGE_KEY = "comercio-theme";
+
+// A maior parte do arquivo continua usando classes cinza cruas (bg-gray-900,
+// border-gray-800, text-gray-400...) — em vez de encher 1300 linhas de props de tema,
+// reskina via CSS var: Tailwind v4 já resolve essas classes através de
+// var(--color-gray-*), então redefinir essas variáveis dentro de
+// ".comercio-scope[data-theme=light]" (ver <style> no componente) troca o visual inteiro
+// sem tocar no JSX. Só as exceções que dependem de branco/inversão de hover (botões com
+// fundo colorido, hover:text-white) são tratadas caso a caso via `theme`/`hoverBright`.
 
 function readFileAsBase64(file: File): Promise<{ base64: string; mimeType: string }> {
   return new Promise((resolve, reject) => {
@@ -280,7 +291,7 @@ function PrevendaVeiculoWizard({
           <ArrowLeft size={12} /> Voltar
         </button>
         {step < PREVENDA_WIZARD_STEPS ? (
-          <button onClick={() => setStep(s => s + 1)} className="bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-1.5 text-xs font-medium">
+          <button onClick={() => setStep(s => s + 1)} className="bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-4 py-1.5 text-xs font-medium">
             Continuar
           </button>
         ) : (
@@ -331,6 +342,23 @@ export function ComercioClient({
     deliveryZones: { name: string; fee: number }[];
   };
 }) {
+  const [theme, setTheme] = useState<ComercioTheme>("dark");
+
+  useEffect(() => {
+    const saved = localStorage.getItem(THEME_STORAGE_KEY);
+    if (saved === "light" || saved === "dark") setTheme(saved);
+  }, []);
+
+  function toggleTheme() {
+    const next: ComercioTheme = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    localStorage.setItem(THEME_STORAGE_KEY, next);
+  }
+
+  // Exceção ao reskin via CSS var: hover que vai pro branco puro no escuro precisa virar
+  // escuro no claro (senão fica ilegível num card branco)
+  const hoverBright = theme === "dark" ? "hover:text-white" : "hover:text-slate-900";
+
   const [showSettings, setShowSettings] = useState(false);
   const [commerceEnabled, setCommerceEnabled] = useState(initialCommerceEnabled);
   const [catalogOnly, setCatalogOnly] = useState(initialCatalogOnly);
@@ -800,7 +828,22 @@ export function ComercioClient({
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-950 text-white p-6">
+    <div
+      data-theme={theme}
+      className={`comercio-scope h-full overflow-y-auto p-6 ${theme === "dark" ? "bg-gray-950 text-white" : "bg-gray-50 text-slate-900"}`}
+    >
+      <style>{`
+        .comercio-scope[data-theme="light"] {
+          --color-gray-950: oklch(98.5% 0.002 247.839);
+          --color-gray-900: #fff;
+          --color-gray-800: oklch(92.8% 0.006 264.531);
+          --color-gray-700: oklch(87.2% 0.01 258.338);
+          --color-gray-600: oklch(70.7% 0.022 261.325);
+          --color-gray-400: oklch(44.6% 0.03 256.802);
+          --color-gray-300: oklch(37.3% 0.034 259.733);
+          --color-gray-200: oklch(27.8% 0.033 256.848);
+        }
+      `}</style>
       <div className="max-w-5xl mx-auto space-y-6">
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
@@ -808,7 +851,7 @@ export function ComercioClient({
             <h1 className="text-3xl font-bold mt-1 flex items-center gap-2"><ShoppingCart size={28} className="text-blue-400" /> Comércio</h1>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <button onClick={() => setShowNewProduct(s => !s)} className="bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-2.5 text-sm font-medium">
+            <button onClick={() => setShowNewProduct(s => !s)} className="bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-4 py-2.5 text-sm font-medium">
               + Novo produto
             </button>
             <button onClick={() => setShowAppearance(s => !s)} className="bg-gray-800 hover:bg-gray-700 rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-1.5">
@@ -816,6 +859,13 @@ export function ComercioClient({
             </button>
             <button onClick={() => setShowSettings(s => !s)} className="bg-gray-800 hover:bg-gray-700 rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-1.5">
               <Settings size={15} /> Configurar pagamento
+            </button>
+            <button
+              onClick={toggleTheme}
+              title={theme === "dark" ? "Mudar para fundo claro" : "Mudar para fundo escuro"}
+              className="p-2.5 rounded-xl bg-gray-800 hover:bg-gray-700"
+            >
+              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
             </button>
           </div>
         </div>
@@ -859,11 +909,11 @@ export function ComercioClient({
                   <div key={b.id ?? `new_${i}`} className={`flex items-center gap-3 ${!b.active ? "opacity-50" : ""}`}>
                     <img src={b.dataUri} alt={`Banner ${i + 1}`} className="w-28 h-12 rounded-lg object-cover border border-gray-800 flex-shrink-0" />
                     <div className="flex gap-2 text-xs flex-wrap">
-                      <button onClick={() => moveBanner(i, -1)} disabled={i === 0} className="text-gray-400 hover:text-white disabled:opacity-30">↑</button>
-                      <button onClick={() => moveBanner(i, 1)} disabled={i === banners.length - 1} className="text-gray-400 hover:text-white disabled:opacity-30">↓</button>
+                      <button onClick={() => moveBanner(i, -1)} disabled={i === 0} className={`text-gray-400 ${hoverBright} disabled:opacity-30`}>↑</button>
+                      <button onClick={() => moveBanner(i, 1)} disabled={i === banners.length - 1} className={`text-gray-400 ${hoverBright} disabled:opacity-30`}>↓</button>
                       <button
                         onClick={() => setBanners(prev => prev.map((x, xi) => xi === i ? { ...x, active: !x.active } : x))}
-                        className="text-gray-400 hover:text-white"
+                        className={`text-gray-400 ${hoverBright}`}
                       >
                         {b.active ? "Ocultar" : "Mostrar"}
                       </button>
@@ -891,7 +941,7 @@ export function ComercioClient({
             <button
               onClick={handleSaveAppearance}
               disabled={savingAppearance}
-              className="bg-green-700 hover:bg-green-600 disabled:opacity-50 rounded-xl px-4 py-2 text-sm font-medium"
+              className="bg-green-700 hover:bg-green-600 disabled:opacity-50 text-white rounded-xl px-4 py-2 text-sm font-medium"
             >
               {savingAppearance ? "Salvando..." : "Salvar personalização"}
             </button>
@@ -911,7 +961,7 @@ export function ComercioClient({
             <div className="flex items-center gap-2 flex-shrink-0">
               <button
                 onClick={copyCatalogLink}
-                className="flex items-center gap-1.5 text-xs text-gray-300 hover:text-white border border-gray-700 hover:border-gray-500 rounded-lg px-3 py-1.5 transition-colors"
+                className={`flex items-center gap-1.5 text-xs text-gray-300 ${hoverBright} border border-gray-700 hover:border-gray-500 rounded-lg px-3 py-1.5 transition-colors`}
               >
                 {catalogCopied ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
                 {catalogCopied ? "Copiado!" : "Copiar link"}
@@ -954,7 +1004,7 @@ export function ComercioClient({
               </label>
             </div>
             {photoError && <p className="text-xs text-red-400">{photoError}</p>}
-            <button onClick={handleAddProduct} className="bg-green-700 hover:bg-green-600 rounded-xl px-4 py-2 text-sm font-medium">Salvar</button>
+            <button onClick={handleAddProduct} className="bg-green-700 hover:bg-green-600 text-white rounded-xl px-4 py-2 text-sm font-medium">Salvar</button>
           </div>
         )}
 
@@ -1198,7 +1248,7 @@ export function ComercioClient({
               </div>
             )}
 
-            <button onClick={handleSaveSettings} disabled={savingSettings} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl px-5 py-2 text-sm font-medium">
+            <button onClick={handleSaveSettings} disabled={savingSettings} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl px-5 py-2 text-sm font-medium">
               {savingSettings ? "Salvando..." : "Salvar configurações"}
             </button>
           </div>
@@ -1249,8 +1299,8 @@ export function ComercioClient({
                         <input value={editFields.description} onChange={e => setEditFields(f => ({ ...f, description: e.target.value }))} placeholder={catalogType === "GENERICO" ? "Descrição (opcional)" : "Observações (opcional)"} className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm col-span-2" />
                       </div>
                       <div className="flex gap-2">
-                        <button onClick={handleSaveEdit} className="bg-blue-600 hover:bg-blue-500 rounded-lg px-3 py-1.5 text-xs font-medium">Salvar</button>
-                        <button onClick={() => setEditingProductId(null)} className="text-xs text-gray-400 hover:text-white">Cancelar</button>
+                        <button onClick={handleSaveEdit} className="bg-blue-600 hover:bg-blue-500 text-white rounded-lg px-3 py-1.5 text-xs font-medium">Salvar</button>
+                        <button onClick={() => setEditingProductId(null)} className={`text-xs text-gray-400 ${hoverBright}`}>Cancelar</button>
                       </div>
                     </div>
                   ) : (
@@ -1272,13 +1322,13 @@ export function ComercioClient({
                         </div>
                       </div>
                       <div className="flex gap-2 text-xs flex-shrink-0">
-                        <button onClick={() => startEdit(p)} className="text-gray-400 hover:text-white">Editar</button>
+                        <button onClick={() => startEdit(p)} className={`text-gray-400 ${hoverBright}`}>Editar</button>
                         {catalogType === "GENERICO" ? (
                           <button onClick={() => { setEditingPhotoId(p.id); editPhotoInputRef.current?.click(); }} className="text-blue-400 hover:text-blue-300">Foto</button>
                         ) : (
                           <button onClick={() => (galleryProductId === p.id ? closeGallery() : openGallery(p.id))} className="text-blue-400 hover:text-blue-300">Fotos</button>
                         )}
-                        <button onClick={() => handleToggleProduct(p)} className="text-gray-400 hover:text-white">{p.active ? "Desativar" : "Ativar"}</button>
+                        <button onClick={() => handleToggleProduct(p)} className={`text-gray-400 ${hoverBright}`}>{p.active ? "Desativar" : "Ativar"}</button>
                         <button onClick={() => handleDeleteProduct(p)} className="text-red-400 hover:text-red-300">Remover</button>
                       </div>
                     </div>
@@ -1295,8 +1345,8 @@ export function ComercioClient({
                               <img src={img.dataUri} alt="" className="w-14 h-14 rounded-lg object-cover border border-gray-800 flex-shrink-0" />
                               <span className="text-xs text-gray-500 w-10 flex-shrink-0">{i === 0 ? "Capa" : `#${i + 1}`}</span>
                               <div className="flex gap-2 text-xs flex-wrap">
-                                <button onClick={() => moveGalleryImage(i, -1)} disabled={i === 0} className="text-gray-400 hover:text-white disabled:opacity-30">↑</button>
-                                <button onClick={() => moveGalleryImage(i, 1)} disabled={i === galleryImages.length - 1} className="text-gray-400 hover:text-white disabled:opacity-30">↓</button>
+                                <button onClick={() => moveGalleryImage(i, -1)} disabled={i === 0} className={`text-gray-400 ${hoverBright} disabled:opacity-30`}>↑</button>
+                                <button onClick={() => moveGalleryImage(i, 1)} disabled={i === galleryImages.length - 1} className={`text-gray-400 ${hoverBright} disabled:opacity-30`}>↓</button>
                                 <button onClick={() => setGalleryImages(prev => prev.filter((_, xi) => xi !== i))} className="text-red-400 hover:text-red-300">Remover</button>
                               </div>
                             </div>
@@ -1312,10 +1362,10 @@ export function ComercioClient({
                       )}
                       {galleryError && <p className="text-xs text-red-400">{galleryError}</p>}
                       <div className="flex gap-2 pt-1">
-                        <button onClick={handleSaveGallery} disabled={gallerySaving} className="bg-green-700 hover:bg-green-600 disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium">
+                        <button onClick={handleSaveGallery} disabled={gallerySaving} className="bg-green-700 hover:bg-green-600 disabled:opacity-50 text-white rounded-lg px-3 py-1.5 text-xs font-medium">
                           {gallerySaving ? "Salvando..." : "Salvar fotos"}
                         </button>
-                        <button onClick={closeGallery} className="text-xs text-gray-400 hover:text-white">Fechar</button>
+                        <button onClick={closeGallery} className={`text-xs text-gray-400 ${hoverBright}`}>Fechar</button>
                       </div>
                     </div>
                   )}
