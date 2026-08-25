@@ -1450,6 +1450,17 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
     }
   }
 
+  // Delay configurável antes de começar a responder — simula "lendo/digitando" em vez de
+  // bater uma resposta instantânea de bot
+  if (config.responseDelaySeconds > 0) {
+    await new Promise(resolve => setTimeout(resolve, config.responseDelaySeconds * 1000));
+  }
+
+  // Assinatura do agente só entra no texto entregue no WhatsApp (vira uma bolha extra no
+  // fim, via o mesmo split por \n\n) — o Message.content salvo no banco fica com a resposta
+  // pura, já que o CRM mostra o nome do agente separado, acima da mensagem
+  const replyForDelivery = config.agentSignatureEnabled ? `${reply}\n\n_- ${config.nome}_` : reply;
+
   // Com áudio ativado, cada resposta sai OU como voz OU como texto (nunca os dois) —
   // a porcentagem decide a chance de sair em áudio; se o TTS falhar, cai pro texto.
   const sendAsAudio = config.whatsappVoiceEnabled && config.elevenlabsApiKey && Math.random() * 100 < config.whatsappVoicePercent;
@@ -1461,10 +1472,10 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
       providerId = await adapter.sendMedia(contactNumber, "audio", audioBuffer.toString("base64"));
     } catch (err) {
       console.error("[whatsapp-inbound] erro ao enviar áudio ElevenLabs, caindo para texto:", err);
-      providerId = await sendBubbledText(adapter, contactNumber, reply);
+      providerId = await sendBubbledText(adapter, contactNumber, replyForDelivery);
     }
   } else {
-    providerId = await sendBubbledText(adapter, contactNumber, reply);
+    providerId = await sendBubbledText(adapter, contactNumber, replyForDelivery);
   }
 
   // Guarda o id do provedor pra resposta da IA poder ser citada depois (pelo cliente ou pelo atendente)

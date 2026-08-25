@@ -3,13 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  ArrowLeft, ArrowRight, Bot, Sparkles, Building2, Tag, Clock, Smartphone, Shuffle, Phone, BookOpen, BarChart3, ChevronRight, MessageCircle,
+  ArrowLeft, ArrowRight, Bot, SlidersHorizontal, Sparkles, Building2, Tag, Clock, Smartphone, Shuffle, Phone, BookOpen, BarChart3, ChevronRight, MessageCircle,
   type LucideIcon,
 } from "lucide-react";
 import { AgentActions } from "./AgentActions";
 import { WhatsappCloudConnect } from "./WhatsappCloudConnect";
 import { DistribuicaoClient } from "./DistribuicaoClient";
 import { PhoneAgentClient } from "./PhoneAgentClient";
+import { ConfiguracoesBasicasPanel } from "./ConfiguracoesBasicasPanel";
 import { PersonalidadePanel } from "./PersonalidadePanel";
 import { SobreEmpresaPanel } from "./SobreEmpresaPanel";
 import { ConfiguracaoComercialPanel } from "./ConfiguracaoComercialPanel";
@@ -17,11 +18,12 @@ import { FollowupPanel } from "./FollowupPanel";
 import { TestAgentChat } from "./TestAgentChat";
 
 type Section =
-  | "agente" | "personalidade" | "sobre-empresa" | "comercial" | "followup"
+  | "agente" | "basico" | "personalidade" | "sobre-empresa" | "comercial" | "followup"
   | "canais" | "distribuicao" | "telefonia" | "conhecimento" | "analytics";
 
 const SECTIONS: { key: Section; label: string; icon: LucideIcon }[] = [
   { key: "agente", label: "O Agente", icon: Bot },
+  { key: "basico", label: "Configurações básicas", icon: SlidersHorizontal },
   { key: "personalidade", label: "Personalidade", icon: Sparkles },
   { key: "sobre-empresa", label: "Sobre a empresa", icon: Building2 },
   { key: "comercial", label: "Configuração comercial", icon: Tag },
@@ -54,6 +56,8 @@ type WhatsappAgentConfig = {
   followupEnabled: boolean;
   followupDelaysMinutes: number[];
   emojiEnabled: boolean;
+  responseDelaySeconds: number;
+  agentSignatureEnabled: boolean;
 };
 
 export function AgentSettingsShell({
@@ -63,6 +67,7 @@ export function AgentSettingsShell({
   leadDistributionMode,
   phoneConfig,
   segmento, whatsappAgentConfig,
+  whatsappAiPaused, instagramAiPaused,
 }: {
   agentId: string;
   nome: string;
@@ -77,6 +82,8 @@ export function AgentSettingsShell({
   phoneConfig: React.ComponentProps<typeof PhoneAgentClient>["initialConfig"];
   segmento?: { segmento: string; subsegmento: string };
   whatsappAgentConfig: WhatsappAgentConfig;
+  whatsappAiPaused: boolean;
+  instagramAiPaused: boolean;
 }) {
   const [section, setSection] = useState<Section>("agente");
 
@@ -160,14 +167,26 @@ export function AgentSettingsShell({
           </div>
         )}
 
+        {section === "basico" && (
+          <div className="space-y-4">
+            <SectionHeader title="Configurações básicas" desc="Delay das respostas, modo somente leitura, emojis e assinatura do agente." />
+            <ConfiguracoesBasicasPanel
+              agentId={agentId}
+              initialResponseDelaySeconds={whatsappAgentConfig.responseDelaySeconds}
+              initialReadOnly={whatsappAiPaused && instagramAiPaused}
+              initialEmojiEnabled={whatsappAgentConfig.emojiEnabled}
+              initialAgentSignatureEnabled={whatsappAgentConfig.agentSignatureEnabled}
+            />
+          </div>
+        )}
+
         {section === "personalidade" && (
           <div className="space-y-4">
-            <SectionHeader title="Personalidade" desc="Nome, tom de voz e uso de emojis nas respostas do agente." />
+            <SectionHeader title="Personalidade" desc="Nome e tom de voz do agente." />
             <PersonalidadePanel
               agentId={agentId}
               initialNome={whatsappAgentConfig.nome}
               initialTom={whatsappAgentConfig.tom}
-              initialEmojiEnabled={whatsappAgentConfig.emojiEnabled}
             />
           </div>
         )}

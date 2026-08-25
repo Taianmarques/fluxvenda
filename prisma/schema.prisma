@@ -713,6 +713,12 @@ model AgentConfig {
   signatureEnabled Boolean @default(false)
   emojiEnabled     Boolean @default(false) // permite que o agente de IA use emojis nas respostas
 
+  // Espera antes de começar a enviar a resposta da IA — simula "lendo/digitando", 0 = instantâneo
+  responseDelaySeconds Int @default(0)
+  // Assina as respostas da IA com o nome do agente, como uma bolha extra no fim (diferente de
+  // signatureEnabled, que assina mensagens manuais de atendente com o nome de quem mandou)
+  agentSignatureEnabled Boolean @default(false)
+
   // Catálogo/pedidos via WhatsApp com pagamento Pix/cartão (Asaas) — cada equipe usa a própria conta
   commerceEnabled  Boolean @default(false)
   catalogOnly      Boolean @default(false) // true = só catálogo/pedidos, sem gerar cobrança online
