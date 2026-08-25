@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ThumbsUp, Trash2 } from "lucide-react";
+import { ThumbsUp, Trash2, Pencil } from "lucide-react";
 
-export type Opportunity = { id: string; title: string | null; dealValue: number; wonAt: string | null };
+export type Opportunity = { id: string; title: string | null; dealValue: number; wonAt: string | null; stageId?: string | null };
 
 type PipelineStage = { id: string; name: string };
 type Pipeline = { id: string; name: string; stages: PipelineStage[] };
@@ -24,6 +24,7 @@ export function OpportunitiesPanel({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [value, setValue] = useState("");
   const [saving, setSaving] = useState(false);
@@ -39,8 +40,8 @@ export function OpportunitiesPanel({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [onClose]);
 
-  // Pipeline/etapa só carregam quando o form abre — evita fetch em toda conversa que tem
-  // oportunidade, já que a maioria nunca chega a abrir "Nova oportunidade"
+  // Pipeline/etapa só carregam quando o form abre (criar ou editar) — evita fetch em toda
+  // conversa que tem oportunidade, já que a maioria nunca chega a abrir o formulário
   useEffect(() => {
     if (!showForm || pipelines.length > 0) return;
     fetch(`/api/agentes/${agentId}/pipelines`)
@@ -48,14 +49,20 @@ export function OpportunitiesPanel({
       .then(data => {
         const list: Pipeline[] = data.pipelines ?? [];
         setPipelines(list);
-        const first = list[0];
-        if (first) {
-          setPipelineId(first.id);
-          setStageId(first.stages[0]?.id ?? "");
+        if (editingId) {
+          // Editando: acha o pipeline dono da etapa atual da oportunidade
+          const owner = list.find(p => p.stages.some(s => s.id === stageId));
+          setPipelineId(owner?.id ?? list[0]?.id ?? "");
+        } else {
+          const first = list[0];
+          if (first) {
+            setPipelineId(first.id);
+            setStageId(first.stages[0]?.id ?? "");
+          }
         }
       })
       .catch(() => {});
-  }, [showForm, pipelines.length, agentId]);
+  }, [showForm, pipelines.length, agentId, editingId, stageId]);
 
   const selectedPipeline = pipelines.find(p => p.id === pipelineId);
 
@@ -65,17 +72,36 @@ export function OpportunitiesPanel({
     setStageId(pipeline?.stages[0]?.id ?? "");
   }
 
-  async function handleCreate() {
+  function startEdit(o: Opportunity) {
+    setEditingId(o.id);
+    setTitle(o.title ?? "");
+    setValue(String(o.dealValue));
+    setStageId(o.stageId ?? "");
+    const owner = pipelines.find(p => p.stages.some(s => s.id === o.stageId));
+    setPipelineId(owner?.id ?? pipelines[0]?.id ?? "");
+    setShowForm(true);
+  }
+
+  function cancelForm() {
+    setShowForm(false);
+    setEditingId(null);
+    setTitle(""); setValue("");
+  }
+
+  async function handleSubmit() {
     const dealValue = Number(value.replace(",", "."));
     if (!Number.isFinite(dealValue) || dealValue <= 0) return;
     setSaving(true);
     try {
-      await fetch(`/api/ferramentas/whatsapp/conversas/${conversationId}/oportunidades`, {
-        method: "POST",
+      const url = editingId
+        ? `/api/ferramentas/whatsapp/conversas/${conversationId}/oportunidades/${editingId}`
+        : `/api/ferramentas/whatsapp/conversas/${conversationId}/oportunidades`;
+      await fetch(url, {
+        method: editingId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: title.trim() || null, dealValue, stageId: stageId || null }),
       });
-      setTitle(""); setValue(""); setShowForm(false);
+      setTitle(""); setValue(""); setShowForm(false); setEditingId(null);
       onChange();
     } finally {
       setSaving(false);
@@ -125,6 +151,13 @@ export function OpportunitiesPanel({
               </button>
             )}
             <button
+              onClick={() => startEdit(o)}
+              title="Editar"
+              className={`p-1 flex-shrink-0 opacity-0 group-hover:opacity-100 ${dark ? "text-gray-500 hover:text-white" : "text-gray-400 hover:text-gray-800"}`}
+            >
+              <Pencil size={12} />
+            </button>
+            <button
               onClick={() => handleDelete(o.id)}
               title="Excluir"
               className="text-gray-500 hover:text-red-400 p-1 flex-shrink-0 opacity-0 group-hover:opacity-100"
@@ -146,7 +179,7 @@ export function OpportunitiesPanel({
             <input
               value={value}
               onChange={e => setValue(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && handleCreate()}
+              onKeyDown={e => e.key === "Enter" && handleSubmit()}
               placeholder="Valor, ex: 1500,00"
               className={`w-full text-xs rounded-lg px-2 py-1.5 border focus:outline-none ${dark ? "bg-gray-950 border-gray-700 text-white placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900 placeholder:text-gray-400"}`}
             />
@@ -169,10 +202,10 @@ export function OpportunitiesPanel({
               </select>
             )}
             <div className="flex gap-1.5">
-              <button onClick={handleCreate} disabled={saving} className="flex-1 text-xs font-medium bg-green-700 hover:bg-green-600 disabled:opacity-50 text-white rounded-lg py-1.5">
-                Salvar
+              <button onClick={handleSubmit} disabled={saving} className="flex-1 text-xs font-medium bg-green-700 hover:bg-green-600 disabled:opacity-50 text-white rounded-lg py-1.5">
+                {editingId ? "Salvar alterações" : "Salvar"}
               </button>
-              <button onClick={() => setShowForm(false)} className={`text-xs px-2 rounded-lg ${dark ? "text-gray-400 hover:bg-gray-800" : "text-gray-500 hover:bg-gray-100"}`}>
+              <button onClick={cancelForm} className={`text-xs px-2 rounded-lg ${dark ? "text-gray-400 hover:bg-gray-800" : "text-gray-500 hover:bg-gray-100"}`}>
                 Cancelar
               </button>
             </div>

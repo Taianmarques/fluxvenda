@@ -587,7 +587,7 @@ export function WhatsappInbox({
       const fp = JSON.stringify([
         c.id, c.messages.length, lastMsg?.id, c.humanTakeover, c.status,
         c.assignedToId, c.leadStatusId, c.opportunities?.length,
-        c.opportunities?.map((o: any) => [o.id, o.wonAt, o.dealValue]),
+        c.opportunities?.map((o: any) => [o.id, o.wonAt, o.dealValue, o.title, o.stageId]),
       ]);
       if (fp !== detailFingerprintRef.current) {
         detailFingerprintRef.current = fp;
