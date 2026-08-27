@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Briefcase } from "lucide-react";
 import { getAgentConfigWithRole } from "@/lib/team";
+import { podeVerNaoAtribuidos } from "@/lib/crm-access";
 import { CrmPageGate } from "@/app/(app)/crm/CrmPageGate";
 import { CarteiraClient, type CarteiraCliente } from "../../carteira/CarteiraClient";
 
@@ -39,6 +40,8 @@ async function CarteiraPageContent({ params }: { params: Promise<{ agentId: stri
     );
   }
 
+  const verNaoAtribuidos = isManager || (await podeVerNaoAtribuidos(user.id));
+
   const [conversations, orders, paidCobrancas] = await Promise.all([
     prisma.conversation.findMany({
       where: {
@@ -46,7 +49,7 @@ async function CarteiraPageContent({ params }: { params: Promise<{ agentId: stri
         isSandbox: false, // conversa de teste do simulador nunca aparece na carteira real
         isGroup: false, // grupo do WhatsApp não é lead, fica só na aba Grupos do chat
         // Atendente vê a carteira dos clientes dele (mesma regra da caixa de entrada)
-        ...(isManager ? {} : { OR: [{ assignedToId: user.id }, { assignedToId: null }] }),
+        ...(isManager ? {} : { OR: [{ assignedToId: user.id }, ...(verNaoAtribuidos ? [{ assignedToId: null }] : [])] }),
       },
       orderBy: { updatedAt: "desc" },
       include: {

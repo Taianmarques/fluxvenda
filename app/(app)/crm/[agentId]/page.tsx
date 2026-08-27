@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { MessageCircle } from "lucide-react";
 import { getAgentConfigWithRole } from "@/lib/team";
+import { podeVerNaoAtribuidos } from "@/lib/crm-access";
 import { CrmPageGate } from "@/app/(app)/crm/CrmPageGate";
 import { WhatsappInbox } from "../WhatsappInbox";
 
@@ -49,17 +50,18 @@ async function WhatsappInboxPageContent({
   }
 
   const { c } = await searchParams;
+  const verNaoAtribuidos = isManager || (await podeVerNaoAtribuidos(user.id));
 
   const [conversations, leadStatuses] = await Promise.all([
     prisma.conversation.findMany({
       where: {
         agentConfigId: config.id,
-        // Gestor vê tudo. Atendente: conversa normal (não-grupo) — dele, ou ainda não atribuída;
-        // grupo — lista de visibilidade vazia (padrão) mostra pra todo mundo, senão só quem tá na
-        // lista (ver groupVisibleToIds, configurado pelo cabeçalho do chat do grupo).
+        // Gestor vê tudo. Atendente: conversa normal (não-grupo) — dele, ou (se o perfil de
+        // acesso permitir) ainda não atribuída; grupo — lista de visibilidade vazia (padrão)
+        // mostra pra todo mundo, senão só quem tá na lista (ver groupVisibleToIds).
         ...(isManager ? {} : {
           OR: [
-            { isGroup: false, OR: [{ assignedToId: user.id }, { assignedToId: null }] },
+            { isGroup: false, OR: [{ assignedToId: user.id }, ...(verNaoAtribuidos ? [{ assignedToId: null }] : [])] },
             { isGroup: true, OR: [{ groupVisibleToIds: { isEmpty: true } }, { groupVisibleToIds: { has: user.id } }] },
           ],
         }),

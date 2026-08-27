@@ -602,6 +602,10 @@ model CrmAccessProfile {
   nome         String
   allowedPages String[] @default([]) // chaves de lib/crm-nav-config.ts (CrmPageKey[])
 
+  // false = só vê conversas já atribuídas a si mesmo — não enxerga leads novos ainda sem
+  // atendente. Default true preserva o comportamento de sempre (todo mundo via não atribuídos).
+  verNaoAtribuidos Boolean @default(true)
+
   membros TeamMember[]
 
   @@index([teamId])

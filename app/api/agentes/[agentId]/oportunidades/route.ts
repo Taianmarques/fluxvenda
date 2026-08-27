@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { getAgentConfigWithRole } from "@/lib/team";
+import { podeVerNaoAtribuidos } from "@/lib/crm-access";
 
 // Lista todas as oportunidades das conversas visíveis pro usuário, já achatadas com os
 // dados da conversa — usado pelo board do Pipeline (cada card é uma oportunidade, não uma conversa).
@@ -13,12 +14,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ agentId
   const result = await getAgentConfigWithRole(userId, agentId);
   if (!result) return NextResponse.json({ opportunities: [] });
   const { config, isManager } = result;
+  const verNaoAtribuidos = isManager || (await podeVerNaoAtribuidos(userId));
 
   const opportunities = await prisma.opportunity.findMany({
     where: {
       conversation: {
         agentConfigId: config.id,
-        ...(isManager ? {} : { OR: [{ assignedToId: userId }, { assignedToId: null }] }),
+        ...(isManager ? {} : { OR: [{ assignedToId: userId }, ...(verNaoAtribuidos ? [{ assignedToId: null }] : [])] }),
       },
     },
     orderBy: { updatedAt: "desc" },

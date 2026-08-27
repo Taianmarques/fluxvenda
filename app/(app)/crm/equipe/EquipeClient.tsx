@@ -19,7 +19,7 @@ type Membro = {
 };
 
 type Departamento = { id: string; nome: string; descricao: string };
-type Perfil = { id: string; nome: string; allowedPages: string[] };
+type Perfil = { id: string; nome: string; allowedPages: string[]; verNaoAtribuidos: boolean };
 
 export function EquipeClient({ teamName, isManager, inviteLink, manager, members, departamentos, perfis, currentUserId }: {
   teamName: string;
@@ -145,6 +145,15 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ allowedPages }),
+    });
+    router.refresh();
+  }
+
+  async function handleToggleVerNaoAtribuidos(p: Perfil) {
+    await fetch(`/api/equipe/perfis/${p.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ verNaoAtribuidos: !p.verNaoAtribuidos }),
     });
     router.refresh();
   }
@@ -524,7 +533,21 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
                           </div>
 
                           {expanded && (
-                            <div className="mt-3 pt-3 border-t border-gray-800 grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
+                            <div className="mt-3 pt-3 border-t border-gray-800 space-y-3">
+                              <div>
+                                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Visibilidade</p>
+                                <label className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={p.verNaoAtribuidos}
+                                    onChange={() => handleToggleVerNaoAtribuidos(p)}
+                                    className="rounded border-gray-700 bg-gray-900"
+                                  />
+                                  Ver atendimentos novos ainda sem vendedor (números não vinculados a si)
+                                </label>
+                                <p className="text-[11px] text-gray-600 mt-0.5 ml-6">Desmarcado, o atendente só vê conversas já atribuídas a ele mesmo.</p>
+                              </div>
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
                               {CRM_CATEGORIES.map(cat => {
                                 const pages = cat.pages.filter(pg => !pg.managerOnly);
                                 if (pages.length === 0) return null;
@@ -545,6 +568,7 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
                                   </div>
                                 );
                               })}
+                              </div>
                             </div>
                           )}
                         </div>

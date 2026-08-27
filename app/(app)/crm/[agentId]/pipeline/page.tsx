@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { KanbanSquare } from "lucide-react";
 import { getAgentConfigWithRole } from "@/lib/team";
+import { podeVerNaoAtribuidos } from "@/lib/crm-access";
 import { PipelineBoardLoader as PipelineBoard } from "../../pipeline/PipelineBoardLoader";
 
 export default async function PipelinePage({ params }: { params: Promise<{ agentId: string }> }) {
@@ -30,6 +31,8 @@ export default async function PipelinePage({ params }: { params: Promise<{ agent
     );
   }
 
+  const verNaoAtribuidos = isManager || (await podeVerNaoAtribuidos(user.id));
+
   const [pipelines, opportunities, leadStatuses] = await Promise.all([
     prisma.pipeline.findMany({
       where: { agentConfigId: config.id },
@@ -42,7 +45,7 @@ export default async function PipelinePage({ params }: { params: Promise<{ agent
           agentConfigId: config.id,
           isSandbox: false, // conversa de teste do simulador nunca aparece no pipeline real
           isGroup: false, // grupo do WhatsApp não é lead, fica só na aba Grupos do chat
-          ...(isManager ? {} : { OR: [{ assignedToId: user.id }, { assignedToId: null }] }),
+          ...(isManager ? {} : { OR: [{ assignedToId: user.id }, ...(verNaoAtribuidos ? [{ assignedToId: null }] : [])] }),
         },
       },
       orderBy: { updatedAt: "desc" },

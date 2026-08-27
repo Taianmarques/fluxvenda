@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { getAgentConfigWithRole } from "@/lib/team";
+import { podeVerNaoAtribuidos } from "@/lib/crm-access";
 import { Prisma } from "@/app/generated/prisma/client";
 import { z } from "zod";
 
@@ -13,16 +14,17 @@ export async function GET(_req: Request, { params }: { params: Promise<{ agentId
   const result = await getAgentConfigWithRole(userId, agentId);
   if (!result) return NextResponse.json({ conversations: [] });
   const { config, isManager } = result;
+  const verNaoAtribuidos = isManager || (await podeVerNaoAtribuidos(userId));
 
   const conversations = await prisma.conversation.findMany({
     where: {
       agentConfigId: config.id,
-      // Gestor vê tudo. Atendente: conversa normal (não-grupo) — dele, ou ainda não atribuída;
-      // grupo — lista de visibilidade vazia (padrão) mostra pra todo mundo, senão só quem tá na
-      // lista (ver groupVisibleToIds, configurado pelo cabeçalho do chat do grupo).
+      // Gestor vê tudo. Atendente: conversa normal (não-grupo) — dele, ou (se o perfil de
+      // acesso permitir) ainda não atribuída; grupo — lista de visibilidade vazia (padrão)
+      // mostra pra todo mundo, senão só quem tá na lista (ver groupVisibleToIds).
       ...(isManager ? {} : {
         OR: [
-          { isGroup: false, OR: [{ assignedToId: userId }, { assignedToId: null }] },
+          { isGroup: false, OR: [{ assignedToId: userId }, ...(verNaoAtribuidos ? [{ assignedToId: null }] : [])] },
           { isGroup: true, OR: [{ groupVisibleToIds: { isEmpty: true } }, { groupVisibleToIds: { has: userId } }] },
         ],
       }),

@@ -8,6 +8,7 @@ import { isTeamManager } from "@/lib/team";
 const patchSchema = z.object({
   nome: z.string().min(1).max(40).optional(),
   allowedPages: z.array(z.enum(CONFIGURABLE_PAGE_KEYS as [CrmPageKey, ...CrmPageKey[]])).optional(),
+  verNaoAtribuidos: z.boolean().optional(),
 });
 
 async function assertManager(userId: string, perfilId: string) {
