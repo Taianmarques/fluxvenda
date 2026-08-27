@@ -197,6 +197,7 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo,
   // inclusive as páginas managerOnly (aovivo/campanhas/auditoria) somem, já que nem são
   // marcáveis no perfil. Sem perfil (gestor ou membro com acesso total), aparece tudo.
   function isPageVisible(page: CrmPageDef) {
+    if (page.hiddenFromSidebar) return false;
     if (allowedPages === null) return true;
     if (page.managerOnly) return false;
     return allowedPages.includes(page.key);

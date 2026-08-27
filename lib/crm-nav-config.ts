@@ -27,6 +27,10 @@ export type CrmPageDef = {
   // Já restrita ao gestor por checagem própria da página (aovivo/campanhas/auditoria) —
   // fica fora do checklist de perfis, sem sentido liberar via perfil pra quem não é gestor
   managerOnly?: true;
+  // Não aparece no menu do CRM (CrmSidebar) — só acessível por um link direto de outra tela
+  // (ex: Treino, alcançado só pelo card dentro de Configurar > Treino). Continua valendo
+  // como CrmPageKey normal pra CrmPageGate e pro checklist de perfis de acesso.
+  hiddenFromSidebar?: true;
 };
 
 export type CrmCategoryDef = {
@@ -69,7 +73,7 @@ export const CRM_CATEGORIES: CrmCategoryDef[] = [
     { key: "canais", label: "Canais", suffix: "/canais", icon: Wifi },
     { key: "equipe", label: "Equipe", suffix: "/equipe", icon: UserPlus },
     { key: "conhecimento", label: "Conhecimento", suffix: "/conhecimento", icon: BookOpen },
-    { key: "treino", label: "Treino", suffix: "/treino", icon: GraduationCap },
+    { key: "treino", label: "Treino", suffix: "/treino", icon: GraduationCap, hiddenFromSidebar: true },
     { key: "mensagensrapidas", label: "Mensagens rápidas", suffix: "/mensagens-rapidas", icon: MessageSquareText },
     { key: "motivosperda", label: "Motivos de perda", suffix: "/motivos-perda", icon: ThumbsDown },
     { key: "creditos", label: "Créditos de IA", suffix: "/creditos", icon: Coins },
