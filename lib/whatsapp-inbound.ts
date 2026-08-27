@@ -1120,11 +1120,22 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       if (!product.imagemBase64) return `Esse produto ainda não tem foto cadastrada.`;
 
       // Com galeria (Veículos/Imóveis), manda todas as fotos cadastradas (máx. 5); sem galeria, só a capa
-      const fotos = product.images.length > 0 ? product.images : [{ imagemBase64: product.imagemBase64 }];
+      const fotos = product.images.length > 0
+        ? product.images
+        : [{ imagemBase64: product.imagemBase64, imagemMimeType: product.imagemMimeType ?? "image/jpeg" }];
       try {
         for (const foto of fotos) {
           await adapter.sendMedia(contactNumber, "image", foto.imagemBase64, { caption: product.name });
+          // A foto enviada pela ferramenta não passava pelo histórico — o atendente revisando a
+          // conversa no CRM não via nem a imagem nem a legenda que o cliente recebeu de verdade.
+          await prisma.message.create({
+            data: {
+              conversationId, role: "assistant", content: product.name,
+              mediaUrl: `data:${foto.imagemMimeType};base64,${foto.imagemBase64}`, mediaType: "image",
+            },
+          });
         }
+        emitChatEvent(agentConfigId, conversationId);
         return `${fotos.length > 1 ? `${fotos.length} fotos` : "Foto"} de "${product.name}" enviada(s).`;
       } catch (err) {
         console.error("[whatsapp-inbound] erro ao enviar foto do produto:", err);
