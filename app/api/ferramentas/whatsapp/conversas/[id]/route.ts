@@ -129,6 +129,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const updated = await prisma.conversation.update({
     where: { id },
     data: {
+      // Encerrar sem dono (nunca foi aceita/atribuída, ex: modo de distribuição não é
+      // "Primeiro a assumir") deixava a conversa visível pra QUALQUER atendente mesmo depois
+      // de finalizada — a lista só esconde conversa de outro colega quando assignedToId está
+      // preenchido (ver app/api/agentes/[agentId]/conversas/route.ts). Quem encerra vira o
+      // dono, do mesmo jeito que já acontece ao aceitar.
+      ...(encerrando && !conversation.assignedToId && { assignedToId: userId }),
       ...(body.data.leadStatusId !== undefined && { leadStatusId: body.data.leadStatusId }),
       ...(body.data.assignedToId !== undefined && { assignedToId: body.data.assignedToId }),
       ...(body.data.status !== undefined && { status: body.data.status }),

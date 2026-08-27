@@ -57,6 +57,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
       where: { id: { in: conversas.map(c => c.id) } },
       data: { status: "FINALIZADO", motivoEncerramento: d.motivo },
     });
+    // Sem dono antes de encerrar: fica com quem encerrou, senão continuaria visível pra
+    // qualquer atendente mesmo já finalizada (ver conversas/route.ts — só some da lista de
+    // quem não é o assignedToId).
+    const semDono = conversas.filter(c => !c.assignedToId).map(c => c.id);
+    if (semDono.length > 0) {
+      await prisma.conversation.updateMany({ where: { id: { in: semDono } }, data: { assignedToId: userId } });
+    }
     return NextResponse.json({ aplicadas: conversas.length, puladas: 0 });
   }
 
