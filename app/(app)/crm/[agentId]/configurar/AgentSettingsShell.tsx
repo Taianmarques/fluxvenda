@@ -65,6 +65,7 @@ type DistribuicaoConfig = {
   transferirAoPedirFoto: boolean;
   iaLeadAttendantId: string | null;
   iaNiveisCarteiraExcluidos: string[];
+  transferenciaCondicoes: string[];
 };
 
 export function AgentSettingsShell({
@@ -282,6 +283,7 @@ export function AgentSettingsShell({
               initialTransferirAoPedirFoto={distribuicaoConfig.transferirAoPedirFoto}
               initialIaLeadAttendantId={distribuicaoConfig.iaLeadAttendantId}
               initialIaNiveisCarteiraExcluidos={distribuicaoConfig.iaNiveisCarteiraExcluidos}
+              initialTransferenciaCondicoes={distribuicaoConfig.transferenciaCondicoes}
             />
           </div>
         )}

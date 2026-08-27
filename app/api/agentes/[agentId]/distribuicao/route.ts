@@ -13,6 +13,7 @@ const schema = z.object({
   transferirAoPedirFoto: z.boolean().optional(),
   iaLeadAttendantId: z.string().nullable().optional(), // "" ou null = padrão; "RODIZIO"; ou um profileId
   iaNiveisCarteiraExcluidos: z.array(z.enum(["A", "B", "C", "INATIVO", "PERDIDO"])).max(5).optional(),
+  transferenciaCondicoes: z.array(z.string().trim().min(1).max(200)).max(10).optional(),
 });
 
 // Só o gestor configura como os leads são distribuídos entre os atendentes da equipe
@@ -51,6 +52,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
       ...(d.transferirAoPedirFoto !== undefined && { transferirAoPedirFoto: d.transferirAoPedirFoto }),
       ...(resolvedIaLeadAttendantId !== undefined && { iaLeadAttendantId: resolvedIaLeadAttendantId }),
       ...(d.iaNiveisCarteiraExcluidos !== undefined && { iaNiveisCarteiraExcluidos: d.iaNiveisCarteiraExcluidos }),
+      ...(d.transferenciaCondicoes !== undefined && { transferenciaCondicoes: d.transferenciaCondicoes }),
     },
   });
 
@@ -60,5 +62,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
     transferirAoPedirFoto: updated.transferirAoPedirFoto,
     iaLeadAttendantId: updated.iaLeadAttendantId,
     iaNiveisCarteiraExcluidos: updated.iaNiveisCarteiraExcluidos,
+    transferenciaCondicoes: updated.transferenciaCondicoes,
   });
 }

@@ -721,6 +721,11 @@ model AgentConfig {
   // enviar mídia) — expõe a tool transferir_atendente_foto só quando ativo.
   transferirAoPedirFoto Boolean @default(false)
 
+  // Condições em texto livre definidas pelo gestor (ex: "cliente pede desconto acima de 20%")
+  // — quando a situação bate com alguma delas, a IA chama transferir_atendente_condicao. Expõe
+  // a tool só quando a lista não está vazia (ver whatsapp-inbound.ts).
+  transferenciaCondicoes String[] @default([])
+
   // Vendedor que recebe os leads que a IA transfere (hoje só transferirAoPedirFoto) — só entra
   // em ação se a conversa ainda não tem dono, nunca rouba de quem já assumiu.
   // null/"" = segue leadDistributionMode normalmente; "RODIZIO" = alterna entre os atendentes

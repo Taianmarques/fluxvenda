@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import {
   runAgent, runAgentWithImage, runAgentWithTools, classifyLeadQualified,
   SCHEDULING_TOOLS, COMMERCE_TOOLS, BILLING_TOOLS, PROSPECTING_TOOLS, POSVENDA_TOOLS, PIPELINE_TOOLS, DEPARTAMENTO_TOOLS,
-  PREVENDA_VEICULO_TOOLS, TRANSFERIR_FOTO_TOOLS,
+  PREVENDA_VEICULO_TOOLS, TRANSFERIR_FOTO_TOOLS, TRANSFERIR_CONDICAO_TOOLS,
 } from "@/lib/agent-engine";
 import { textToSpeech } from "@/lib/elevenlabs";
 import { logTokenUsage, isOverQuota } from "@/lib/token-usage";
@@ -798,6 +798,25 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       return "Conversa transferida pra um atendente humano. Na SUA RESPOSTA, avise o cliente com naturalidade que alguém vai te mandar a foto em instantes. Depois desta mensagem você para de responder — o atendimento é humano a partir daqui.";
     }
 
+    if (name === "transferir_atendente_condicao") {
+      const condicao = typeof args?.condicao === "string" ? args.condicao.trim() : "";
+      const motivo = typeof args?.motivo === "string" ? args.motivo.trim() : "";
+      const current = await prisma.conversation.findUnique({ where: { id: conversationId }, select: { assignedToId: true } });
+      const assignedToId = await resolveHandoffAssignee(config, conversationId, current?.assignedToId ?? null);
+
+      await prisma.conversation.update({
+        where: { id: conversationId },
+        data: { humanTakeover: true, status: "ATIVO", ...(assignedToId ? { assignedToId } : {}) },
+      });
+      await prisma.message.create({
+        data: { conversationId, role: "note", content: `Transferida pela IA — condição: "${condicao || "não informada"}".${motivo ? ` ${motivo}` : ""}` },
+      });
+      emitChatEvent(agentConfigId, conversationId);
+      notifyHumanTakeoverMessage(config, conversationId, assignedToId, contactName ?? contactNumber, motivo || condicao || "Condição de transferência automática.").catch(() => {});
+
+      return "Conversa transferida pra um atendente humano. Na SUA RESPOSTA, avise o cliente com naturalidade que alguém vai continuar o atendimento em instantes. Depois desta mensagem você para de responder — o atendimento é humano a partir daqui.";
+    }
+
     if (name === "registrar_veiculo_interesse") {
       const tipo = args?.tipo === "MOTO" ? "MOTO" : args?.tipo === "CARRO" ? "CARRO" : null;
       const modeloDesejado = typeof args?.modeloDesejado === "string" ? args.modeloDesejado.trim() : "";
@@ -1446,6 +1465,7 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
     ...(config.pipelineAutoAvancar ? PIPELINE_TOOLS : []),
     ...(departamentos.length > 0 ? DEPARTAMENTO_TOOLS : []),
     ...(config.transferirAoPedirFoto ? TRANSFERIR_FOTO_TOOLS : []),
+    ...(config.transferenciaCondicoes.length > 0 ? TRANSFERIR_CONDICAO_TOOLS : []),
     ...(isProspect ? PROSPECTING_TOOLS : []),
     // Pré-vendas de veículos: transferir_vendedor_veiculo não é opcional (é o mecanismo de
     // saída do fluxo) — cada etapa de coleta liga/desliga independente.
@@ -1489,11 +1509,18 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
     ? `\n\nINSTRUÇÕES ADICIONAIS DO GESTOR:\n${config.instrucoesExtras.trim()}`
     : "";
 
+  // Lista de condições em texto livre (Distribuição → "Transferir automaticamente para
+  // atendente quando...") — só entra no prompt se a tool transferir_atendente_condicao
+  // estiver exposta (ver TRANSFERIR_CONDICAO_TOOLS acima)
+  const transferenciaCondicoesBlock = config.transferenciaCondicoes.length > 0
+    ? `\n\nCONDIÇÕES DE TRANSFERÊNCIA AUTOMÁTICA PRA HUMANO (definidas pelo gestor — assim que a conversa bater com QUALQUER uma delas, chame transferir_atendente_condicao imediatamente):\n${config.transferenciaCondicoes.map(c => `- ${c}`).join("\n")}`
+    : "";
+
   // Conhecimento entra no activeSystemPrompt (e não no extraContext) porque os três
   // caminhos de resposta (tools, texto puro e imagem) consomem o system prompt
   const conhecimentoContext = await buildConhecimentoContext(config.id);
   const treinoContext = await buildTreinoContext(config, text);
-  const activeSystemPrompt = config.systemPrompt + BUBBLE_INSTRUCTION + emojiInstruction + instrucoesExtrasBlock + stageInstruction + conhecimentoContext + treinoContext;
+  const activeSystemPrompt = config.systemPrompt + BUBBLE_INSTRUCTION + emojiInstruction + instrucoesExtrasBlock + transferenciaCondicoesBlock + stageInstruction + conhecimentoContext + treinoContext;
 
   if (await isOverQuota(config.teamId)) {
     await adapter.sendText(contactNumber, "Serviço de IA temporariamente indisponível. Por favor, aguarde ou entre em contato com nossa equipe.");

@@ -364,6 +364,26 @@ export const TRANSFERIR_FOTO_TOOLS = [
   },
 ];
 
+// Só exposta quando AgentConfig.transferenciaCondicoes tem alguma condição cadastrada (ver
+// whatsapp-inbound.ts) — a lista em si entra no system prompt, o gestor define o texto livre
+export const TRANSFERIR_CONDICAO_TOOLS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "transferir_atendente_condicao",
+      description: "Transfere a conversa pra um atendente humano quando a situação atual bate com uma das condições de transferência automática definidas pelo gestor (ver lista no system prompt). Use assim que perceber que uma condição se aplica.",
+      parameters: {
+        type: "object",
+        properties: {
+          condicao: { type: "string", description: "Qual das condições cadastradas se aplicou, com o texto exato dela" },
+          motivo: { type: "string", description: "Resumo em uma frase da situação — o atendente lê isso" },
+        },
+        required: ["condicao"],
+      },
+    },
+  },
+];
+
 // Pré-vendas de veículos (SDR): fluxo em etapas — identificar o veículo, qualificar
 // (pagamento/troca/urgência), coletar documentos de financiamento se for o caso, e
 // transferir pro vendedor. Cada etapa é uma ferramenta própria, que grava uma nota na

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Users } from "lucide-react";
+import { Users, Plus, X } from "lucide-react";
 
 const MODES = [
   { value: "MANUAL", label: "Manual", description: "Ninguém é atribuído automaticamente — o gestor ou o próprio atendente escolhem quem fica com cada conversa." },
@@ -24,9 +24,11 @@ function toggleInArray(arr: string[], value: string): string[] {
 
 type Attendant = { id: string; name: string; isManager: boolean };
 
+const MAX_CONDICOES = 10;
+
 export function DistribuicaoClient({
   agentId, initialMode, initialIaIgnoraAtribuidos, initialTransferirAoPedirFoto,
-  initialIaLeadAttendantId, initialIaNiveisCarteiraExcluidos,
+  initialIaLeadAttendantId, initialIaNiveisCarteiraExcluidos, initialTransferenciaCondicoes,
 }: {
   agentId: string;
   initialMode: string;
@@ -34,15 +36,33 @@ export function DistribuicaoClient({
   initialTransferirAoPedirFoto: boolean;
   initialIaLeadAttendantId: string | null;
   initialIaNiveisCarteiraExcluidos: string[];
+  initialTransferenciaCondicoes: string[];
 }) {
   const [mode, setMode] = useState(initialMode);
   const [iaIgnoraAtribuidos, setIaIgnoraAtribuidos] = useState(initialIaIgnoraAtribuidos);
   const [transferirAoPedirFoto, setTransferirAoPedirFoto] = useState(initialTransferirAoPedirFoto);
   const [iaLeadAttendantId, setIaLeadAttendantId] = useState(initialIaLeadAttendantId ?? "");
   const [iaNiveisCarteiraExcluidos, setIaNiveisCarteiraExcluidos] = useState<string[]>(initialIaNiveisCarteiraExcluidos);
+  const [transferenciaCondicoes, setTransferenciaCondicoes] = useState<string[]>(initialTransferenciaCondicoes);
+  const [novaCondicao, setNovaCondicao] = useState("");
   const [attendants, setAttendants] = useState<Attendant[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  function adicionarCondicao() {
+    const texto = novaCondicao.trim();
+    if (!texto || transferenciaCondicoes.length >= MAX_CONDICOES) return;
+    const next = [...transferenciaCondicoes, texto];
+    setTransferenciaCondicoes(next);
+    setNovaCondicao("");
+    save({ transferenciaCondicoes: next });
+  }
+
+  function removerCondicao(i: number) {
+    const next = transferenciaCondicoes.filter((_, idx) => idx !== i);
+    setTransferenciaCondicoes(next);
+    save({ transferenciaCondicoes: next });
+  }
 
   useEffect(() => {
     fetch(`/api/agentes/${agentId}/atendentes`)
@@ -117,6 +137,44 @@ export function DistribuicaoClient({
             <span className="text-sm">Transferir direto pra um atendente quando o cliente pedir foto/imagem</span>
           </label>
           <p className="text-xs text-gray-500 mt-1 ml-6">A IA não consegue enviar mídia — em vez de tentar contornar, ela já passa a conversa pra um humano assim que perceber o pedido.</p>
+        </div>
+
+        <div>
+          <p className="text-sm font-medium">Transferir automaticamente para atendente quando...</p>
+          <p className="text-xs text-gray-500 mt-0.5 mb-2">
+            Descreva situações em texto livre (ex: "cliente pedir desconto acima de 20%", "cliente reclamar do produto") — a IA avalia a conversa e transfere pra um humano assim que alguma delas acontecer.
+          </p>
+          {transferenciaCondicoes.length > 0 && (
+            <ul className="space-y-1.5 mb-2">
+              {transferenciaCondicoes.map((c, i) => (
+                <li key={i} className="flex items-center gap-2 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm">
+                  <span className="flex-1">{c}</span>
+                  <button onClick={() => removerCondicao(i)} title="Remover" className="text-gray-500 hover:text-red-400 flex-shrink-0">
+                    <X size={14} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {transferenciaCondicoes.length < MAX_CONDICOES && (
+            <div className="flex gap-2">
+              <input
+                value={novaCondicao}
+                onChange={e => setNovaCondicao(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); adicionarCondicao(); } }}
+                placeholder="Ex: cliente pedir para falar com um humano"
+                maxLength={200}
+                className="flex-1 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+              />
+              <button
+                onClick={adicionarCondicao}
+                disabled={!novaCondicao.trim()}
+                className="flex items-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl px-3 py-2 flex-shrink-0"
+              >
+                <Plus size={14} /> Adicionar
+              </button>
+            </div>
+          )}
         </div>
 
         <div>

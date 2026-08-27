@@ -132,6 +132,7 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
             transferirAoPedirFoto: config.transferirAoPedirFoto,
             iaLeadAttendantId: config.iaLeadAttendantId,
             iaNiveisCarteiraExcluidos: config.iaNiveisCarteiraExcluidos as unknown as string[],
+            transferenciaCondicoes: config.transferenciaCondicoes,
           }}
           phoneConfig={{
             phoneEnabled: config.phoneEnabled,
