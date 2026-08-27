@@ -3,14 +3,16 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X, Check, Copy, ExternalLink, Loader2, CheckCircle2 } from "lucide-react";
-import { CRM_PLAN_TIERS, type CrmPlanTier } from "@/lib/crm-plans";
+import { CRM_PLAN_TIERS, BILLING_CYCLES, getSavingsCentavos, type CrmPlanTier, type BillingCycle } from "@/lib/crm-plans";
 
 const brl = (centavos: number) => (centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 // Modal "Ver planos" — grade de planos (estilo da referência que o usuário passou) + etapa
 // de pagamento reaproveitando o mesmo fluxo Asaas Pix/Cartão de app/(app)/creditos/CreditosClient.tsx.
+// Cobrança é sempre à vista pelo ciclo escolhido (sem parcelamento, sem renovação automática).
 export function PlanosModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
+  const [cycle, setCycle] = useState<BillingCycle>("MENSAL");
   const [tierSelecionado, setTierSelecionado] = useState<CrmPlanTier | null>(null);
   const [formaPagamento, setFormaPagamento] = useState<"PIX" | "CARTAO">("PIX");
   const [cpfCnpj, setCpfCnpj] = useState("");
@@ -48,7 +50,7 @@ export function PlanosModal({ onClose }: { onClose: () => void }) {
       const res = await fetch("/api/planos/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tierId: tierSelecionado.id, formaPagamento, cpfCnpj: digits }),
+        body: JSON.stringify({ tierId: tierSelecionado.id, cycle, formaPagamento, cpfCnpj: digits }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Erro ao gerar a cobrança.");
@@ -99,50 +101,79 @@ export function PlanosModal({ onClose }: { onClose: () => void }) {
           <>
             <div className="flex justify-center mb-6">
               <div className="inline-flex bg-gray-100 rounded-xl p-1 text-sm font-medium">
-                <span title="Em breve" className="px-4 py-1.5 rounded-lg text-gray-400 cursor-not-allowed">Anual</span>
-                <span title="Em breve" className="px-4 py-1.5 rounded-lg text-gray-400 cursor-not-allowed">Semestral</span>
-                <span className="px-4 py-1.5 rounded-lg bg-blue-600 text-white">Mensal</span>
+                {BILLING_CYCLES.map(c => (
+                  <button
+                    key={c.id}
+                    onClick={() => setCycle(c.id)}
+                    className={`px-4 py-1.5 rounded-lg transition-colors ${cycle === c.id ? "bg-blue-600 text-white" : "text-gray-500 hover:text-gray-800"}`}
+                  >
+                    {c.label}
+                  </button>
+                ))}
               </div>
             </div>
 
             <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
-              {CRM_PLAN_TIERS.map(tier => (
-                <div
-                  key={tier.id}
-                  className={`relative flex flex-col rounded-2xl border p-5 ${tier.destaque ? "border-blue-500 shadow-md" : "border-gray-200"}`}
-                >
-                  {tier.destaque && (
-                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[11px] font-semibold px-3 py-1 rounded-full">
-                      Recomendado
-                    </span>
-                  )}
-                  <p className="font-bold text-lg text-blue-700">{tier.label}</p>
-                  <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">{tier.description}</p>
+              {CRM_PLAN_TIERS.map(tier => {
+                const preco = tier.pricing[cycle];
+                const savings = getSavingsCentavos(tier, cycle);
+                const cicloInfo = BILLING_CYCLES.find(c => c.id === cycle)!;
+                return (
+                  <div
+                    key={tier.id}
+                    className={`relative flex flex-col rounded-2xl border p-5 ${tier.destaque ? "border-blue-500 shadow-md" : "border-gray-200"}`}
+                  >
+                    {tier.destaque && (
+                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[11px] font-semibold px-3 py-1 rounded-full">
+                        Recomendado
+                      </span>
+                    )}
+                    <p className="font-bold text-lg text-blue-700">{tier.label}</p>
+                    <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">{tier.description}</p>
 
-                  <ul className="mt-4 space-y-2 flex-1">
-                    {tier.features.map(f => (
-                      <li key={f} className="flex items-start gap-2 text-xs text-gray-700">
-                        <Check size={14} className="text-blue-600 flex-shrink-0 mt-0.5" />
-                        <span>{f}</span>
-                      </li>
-                    ))}
-                  </ul>
+                    <ul className="mt-4 space-y-2 flex-1">
+                      {tier.features.map(f => (
+                        <li key={f} className="flex items-start gap-2 text-xs text-gray-700">
+                          <Check size={14} className="text-blue-600 flex-shrink-0 mt-0.5" />
+                          <span>{f}</span>
+                        </li>
+                      ))}
+                    </ul>
 
-                  <div className="mt-5">
-                    <p className="text-2xl font-bold">
-                      {brl(tier.valorCentavos)}<span className="text-sm font-normal text-gray-400">/mês</span>
-                    </p>
-                    <button
-                      onClick={() => abrirPagamento(tier)}
-                      className={`mt-3 w-full rounded-xl py-2.5 text-sm font-semibold text-white transition-colors ${
-                        tier.destaque ? "bg-blue-600 hover:bg-blue-500" : "bg-gray-900 hover:bg-gray-800"
-                      }`}
-                    >
-                      Atualizar plano
-                    </button>
+                    <div className="mt-5">
+                      {savings > 0 && (
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs text-gray-400 line-through">{brl(tier.pricing.MENSAL.valorMensalCentavos)}</span>
+                          <span className="text-[11px] font-medium text-green-700 bg-green-50 rounded-full px-2 py-0.5">
+                            Economize {brl(savings)}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex items-baseline gap-2">
+                        <p className="text-2xl font-bold">
+                          {brl(preco.valorMensalCentavos)}<span className="text-sm font-normal text-gray-400">/mês</span>
+                        </p>
+                        {cycle !== "MENSAL" && (
+                          <span className="text-[11px] font-medium text-gray-500 bg-gray-100 rounded-full px-2 py-0.5">{cicloInfo.label}</span>
+                        )}
+                      </div>
+                      {cycle !== "MENSAL" && (
+                        <p className="text-[11px] text-gray-400 mt-1 leading-snug">
+                          Valor total de {brl(preco.totalCentavos)}, cobrado à vista a cada {cicloInfo.meses} meses.
+                        </p>
+                      )}
+                      <button
+                        onClick={() => abrirPagamento(tier)}
+                        className={`mt-3 w-full rounded-xl py-2.5 text-sm font-semibold text-white transition-colors ${
+                          tier.destaque ? "bg-blue-600 hover:bg-blue-500" : "bg-gray-900 hover:bg-gray-800"
+                        }`}
+                      >
+                        Atualizar plano
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </>
         ) : (
@@ -152,8 +183,10 @@ export function PlanosModal({ onClose }: { onClose: () => void }) {
             </button>
             <div className="border border-gray-200 rounded-2xl p-5 space-y-4">
               <div>
-                <p className="font-semibold">Plano {tierSelecionado.label}</p>
-                <p className="text-sm text-gray-500">{brl(tierSelecionado.valorCentavos)}/mês</p>
+                <p className="font-semibold">Plano {tierSelecionado.label} — {BILLING_CYCLES.find(c => c.id === cycle)!.label}</p>
+                <p className="text-sm text-gray-500">
+                  {brl(tierSelecionado.pricing[cycle].totalCentavos)} {cycle !== "MENSAL" ? "à vista" : "/mês"}
+                </p>
               </div>
 
               {pago ? (

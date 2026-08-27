@@ -5,8 +5,11 @@ import { createAsaasCustomer, createAsaasCharge, getAsaasPixQrCode } from "@/lib
 import { getCrmPlanTier } from "@/lib/crm-plans";
 import { z } from "zod";
 
+const CICLO_LABEL: Record<string, string> = { MENSAL: "mensal", SEMESTRAL: "semestral", ANUAL: "anual" };
+
 const schema = z.object({
   tierId: z.string().min(1),
+  cycle: z.enum(["MENSAL", "SEMESTRAL", "ANUAL"]),
   formaPagamento: z.enum(["PIX", "CARTAO"]),
   cpfCnpj: z.string().min(11).max(18),
 });
@@ -45,11 +48,12 @@ export async function POST(req: NextRequest) {
       await prisma.team.update({ where: { id: team.id }, data: { asaasCustomerId } });
     }
 
-    const valor = tier.valorCentavos / 100;
+    const totalCentavos = tier.pricing[body.data.cycle].totalCentavos;
+    const valor = totalCentavos / 100;
     const billingType = body.data.formaPagamento === "PIX" ? "PIX" : "CREDIT_CARD";
     const payment = await createAsaasCharge(
       apiKey, sandbox, asaasCustomerId, valor,
-      `Plano ${tier.label} — FluxVenda CRM (mensal)`,
+      `Plano ${tier.label} — FluxVenda CRM (${CICLO_LABEL[body.data.cycle]})`,
       billingType
     );
 
@@ -63,7 +67,8 @@ export async function POST(req: NextRequest) {
       data: {
         teamId: team.id,
         tier: tier.id,
-        valorCentavos: tier.valorCentavos,
+        cycle: body.data.cycle,
+        valorCentavos: totalCentavos,
         formaPagamento: body.data.formaPagamento,
         cpfCnpj,
         asaasPaymentId: payment.id,

@@ -1775,7 +1775,8 @@ model PlanPurchase {
   team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
   tier           String // STARTER | ESSENTIAL | PRO | BUSINESS — ver lib/crm-plans.ts
-  valorCentavos  Int
+  cycle          String @default("MENSAL") // MENSAL | SEMESTRAL | ANUAL
+  valorCentavos  Int    // total cobrado (à vista) — cobre o ciclo inteiro, não só um mês
   status         String @default("PENDENTE") // PENDENTE | PAGO
   formaPagamento String // PIX | CARTAO
   cpfCnpj        String @default("")
