@@ -24,6 +24,14 @@ export async function POST(req: NextRequest) {
         prisma.team.update({ where: { id: compra.teamId }, data: { aiCreditsBalance: { increment: compra.tokens } } }),
       ]);
     }
+
+    const planCompra = await prisma.planPurchase.findUnique({ where: { asaasPaymentId: paymentId } });
+    if (planCompra && planCompra.status !== "PAGO") {
+      await prisma.$transaction([
+        prisma.planPurchase.update({ where: { id: planCompra.id }, data: { status: "PAGO" } }),
+        prisma.team.update({ where: { id: planCompra.teamId }, data: { crmPlanTier: planCompra.tier } }),
+      ]);
+    }
   }
 
   return NextResponse.json({ ok: true });

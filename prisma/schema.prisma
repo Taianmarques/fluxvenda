@@ -547,6 +547,11 @@ model Team {
   creditoCompras    CreditoCompra[]
   tokenUsageLogs    TokenUsageLog[]
   demoBookings      DemoBooking[]
+  planPurchases     PlanPurchase[]
+
+  // Plano do CRM comprado via aba Recursos > Ver planos (lib/crm-plans.ts) — null = ainda
+  // não comprou nenhum (trial/sem plano definido). Cobrança avulsa, sem renovação automática.
+  crmPlanTier String?
 }
 
 model TeamMember {
@@ -1755,6 +1760,29 @@ model CreditoCompra {
   asaasPaymentId  String? @unique
   asaasInvoiceUrl String? // link hospedado do Asaas (usado no pagamento por cartão)
   asaasPixPayload String? // código Pix copia-e-cola
+
+  @@index([teamId, createdAt])
+}
+
+// Compra de plano do CRM (aba Recursos > Ver planos) — mesma cobrança avulsa via Asaas
+// Pix/Cartão da conta da plataforma que CreditoCompra já usa, só que atualiza
+// Team.crmPlanTier em vez de somar créditos (ver app/api/webhooks/asaas-plataforma).
+model PlanPurchase {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  teamId String
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  tier           String // STARTER | ESSENTIAL | PRO | BUSINESS — ver lib/crm-plans.ts
+  valorCentavos  Int
+  status         String @default("PENDENTE") // PENDENTE | PAGO
+  formaPagamento String // PIX | CARTAO
+  cpfCnpj        String @default("")
+
+  asaasPaymentId  String? @unique
+  asaasInvoiceUrl String?
+  asaasPixPayload String?
 
   @@index([teamId, createdAt])
 }
