@@ -68,6 +68,11 @@ type Attachment = {
 
 const MAX_ATTACHMENT_MB = 15;
 
+// Pra popular o seletor de etapa da ação em lote "Mover pra etapa" — mesmo shape de
+// GET /api/agentes/[agentId]/pipelines
+type PipelineStageLite = { id: string; name: string };
+type Pipeline = { id: string; name: string; stages: PipelineStageLite[] };
+
 function detectMediaKind(mime: string): MediaKind {
   if (mime.startsWith("image/")) return "image";
   if (mime.startsWith("video/")) return "video";
@@ -345,6 +350,17 @@ export function WhatsappInbox({
   const [theme, setTheme] = useState<ChatTheme>("dark");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ativos" | "pendentes" | "finalizados" | "grupos">("ativos");
+  // Seleção múltipla + ações em lote — só faz sentido nas abas Ativos/Pendentes
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
+  const [showMoverEtapa, setShowMoverEtapa] = useState(false);
+  const [pipelinesLote, setPipelinesLote] = useState<Pipeline[]>([]);
+  const [pipelineLoteId, setPipelineLoteId] = useState("");
+  const [stageLoteId, setStageLoteId] = useState("");
+  const [showEncerrarLote, setShowEncerrarLote] = useState(false);
+  const [motivoLote, setMotivoLote] = useState("");
+  const [motivoLoteObs, setMotivoLoteObs] = useState("");
+  const [executandoLote, setExecutandoLote] = useState(false);
+  const [resumoLote, setResumoLote] = useState("");
   const [conversations, setConversations] = useState(initialConversations);
   const [leadStatuses, setLeadStatuses] = useState(initialLeadStatuses);
   const [attendants, setAttendants] = useState<Attendant[]>([]);
@@ -357,6 +373,8 @@ export function WhatsappInbox({
     document.documentElement.dataset.mobileChat = mobileChatOpen ? "1" : "0";
     return () => { delete document.documentElement.dataset.mobileChat; };
   }, [mobileChatOpen]);
+  // Troca de aba limpa a seleção em lote — evita aplicar ação numa seleção feita noutra aba
+  useEffect(() => { setSelecionados(new Set()); }, [statusFilter]);
   const [detail, setDetail] = useState<ConversationDetail | null>(null);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -1059,6 +1077,60 @@ export function WhatsappInbox({
     await refreshList();
   }
 
+  // Ações em lote (Ativos/Pendentes) — aceitar, mover de etapa ou encerrar várias conversas
+  // selecionadas de uma vez, ver app/api/agentes/[agentId]/conversas/bulk/route.ts
+  async function executarLote(payload: Record<string, unknown>) {
+    setExecutandoLote(true);
+    setResumoLote("");
+    try {
+      const res = await fetch(`/api/agentes/${agentId}/conversas/bulk`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationIds: Array.from(selecionados), ...payload }),
+      });
+      const data = await res.json().catch(() => ({} as { aplicadas?: number; puladas?: number; error?: string }));
+      if (!res.ok) { setResumoLote(data.error ?? "Não foi possível aplicar a ação."); return; }
+      const puladas = data.puladas ?? 0;
+      setResumoLote(`${data.aplicadas ?? 0} aplicada${(data.aplicadas ?? 0) === 1 ? "" : "s"}${puladas > 0 ? `, ${puladas} pulada${puladas === 1 ? "" : "s"}` : ""}`);
+      setSelecionados(new Set());
+      await refreshList();
+    } finally {
+      setExecutandoLote(false);
+    }
+  }
+
+  async function handleAceitarLote() {
+    await executarLote({ acao: "aceitar" });
+  }
+
+  async function abrirMoverEtapaLote() {
+    setShowMoverEtapa(true);
+    setPipelineLoteId("");
+    setStageLoteId("");
+    if (pipelinesLote.length === 0) {
+      try {
+        const res = await fetch(`/api/agentes/${agentId}/pipelines`);
+        const data = await res.json();
+        if (data.pipelines) setPipelinesLote(data.pipelines);
+      } catch {}
+    }
+  }
+
+  async function confirmarMoverEtapaLote() {
+    if (!stageLoteId) return;
+    await executarLote({ acao: "mover_etapa", stageId: stageLoteId });
+    setShowMoverEtapa(false);
+  }
+
+  async function confirmarEncerrarLote() {
+    if (!motivoLote) return;
+    const motivo = motivoLote === "Outro" && motivoLoteObs.trim()
+      ? `Outro: ${motivoLoteObs.trim()}`
+      : motivoLoteObs.trim() ? `${motivoLote} — ${motivoLoteObs.trim()}` : motivoLote;
+    await executarLote({ acao: "encerrar", motivo });
+    setShowEncerrarLote(false);
+  }
+
   async function handleToggleSignature() {
     if (!isManager || signatureSaving) return;
     const next = !signatureEnabled;
@@ -1112,6 +1184,20 @@ export function WhatsappInbox({
           || (c.lastMessage ?? "").toLowerCase().includes(q);
       })
     : extraFiltered;
+
+  const showSelecaoLote = statusFilter === "ativos" || statusFilter === "pendentes";
+  const todosSelecionadosLote = filteredConversations.length > 0 && filteredConversations.every(c => selecionados.has(c.id));
+  function toggleTodosLote() {
+    setSelecionados(todosSelecionadosLote ? new Set() : new Set(filteredConversations.map(c => c.id)));
+  }
+  function toggleSelecionado(id: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    setSelecionados(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
 
   return (
     <div className={`h-full flex flex-col ${t.root}`}>
@@ -1199,6 +1285,57 @@ export function WhatsappInbox({
                 </button>
               </div>
             </div>
+
+            {showSelecaoLote && filteredConversations.length > 0 && (
+              <div className={`px-3 py-1.5 border-b ${t.sidebar} flex-shrink-0`}>
+                <label className="flex items-center gap-2 text-xs cursor-pointer">
+                  <input type="checkbox" checked={todosSelecionadosLote} onChange={toggleTodosLote} className="w-3.5 h-3.5" />
+                  <span className={t.listSecondary}>
+                    {selecionados.size > 0 ? `${selecionados.size} selecionada${selecionados.size === 1 ? "" : "s"}` : "Selecionar todas"}
+                  </span>
+                </label>
+              </div>
+            )}
+
+            {selecionados.size > 0 && (
+              <div className={`@container px-2.5 py-2 border-b ${t.sidebar} flex-shrink-0 space-y-1`}>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={handleAceitarLote}
+                    disabled={executandoLote}
+                    title="Aceitar atendimento"
+                    className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg disabled:opacity-50 ${t.toggleBar} ${t.toggleInactive}`}
+                  >
+                    <UserCheck size={14} /> <span className="hidden @[420px]:inline">Aceitar</span>
+                  </button>
+                  <button
+                    onClick={abrirMoverEtapaLote}
+                    disabled={executandoLote}
+                    title="Mover pra etapa do pipeline"
+                    className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg disabled:opacity-50 ${t.toggleBar} ${t.toggleInactive}`}
+                  >
+                    <ArrowRightLeft size={14} /> <span className="hidden @[420px]:inline">Mover etapa</span>
+                  </button>
+                  <button
+                    onClick={() => { setShowEncerrarLote(true); setMotivoLote(""); setMotivoLoteObs(""); }}
+                    disabled={executandoLote}
+                    title="Encerrar com motivo"
+                    className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg disabled:opacity-50 ${t.toggleBar} ${t.toggleInactive}`}
+                  >
+                    <Lock size={14} /> <span className="hidden @[420px]:inline">Encerrar</span>
+                  </button>
+                  <button
+                    onClick={() => setSelecionados(new Set())}
+                    title="Limpar seleção"
+                    className={`ml-auto p-1.5 rounded-lg flex-shrink-0 ${t.toggleBar} ${t.toggleInactive}`}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                {resumoLote && <p className={`text-[10px] ${t.listSecondary}`}>{resumoLote}</p>}
+              </div>
+            )}
+
             <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1.5">
               {filteredConversations.length === 0 ? (
                 <p className={`text-sm p-4 ${t.listSecondary}`}>{search ? "Nenhuma conversa encontrada." : "Nenhuma conversa nessa aba."}</p>
@@ -1218,6 +1355,15 @@ export function WhatsappInbox({
                     className={`w-full text-left px-3.5 py-3 rounded-xl border transition-colors cursor-pointer flex items-start gap-2.5 ${selectedId === c.id ? t.cardBgSelected : t.cardBg} ${statusColor ? "border-l-4" : ""}`}
                     style={statusColor ? { borderLeftColor: statusColor } : undefined}
                   >
+                    {showSelecaoLote && (
+                      <input
+                        type="checkbox"
+                        checked={selecionados.has(c.id)}
+                        onClick={e => toggleSelecionado(c.id, e)}
+                        onChange={() => {}}
+                        className="w-4 h-4 flex-shrink-0 mt-1.5"
+                      />
+                    )}
                     <div className="relative flex-shrink-0 mt-0.5">
                       {c.isGroup ? (
                         <div className="w-9 h-9 rounded-full bg-gray-700 flex items-center justify-center">
@@ -1921,6 +2067,102 @@ export function WhatsappInbox({
                 className="text-sm font-medium bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white rounded-xl px-4 py-2"
               >
                 {encerrando ? "Encerrando..." : "Encerrar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de mover etapa em lote */}
+      {showMoverEtapa && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className={`w-full max-w-sm rounded-2xl border p-5 space-y-4 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}>
+            <div className="flex items-center justify-between">
+              <p className="font-semibold">Mover {selecionados.size} conversa{selecionados.size === 1 ? "" : "s"} pra etapa</p>
+              <button onClick={() => setShowMoverEtapa(false)} className="text-gray-500 hover:text-gray-300"><X size={16} /></button>
+            </div>
+            <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+              Conversa sem oportunidade aberta ganha uma nova já nessa etapa. Conversa com mais de uma oportunidade aberta é pulada.
+            </p>
+            <select
+              value={pipelineLoteId}
+              onChange={e => { setPipelineLoteId(e.target.value); setStageLoteId(""); }}
+              className={`w-full rounded-xl border px-3 py-2 text-sm focus:outline-none ${theme === "dark" ? "bg-gray-950 border-gray-800" : "bg-gray-50 border-gray-200"}`}
+            >
+              <option value="">Escolha o pipeline...</option>
+              {pipelinesLote.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+            <select
+              value={stageLoteId}
+              onChange={e => setStageLoteId(e.target.value)}
+              disabled={!pipelineLoteId}
+              className={`w-full rounded-xl border px-3 py-2 text-sm focus:outline-none disabled:opacity-50 ${theme === "dark" ? "bg-gray-950 border-gray-800" : "bg-gray-50 border-gray-200"}`}
+            >
+              <option value="">Escolha a etapa...</option>
+              {pipelinesLote.find(p => p.id === pipelineLoteId)?.stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowMoverEtapa(false)} className="text-sm text-gray-400 hover:text-gray-200 px-3 py-2">Cancelar</button>
+              <button
+                onClick={confirmarMoverEtapaLote}
+                disabled={!stageLoteId || executandoLote}
+                className="text-sm font-medium bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl px-4 py-2"
+              >
+                {executandoLote ? "Movendo..." : "Mover"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de encerramento em lote (mesma lista de motivos do encerramento individual) */}
+      {showEncerrarLote && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className={`w-full max-w-sm rounded-2xl border p-5 space-y-4 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}>
+            <div className="flex items-center justify-between">
+              <p className="font-semibold">Encerrar {selecionados.size} conversa{selecionados.size === 1 ? "" : "s"}</p>
+              <button onClick={() => setShowEncerrarLote(false)} className="text-gray-500 hover:text-gray-300"><X size={16} /></button>
+            </div>
+            <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+              Qual o motivo do encerramento? Isso alimenta o relatório em Vendas.
+            </p>
+            <div className="space-y-1.5">
+              {["Venda concluída", "Dúvida resolvida", "Sem interesse", "Sem resposta", "Preço", "Comprou de concorrente", "Spam / engano", "Outro"].map(m => (
+                <label
+                  key={m}
+                  className={`flex items-center gap-2 rounded-xl border px-3 py-2 cursor-pointer text-sm transition-colors ${
+                    motivoLote === m
+                      ? "border-blue-500 bg-blue-500/10"
+                      : theme === "dark" ? "border-gray-800 hover:border-gray-600" : "border-gray-200 hover:border-gray-400"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="motivo-encerramento-lote"
+                    checked={motivoLote === m}
+                    onChange={() => setMotivoLote(m)}
+                    className="w-3.5 h-3.5"
+                  />
+                  {m}
+                </label>
+              ))}
+            </div>
+            <textarea
+              value={motivoLoteObs}
+              onChange={e => setMotivoLoteObs(e.target.value)}
+              rows={2}
+              maxLength={150}
+              placeholder={motivoLote === "Outro" ? "Descreva o motivo..." : "Observação (opcional)"}
+              className={`w-full rounded-xl border px-3 py-2 text-sm resize-none focus:outline-none ${theme === "dark" ? "bg-gray-950 border-gray-800" : "bg-gray-50 border-gray-200"}`}
+            />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowEncerrarLote(false)} className="text-sm text-gray-400 hover:text-gray-200 px-3 py-2">Cancelar</button>
+              <button
+                onClick={confirmarEncerrarLote}
+                disabled={!motivoLote || (motivoLote === "Outro" && !motivoLoteObs.trim()) || executandoLote}
+                className="text-sm font-medium bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white rounded-xl px-4 py-2"
+              >
+                {executandoLote ? "Encerrando..." : "Encerrar"}
               </button>
             </div>
           </div>
