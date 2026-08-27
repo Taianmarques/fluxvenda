@@ -1016,7 +1016,7 @@ export function WhatsappInbox({
     setReplyingTo(null);
     setSending(true);
     try {
-      await fetch(`/api/ferramentas/whatsapp/conversas/${selectedId}/mensagem`, {
+      const res = await fetch(`/api/ferramentas/whatsapp/conversas/${selectedId}/mensagem`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1025,6 +1025,16 @@ export function WhatsappInbox({
           ...(replyTo && { replyToMessageId: replyTo.id }),
         }),
       });
+      if (!res.ok) {
+        // Falha real (WhatsApp/UazAPI fora do ar, número inválido etc) — devolve o que foi
+        // digitado/anexado em vez de deixar sumir silenciosamente sem o atendente perceber.
+        const data = await res.json().catch(() => ({}));
+        setInput(content);
+        setAttachment(media);
+        setReplyingTo(replyTo);
+        alert(data.error ?? "Não foi possível enviar a mensagem. Tente novamente.");
+        return;
+      }
       await refreshDetail(selectedId);
       await refreshList();
     } finally {
