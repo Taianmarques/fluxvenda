@@ -2,11 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
-  type DragEndEvent, type DragStartEvent,
+  DndContext, DragOverlay, PointerSensor, useSensor, useSensors, rectIntersection,
+  type DragEndEvent, type DragStartEvent, type CollisionDetection,
 } from "@dnd-kit/core";
 import { useDroppable, useDraggable } from "@dnd-kit/core";
-import { ThumbsUp, ThumbsDown, MessageCircle, Bot, X, ListChecks, MoreVertical, ArrowRightLeft, Shuffle, Pencil, Trash2, Clock } from "lucide-react";
+import { SortableContext, useSortable, arrayMove, horizontalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { ThumbsUp, ThumbsDown, MessageCircle, Bot, X, ListChecks, MoreVertical, ArrowRightLeft, Shuffle, GripVertical, Pencil, Trash2, Clock } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { ConversationPopup } from "./ConversationPopup";
 import { PipelineTaskPanel } from "./PipelineTaskPanel";
@@ -374,6 +376,12 @@ function Column({
   t: typeof PIPELINE_THEMES.dark;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id });
+  // Reordenar colunas: "Sem etapa" é uma pseudo-coluna (não existe no banco), nunca arrastável
+  const isRealStage = stage.id !== "__sem_etapa__";
+  const {
+    attributes: sortableAttrs, listeners: sortableListeners, setNodeRef: setSortableRef,
+    transform, transition, isDragging: isColDragging,
+  } = useSortable({ id: `col:${stage.id}`, disabled: !isRealStage });
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(stage.name);
 
@@ -417,13 +425,24 @@ function Column({
 
   return (
     <div
-      ref={setNodeRef}
-      className={`w-72 flex-shrink-0 flex flex-col rounded-2xl border overflow-hidden ${isOver ? "border-blue-500" : t.column}`}
+      ref={node => { setNodeRef(node); setSortableRef(node); }}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={`w-72 flex-shrink-0 flex flex-col rounded-2xl border overflow-hidden ${isColDragging ? "opacity-30" : ""} ${isOver ? "border-blue-500" : t.column}`}
     >
       <div className="h-[3px] flex-shrink-0" style={{ backgroundColor: stage.color }} />
       <div className={`group p-3 border-b ${t.columnHeaderBorder}`}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
+            {isRealStage && (
+              <button
+                {...sortableAttrs}
+                {...sortableListeners}
+                title="Arrastar pra reordenar"
+                className="flex-shrink-0 cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-300 touch-none"
+              >
+                <GripVertical size={14} />
+              </button>
+            )}
             {editing ? (
               <input
                 autoFocus
@@ -564,24 +583,58 @@ export function WhatsappPipeline({
   const [chatConversationId, setChatConversationId] = useState<string | null>(null);
   const [newStageName, setNewStageName] = useState("");
   const [localOpportunities, setLocalOpportunities] = useState(opportunities);
+  const [localStages, setLocalStages] = useState(stages);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const t = PIPELINE_THEMES[theme];
 
   // sincroniza quando o pai atualiza (polling)
   useEffect(() => setLocalOpportunities(opportunities), [opportunities]);
+  useEffect(() => setLocalStages(stages), [stages]);
 
-  const semEtapa = localOpportunities.filter(o => !o.stageId || !stages.some(s => s.id === o.stageId));
+  const semEtapa = localOpportunities.filter(o => !o.stageId || !localStages.some(s => s.id === o.stageId));
+
+  // O mesmo DndContext cobre dois tipos de arrastar (card pra etapa, e coluna pra reordenar) —
+  // ids de coluna vêm prefixados com "col:" só pra não colidir com o id da oportunidade. Sem
+  // esse filtro de namespace, um card e uma coluna ocupando a mesma área (mesmo <div>) fariam
+  // o dnd-kit escolher "over" ambíguo entre os dois tipos de zona.
+  const collisionDetectionStrategy: CollisionDetection = args => {
+    const activeIsColumn = String(args.active.id).startsWith("col:");
+    const filtered = args.droppableContainers.filter(c => String(c.id).startsWith("col:") === activeIsColumn);
+    return rectIntersection({ ...args, droppableContainers: filtered });
+  };
 
   function handleDragStart(e: DragStartEvent) {
     setActiveId(String(e.active.id));
   }
 
+  async function handleReorderStages(fromStageId: string, toStageId: string) {
+    const oldIndex = localStages.findIndex(s => s.id === fromStageId);
+    const newIndex = localStages.findIndex(s => s.id === toStageId);
+    if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
+    const reordered = arrayMove(localStages, oldIndex, newIndex);
+    setLocalStages(reordered);
+    await Promise.all(reordered.map((s, i) => fetch(`/api/ferramentas/whatsapp/etapas/${s.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order: i }),
+    })));
+    onStagesChange();
+  }
+
   async function handleDragEnd(e: DragEndEvent) {
     setActiveId(null);
-    const oppId = String(e.active.id);
-    const stageId = e.over ? String(e.over.id) : null;
-    if (!stageId) return;
+    const activeIdStr = String(e.active.id);
+    const overIdStr = e.over ? String(e.over.id) : null;
+    if (!overIdStr) return;
 
+    if (activeIdStr.startsWith("col:")) {
+      if (!overIdStr.startsWith("col:")) return;
+      handleReorderStages(activeIdStr.slice(4), overIdStr.slice(4));
+      return;
+    }
+
+    const oppId = activeIdStr;
+    const stageId = overIdStr;
     const opp = localOpportunities.find(o => o.id === oppId);
     if (!opp || opp.stageId === stageId) return;
 
@@ -701,11 +754,12 @@ export function WhatsappPipeline({
     onStagesChange();
   }
 
-  const activeOpp = activeId ? localOpportunities.find(o => o.id === activeId) : null;
+  const activeOpp = activeId && !activeId.startsWith("col:") ? localOpportunities.find(o => o.id === activeId) : null;
+  const activeCol = activeId?.startsWith("col:") ? localStages.find(s => s.id === activeId.slice(4)) : null;
 
   return (
     <>
-    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+    <DndContext sensors={sensors} collisionDetection={collisionDetectionStrategy} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="flex-1 overflow-x-auto overflow-y-hidden p-4">
         <div className="flex gap-3 h-full">
           {semEtapa.length > 0 && (
@@ -734,33 +788,35 @@ export function WhatsappPipeline({
               t={t}
             />
           )}
-          {stages.map(stage => (
-            <Column
-              key={stage.id}
-              agentId={agentId}
-              stage={stage}
-              opportunities={localOpportunities.filter(o => o.stageId === stage.id)}
-              attendants={attendants}
-              outrosPipelines={outrosPipelines}
-              onClickCard={onSelectConversation}
-              onRename={handleRename}
-              onDelete={handleDelete}
-              onStagesChange={onStagesChange}
-              onValueChange={handleValueChange}
-              onLeadStatusChange={handleLeadStatusChange}
-              onMarcarGanho={handleMarcarGanho}
-              onMarcarPerda={handleMarcarPerda}
-              onTransfer={handleTransfer}
-              onMoverPipeline={handleMoverPipeline}
-              onDeleteOpportunity={handleDeleteOpportunity}
-              onOpenChat={setChatConversationId}
-              onOpportunitiesChange={onOpportunitiesChange}
-              leadStatuses={leadStatuses}
-              onLeadStatusesChange={onLeadStatusesChange}
-              dark={theme === "dark"}
-              t={t}
-            />
-          ))}
+          <SortableContext items={localStages.map(s => `col:${s.id}`)} strategy={horizontalListSortingStrategy}>
+            {localStages.map(stage => (
+              <Column
+                key={stage.id}
+                agentId={agentId}
+                stage={stage}
+                opportunities={localOpportunities.filter(o => o.stageId === stage.id)}
+                attendants={attendants}
+                outrosPipelines={outrosPipelines}
+                onClickCard={onSelectConversation}
+                onRename={handleRename}
+                onDelete={handleDelete}
+                onStagesChange={onStagesChange}
+                onValueChange={handleValueChange}
+                onLeadStatusChange={handleLeadStatusChange}
+                onMarcarGanho={handleMarcarGanho}
+                onMarcarPerda={handleMarcarPerda}
+                onTransfer={handleTransfer}
+                onMoverPipeline={handleMoverPipeline}
+                onDeleteOpportunity={handleDeleteOpportunity}
+                onOpenChat={setChatConversationId}
+                onOpportunitiesChange={onOpportunitiesChange}
+                leadStatuses={leadStatuses}
+                onLeadStatusesChange={onLeadStatusesChange}
+                dark={theme === "dark"}
+                t={t}
+              />
+            ))}
+          </SortableContext>
           <div className="w-64 flex-shrink-0">
             <div className="flex gap-2">
               <input
@@ -777,11 +833,15 @@ export function WhatsappPipeline({
       </div>
 
       <DragOverlay>
-        {activeOpp && (
+        {activeOpp ? (
           <div className={`border rounded-xl p-3 w-64 shadow-xl ${t.overlay}`}>
             <p className="font-medium text-sm truncate">{activeOpp.contactName || activeOpp.contactNumber}</p>
           </div>
-        )}
+        ) : activeCol ? (
+          <div className={`w-72 rounded-2xl border p-3 shadow-xl ${t.overlay}`}>
+            <p className="font-bold text-xs uppercase tracking-wide truncate">{activeCol.name}</p>
+          </div>
+        ) : null}
       </DragOverlay>
     </DndContext>
     {chatConversationId && (
