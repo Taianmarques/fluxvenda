@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  MessageCircle, Search, X, Trophy, Lock, Unlock, Bot, User, UserPlus, UserCheck, Users, Eye,
+  MessageCircle, Search, X, Lock, Unlock, Bot, User, UserPlus, UserCheck, Users, Eye,
   FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap, StickyNote, ArrowRightLeft, HandCoins, CalendarClock, ListFilter, ListChecks, Instagram, ArrowLeft,
   Reply, Forward, ChevronDown, Package, ImageOff, Pin, Maximize2, Download,
 } from "lucide-react";
@@ -1423,23 +1423,27 @@ export function WhatsappInbox({
                           {c.etiquetas.length > 3 && <span className="text-[9px] text-gray-500">+{c.etiquetas.length - 3}</span>}
                         </div>
                       )}
-                      {(c.assignedToId || c.opportunities.length > 0) && (
-                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                          {c.assignedToId && (
-                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-300 text-black flex items-center gap-1 flex-shrink-0">
-                              <User size={9} className="flex-shrink-0" />
-                              {attendants.find(a => a.id === c.assignedToId)?.name ?? "Atendente"}
-                            </span>
-                          )}
-                          {c.opportunities.length > 0 && (
-                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 flex-shrink-0 bg-green-400 text-black">
-                              {c.opportunities.some(o => o.wonAt) && <Trophy size={9} />}
-                              {formatBRL(c.opportunities.reduce((sum, o) => sum + o.dealValue, 0))}
-                              {c.opportunities.length > 1 && ` (${c.opportunities.length})`}
-                            </span>
-                          )}
-                        </div>
-                      )}
+                      {(() => {
+                        // Oportunidade já ganha some daqui — só negociação em aberto aparece,
+                        // pra não confundir com um valor ainda em jogo
+                        const abertas = c.opportunities.filter(o => !o.wonAt);
+                        return (c.assignedToId || abertas.length > 0) && (
+                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                            {c.assignedToId && (
+                              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-300 text-black flex items-center gap-1 flex-shrink-0">
+                                <User size={9} className="flex-shrink-0" />
+                                {attendants.find(a => a.id === c.assignedToId)?.name ?? "Atendente"}
+                              </span>
+                            )}
+                            {abertas.length > 0 && (
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 flex-shrink-0 bg-green-400 text-black">
+                                {formatBRL(abertas.reduce((sum, o) => sum + o.dealValue, 0))}
+                                {abertas.length > 1 && ` (${abertas.length})`}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                       <div className="flex items-center justify-between mt-1.5">
                         <div className="flex items-center gap-1.5">
                           <p className={`text-[10px] ${t.listTertiary}`}>{timeAgo(c.updatedAt)}</p>
@@ -1508,13 +1512,17 @@ export function WhatsappInbox({
                     <p className={`text-xs ${t.subtitle}`}>
                       {isIgContact(detail.contactNumber) ? `ID: ${detail.contactNumber.replace("ig_", "")}` : detail.contactNumber}
                     </p>
-                    {detail.opportunities.length > 0 && (
-                      <p className="text-xs font-semibold mt-1 flex items-center gap-1 text-green-500">
-                        {detail.opportunities.some(o => o.wonAt) && <Trophy size={12} />}
-                        {formatBRL(detail.opportunities.reduce((sum, o) => sum + o.dealValue, 0))}
-                        {detail.opportunities.length > 1 && ` (${detail.opportunities.length})`}
-                      </p>
-                    )}
+                    {(() => {
+                      // Oportunidade já ganha some do cabeçalho — só negociação em aberto
+                      // aparece, pra não confundir com um valor ainda em jogo
+                      const abertas = detail.opportunities.filter(o => !o.wonAt);
+                      return abertas.length > 0 && (
+                        <p className="text-xs font-semibold mt-1 flex items-center gap-1 text-green-500">
+                          {formatBRL(abertas.reduce((sum, o) => sum + o.dealValue, 0))}
+                          {abertas.length > 1 && ` (${abertas.length})`}
+                        </p>
+                      );
+                    })()}
                   </div>
                   </div>
                   <div className="flex items-center gap-0.5 md:gap-1.5 flex-nowrap flex-shrink-0">
