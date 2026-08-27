@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Bot, X, ListFilter } from "lucide-react";
 import { WhatsappPipeline, type Stage, type PipelineOpportunity } from "../WhatsappPipeline";
 import { type LeadStatus } from "../LeadStatusBadge";
@@ -24,7 +23,6 @@ export function PipelineBoard({
   initialOpportunities: PipelineOpportunity[];
   initialAutoAvancar?: boolean;
 }) {
-  const router = useRouter();
   const [theme, setTheme] = useState<ChatTheme>("dark");
   const [pipelines, setPipelines] = useState(initialPipelines);
   const [activeId, setActiveId] = useState<string | null>(initialPipelines[0]?.id ?? null);
@@ -316,7 +314,6 @@ export function PipelineBoard({
           leadStatuses={leadStatuses}
           opportunities={relevantOpportunities}
           theme={theme}
-          onSelectConversation={id => router.push(`/crm/${agentId}?c=${id}`)}
           onStagesChange={refreshPipelines}
           onLeadStatusesChange={refreshLeadStatuses}
           onOpportunitiesChange={refreshOpportunities}

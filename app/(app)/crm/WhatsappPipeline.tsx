@@ -8,10 +8,11 @@ import {
 import { useDroppable, useDraggable } from "@dnd-kit/core";
 import { SortableContext, useSortable, arrayMove, horizontalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ThumbsUp, ThumbsDown, MessageCircle, Bot, X, ListChecks, MoreVertical, ArrowRightLeft, Shuffle, GripVertical, Pencil, Trash2, Clock } from "lucide-react";
+import { ThumbsUp, ThumbsDown, MessageCircle, Bot, X, ListChecks, MoreVertical, ArrowRightLeft, Shuffle, GripVertical, Pencil, Trash2, Clock, Info } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { ConversationPopup } from "./ConversationPopup";
 import { PipelineTaskPanel } from "./PipelineTaskPanel";
+import { OpportunityDetailModal } from "./OpportunityDetailModal";
 import type { Attendant } from "./PipelineFiltersPanel";
 
 export type Stage = { id: string; name: string; color: string; order: number; agenteInstrucoes?: string; followupDelaysMinutes?: number[] };
@@ -196,6 +197,14 @@ function Card({
           <MessageCircle size={14} />
         </button>
         <button
+          onClick={e => { e.stopPropagation(); onClick(); }}
+          onPointerDown={e => e.stopPropagation()}
+          title="Detalhes"
+          className={`p-1 rounded flex-shrink-0 ${dark ? "text-gray-400 hover:text-white hover:bg-gray-800" : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"}`}
+        >
+          <Info size={14} />
+        </button>
+        <button
           ref={menuBtnRef}
           onClick={toggleMenu}
           onPointerDown={e => e.stopPropagation()}
@@ -350,14 +359,14 @@ function Card({
 }
 
 function Column({
-  agentId, stage, opportunities, attendants, outrosPipelines, onClickCard, onRename, onDelete, onStagesChange, onValueChange, onLeadStatusChange, onMarcarGanho, onMarcarPerda, onTransfer, onMoverPipeline, onDeleteOpportunity, onOpenChat, onOpportunitiesChange, leadStatuses, onLeadStatusesChange, dark, t,
+  agentId, stage, opportunities, attendants, outrosPipelines, onOpenDetails, onRename, onDelete, onStagesChange, onValueChange, onLeadStatusChange, onMarcarGanho, onMarcarPerda, onTransfer, onMoverPipeline, onDeleteOpportunity, onOpenChat, onOpportunitiesChange, leadStatuses, onLeadStatusesChange, dark, t,
 }: {
   agentId: string;
   stage: Stage;
   opportunities: PipelineOpportunity[];
   attendants: Attendant[];
   outrosPipelines: OtherPipeline[];
-  onClickCard: (conversationId: string) => void;
+  onOpenDetails: (opp: PipelineOpportunity) => void;
   onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
   onStagesChange: () => void;
@@ -549,7 +558,7 @@ function Column({
       <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[120px]">
         {opportunities.map(o => (
           <Card
-            key={o.id} agentId={agentId} opp={o} stageColor={stage.color} attendants={attendants} outrosPipelines={outrosPipelines} onClick={() => onClickCard(o.conversationId)} onValueChange={onValueChange}
+            key={o.id} agentId={agentId} opp={o} stageColor={stage.color} attendants={attendants} outrosPipelines={outrosPipelines} onClick={() => onOpenDetails(o)} onValueChange={onValueChange}
             onLeadStatusChange={onLeadStatusChange} onMarcarGanho={onMarcarGanho} onMarcarPerda={onMarcarPerda} onTransfer={onTransfer} onMoverPipeline={onMoverPipeline} onDeleteOpportunity={onDeleteOpportunity}
             onOpenChat={onOpenChat} onOpportunitiesChange={onOpportunitiesChange}
             leadStatuses={leadStatuses} onLeadStatusesChange={onLeadStatusesChange}
@@ -562,7 +571,7 @@ function Column({
 }
 
 export function WhatsappPipeline({
-  agentId, pipelineId, stages, leadStatuses, opportunities, theme, attendants, motivosPerda, outrosPipelines, onSelectConversation, onStagesChange, onLeadStatusesChange, onOpportunitiesChange,
+  agentId, pipelineId, stages, leadStatuses, opportunities, theme, attendants, motivosPerda, outrosPipelines, onStagesChange, onLeadStatusesChange, onOpportunitiesChange,
 }: {
   agentId: string;
   pipelineId: string;
@@ -573,7 +582,6 @@ export function WhatsappPipeline({
   attendants: Attendant[];
   motivosPerda: { id: string; nome: string }[];
   outrosPipelines: OtherPipeline[];
-  onSelectConversation: (id: string) => void;
   onStagesChange: () => void;
   onLeadStatusesChange: () => void;
   onOpportunitiesChange: () => void;
@@ -581,6 +589,7 @@ export function WhatsappPipeline({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [perdaOppId, setPerdaOppId] = useState<string | null>(null);
   const [chatConversationId, setChatConversationId] = useState<string | null>(null);
+  const [detailOppId, setDetailOppId] = useState<string | null>(null);
   const [newStageName, setNewStageName] = useState("");
   const [localOpportunities, setLocalOpportunities] = useState(opportunities);
   const [localStages, setLocalStages] = useState(stages);
@@ -756,6 +765,7 @@ export function WhatsappPipeline({
 
   const activeOpp = activeId && !activeId.startsWith("col:") ? localOpportunities.find(o => o.id === activeId) : null;
   const activeCol = activeId?.startsWith("col:") ? localStages.find(s => s.id === activeId.slice(4)) : null;
+  const detailOpp = detailOppId ? localOpportunities.find(o => o.id === detailOppId) : null;
 
   return (
     <>
@@ -769,7 +779,7 @@ export function WhatsappPipeline({
               opportunities={semEtapa}
               attendants={attendants}
               outrosPipelines={outrosPipelines}
-              onClickCard={onSelectConversation}
+              onOpenDetails={opp => setDetailOppId(opp.id)}
               onRename={() => {}}
               onDelete={() => {}}
               onStagesChange={() => {}}
@@ -797,7 +807,7 @@ export function WhatsappPipeline({
                 opportunities={localOpportunities.filter(o => o.stageId === stage.id)}
                 attendants={attendants}
                 outrosPipelines={outrosPipelines}
-                onClickCard={onSelectConversation}
+                onOpenDetails={opp => setDetailOppId(opp.id)}
                 onRename={handleRename}
                 onDelete={handleDelete}
                 onStagesChange={onStagesChange}
@@ -849,6 +859,19 @@ export function WhatsappPipeline({
         conversationId={chatConversationId}
         onClose={() => setChatConversationId(null)}
         dark={theme === "dark"}
+      />
+    )}
+    {detailOpp && (
+      <OpportunityDetailModal
+        agentId={agentId}
+        opp={detailOpp}
+        stages={localStages}
+        dark={theme === "dark"}
+        onClose={() => setDetailOppId(null)}
+        onValueChange={handleValueChange}
+        onMarcarGanho={handleMarcarGanho}
+        onMarcarPerda={handleMarcarPerda}
+        onOpportunitiesChange={onOpportunitiesChange}
       />
     )}
     {perdaOppId && (

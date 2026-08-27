@@ -12,15 +12,17 @@ type Task = {
 };
 
 export function PipelineTaskPanel({
-  agentId, conversationId, oppId, pos, onClose, onTasksChange, dark,
+  agentId, conversationId, oppId, pos, onClose, onTasksChange, dark, embedded,
 }: {
   agentId: string;
   conversationId: string;
   oppId: string;
-  pos: { top: number; left: number };
-  onClose: () => void;
+  pos?: { top: number; left: number };
+  onClose?: () => void;
   onTasksChange: () => void;
   dark: boolean;
+  // true = usado como aba dentro de um modal maior (sem casca de popover posicionado)
+  embedded?: boolean;
 }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,19 +90,14 @@ export function PipelineTaskPanel({
   const inputClass = `w-full text-xs rounded-lg px-2 py-1.5 border focus:outline-none ${dark ? "bg-gray-950 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`;
   const today = new Date(); today.setHours(0, 0, 0, 0);
 
-  return (
-    <>
-      <div className="fixed inset-0 z-40" onClick={onClose} onPointerDown={e => e.stopPropagation()} />
-      <div
-        className={`fixed z-50 w-72 max-w-[calc(100vw-2rem)] max-h-[70vh] overflow-y-auto rounded-xl border shadow-xl p-3 space-y-3 ${dark ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}
-        style={{ top: pos.top, left: pos.left }}
-        onClick={e => e.stopPropagation()}
-        onPointerDown={e => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-semibold">Tarefas</p>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-300"><X size={14} /></button>
-        </div>
+  const body = (
+    <div className={embedded ? "space-y-3" : "space-y-3"}>
+        {!embedded && (
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold">Tarefas</p>
+            <button onClick={onClose} className="text-gray-500 hover:text-gray-300"><X size={14} /></button>
+          </div>
+        )}
 
         {loading ? (
           <p className="text-xs text-gray-500">Carregando...</p>
@@ -158,6 +155,21 @@ export function PipelineTaskPanel({
             <Plus size={12} /> Adicionar tarefa
           </button>
         </div>
+    </div>
+  );
+
+  if (embedded) return body;
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40" onClick={onClose} onPointerDown={e => e.stopPropagation()} />
+      <div
+        className={`fixed z-50 w-72 max-w-[calc(100vw-2rem)] max-h-[70vh] overflow-y-auto rounded-xl border shadow-xl p-3 ${dark ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}
+        style={pos}
+        onClick={e => e.stopPropagation()}
+        onPointerDown={e => e.stopPropagation()}
+      >
+        {body}
       </div>
     </>
   );

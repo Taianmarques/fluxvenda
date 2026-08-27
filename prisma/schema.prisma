@@ -66,6 +66,7 @@ model Profile {
   scheduledMessages ScheduledMessage[]
   opportunityTasks OpportunityTask[]
   treinoExemplosCriados TreinoExemplo[]
+  opportunityFiles OpportunityFile[]
 }
 
 // Cadastro "em espera" enquanto o código de verificação do WhatsApp não é
@@ -1583,6 +1584,7 @@ model Opportunity {
   motivoPerda   MotivoPerda? @relation(fields: [motivoPerdaId], references: [id], onDelete: SetNull)
 
   tasks OpportunityTask[]
+  files OpportunityFile[]
 }
 
 // Motivo de perda configurável (ex: "Preço", "Escolheu concorrente", "Sem resposta") —
@@ -1614,6 +1616,26 @@ model OpportunityTask {
 
   assignedToId String?
   assignedTo   Profile? @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  @@index([opportunityId])
+}
+
+// Arquivo interno anexado a uma oportunidade (contrato, documento, print) — nunca é enviado
+// ao cliente pelo WhatsApp, só visível pra equipe na aba Arquivos do modal de detalhes.
+// Base64 direto no banco, mesma convenção já usada pra imagem de produto (sem blob storage).
+model OpportunityFile {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  opportunityId String
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  fileName String
+  mimeType String
+  base64   String @db.Text
+
+  uploadedById String
+  uploadedBy   Profile @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
 
   @@index([opportunityId])
 }
