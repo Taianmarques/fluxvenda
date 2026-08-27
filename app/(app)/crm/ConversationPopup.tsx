@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { X, Bot, User as UserIcon, StickyNote, Forward } from "lucide-react";
+import { formatDateSeparator, isSameLocalDay } from "@/lib/chat-date";
 
 type Message = {
   id: string;
@@ -84,22 +85,38 @@ export function ConversationPopup({ conversationId, onClose, dark }: { conversat
           {!detail ? (
             <p className={`text-sm text-center mt-10 ${dark ? "text-gray-500" : "text-gray-400"}`}>Carregando...</p>
           ) : (
-            detail.messages.map(m => {
+            detail.messages.map((m, msgIdx) => {
+              const msgDate = new Date(m.createdAt);
+              const prevMsg = msgIdx > 0 ? detail.messages[msgIdx - 1] : null;
+              const showDateSeparator = !prevMsg || !isSameLocalDay(msgDate, new Date(prevMsg.createdAt));
+              const dateSeparator = showDateSeparator ? (
+                <div className="flex justify-center py-1">
+                  <span className={`text-[11px] font-medium px-3 py-1 rounded-full ${dark ? "bg-black/40 text-gray-300" : "bg-white/90 text-gray-600 shadow-sm"}`}>
+                    {formatDateSeparator(msgDate)}
+                  </span>
+                </div>
+              ) : null;
+
               if (m.role === "note") {
                 return (
-                  <div key={m.id} className="flex justify-center">
-                    <div className="max-w-[85%] rounded-lg px-3 py-2 text-sm bg-amber-900/30 border border-amber-800/40 text-amber-100">
-                      <p className="text-[10px] opacity-80 mb-0.5 flex items-center gap-1 text-amber-300">
-                        <StickyNote size={10} /> Nota interna — {m.sender?.name ?? "Atendente"}
-                      </p>
-                      <p className="whitespace-pre-wrap">{m.content}</p>
+                  <div key={m.id}>
+                    {dateSeparator}
+                    <div className="flex justify-center">
+                      <div className="max-w-[85%] rounded-lg px-3 py-2 text-sm bg-amber-900/30 border border-amber-800/40 text-amber-100">
+                        <p className="text-[10px] opacity-80 mb-0.5 flex items-center gap-1 text-amber-300">
+                          <StickyNote size={10} /> Nota interna — {m.sender?.name ?? "Atendente"}
+                        </p>
+                        <p className="whitespace-pre-wrap">{m.content}</p>
+                      </div>
                     </div>
                   </div>
                 );
               }
               const isOutgoing = m.role === "assistant" || m.role === "human";
               return (
-                <div key={m.id} className={`flex ${isOutgoing ? "justify-end" : "justify-start"}`}>
+                <div key={m.id}>
+                  {dateSeparator}
+                  <div className={`flex ${isOutgoing ? "justify-end" : "justify-start"}`}>
                   <div
                     className={`max-w-[75%] rounded-lg px-3 py-2 text-sm ${
                       m.role === "human" ? "bg-green-700 text-white" :
@@ -130,6 +147,7 @@ export function ConversationPopup({ conversationId, onClose, dark }: { conversat
                       <p className="whitespace-pre-wrap">{m.content}</p>
                     )}
                     <p className="text-[10px] opacity-60 mt-1 text-right">{new Date(m.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</p>
+                  </div>
                   </div>
                 </div>
               );

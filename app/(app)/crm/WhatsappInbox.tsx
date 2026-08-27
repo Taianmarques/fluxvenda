@@ -12,6 +12,7 @@ import { QuickReplies, type QuickReply } from "./QuickReplies";
 import { OpportunitiesPanel, type Opportunity } from "./OpportunitiesPanel";
 import { ScheduledMessagesPanel, type ScheduledMessage } from "./ScheduledMessagesPanel";
 import { ConversationFiltersPanel, EMPTY_FILTERS, hasActiveFilters, type ConversationFilters } from "./ConversationFiltersPanel";
+import { formatDateSeparator, isSameLocalDay } from "@/lib/chat-date";
 
 type ConversationSummary = {
   id: string;
@@ -1492,23 +1493,39 @@ export function WhatsappInbox({
                 </div>
 
                 <div ref={chatScrollRef} onScroll={handleChatScroll} className={`flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-5 space-y-2 ${t.chatBg}`}>
-                  {detail.messages.map(m => {
+                  {detail.messages.map((m, msgIdx) => {
+                    const msgDate = new Date(m.createdAt);
+                    const prevMsg = msgIdx > 0 ? detail.messages[msgIdx - 1] : null;
+                    const showDateSeparator = !prevMsg || !isSameLocalDay(msgDate, new Date(prevMsg.createdAt));
+                    const dateSeparator = showDateSeparator ? (
+                      <div className="flex justify-center py-1">
+                        <span className={`text-[11px] font-medium px-3 py-1 rounded-full ${theme === "dark" ? "bg-black/40 text-gray-300" : "bg-white/90 text-gray-600 shadow-sm"}`}>
+                          {formatDateSeparator(msgDate)}
+                        </span>
+                      </div>
+                    ) : null;
+
                     if (m.role === "note") {
                       return (
-                        <div key={m.id} className="flex justify-center">
-                          <div className="max-w-[85%] rounded-lg px-3 py-2 text-sm bg-amber-900/30 border border-amber-800/40 text-amber-100">
-                            <p className="text-[10px] opacity-80 mb-0.5 flex items-center gap-1 text-amber-300">
-                              <StickyNote size={10} /> Nota interna — {m.sender?.name ?? "Atendente"}
-                            </p>
-                            <p className="whitespace-pre-wrap">{m.content}</p>
-                            <p className="text-[10px] opacity-60 mt-1 text-right">{new Date(m.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</p>
+                        <div key={m.id}>
+                          {dateSeparator}
+                          <div className="flex justify-center">
+                            <div className="max-w-[85%] rounded-lg px-3 py-2 text-sm bg-amber-900/30 border border-amber-800/40 text-amber-100">
+                              <p className="text-[10px] opacity-80 mb-0.5 flex items-center gap-1 text-amber-300">
+                                <StickyNote size={10} /> Nota interna — {m.sender?.name ?? "Atendente"}
+                              </p>
+                              <p className="whitespace-pre-wrap">{m.content}</p>
+                              <p className="text-[10px] opacity-60 mt-1 text-right">{new Date(m.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</p>
+                            </div>
                           </div>
                         </div>
                       );
                     }
                     const isOutgoing = m.role === "assistant" || m.role === "human";
                     return (
-                      <div key={m.id} id={`msg-${m.id}`} className={`flex ${isOutgoing ? "justify-end" : "justify-start"}`}>
+                      <div key={m.id}>
+                        {dateSeparator}
+                        <div id={`msg-${m.id}`} className={`flex ${isOutgoing ? "justify-end" : "justify-start"}`}>
                         <div className={`group relative max-w-[70%] rounded-lg px-3 py-2 text-sm ${
                           m.role === "human" ? t.bubbleHuman :
                           m.role === "assistant" ? t.bubbleAssistant :
@@ -1605,6 +1622,7 @@ export function WhatsappInbox({
                             {m.edited && !m.deleted && <span className="italic mr-1">editada</span>}
                             {new Date(m.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                           </p>
+                        </div>
                         </div>
                       </div>
                     );
