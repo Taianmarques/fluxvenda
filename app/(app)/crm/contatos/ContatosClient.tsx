@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { BookUser, Search, Pencil, MessageCircle, Download, Upload, Instagram, X, Plus, Tags, UserCheck } from "lucide-react";
+import { BookUser, Search, Pencil, MessageCircle, Download, Upload, Instagram, X, Plus, Tags, UserCheck, ListFilter } from "lucide-react";
+import { NIVEL_META, type Nivel } from "../carteira/CarteiraClient";
 
 export type Etiqueta = { id: string; nome: string; cor: string };
 
@@ -16,10 +17,15 @@ export type Contato = {
   totalGanho: number;
   lastMessageAt: string | null;
   atendenteNome: string | null;
+  assignedToId: string | null;
   etiquetas: Etiqueta[];
+  conversaStatus: "ativo" | "pendente" | "finalizado";
+  nivel: Nivel;
 };
 
 type Attendant = { id: string; name: string; isManager: boolean };
+
+const STATUS_LABEL: Record<Contato["conversaStatus"], string> = { ativo: "Ativo", pendente: "Pendente", finalizado: "Finalizado" };
 
 // Saturação mais forte que a paleta antiga (que tinha verde/azul claros demais, texto
 // branco ficava com pouco contraste) — essas mantêm boa leitura em qualquer badge.
@@ -62,6 +68,14 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
   const [novoNumero, setNovoNumero] = useState("");
   const [criando, setCriando] = useState(false);
 
+  // Filtros — "" = todos; vendedor usa "__none__" pra "sem atendente"
+  const [showFiltros, setShowFiltros] = useState(false);
+  const [filtroVendedor, setFiltroVendedor] = useState("");
+  const [filtroNivel, setFiltroNivel] = useState<Nivel | "">("");
+  const [filtroEtiqueta, setFiltroEtiqueta] = useState("");
+  const [filtroStatus, setFiltroStatus] = useState<Contato["conversaStatus"] | "">("");
+  const filtrosAtivos = [filtroVendedor, filtroNivel, filtroEtiqueta, filtroStatus].filter(Boolean).length;
+
   // Seleção + ações em massa
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [attendants, setAttendants] = useState<Attendant[]>([]);
@@ -85,13 +99,20 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
-    if (!q) return contatos;
-    return contatos.filter(c =>
-      (c.contactName ?? "").toLowerCase().includes(q) ||
-      c.contactNumber.includes(q) ||
-      c.etiquetas.some(e => e.nome.toLowerCase().includes(q))
-    );
-  }, [busca, contatos]);
+    return contatos.filter(c => {
+      if (q && !(
+        (c.contactName ?? "").toLowerCase().includes(q) ||
+        c.contactNumber.includes(q) ||
+        c.etiquetas.some(e => e.nome.toLowerCase().includes(q))
+      )) return false;
+      if (filtroVendedor === "__none__" && c.assignedToId) return false;
+      if (filtroVendedor && filtroVendedor !== "__none__" && c.assignedToId !== filtroVendedor) return false;
+      if (filtroNivel && c.nivel !== filtroNivel) return false;
+      if (filtroEtiqueta && !c.etiquetas.some(e => e.id === filtroEtiqueta)) return false;
+      if (filtroStatus && c.conversaStatus !== filtroStatus) return false;
+      return true;
+    });
+  }, [busca, contatos, filtroVendedor, filtroNivel, filtroEtiqueta, filtroStatus]);
 
   const todosSelecionados = filtrados.length > 0 && filtrados.every(c => selecionados.has(c.conversationId));
 
@@ -412,15 +433,84 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
           </div>
         )}
 
-        <div className="relative">
-          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" />
-          <input
-            value={busca}
-            onChange={e => setBusca(e.target.value)}
-            placeholder="Buscar por nome, número ou etiqueta..."
-            className="w-full bg-gray-900 border border-gray-800 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-blue-600"
-          />
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" />
+            <input
+              value={busca}
+              onChange={e => setBusca(e.target.value)}
+              placeholder="Buscar por nome, número ou etiqueta..."
+              className="w-full bg-gray-900 border border-gray-800 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-blue-600"
+            />
+          </div>
+          <button
+            onClick={() => setShowFiltros(s => !s)}
+            title="Filtros"
+            className={`flex items-center gap-1.5 text-sm font-medium rounded-xl px-3.5 py-2.5 flex-shrink-0 transition-colors ${
+              filtrosAtivos > 0 ? "bg-blue-600 text-white" : "bg-gray-900 border border-gray-800 text-gray-300 hover:border-gray-700"
+            }`}
+          >
+            <ListFilter size={15} /> {filtrosAtivos > 0 && filtrosAtivos}
+          </button>
         </div>
+
+        {showFiltros && (
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 flex flex-wrap gap-3">
+            <div>
+              <label className="text-[11px] text-gray-500 block mb-1">Vendedor</label>
+              <select
+                value={filtroVendedor}
+                onChange={e => setFiltroVendedor(e.target.value)}
+                className="bg-gray-950 border border-gray-800 rounded-lg px-2.5 py-1.5 text-xs min-w-[140px]"
+              >
+                <option value="">Todos</option>
+                <option value="__none__">Sem atendente</option>
+                {attendants.map(a => <option key={a.id} value={a.id}>{a.name}{a.isManager ? " (gestor)" : ""}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] text-gray-500 block mb-1">Nível da carteira</label>
+              <select
+                value={filtroNivel}
+                onChange={e => setFiltroNivel(e.target.value as Nivel | "")}
+                className="bg-gray-950 border border-gray-800 rounded-lg px-2.5 py-1.5 text-xs min-w-[140px]"
+              >
+                <option value="">Todos</option>
+                {(Object.keys(NIVEL_META) as Nivel[]).map(n => <option key={n} value={n}>{NIVEL_META[n].label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] text-gray-500 block mb-1">Etiqueta</label>
+              <select
+                value={filtroEtiqueta}
+                onChange={e => setFiltroEtiqueta(e.target.value)}
+                className="bg-gray-950 border border-gray-800 rounded-lg px-2.5 py-1.5 text-xs min-w-[140px]"
+              >
+                <option value="">Todas</option>
+                {etiquetas.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] text-gray-500 block mb-1">Status</label>
+              <select
+                value={filtroStatus}
+                onChange={e => setFiltroStatus(e.target.value as Contato["conversaStatus"] | "")}
+                className="bg-gray-950 border border-gray-800 rounded-lg px-2.5 py-1.5 text-xs min-w-[140px]"
+              >
+                <option value="">Todos</option>
+                {(Object.keys(STATUS_LABEL) as Contato["conversaStatus"][]).map(s => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
+              </select>
+            </div>
+            {filtrosAtivos > 0 && (
+              <button
+                onClick={() => { setFiltroVendedor(""); setFiltroNivel(""); setFiltroEtiqueta(""); setFiltroStatus(""); }}
+                className="text-xs text-gray-400 hover:text-white self-end ml-auto"
+              >
+                Limpar filtros
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Barra de ações em massa */}
         {selecionados.size > 0 && (
@@ -514,6 +604,9 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
                         {c.lastMessageAt && ` · última interação ${new Date(c.lastMessageAt).toLocaleDateString("pt-BR")}`}
                       </p>
                     </div>
+                    <span className={`hidden md:inline-block text-[10px] font-bold px-2 py-1 rounded-full border flex-shrink-0 ${NIVEL_META[c.nivel].badge}`} title={NIVEL_META[c.nivel].desc}>
+                      {NIVEL_META[c.nivel].label}
+                    </span>
                     {c.leadStatusName && (
                       <span
                         className="hidden md:inline-block text-[10px] font-semibold px-2 py-1 rounded-full border flex-shrink-0"

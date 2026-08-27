@@ -5,6 +5,7 @@ import Link from "next/link";
 import { BookUser } from "lucide-react";
 import { getAgentConfigWithRole } from "@/lib/team";
 import { CrmPageGate } from "@/app/(app)/crm/CrmPageGate";
+import { calcularNiveis } from "@/lib/carteira-nivel";
 import { ContatosClient, type Contato } from "../../contatos/ContatosClient";
 
 export default function ContatosPage(props: { params: Promise<{ agentId: string }> }) {
@@ -38,7 +39,7 @@ async function ContatosPageContent({ params }: { params: Promise<{ agentId: stri
     );
   }
 
-  const [conversations, etiquetas] = await Promise.all([
+  const [conversations, etiquetas, orders, cobrancas] = await Promise.all([
     prisma.conversation.findMany({
       where: {
         agentConfigId: config.id,
@@ -61,10 +62,14 @@ async function ContatosPageContent({ params }: { params: Promise<{ agentId: stri
       orderBy: { createdAt: "asc" },
       select: { id: true, nome: true, cor: true },
     }),
+    // Nível da carteira usa a mesma régua RFM do resto do CRM (ver lib/carteira-nivel.ts) —
+    // precisa do histórico de compras, não só das conversas
+    prisma.order.findMany({ where: { agentConfigId: config.id, status: "PAGO" }, select: { contactNumber: true, total: true, deliveryFee: true, paidAt: true } }),
+    prisma.cobranca.findMany({ where: { agentConfigId: config.id, status: "PAGO" }, select: { contactNumber: true, valor: true, paidAt: true } }),
   ]);
 
   // Um contato por número — se houver mais de uma conversa, fica a de interação mais recente
-  const byNumber = new Map<string, Contato>();
+  const byNumber = new Map<string, Contato & { nivelManual: string | null }>();
   for (const c of conversations) {
     if (byNumber.has(c.contactNumber)) continue;
     byNumber.set(c.contactNumber, {
@@ -76,9 +81,40 @@ async function ContatosPageContent({ params }: { params: Promise<{ agentId: stri
       totalGanho: c.opportunities.filter(o => o.wonAt).reduce((s, o) => s + o.dealValue, 0),
       lastMessageAt: c.messages[0]?.createdAt.toISOString() ?? null,
       atendenteNome: c.assignedTo?.name ?? null,
+      assignedToId: c.assignedToId,
       etiquetas: c.etiquetas,
+      conversaStatus: c.status === "FINALIZADO" ? "finalizado" : c.humanTakeover ? "ativo" : "pendente",
+      nivel: "C", // preenchido abaixo por calcularNiveis
+      nivelManual: c.nivelCarteira,
     });
   }
 
-  return <ContatosClient agentId={config.id} contatos={Array.from(byNumber.values())} etiquetas={etiquetas} />;
+  // Compras (pedidos pagos + cobranças pagas + oportunidades ganhas) por número, pra régua RFM
+  const comprasPorContato = new Map<string, { at: Date; valor: number }[]>();
+  function addCompra(numero: string, at: Date | null, valor: number) {
+    if (!at) return;
+    if (!comprasPorContato.has(numero)) comprasPorContato.set(numero, []);
+    comprasPorContato.get(numero)!.push({ at, valor });
+  }
+  for (const o of orders) addCompra(o.contactNumber, o.paidAt, o.total + o.deliveryFee);
+  for (const cb of cobrancas) addCompra(cb.contactNumber, cb.paidAt, cb.valor);
+  for (const c of conversations) {
+    for (const o of c.opportunities) if (o.wonAt) addCompra(c.contactNumber, o.wonAt, o.dealValue);
+  }
+
+  const niveis = calcularNiveis(
+    Array.from(byNumber.entries()).map(([contactNumber, c]) => ({
+      contactNumber, nivelManual: c.nivelManual, compras: comprasPorContato.get(contactNumber) ?? [],
+    })),
+    config.carteiraInativoDias,
+  );
+  for (const [contactNumber, c] of byNumber) c.nivel = niveis.get(contactNumber) ?? "C";
+
+  return (
+    <ContatosClient
+      agentId={config.id}
+      contatos={Array.from(byNumber.values()).map(({ nivelManual: _nivelManual, ...c }) => c)}
+      etiquetas={etiquetas}
+    />
+  );
 }
