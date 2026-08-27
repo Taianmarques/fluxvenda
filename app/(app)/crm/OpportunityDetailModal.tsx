@@ -62,7 +62,7 @@ export function OpportunityDetailModal({
     <div className="fixed inset-0 z-40 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
       <div
         onClick={e => e.stopPropagation()}
-        className={`w-full max-w-4xl h-[85vh] rounded-2xl border flex flex-col overflow-hidden ${dark ? "bg-gray-950 border-gray-800 text-white" : "bg-white border-gray-200 text-gray-900"}`}
+        className={`w-full max-w-4xl h-[70vh] rounded-2xl border flex flex-col overflow-hidden ${dark ? "bg-gray-950 border-gray-800 text-white" : "bg-white border-gray-200 text-gray-900"}`}
       >
         <div className={`px-4 py-3 border-b flex items-center justify-between gap-3 flex-shrink-0 ${dark ? "border-gray-800" : "border-gray-200"}`}>
           <p className="font-semibold truncate">{opp.contactName || opp.contactNumber}</p>
@@ -156,7 +156,7 @@ export function OpportunityDetailModal({
                 </button>
                 <button
                   onClick={() => onMarcarPerda(opp.id)}
-                  className="flex-1 flex items-center justify-center gap-1.5 bg-red-900/40 hover:bg-red-900/60 text-red-300 border border-red-800/50 rounded-lg py-2 text-xs font-medium"
+                  className="flex-1 flex items-center justify-center gap-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg py-2 text-xs font-medium"
                 >
                   <ThumbsDown size={13} /> Perder
                 </button>
