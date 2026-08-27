@@ -85,7 +85,12 @@ function EtiquetaChip({ e, onRemove }: { e: Etiqueta; onRemove?: () => void }) {
 export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: string; contatos: Contato[]; etiquetas: Etiqueta[] }) {
   const router = useRouter();
   const [busca, setBusca] = useState("");
-  const [salvando, setSalvando] = useState<string | null>(null);
+  // Modal de editar nome/número do contato
+  const [editando, setEditando] = useState<Contato | null>(null);
+  const [editNome, setEditNome] = useState("");
+  const [editNumero, setEditNumero] = useState("");
+  const [salvandoEdicao, setSalvandoEdicao] = useState(false);
+  const [erroEdicao, setErroEdicao] = useState("");
   const [importando, setImportando] = useState(false);
   const [importResult, setImportResult] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -213,19 +218,34 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
     router.refresh();
   }
 
-  async function handleRenomear(c: Contato) {
-    const nome = window.prompt("Nome do contato", c.contactName ?? "");
-    if (!nome || !nome.trim() || nome.trim() === c.contactName) return;
-    setSalvando(c.conversationId);
+  function abrirEdicao(c: Contato) {
+    setEditando(c);
+    setEditNome(c.contactName ?? "");
+    setEditNumero(c.contactNumber);
+    setErroEdicao("");
+  }
+
+  async function confirmarEdicao() {
+    if (!editando) return;
+    const nome = editNome.trim();
+    if (!nome) { setErroEdicao("Nome é obrigatório."); return; }
+    const isIg = isIgContact(editando.contactNumber);
+    const numero = isIg ? editando.contactNumber : editNumero.replace(/\D/g, "");
+    if (!isIg && numero.length < 10) { setErroEdicao("Número inválido — use DDD + número."); return; }
+    setSalvandoEdicao(true);
+    setErroEdicao("");
     try {
-      await fetch(`/api/ferramentas/whatsapp/conversas/${c.conversationId}`, {
+      const res = await fetch(`/api/ferramentas/whatsapp/conversas/${editando.conversationId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contactName: nome.trim() }),
+        body: JSON.stringify({ contactName: nome, ...(isIg ? {} : { contactNumber: numero }) }),
       });
+      const data = await res.json().catch(() => ({} as { error?: string }));
+      if (!res.ok) { setErroEdicao(data.error ?? "Não foi possível salvar."); return; }
+      setEditando(null);
       router.refresh();
     } finally {
-      setSalvando(null);
+      setSalvandoEdicao(false);
     }
   }
 
@@ -696,10 +716,9 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
                       <span className="hidden md:inline text-xs font-semibold text-green-400 flex-shrink-0">{formatBRL(c.totalGanho)}</span>
                     )}
                     <button
-                      onClick={() => handleRenomear(c)}
-                      disabled={salvando === c.conversationId}
-                      title={c.contactName ? "Renomear contato" : "Salvar nome do contato"}
-                      className="text-gray-500 hover:text-white disabled:opacity-50 flex-shrink-0 p-1.5"
+                      onClick={() => abrirEdicao(c)}
+                      title="Editar nome/número"
+                      className="text-gray-500 hover:text-white flex-shrink-0 p-1.5"
                     >
                       <Pencil size={14} />
                     </button>
@@ -717,6 +736,53 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
           )}
         </div>
       </div>
+
+      {editando && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setEditando(null)}>
+          <div onClick={e => e.stopPropagation()} className="w-full max-w-sm bg-gray-900 border border-gray-700 rounded-2xl p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="font-semibold">Editar contato</p>
+              <button onClick={() => setEditando(null)} className="text-gray-500 hover:text-gray-300"><X size={16} /></button>
+            </div>
+            <div>
+              <label className="text-xs text-gray-400 block mb-1">Nome</label>
+              <input
+                value={editNome}
+                onChange={e => setEditNome(e.target.value)}
+                maxLength={80}
+                autoFocus
+                className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+              />
+            </div>
+            {isIgContact(editando.contactNumber) ? (
+              <p className="text-[11px] text-gray-600">Contato do Instagram — o identificador não pode ser editado, só o nome.</p>
+            ) : (
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">WhatsApp (DDD + número)</label>
+                <input
+                  value={editNumero}
+                  onChange={e => setEditNumero(e.target.value.replace(/[^\d\s()-]/g, ""))}
+                  inputMode="tel"
+                  maxLength={20}
+                  className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+                />
+                <p className="text-[11px] text-gray-600 mt-1">Muda só o cadastro — mensagens já trocadas continuam no histórico normalmente.</p>
+              </div>
+            )}
+            {erroEdicao && <p className="text-xs text-red-400">{erroEdicao}</p>}
+            <div className="flex justify-end gap-2 pt-1">
+              <button onClick={() => setEditando(null)} className="text-sm text-gray-400 hover:text-gray-200 px-3 py-2">Cancelar</button>
+              <button
+                onClick={confirmarEdicao}
+                disabled={salvandoEdicao || !editNome.trim()}
+                className="text-sm font-medium bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl px-4 py-2"
+              >
+                {salvandoEdicao ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

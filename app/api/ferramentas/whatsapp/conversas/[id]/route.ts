@@ -50,6 +50,7 @@ const patchSchema = z.object({
   status: z.enum(["ATIVO", "AGUARDANDO", "FINALIZADO"]).optional(),
   motivoEncerramento: z.string().max(200).optional(), // enviado junto com status FINALIZADO
   contactName: z.string().trim().min(1).max(80).optional(), // salvar/renomear o contato
+  contactNumber: z.string().transform(v => v.replace(/\D/g, "")).optional(), // editar o WhatsApp cadastrado
   pinned: z.boolean().optional(),
   groupVisibleToIds: z.array(z.string()).max(200).optional(), // só grupo, só gestor — ver checagem abaixo
 });
@@ -105,6 +106,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
   }
 
+  // Editar o número cadastrado — não vale pra contato do Instagram (contactNumber ali é o
+  // IGSID, não um telefone) e nunca pode colidir com outro contato do mesmo agente.
+  if (body.data.contactNumber !== undefined) {
+    if (conversation.contactNumber.startsWith("ig_")) {
+      return NextResponse.json({ error: "Não é possível editar o número de um contato do Instagram" }, { status: 400 });
+    }
+    if (body.data.contactNumber.length < 10 || body.data.contactNumber.length > 13) {
+      return NextResponse.json({ error: "Número inválido — use DDD + número" }, { status: 400 });
+    }
+    if (body.data.contactNumber !== conversation.contactNumber) {
+      const duplicado = await prisma.conversation.findFirst({
+        where: { agentConfigId: conversation.agentConfigId, contactNumber: body.data.contactNumber, id: { not: id } },
+      });
+      if (duplicado) return NextResponse.json({ error: "Já existe outro contato com esse número" }, { status: 409 });
+    }
+  }
+
   const encerrando = body.data.status === "FINALIZADO";
   const reabrindo = body.data.status !== undefined && body.data.status !== "FINALIZADO" && conversation.status === "FINALIZADO";
 
@@ -115,6 +133,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       ...(body.data.assignedToId !== undefined && { assignedToId: body.data.assignedToId }),
       ...(body.data.status !== undefined && { status: body.data.status }),
       ...(body.data.contactName !== undefined && { contactName: body.data.contactName }),
+      ...(body.data.contactNumber !== undefined && { contactNumber: body.data.contactNumber }),
       ...(body.data.pinned !== undefined && { pinned: body.data.pinned }),
       ...(body.data.groupVisibleToIds !== undefined && { groupVisibleToIds: body.data.groupVisibleToIds }),
       ...(encerrando && { motivoEncerramento: body.data.motivoEncerramento ?? null, encerradaEm: new Date() }),
