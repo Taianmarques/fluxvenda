@@ -55,6 +55,24 @@ export async function sendTeamMemberAddedEmail(to: string, name: string, teamNam
   );
 }
 
+// Aviso interno pra equipe FluxVenda quando alguém agenda uma demonstração pela aba
+// "Recursos" da página de início. DEMO_NOTIFY_EMAIL ausente = no-op (mesmo padrão do resto
+// do arquivo) — o agendamento em si não depende de e-mail, só o aviso.
+export async function sendDemoBookingNotification(teamName: string, requesterName: string, requesterEmail: string, scheduledAt: Date): Promise<boolean> {
+  const to = process.env.DEMO_NOTIFY_EMAIL ?? "";
+  if (!to) {
+    console.warn("[email] DEMO_NOTIFY_EMAIL não configurado — aviso de demonstração não enviado");
+    return false;
+  }
+  const dataFormatada = scheduledAt.toLocaleString("pt-BR", { dateStyle: "full", timeStyle: "short" });
+  return send(
+    to,
+    `Nova demonstração agendada — ${teamName}`,
+    `<p>${requesterName} (${requesterEmail}), da equipe <strong>${teamName}</strong>, agendou uma demonstração do CRM.</p>
+     <p><strong>Data/hora:</strong> ${dataFormatada}</p>`
+  );
+}
+
 export async function sendPasswordResetEmail(to: string, name: string, token: string, isMigration = false): Promise<boolean> {
   const url = `${APP_URL}/redefinir-senha?token=${token}`;
   const intro = isMigration

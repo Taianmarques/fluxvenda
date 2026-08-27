@@ -67,6 +67,7 @@ model Profile {
   opportunityTasks OpportunityTask[]
   treinoExemplosCriados TreinoExemplo[]
   opportunityFiles OpportunityFile[]
+  demoBookings DemoBooking[]
 }
 
 // Cadastro "em espera" enquanto o código de verificação do WhatsApp não é
@@ -545,6 +546,7 @@ model Team {
   agentConfigs      AgentConfig[]
   creditoCompras    CreditoCompra[]
   tokenUsageLogs    TokenUsageLog[]
+  demoBookings      DemoBooking[]
 }
 
 model TeamMember {
@@ -1638,6 +1640,27 @@ model OpportunityFile {
   uploadedBy   Profile @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
 
   @@index([opportunityId])
+}
+
+// Agendamento de demonstração do CRM pela própria equipe (plataforma, não por AgentConfig) —
+// aba "Recursos" da página de início. Horário fixo (lib/demo-scheduling.ts), sem conceito de
+// profissional/serviço como o agendamento público em app/agendar/[agentId].
+model DemoBooking {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  teamId String
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  requestedById String
+  requestedBy   Profile @relation(fields: [requestedById], references: [id], onDelete: Cascade)
+
+  scheduledAt     DateTime
+  durationMinutes Int      @default(40)
+  status          String   @default("AGENDADO") // AGENDADO | CANCELADO
+
+  @@index([teamId])
+  @@index([scheduledAt])
 }
 
 // Mensagem de texto programada pra ser enviada automaticamente numa data/hora futura —
