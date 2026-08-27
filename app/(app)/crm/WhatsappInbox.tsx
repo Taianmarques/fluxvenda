@@ -80,7 +80,7 @@ type Attachment = {
   previewUrl: string;
 };
 
-const MAX_ATTACHMENT_MB = 15;
+const MAX_ATTACHMENT_MB = 100;
 
 const MOTIVOS_ENCERRAMENTO = ["Venda concluída", "Dúvida resolvida", "Sem interesse", "Sem resposta", "Preço", "Comprou de concorrente", "Spam / engano", "Outro"];
 
