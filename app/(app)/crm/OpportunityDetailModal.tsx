@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, ThumbsUp, ThumbsDown, MessageCircle, ListChecks, Paperclip, StickyNote, Trash2, Download } from "lucide-react";
+import Link from "next/link";
+import { X, ThumbsUp, ThumbsDown, MessageCircle, ListChecks, Paperclip, StickyNote, Trash2, Download, ExternalLink } from "lucide-react";
 import { ConversationThread } from "./ConversationThread";
 import { PipelineTaskPanel } from "./PipelineTaskPanel";
 import type { PipelineOpportunity, Stage } from "./WhatsappPipeline";
@@ -63,11 +64,20 @@ export function OpportunityDetailModal({
         onClick={e => e.stopPropagation()}
         className={`w-full max-w-4xl h-[85vh] rounded-2xl border flex flex-col overflow-hidden ${dark ? "bg-gray-950 border-gray-800 text-white" : "bg-white border-gray-200 text-gray-900"}`}
       >
-        <div className={`px-4 py-3 border-b flex items-center justify-between flex-shrink-0 ${dark ? "border-gray-800" : "border-gray-200"}`}>
-          <p className="font-semibold">{opp.contactName || opp.contactNumber}</p>
-          <button onClick={onClose} className={`p-1.5 rounded-lg ${dark ? "text-gray-400 hover:bg-gray-800" : "text-gray-500 hover:bg-gray-100"}`}>
-            <X size={18} />
-          </button>
+        <div className={`px-4 py-3 border-b flex items-center justify-between gap-3 flex-shrink-0 ${dark ? "border-gray-800" : "border-gray-200"}`}>
+          <p className="font-semibold truncate">{opp.contactName || opp.contactNumber}</p>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <Link
+              href={`/crm/${agentId}?c=${opp.conversationId}`}
+              title="Ir para conversa"
+              className={`flex items-center gap-1.5 text-xs font-medium rounded-lg px-3 py-1.5 ${dark ? "text-blue-400 hover:bg-gray-800" : "text-blue-600 hover:bg-gray-100"}`}
+            >
+              <ExternalLink size={14} /> Ir para conversa
+            </Link>
+            <button onClick={onClose} className={`p-1.5 rounded-lg ${dark ? "text-gray-400 hover:bg-gray-800" : "text-gray-500 hover:bg-gray-100"}`}>
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {orderedStages.length > 0 && (
