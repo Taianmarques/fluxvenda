@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  ArrowLeft, ArrowRight, Bot, SlidersHorizontal, Sparkles, Building2, Tag, Clock, Shuffle, BookOpen, BarChart3, ChevronRight, ChevronDown, MessageCircle,
+  ArrowLeft, ArrowRight, Bot, SlidersHorizontal, Sparkles, Building2, Tag, Clock, Shuffle, BookOpen, GraduationCap, BarChart3, ChevronRight, ChevronDown, MessageCircle,
   type LucideIcon,
 } from "lucide-react";
 import { AgentActions } from "./AgentActions";
@@ -19,7 +19,7 @@ import { TestAgentChat } from "./TestAgentChat";
 
 type Section =
   | "agente" | "basico" | "personalidade" | "sobre-empresa" | "comercial" | "followup"
-  | "distribuicao" | "conhecimento" | "analytics";
+  | "distribuicao" | "conhecimento" | "treino" | "analytics";
 
 const SECTIONS: { key: Section; label: string; icon: LucideIcon }[] = [
   { key: "agente", label: "O Agente", icon: Bot },
@@ -30,6 +30,7 @@ const SECTIONS: { key: Section; label: string; icon: LucideIcon }[] = [
   { key: "followup", label: "Follow-up", icon: Clock },
   { key: "distribuicao", label: "Distribuição", icon: Shuffle },
   { key: "conhecimento", label: "Conhecimento", icon: BookOpen },
+  { key: "treino", label: "Treino", icon: GraduationCap },
   { key: "analytics", label: "Analytics", icon: BarChart3 },
 ];
 
@@ -298,6 +299,22 @@ export function AgentSettingsShell({
               <div>
                 <p className="font-semibold flex items-center gap-2"><BookOpen size={18} className="text-blue-400" /> Base de conhecimento</p>
                 <p className="text-sm text-gray-400 mt-1">Cadastre PDFs, links e textos que o agente usa como referência nas respostas.</p>
+              </div>
+              <ArrowRight size={20} className="text-gray-500 flex-shrink-0" />
+            </Link>
+          </div>
+        )}
+
+        {section === "treino" && (
+          <div className="space-y-4">
+            <SectionHeader title="Treino" desc="Exemplos de atendimento simulado que a IA usa como referência em conversas parecidas." />
+            <Link
+              href={`/crm/${agentId}/treino`}
+              className="flex items-center justify-between gap-4 bg-gray-900 border border-gray-800 hover:border-blue-700 rounded-2xl p-5 transition-colors"
+            >
+              <div>
+                <p className="font-semibold flex items-center gap-2"><GraduationCap size={18} className="text-blue-400" /> Exemplos de treino</p>
+                <p className="text-sm text-gray-400 mt-1">Cadastre cenários e conversas de exemplo (RAG) pra guiar a IA sem precisar de fine-tuning.</p>
               </div>
               <ArrowRight size={20} className="text-gray-500 flex-shrink-0" />
             </Link>
