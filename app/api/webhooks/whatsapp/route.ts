@@ -18,6 +18,16 @@ function mediaFileName(message: any): string | undefined {
   return message?.content?.fileName ?? message?.content?.filename ?? message?.fileName ?? undefined;
 }
 
+// Legenda de foto/vídeo/documento — pra mídia, a UazAPI manda a legenda dentro de
+// `content.caption` (não em `message.text`, que fica vazio nesse caso); extração defensiva
+// porque o campo varia por versão da API, igual ao quoted e ao fileName acima.
+function mediaCaption(message: any): string {
+  if (typeof message?.content === "object" && typeof message.content?.caption === "string" && message.content.caption) {
+    return message.content.caption;
+  }
+  return typeof message?.caption === "string" ? message.caption : "";
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ ok: true });
@@ -45,7 +55,7 @@ export async function POST(req: NextRequest) {
 
   const caption: string = typeof message.text === "string" && message.text
     ? message.text
-    : (typeof message.content === "string" ? message.content : "");
+    : mediaCaption(message) || (typeof message.content === "string" ? message.content : "");
 
   const mimetype = mediaMimetype(message);
   let imageUrl: string | null = null;

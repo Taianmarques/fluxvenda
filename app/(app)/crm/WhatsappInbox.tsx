@@ -285,8 +285,17 @@ function MediaLightbox({ mediaUrl, mediaType, onClose }: { mediaUrl: string; med
   );
 }
 
+// "[Imagem] legenda real" (tem legenda) vs "[Imagem enviada pelo cliente]" (sem legenda,
+// texto fixo gerado no webhook) — startsWith("[") sozinho não distinguia os dois casos e a
+// legenda nunca aparecia; o prefixo "[Tipo] " some no que é exibido, só fica salvo no banco
+// (histórico da IA usa o content bruto, ver lib/whatsapp-inbound.ts).
+function isMediaPlaceholder(content: string): boolean {
+  return !content || /^\[(Imagem enviada|Vídeo enviado|Documento enviado) pelo cliente/.test(content);
+}
+
 function MediaContent({ mediaUrl, mediaType, content }: { mediaUrl: string; mediaType: string; content: string }) {
-  const isPlaceholder = !content || content.startsWith("[");
+  const isPlaceholder = isMediaPlaceholder(content);
+  const displayContent = isPlaceholder ? content : content.replace(/^\[(Imagem|Vídeo|Documento)\] /, "");
   const [lightbox, setLightbox] = useState<"image" | "video" | null>(null);
   return (
     <div>
@@ -311,10 +320,10 @@ function MediaContent({ mediaUrl, mediaType, content }: { mediaUrl: string; medi
       {mediaType === "audio" && <audio controls src={mediaUrl} className="mb-1" />}
       {mediaType === "document" && (
         <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 underline mb-1">
-          <FileText size={14} /> {isPlaceholder ? "Documento" : content}
+          <FileText size={14} /> {isPlaceholder ? "Documento" : displayContent}
         </a>
       )}
-      {!isPlaceholder && mediaType !== "document" && <p className="whitespace-pre-wrap">{content}</p>}
+      {!isPlaceholder && mediaType !== "document" && <p className="whitespace-pre-wrap">{displayContent}</p>}
 
       {lightbox && <MediaLightbox mediaUrl={mediaUrl} mediaType={lightbox} onClose={() => setLightbox(null)} />}
     </div>
@@ -1240,7 +1249,7 @@ export function WhatsappInbox({
                       <p className={`text-xs truncate mt-0.5 ${t.listSecondary}`}>
                         {c.lastMessageRole === "assistant" && <span className="font-semibold">IA: </span>}
                         {c.lastMessageRole === "human" && <span className="font-semibold">Você: </span>}
-                        {c.lastMessage || "—"}
+                        {c.lastMessage ? c.lastMessage.replace(/^\[(Imagem|Vídeo|Documento)\] /, "") : "—"}
                       </p>
                       {c.etiquetas.length > 0 && (
                         <div className="flex items-center gap-1 mt-1 flex-wrap">
