@@ -6,13 +6,17 @@ import {
   type DragEndEvent, type DragStartEvent,
 } from "@dnd-kit/core";
 import { useDroppable, useDraggable } from "@dnd-kit/core";
-import { ThumbsUp, ThumbsDown, MessageCircle, Bot, X, ListChecks, MoreVertical, ArrowRightLeft, Pencil, Trash2, Clock } from "lucide-react";
+import { ThumbsUp, ThumbsDown, MessageCircle, Bot, X, ListChecks, MoreVertical, ArrowRightLeft, Shuffle, Pencil, Trash2, Clock } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { ConversationPopup } from "./ConversationPopup";
 import { PipelineTaskPanel } from "./PipelineTaskPanel";
 import type { Attendant } from "./PipelineFiltersPanel";
 
 export type Stage = { id: string; name: string; color: string; order: number; agenteInstrucoes?: string; followupDelaysMinutes?: number[] };
+
+// Outros pipelines do agente (exclui o ativo) — pra "Mover pipeline" no menu do card, ver
+// PipelineBoard.tsx. Move sempre pra primeira etapa (stages[0], já vem ordenada por order asc).
+export type OtherPipeline = { id: string; name: string; stages: { id: string; name: string }[] };
 
 // Follow-up por etapa: cada tentativa é um tempo (parado na etapa) + unidade, convertido pra minutos ao salvar
 type DelayUnit = "horas" | "minutos";
@@ -115,18 +119,20 @@ function CardAvatar({ agentId, conversationId, seed }: { agentId: string; conver
 }
 
 function Card({
-  agentId, opp, stageColor, attendants, onClick, onValueChange, onLeadStatusChange, onMarcarGanho, onMarcarPerda, onTransfer, onDeleteOpportunity, onOpenChat, onOpportunitiesChange, leadStatuses, onLeadStatusesChange, dark, t,
+  agentId, opp, stageColor, attendants, outrosPipelines, onClick, onValueChange, onLeadStatusChange, onMarcarGanho, onMarcarPerda, onTransfer, onMoverPipeline, onDeleteOpportunity, onOpenChat, onOpportunitiesChange, leadStatuses, onLeadStatusesChange, dark, t,
 }: {
   agentId: string;
   opp: PipelineOpportunity;
   stageColor?: string;
   attendants: { id: string; name: string; isManager: boolean }[];
+  outrosPipelines: OtherPipeline[];
   onClick: () => void;
   onValueChange: (id: string, value: number) => void;
   onLeadStatusChange: (conversationId: string, leadStatusId: string | null) => void;
   onMarcarGanho: (id: string) => void;
   onMarcarPerda: (id: string) => void;
   onTransfer: (conversationId: string, attendantId: string) => void;
+  onMoverPipeline: (oppId: string, stageId: string) => void;
   onDeleteOpportunity: (id: string) => void;
   onOpenChat: (conversationId: string) => void;
   onOpportunitiesChange: () => void;
@@ -140,7 +146,7 @@ function Card({
   const [valueInput, setValueInput] = useState(String(opp.dealValue));
   const menuBtnRef = useRef<HTMLButtonElement>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
-  const [menuView, setMenuView] = useState<"main" | "transfer">("main");
+  const [menuView, setMenuView] = useState<"main" | "transfer" | "pipeline">("main");
   const [taskPanelPos, setTaskPanelPos] = useState<{ top: number; left: number } | null>(null);
   const closed = Boolean(opp.wonAt || opp.lostAt);
 
@@ -237,6 +243,11 @@ function Card({
                 <button onClick={e => { e.stopPropagation(); setMenuView("transfer"); }} className={menuItemClass}>
                   <ArrowRightLeft size={13} /> Transferir
                 </button>
+                {!closed && outrosPipelines.length > 0 && (
+                  <button onClick={e => { e.stopPropagation(); setMenuView("pipeline"); }} className={menuItemClass}>
+                    <Shuffle size={13} /> Mover pipeline
+                  </button>
+                )}
                 <button onClick={() => { closeMenu(); onOpenChat(opp.conversationId); }} className={menuItemClass}>
                   <MessageCircle size={13} /> Abrir conversa
                 </button>
@@ -257,13 +268,28 @@ function Card({
                   <Trash2 size={13} /> Excluir
                 </button>
               </>
-            ) : (
+            ) : menuView === "transfer" ? (
               <>
                 <div className={`px-3 py-1.5 text-[10px] uppercase tracking-wide font-medium ${t.cardSecondary}`}>Transferir para</div>
                 {attendants.length === 0 && <p className="px-3 py-1.5 text-xs text-gray-500">Nenhum atendente</p>}
                 {attendants.map(a => (
                   <button key={a.id} onClick={() => { closeMenu(); onTransfer(opp.conversationId, a.id); }} className={menuItemClass}>
                     {a.name}
+                  </button>
+                ))}
+              </>
+            ) : (
+              <>
+                <div className={`px-3 py-1.5 text-[10px] uppercase tracking-wide font-medium ${t.cardSecondary}`}>Mover pra pipeline</div>
+                {outrosPipelines.map(p => (
+                  <button
+                    key={p.id}
+                    disabled={p.stages.length === 0}
+                    onClick={() => { closeMenu(); if (p.stages[0]) onMoverPipeline(opp.id, p.stages[0].id); }}
+                    className={`${menuItemClass} disabled:opacity-40 disabled:cursor-not-allowed`}
+                    title={p.stages.length === 0 ? "Esse pipeline não tem etapas" : `Entra em "${p.stages[0].name}"`}
+                  >
+                    {p.name}
                   </button>
                 ))}
               </>
@@ -322,12 +348,13 @@ function Card({
 }
 
 function Column({
-  agentId, stage, opportunities, attendants, onClickCard, onRename, onDelete, onStagesChange, onValueChange, onLeadStatusChange, onMarcarGanho, onMarcarPerda, onTransfer, onDeleteOpportunity, onOpenChat, onOpportunitiesChange, leadStatuses, onLeadStatusesChange, dark, t,
+  agentId, stage, opportunities, attendants, outrosPipelines, onClickCard, onRename, onDelete, onStagesChange, onValueChange, onLeadStatusChange, onMarcarGanho, onMarcarPerda, onTransfer, onMoverPipeline, onDeleteOpportunity, onOpenChat, onOpportunitiesChange, leadStatuses, onLeadStatusesChange, dark, t,
 }: {
   agentId: string;
   stage: Stage;
   opportunities: PipelineOpportunity[];
   attendants: Attendant[];
+  outrosPipelines: OtherPipeline[];
   onClickCard: (conversationId: string) => void;
   onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
@@ -337,6 +364,7 @@ function Column({
   onMarcarGanho: (id: string) => void;
   onMarcarPerda: (id: string) => void;
   onTransfer: (conversationId: string, attendantId: string) => void;
+  onMoverPipeline: (oppId: string, stageId: string) => void;
   onDeleteOpportunity: (id: string) => void;
   onOpenChat: (conversationId: string) => void;
   onOpportunitiesChange: () => void;
@@ -502,8 +530,8 @@ function Column({
       <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[120px]">
         {opportunities.map(o => (
           <Card
-            key={o.id} agentId={agentId} opp={o} stageColor={stage.color} attendants={attendants} onClick={() => onClickCard(o.conversationId)} onValueChange={onValueChange}
-            onLeadStatusChange={onLeadStatusChange} onMarcarGanho={onMarcarGanho} onMarcarPerda={onMarcarPerda} onTransfer={onTransfer} onDeleteOpportunity={onDeleteOpportunity}
+            key={o.id} agentId={agentId} opp={o} stageColor={stage.color} attendants={attendants} outrosPipelines={outrosPipelines} onClick={() => onClickCard(o.conversationId)} onValueChange={onValueChange}
+            onLeadStatusChange={onLeadStatusChange} onMarcarGanho={onMarcarGanho} onMarcarPerda={onMarcarPerda} onTransfer={onTransfer} onMoverPipeline={onMoverPipeline} onDeleteOpportunity={onDeleteOpportunity}
             onOpenChat={onOpenChat} onOpportunitiesChange={onOpportunitiesChange}
             leadStatuses={leadStatuses} onLeadStatusesChange={onLeadStatusesChange}
             dark={dark} t={t}
@@ -515,7 +543,7 @@ function Column({
 }
 
 export function WhatsappPipeline({
-  agentId, pipelineId, stages, leadStatuses, opportunities, theme, attendants, motivosPerda, onSelectConversation, onStagesChange, onLeadStatusesChange, onOpportunitiesChange,
+  agentId, pipelineId, stages, leadStatuses, opportunities, theme, attendants, motivosPerda, outrosPipelines, onSelectConversation, onStagesChange, onLeadStatusesChange, onOpportunitiesChange,
 }: {
   agentId: string;
   pipelineId: string;
@@ -525,6 +553,7 @@ export function WhatsappPipeline({
   theme: PipelineTheme;
   attendants: Attendant[];
   motivosPerda: { id: string; nome: string }[];
+  outrosPipelines: OtherPipeline[];
   onSelectConversation: (id: string) => void;
   onStagesChange: () => void;
   onLeadStatusesChange: () => void;
@@ -613,6 +642,22 @@ export function WhatsappPipeline({
     setLocalOpportunities(prev => prev.map(o => o.id === oppId ? { ...o, lostAt: data.opportunity.lostAt, stageId: data.opportunity.stageId, motivoPerdaNome: motivoNome } : o));
   }
 
+  // Move a oportunidade pra primeira etapa de outro pipeline — o PATCH de etapa não exige que
+  // a nova etapa pertença ao mesmo pipeline da atual, só ao mesmo agente (ver
+  // app/api/ferramentas/whatsapp/conversas/[id]/oportunidades/[oppId]/route.ts:36-39), então
+  // reaproveita o mesmo endpoint do drag-and-drop entre etapas.
+  async function handleMoverPipeline(oppId: string, stageId: string) {
+    const opp = localOpportunities.find(o => o.id === oppId);
+    if (!opp) return;
+    setLocalOpportunities(prev => prev.filter(o => o.id !== oppId));
+    await fetch(`/api/ferramentas/whatsapp/conversas/${opp.conversationId}/oportunidades/${oppId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stageId }),
+    });
+    onOpportunitiesChange();
+  }
+
   async function handleTransfer(conversationId: string, attendantId: string) {
     await fetch(`/api/ferramentas/whatsapp/conversas/${conversationId}`, {
       method: "PATCH",
@@ -669,6 +714,7 @@ export function WhatsappPipeline({
               stage={{ id: "__sem_etapa__", name: "Sem etapa", color: "#6b7280", order: -1 }}
               opportunities={semEtapa}
               attendants={attendants}
+              outrosPipelines={outrosPipelines}
               onClickCard={onSelectConversation}
               onRename={() => {}}
               onDelete={() => {}}
@@ -678,6 +724,7 @@ export function WhatsappPipeline({
               onMarcarGanho={handleMarcarGanho}
               onMarcarPerda={handleMarcarPerda}
               onTransfer={handleTransfer}
+              onMoverPipeline={handleMoverPipeline}
               onDeleteOpportunity={handleDeleteOpportunity}
               onOpenChat={setChatConversationId}
               onOpportunitiesChange={onOpportunitiesChange}
@@ -694,6 +741,7 @@ export function WhatsappPipeline({
               stage={stage}
               opportunities={localOpportunities.filter(o => o.stageId === stage.id)}
               attendants={attendants}
+              outrosPipelines={outrosPipelines}
               onClickCard={onSelectConversation}
               onRename={handleRename}
               onDelete={handleDelete}
@@ -703,6 +751,7 @@ export function WhatsappPipeline({
               onMarcarGanho={handleMarcarGanho}
               onMarcarPerda={handleMarcarPerda}
               onTransfer={handleTransfer}
+              onMoverPipeline={handleMoverPipeline}
               onDeleteOpportunity={handleDeleteOpportunity}
               onOpenChat={setChatConversationId}
               onOpportunitiesChange={onOpportunitiesChange}

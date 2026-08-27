@@ -322,6 +322,7 @@ export function PipelineBoard({
           onOpportunitiesChange={refreshOpportunities}
           attendants={attendants}
           motivosPerda={motivosPerda}
+          outrosPipelines={pipelines.filter(p => p.id !== active.id).map(p => ({ id: p.id, name: p.name, stages: p.stages }))}
         />
       )}
     </div>
