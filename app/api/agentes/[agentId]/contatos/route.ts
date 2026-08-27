@@ -9,11 +9,15 @@ const schema = z.object({
     nome: z.string().trim().max(80).optional(),
     numero: z.string().transform(v => v.replace(/\D/g, "")),
   })).min(1).max(1000),
+  // Aplicados ao lote inteiro (importação em massa ou contato único) — só preenchem quem
+  // ainda não tem vendedor/nível definido, nunca sobrescrevem um vínculo já existente.
+  atendenteId: z.string().optional(),
+  nivelCarteira: z.enum(["A", "B", "C", "INATIVO", "PERDIDO"]).optional(),
 });
 
-// Importa contatos em massa (CSV parseado no cliente). Cada contato vira uma conversa sem
-// mensagens — mesmo modelo dos contatos que chegam pelo WhatsApp. Número que já existe:
-// só preenche o nome se ainda estiver vazio, nunca sobrescreve.
+// Importa contatos em massa (CSV parseado no cliente) ou cria um único contato. Cada contato
+// vira uma conversa sem mensagens — mesmo modelo dos contatos que chegam pelo WhatsApp. Número
+// que já existe: só preenche nome/vendedor/nível se ainda estiverem vazios, nunca sobrescreve.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -25,6 +29,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
 
   const body = schema.safeParse(await req.json());
   if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
+
+  // Confirma que o vendedor escolhido pra vincular o lote pertence a este time — evita
+  // gravar um profileId arbitrário vindo do client (mesma checagem da ação em massa abaixo).
+  let atendenteId: string | undefined;
+  if (body.data.atendenteId) {
+    const team = await prisma.team.findUnique({ where: { id: config.teamId } });
+    const member = await prisma.teamMember.findUnique({ where: { profileId: body.data.atendenteId } });
+    const pertence = team?.managerId === body.data.atendenteId || member?.teamId === config.teamId;
+    if (!pertence) return NextResponse.json({ error: "Atendente não encontrado" }, { status: 404 });
+    atendenteId = body.data.atendenteId;
+  }
+  const nivelCarteira = body.data.nivelCarteira;
 
   // Dedup interno + descarta números inválidos
   const porNumero = new Map<string, { nome?: string; numero: string }>();
@@ -40,7 +56,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
 
   const existentes = await prisma.conversation.findMany({
     where: { agentConfigId: config.id, contactNumber: { in: validos.map(v => v.numero) } },
-    select: { id: true, contactNumber: true, contactName: true },
+    select: { id: true, contactNumber: true, contactName: true, assignedToId: true, nivelCarteira: true },
   });
   const existentesPorNumero = new Map(existentes.map(e => [e.contactNumber, e]));
 
@@ -50,14 +66,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
       agentConfigId: config.id,
       contactNumber: v.numero,
       contactName: v.nome?.trim() || null,
+      ...(atendenteId && { assignedToId: atendenteId }),
+      ...(nivelCarteira && { nivelCarteira }),
     })),
   });
 
   let atualizados = 0;
   for (const v of validos) {
     const existente = existentesPorNumero.get(v.numero);
-    if (existente && !existente.contactName && v.nome?.trim()) {
-      await prisma.conversation.update({ where: { id: existente.id }, data: { contactName: v.nome.trim() } });
+    if (!existente) continue;
+    const data: { contactName?: string; assignedToId?: string; nivelCarteira?: string } = {};
+    if (!existente.contactName && v.nome?.trim()) data.contactName = v.nome.trim();
+    if (atendenteId && !existente.assignedToId) data.assignedToId = atendenteId;
+    if (nivelCarteira && !existente.nivelCarteira) data.nivelCarteira = nivelCarteira;
+    if (Object.keys(data).length > 0) {
+      await prisma.conversation.update({ where: { id: existente.id }, data });
       atualizados++;
     }
   }

@@ -40,6 +40,34 @@ function isIgContact(n: string): boolean {
   return n.startsWith("ig_");
 }
 
+const NIVEIS_MANUAIS = ["A", "B", "C", "INATIVO", "PERDIDO"] as const;
+
+// Par de selects reaproveitado no "Novo contato" e no "Importar CSV" — vincula vendedor e/ou
+// nível da carteira já na criação, no lugar do gestor ter que aplicar depois via etiqueta
+// genérica como workaround.
+function VendedorNivelSelects({
+  attendants, atendenteId, onAtendenteChange, nivel, onNivelChange,
+}: {
+  attendants: Attendant[];
+  atendenteId: string;
+  onAtendenteChange: (v: string) => void;
+  nivel: string;
+  onNivelChange: (v: string) => void;
+}) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+      <select value={atendenteId} onChange={e => onAtendenteChange(e.target.value)} className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm">
+        <option value="">Sem vendedor vinculado</option>
+        {attendants.map(a => <option key={a.id} value={a.id}>{a.name}{a.isManager ? " (gestor)" : ""}</option>)}
+      </select>
+      <select value={nivel} onChange={e => onNivelChange(e.target.value)} className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm">
+        <option value="">Sem nível definido</option>
+        {NIVEIS_MANUAIS.map(n => <option key={n} value={n} title={NIVEL_META[n].desc}>Nível {NIVEL_META[n].label}</option>)}
+      </select>
+    </div>
+  );
+}
+
 function EtiquetaChip({ e, onRemove }: { e: Etiqueta; onRemove?: () => void }) {
   return (
     <span
@@ -67,6 +95,12 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
   const [novoNome, setNovoNome] = useState("");
   const [novoNumero, setNovoNumero] = useState("");
   const [criando, setCriando] = useState(false);
+
+  // Vínculo de vendedor + nível da carteira já na criação/importação — compartilhado pelos
+  // dois fluxos (contato único e CSV), só preenche quem ainda não tiver vendedor/nível
+  const [importAtendenteId, setImportAtendenteId] = useState("");
+  const [importNivel, setImportNivel] = useState<"" | "A" | "B" | "C" | "INATIVO" | "PERDIDO">("");
+  const [showImportCsv, setShowImportCsv] = useState(false);
 
   // Filtros — "" = todos; vendedor usa "__none__" pra "sem atendente"
   const [showFiltros, setShowFiltros] = useState(false);
@@ -223,11 +257,16 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
       const res = await fetch(`/api/agentes/${agentId}/contatos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contatos: parsed }),
+        body: JSON.stringify({
+          contatos: parsed,
+          ...(importAtendenteId && { atendenteId: importAtendenteId }),
+          ...(importNivel && { nivelCarteira: importNivel }),
+        }),
       });
       const data = await res.json();
       if (res.ok) {
         setImportResult(`Importação concluída: ${data.criados} novo${data.criados === 1 ? "" : "s"}, ${data.atualizados} atualizado${data.atualizados === 1 ? "" : "s"}${data.ignorados > 0 ? `, ${data.ignorados} ignorado${data.ignorados === 1 ? "" : "s"} (número inválido ou repetido)` : ""}.`);
+        setShowImportCsv(false);
         router.refresh();
       } else {
         setImportResult(data.error ?? "Não foi possível importar. Tente novamente.");
@@ -247,7 +286,11 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
       const res = await fetch(`/api/agentes/${agentId}/contatos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contatos: [{ nome: novoNome.trim() || undefined, numero }] }),
+        body: JSON.stringify({
+          contatos: [{ nome: novoNome.trim() || undefined, numero }],
+          ...(importAtendenteId && { atendenteId: importAtendenteId }),
+          ...(importNivel && { nivelCarteira: importNivel }),
+        }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -329,7 +372,7 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
               <Tags size={14} /> Etiquetas
             </button>
             <button
-              onClick={() => fileRef.current?.click()}
+              onClick={() => setShowImportCsv(s => !s)}
               disabled={importando}
               className="flex items-center gap-1.5 text-sm font-medium text-blue-400 hover:text-blue-300 border border-blue-800/50 hover:border-blue-600/50 disabled:opacity-50 rounded-xl px-4 py-2 transition-colors"
             >
@@ -420,6 +463,13 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
                 className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
               />
             </div>
+            <VendedorNivelSelects
+              attendants={attendants}
+              atendenteId={importAtendenteId}
+              onAtendenteChange={setImportAtendenteId}
+              nivel={importNivel}
+              onNivelChange={v => setImportNivel(v as typeof importNivel)}
+            />
             <div className="flex gap-2">
               <button
                 onClick={handleCriarContato}
@@ -429,6 +479,33 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
                 {criando ? "Adicionando..." : "Adicionar"}
               </button>
               <button onClick={() => setShowNovo(false)} className="text-xs text-gray-400 hover:text-gray-200 px-2">Cancelar</button>
+            </div>
+          </div>
+        )}
+
+        {showImportCsv && (
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-2">
+            <p className="font-semibold text-sm">Importar CSV</p>
+            <p className="text-xs text-gray-500">
+              Aceita nome e número (DDD + número), com ou sem cabeçalho. Vendedor e nível abaixo são opcionais —
+              aplicam a todo o lote, só em quem ainda não tiver um vínculo definido.
+            </p>
+            <VendedorNivelSelects
+              attendants={attendants}
+              atendenteId={importAtendenteId}
+              onAtendenteChange={setImportAtendenteId}
+              nivel={importNivel}
+              onNivelChange={v => setImportNivel(v as typeof importNivel)}
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => fileRef.current?.click()}
+                disabled={importando}
+                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium"
+              >
+                <Upload size={13} /> {importando ? "Importando..." : "Escolher arquivo .csv"}
+              </button>
+              <button onClick={() => setShowImportCsv(false)} className="text-xs text-gray-400 hover:text-gray-200 px-2">Cancelar</button>
             </div>
           </div>
         )}
