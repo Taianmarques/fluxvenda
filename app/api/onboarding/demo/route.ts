@@ -5,6 +5,7 @@ import { listMyAgentConfigs } from "@/lib/team";
 import { prisma } from "@/lib/prisma";
 import { isDemoSlotAvailable, DEMO_SLOT_MINUTES, DEFAULT_DEMO_TIMES } from "@/lib/demo-scheduling";
 import { sendDemoBookingNotification } from "@/lib/email";
+import { sendWhatsAppText, buildDemoConfirmationMessage } from "@/lib/whatsapp";
 
 // date/time separados (não um datetime ISO já combinado) — o cliente não sabe o fuso do
 // servidor; o servidor monta o Date na hora local dele (America/Sao_Paulo, ver
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
 
   const [team, profile] = await Promise.all([
     prisma.team.findUniqueOrThrow({ where: { id: result.teamId }, select: { name: true } }),
-    prisma.profile.findUniqueOrThrow({ where: { id: user.id }, select: { name: true, email: true } }),
+    prisma.profile.findUniqueOrThrow({ where: { id: user.id }, select: { name: true, email: true, phone: true } }),
   ]);
 
   const booking = await prisma.demoBooking.create({
@@ -48,6 +49,9 @@ export async function POST(req: NextRequest) {
   });
 
   sendDemoBookingNotification(team.name, profile.name, profile.email, scheduledAt).catch(() => {});
+  if (profile.phone) {
+    sendWhatsAppText(profile.phone, buildDemoConfirmationMessage(profile.name, scheduledAt, DEMO_SLOT_MINUTES)).catch(() => {});
+  }
 
   return NextResponse.json({ booking });
 }

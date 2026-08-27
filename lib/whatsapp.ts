@@ -277,3 +277,20 @@ export function buildWelcomeMessage(name: string, role: "GESTOR" | "VENDEDOR" | 
 export function buildOtpMessage(code: string): string {
   return `Seu código de verificação FluxVenda é *${code}*.\n\nVálido por 10 minutos. Não compartilhe esse código com ninguém.`;
 }
+
+// Confirmação enviada a quem agendou (aba Recursos > Agendar uma demonstração), pela
+// instância global da plataforma — mesmo canal do buildWelcomeMessage/OTP.
+export function buildDemoConfirmationMessage(name: string, scheduledAt: Date, durationMinutes: number): string {
+  const dataFormatada = scheduledAt.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" });
+  const horaFormatada = scheduledAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  return [
+    `Olá, ${name}! 👋`,
+    ``,
+    `Sua demonstração do CRM FluxVenda está confirmada:`,
+    ``,
+    `📅 ${dataFormatada}`,
+    `🕐 ${horaFormatada} (${durationMinutes} min)`,
+    ``,
+    `Qualquer imprevisto, é só responder esta mensagem.`,
+  ].join("\n");
+}
