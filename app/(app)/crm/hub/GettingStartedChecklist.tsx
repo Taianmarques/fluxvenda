@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronDown, CheckCircle2, Circle } from "lucide-react";
 import type { ChecklistStep, ChecklistStepKey } from "@/lib/crm-onboarding";
+import { PlanosModal } from "./PlanosModal";
 
 // dismissHref: se informado, "Dispensar" navega pra lá em vez de só esconder o card no
 // lugar — usado na página de boas-vindas standalone, que ficaria em branco sem isso.
@@ -16,6 +17,7 @@ export function GettingStartedChecklist({ steps, name, dismissHref }: { steps: C
   const doneCount = steps.filter(s => s.done).length;
   const allDone = doneCount === steps.length;
   const [dismissed, setDismissed] = useState(false);
+  const [planosAberto, setPlanosAberto] = useState(false);
   if (allDone && dismissed) return null;
 
   function handleDismiss() {
@@ -73,18 +75,29 @@ export function GettingStartedChecklist({ steps, name, dismissHref }: { steps: C
               {open && (
                 <div className="px-4 pb-4 pl-11 space-y-3">
                   <p className="text-sm text-gray-500">{step.description}</p>
-                  <Link
-                    href={step.href}
-                    className="inline-block bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-4 py-2 text-sm font-medium transition-colors"
-                  >
-                    {step.cta}
-                  </Link>
+                  {step.key === "plano" ? (
+                    <button
+                      onClick={() => setPlanosAberto(true)}
+                      className="inline-block bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-4 py-2 text-sm font-medium transition-colors"
+                    >
+                      {step.cta}
+                    </button>
+                  ) : (
+                    <Link
+                      href={step.href}
+                      className="inline-block bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-4 py-2 text-sm font-medium transition-colors"
+                    >
+                      {step.cta}
+                    </Link>
+                  )}
                 </div>
               )}
             </div>
           );
         })}
       </div>
+
+      {planosAberto && <PlanosModal onClose={() => setPlanosAberto(false)} />}
     </div>
   );
 }
