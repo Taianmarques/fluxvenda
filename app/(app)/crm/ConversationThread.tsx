@@ -127,8 +127,8 @@ export function ConversationThread({ conversationId, dark, onClose, showHeader =
                 <div className={`flex ${isOutgoing ? "justify-end" : "justify-start"}`}>
                 <div
                   className={`max-w-[75%] rounded-lg px-3 py-2 text-sm ${
-                    m.role === "human" ? "bg-green-700 text-white" :
-                    m.role === "assistant" ? "bg-[#005c4b] text-white" :
+                    m.role === "human" ? (dark ? "bg-green-700 text-white" : "bg-[#cfe9ff] text-gray-900") :
+                    m.role === "assistant" ? (dark ? "bg-[#005c4b] text-white" : "bg-[#d9fdd3] text-gray-900") :
                     dark ? "bg-[#202c33] text-gray-100" : "bg-white text-gray-900"
                   }`}
                 >
