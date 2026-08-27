@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   MessageCircle, Search, X, Trophy, Lock, Unlock, Bot, User, UserPlus, UserCheck, Users, Eye,
-  FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap, StickyNote, ArrowRightLeft, HandCoins, CalendarClock, ListFilter, Instagram, ArrowLeft,
+  FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap, StickyNote, ArrowRightLeft, HandCoins, CalendarClock, ListFilter, ListChecks, Instagram, ArrowLeft,
   Reply, Forward, ChevronDown, Package, ImageOff, Pin, Maximize2, Download,
 } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
@@ -350,7 +350,10 @@ export function WhatsappInbox({
   const [theme, setTheme] = useState<ChatTheme>("dark");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ativos" | "pendentes" | "finalizados" | "grupos">("ativos");
-  // Seleção múltipla + ações em lote — só faz sentido nas abas Ativos/Pendentes
+  // Seleção múltipla + ações em lote — só faz sentido nas abas Ativos/Pendentes; os checkboxes
+  // só aparecem depois de ativar o modo seleção (ícone perto de Filtros), pra não poluir a
+  // lista por padrão
+  const [selecaoAtiva, setSelecaoAtiva] = useState(false);
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [showMoverEtapa, setShowMoverEtapa] = useState(false);
   const [pipelinesLote, setPipelinesLote] = useState<Pipeline[]>([]);
@@ -1185,7 +1188,7 @@ export function WhatsappInbox({
       })
     : extraFiltered;
 
-  const showSelecaoLote = statusFilter === "ativos" || statusFilter === "pendentes";
+  const showSelecaoLote = (statusFilter === "ativos" || statusFilter === "pendentes") && selecaoAtiva;
   const todosSelecionadosLote = filteredConversations.length > 0 && filteredConversations.every(c => selecionados.has(c.id));
   function toggleTodosLote() {
     setSelecionados(todosSelecionadosLote ? new Set() : new Set(filteredConversations.map(c => c.id)));
@@ -1276,6 +1279,15 @@ export function WhatsappInbox({
                     />
                   )}
                 </div>
+                {(statusFilter === "ativos" || statusFilter === "pendentes") && (
+                  <button
+                    onClick={() => { setSelecaoAtiva(s => !s); if (selecaoAtiva) setSelecionados(new Set()); }}
+                    title={selecaoAtiva ? "Cancelar seleção" : "Selecionar conversas"}
+                    className={`p-2 rounded-lg flex-shrink-0 ${selecaoAtiva ? "bg-blue-600 text-white" : `${t.toggleBar} ${t.toggleInactive}`}`}
+                  >
+                    <ListChecks size={14} />
+                  </button>
+                )}
                 <button
                   onClick={() => setShowNovoAtendimento(true)}
                   title="Novo atendimento"
