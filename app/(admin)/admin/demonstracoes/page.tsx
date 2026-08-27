@@ -1,14 +1,19 @@
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_DEMO_TIMES } from "@/lib/demo-scheduling";
+import { DemoHorariosConfig } from "./DemoHorariosConfig";
 
 export default async function AdminDemonstracoesPage() {
-  const bookings = await prisma.demoBooking.findMany({
-    orderBy: { scheduledAt: "desc" },
-    include: {
-      team: { select: { name: true } },
-      requestedBy: { select: { name: true, email: true } },
-    },
-    take: 100,
-  });
+  const [bookings, settings] = await Promise.all([
+    prisma.demoBooking.findMany({
+      orderBy: { scheduledAt: "desc" },
+      include: {
+        team: { select: { name: true } },
+        requestedBy: { select: { name: true, email: true } },
+      },
+      take: 100,
+    }),
+    prisma.platformSettings.findUnique({ where: { id: "singleton" }, select: { demoAvailableTimes: true } }),
+  ]);
 
   const now = new Date();
 
@@ -19,6 +24,8 @@ export default async function AdminDemonstracoesPage() {
           <p className="text-gray-400 text-sm">Aba Recursos → Agendar uma demonstração</p>
           <h1 className="text-3xl font-bold mt-1">Demonstrações agendadas</h1>
         </div>
+
+        <DemoHorariosConfig initialTimes={settings?.demoAvailableTimes ?? DEFAULT_DEMO_TIMES} />
 
         {bookings.length === 0 ? (
           <div className="bg-gray-900 border border-dashed border-gray-700 rounded-2xl p-12 text-center">

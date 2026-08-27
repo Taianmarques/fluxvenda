@@ -1948,4 +1948,8 @@ model PlatformSettings {
   pwaIcon512MimeType         String?
   pwaIcon512MaskableBase64   String? @db.Text
   pwaIcon512MaskableMimeType String?
+
+  // Horários fixos (HH:mm, seg-sex) oferecidos na aba Recursos > Agendar uma demonstração
+  // (app/(app)/crm/hub/AgendarDemoModal.tsx) — configurável em /admin/demonstracoes.
+  demoAvailableTimes String[] @default(["09:00", "11:00", "14:00", "16:00"])
 }

@@ -3,8 +3,7 @@ import { z } from "zod";
 import { currentUser } from "@/lib/auth/server";
 import { listMyAgentConfigs } from "@/lib/team";
 import { prisma } from "@/lib/prisma";
-import { isSlotAvailable } from "@/lib/scheduling";
-import { DEMO_AVAILABILITY, DEMO_SLOT_MINUTES } from "@/lib/demo-scheduling";
+import { isDemoSlotAvailable, DEMO_SLOT_MINUTES, DEFAULT_DEMO_TIMES } from "@/lib/demo-scheduling";
 import { sendDemoBookingNotification } from "@/lib/email";
 
 // date/time separados (não um datetime ISO já combinado) — o cliente não sabe o fuso do
@@ -26,12 +25,16 @@ export async function POST(req: NextRequest) {
 
   const scheduledAt = new Date(`${body.data.date}T${body.data.time}:00`);
 
-  const busy = await prisma.demoBooking.findMany({
-    where: { status: "AGENDADO", scheduledAt: { gte: new Date() } },
-    select: { scheduledAt: true, durationMinutes: true },
-  });
+  const [settings, busy] = await Promise.all([
+    prisma.platformSettings.findUnique({ where: { id: "singleton" }, select: { demoAvailableTimes: true } }),
+    prisma.demoBooking.findMany({
+      where: { status: "AGENDADO", scheduledAt: { gte: new Date() } },
+      select: { scheduledAt: true, durationMinutes: true },
+    }),
+  ]);
+  const times = settings?.demoAvailableTimes ?? DEFAULT_DEMO_TIMES;
 
-  if (!isSlotAvailable(DEMO_AVAILABILITY, DEMO_SLOT_MINUTES, busy, scheduledAt)) {
+  if (!isDemoSlotAvailable(times, busy, scheduledAt)) {
     return NextResponse.json({ error: "Esse horário não está mais disponível" }, { status: 409 });
   }
 
