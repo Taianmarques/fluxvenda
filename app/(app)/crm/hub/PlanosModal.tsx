@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { X, Check, Copy, ExternalLink, Loader2, CheckCircle2 } from "lucide-react";
+import { X, Check, Copy, Loader2, CheckCircle2 } from "lucide-react";
 import { CRM_PLAN_TIERS, BILLING_CYCLES, getSavingsCentavos, type CrmPlanTier, type BillingCycle } from "@/lib/crm-plans";
+import { CartaoForm, type CartaoFormData } from "@/app/(app)/CartaoForm";
 
 const brl = (centavos: number) => (centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -18,7 +19,7 @@ export function PlanosModal({ onClose }: { onClose: () => void }) {
   const [cpfCnpj, setCpfCnpj] = useState("");
   const [gerando, setGerando] = useState(false);
   const [error, setError] = useState("");
-  const [cobranca, setCobranca] = useState<{ compraId: string; pixPayload?: string; invoiceUrl?: string } | null>(null);
+  const [cobranca, setCobranca] = useState<{ compraId: string; pixPayload?: string } | null>(null);
   const [copiado, setCopiado] = useState(false);
   const [pago, setPago] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -37,24 +38,30 @@ export function PlanosModal({ onClose }: { onClose: () => void }) {
     setError("");
   }
 
-  async function handleGerarCobranca() {
-    if (!tierSelecionado) return;
+  function digitsCpfCnpj(): string | null {
     const digits = cpfCnpj.replace(/\D/g, "");
     if (digits.length !== 11 && digits.length !== 14) {
       setError("Informe um CPF ou CNPJ válido.");
-      return;
+      return null;
     }
+    return digits;
+  }
+
+  async function handleGerarCobranca() {
+    if (!tierSelecionado) return;
+    const digits = digitsCpfCnpj();
+    if (!digits) return;
     setGerando(true);
     setError("");
     try {
       const res = await fetch("/api/planos/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tierId: tierSelecionado.id, cycle, formaPagamento, cpfCnpj: digits }),
+        body: JSON.stringify({ tierId: tierSelecionado.id, cycle, formaPagamento: "PIX", cpfCnpj: digits }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Erro ao gerar a cobrança.");
-      setCobranca({ compraId: data.compraId, pixPayload: data.pixPayload, invoiceUrl: data.invoiceUrl });
+      setCobranca({ compraId: data.compraId, pixPayload: data.pixPayload });
 
       pollRef.current = setInterval(async () => {
         const r = await fetch(`/api/planos/compras/${data.compraId}`);
@@ -66,6 +73,30 @@ export function PlanosModal({ onClose }: { onClose: () => void }) {
           setTimeout(() => { router.refresh(); onClose(); }, 2000);
         }
       }, 4000);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setGerando(false);
+    }
+  }
+
+  async function handleCartaoSubmit(cartao: CartaoFormData) {
+    if (!tierSelecionado) return;
+    const digits = digitsCpfCnpj();
+    if (!digits) return;
+    setGerando(true);
+    setError("");
+    try {
+      const res = await fetch("/api/planos/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tierId: tierSelecionado.id, cycle, formaPagamento: "CARTAO", cpfCnpj: digits, cartao }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Erro ao processar o cartão.");
+      if (!data.pago) throw new Error("Pagamento não foi aprovado. Confira os dados do cartão ou tente outro.");
+      setPago(true);
+      setTimeout(() => { router.refresh(); onClose(); }, 2000);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -177,7 +208,7 @@ export function PlanosModal({ onClose }: { onClose: () => void }) {
             </div>
           </>
         ) : (
-          <div className={`mx-auto ${cobranca && formaPagamento === "CARTAO" && !pago ? "max-w-2xl" : "max-w-sm"}`}>
+          <div className={`mx-auto ${formaPagamento === "CARTAO" && !pago && !cobranca ? "max-w-md" : "max-w-sm"}`}>
             <button onClick={() => setTierSelecionado(null)} className="text-xs text-gray-400 hover:text-gray-700 mb-3">
               ← Voltar pros planos
             </button>
@@ -197,36 +228,16 @@ export function PlanosModal({ onClose }: { onClose: () => void }) {
                 </div>
               ) : cobranca ? (
                 <div className="space-y-3">
-                  {formaPagamento === "PIX" && cobranca.pixPayload ? (
-                    <>
-                      <p className="text-xs text-gray-500">Escaneie ou copie o código Pix no seu banco:</p>
-                      <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
-                        <p className="text-[10px] text-gray-600 break-all font-mono">{cobranca.pixPayload}</p>
-                      </div>
-                      <button
-                        onClick={copiarPix}
-                        className="w-full flex items-center justify-center gap-1.5 text-sm font-medium bg-gray-100 hover:bg-gray-200 rounded-xl py-2"
-                      >
-                        <Copy size={13} /> {copiado ? "Copiado!" : "Copiar código Pix"}
-                      </button>
-                    </>
-                  ) : cobranca.invoiceUrl ? (
-                    <div className="space-y-2">
-                      <iframe
-                        src={cobranca.invoiceUrl}
-                        className="w-full h-[560px] rounded-xl border border-gray-200"
-                        title="Pagamento com cartão"
-                      />
-                      <a
-                        href={cobranca.invoiceUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-1.5 text-xs text-gray-400 hover:text-gray-600"
-                      >
-                        <ExternalLink size={12} /> Não carregou? Abrir em outra aba
-                      </a>
-                    </div>
-                  ) : null}
+                  <p className="text-xs text-gray-500">Escaneie ou copie o código Pix no seu banco:</p>
+                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                    <p className="text-[10px] text-gray-600 break-all font-mono">{cobranca.pixPayload}</p>
+                  </div>
+                  <button
+                    onClick={copiarPix}
+                    className="w-full flex items-center justify-center gap-1.5 text-sm font-medium bg-gray-100 hover:bg-gray-200 rounded-xl py-2"
+                  >
+                    <Copy size={13} /> {copiado ? "Copiado!" : "Copiar código Pix"}
+                  </button>
                   <p className="text-xs text-gray-400 flex items-center gap-1.5 justify-center">
                     <Loader2 size={12} className="animate-spin" /> Aguardando confirmação do pagamento...
                   </p>
@@ -257,14 +268,20 @@ export function PlanosModal({ onClose }: { onClose: () => void }) {
                       maxLength={18}
                     />
                   </div>
-                  {error && <p className="text-xs text-red-600">{error}</p>}
-                  <button
-                    onClick={handleGerarCobranca}
-                    disabled={gerando}
-                    className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl py-2.5 text-sm font-medium"
-                  >
-                    {gerando ? "Gerando cobrança..." : "Continuar"}
-                  </button>
+                  {formaPagamento === "PIX" ? (
+                    <>
+                      {error && <p className="text-xs text-red-600">{error}</p>}
+                      <button
+                        onClick={handleGerarCobranca}
+                        disabled={gerando}
+                        className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl py-2.5 text-sm font-medium"
+                      >
+                        {gerando ? "Gerando cobrança..." : "Continuar"}
+                      </button>
+                    </>
+                  ) : (
+                    <CartaoForm onSubmit={handleCartaoSubmit} submitting={gerando} error={error || null} />
+                  )}
                 </div>
               )}
             </div>

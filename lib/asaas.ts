@@ -12,7 +12,14 @@ async function asaasFetch(apiKey: string, sandbox: boolean, path: string, init?:
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`Asaas ${path} falhou (${res.status}): ${body}`);
+    // Asaas devolve { errors: [{ code, description }] } — description é a mensagem
+    // em português que faz sentido mostrar pro usuário final (ex: "CVV inválido").
+    let mensagem = body;
+    try {
+      const parsed = JSON.parse(body);
+      if (parsed?.errors?.[0]?.description) mensagem = parsed.errors[0].description;
+    } catch {}
+    throw new Error(mensagem || `Asaas ${path} falhou (${res.status})`);
   }
   return res.json();
 }
@@ -42,6 +49,33 @@ export async function createAsaasCharge(
     body.value = value;
   }
   return asaasFetch(apiKey, sandbox, "/payments", { method: "POST", body: JSON.stringify(body) });
+}
+
+export type CreditCardData = { holderName: string; number: string; expiryMonth: string; expiryYear: string; ccv: string };
+export type CreditCardHolderInfo = { name: string; email: string; cpfCnpj: string; postalCode: string; addressNumber: string; phone: string };
+
+// Cobrança de cartão processada direto (sem redirecionar pra página hospedada do Asaas) —
+// os dados do cartão passam pelo nosso backend só nesta chamada, nunca são gravados no
+// banco. Diferente do Pix, o resultado é síncrono: `status` já vem CONFIRMED/RECEIVED (ou
+// erro) na resposta, sem precisar de webhook pra saber se aprovou.
+export async function createAsaasCardCharge(
+  apiKey: string, sandbox: boolean, customerId: string, value: number, description: string,
+  creditCard: CreditCardData, creditCardHolderInfo: CreditCardHolderInfo, remoteIp: string
+): Promise<{ id: string; status: string }> {
+  const dueDate = new Date().toISOString().slice(0, 10);
+  return asaasFetch(apiKey, sandbox, "/payments", {
+    method: "POST",
+    body: JSON.stringify({
+      customer: customerId,
+      billingType: "CREDIT_CARD",
+      value,
+      dueDate,
+      description,
+      creditCard,
+      creditCardHolderInfo,
+      remoteIp,
+    }),
+  });
 }
 
 export async function getAsaasPixQrCode(apiKey: string, sandbox: boolean, paymentId: string): Promise<{ encodedImage: string; payload: string }> {
