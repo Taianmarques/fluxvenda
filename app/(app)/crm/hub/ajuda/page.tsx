@@ -22,7 +22,7 @@ export default async function AjudaPage() {
       .filter(p => !p.hiddenFromSidebar)
       .filter(p => !p.managerOnly || result.isManager)
       .filter(p => CRM_HELP[p.key])
-      .map(p => ({ key: p.key, label: p.label, icon: p.icon, summary: CRM_HELP[p.key]!.summary })),
+      .map(p => ({ key: p.key, label: p.label, summary: CRM_HELP[p.key]!.summary })),
   })).filter(cat => cat.pages.length > 0);
 
   return (
