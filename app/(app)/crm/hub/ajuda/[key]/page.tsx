@@ -24,7 +24,7 @@ export default async function AjudaArtigoPage({ params }: { params: Promise<{ ke
 
   return (
     <div className="min-h-full bg-gradient-to-br from-blue-50 via-white to-blue-50 text-gray-900 p-4 md:p-6 overflow-y-auto h-full">
-      <div className="max-w-2xl mx-auto py-6">
+      <div className="max-w-3xl mx-auto py-6">
         <Link href="/crm/hub/ajuda" className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 mb-4">
           <ArrowLeft size={13} /> Central de ajuda
         </Link>
@@ -42,7 +42,18 @@ export default async function AjudaArtigoPage({ params }: { params: Promise<{ ke
               Abrir página <ExternalLink size={12} />
             </Link>
           </div>
-          <p className="text-sm text-gray-500 mb-6">{artigo.summary}</p>
+          <p className="text-sm text-gray-500 mb-5">{artigo.summary}</p>
+
+          {artigo.screenshot && (
+            <div className="mb-6">
+              <img
+                src={artigo.screenshot}
+                alt={`Tela de ${pageDef.label} no CRM`}
+                className="w-full rounded-xl border border-gray-200 shadow-sm"
+              />
+              <p className="text-[11px] text-gray-400 mt-1.5">Print da tela (dados de exemplo).</p>
+            </div>
+          )}
 
           <div className="space-y-4">
             {artigo.blocks.map((block, i) => (
