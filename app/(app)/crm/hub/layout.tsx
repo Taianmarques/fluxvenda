@@ -32,7 +32,9 @@ export default async function CrmHubLayout({ children }: { children: React.React
         <CrmSidebar agentId={result.configs[0]?.id ?? ""} agents={result.configs.map(c => ({ id: c.id, nome: c.nome }))} allowedPages={allowedPages} isManager={result.isManager} menuLogo={menuLogo} hasPlataforma={hasProduct(products, "PLATAFORMA")} />
         <div className="flex-1 overflow-hidden">
           <CrmThemeProvider>
-            <CrmThemeScope>{children}</CrmThemeScope>
+            <CrmThemeScope>
+              <div className="crm-native-scale h-full">{children}</div>
+            </CrmThemeScope>
           </CrmThemeProvider>
         </div>
       </div>

@@ -214,7 +214,7 @@ export function AoVivoClient({ agentId, atendentes }: { agentId: string; atenden
   }
 
   return (
-    <div className={`h-full flex flex-col ${t.root}`}>
+    <div className={`crm-native-scale h-full flex flex-col ${t.root}`}>
       <div className={`px-4 md:px-6 py-4 border-b flex items-center justify-between gap-3 flex-wrap flex-shrink-0 ${t.headerBorder}`}>
         <div>
           <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">

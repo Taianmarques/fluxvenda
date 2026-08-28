@@ -160,7 +160,7 @@ export function PipelineBoard({
     : [];
 
   return (
-    <div className={`h-full flex flex-col ${theme === "dark" ? "bg-gray-950 text-white" : "bg-gray-50 text-slate-900"}`}>
+    <div className={`crm-native-scale h-full flex flex-col ${theme === "dark" ? "bg-gray-950 text-white" : "bg-gray-50 text-slate-900"}`}>
       <div className={`px-4 py-3 border-b flex items-center justify-between flex-wrap gap-2 flex-shrink-0 ${theme === "dark" ? "border-gray-800" : "border-gray-200"}`}>
         <div className="flex items-center gap-1 flex-wrap">
           {pipelines.map(p => (

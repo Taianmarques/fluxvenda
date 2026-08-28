@@ -1191,7 +1191,7 @@ export function WhatsappInbox({
   }
 
   return (
-    <div className={`h-full flex flex-col ${t.root}`}>
+    <div className={`crm-native-scale h-full flex flex-col ${t.root}`}>
       <div className={`px-4 py-3 border-b ${t.header} ${mobileChatOpen ? "hidden md:flex" : "flex"} items-center justify-between flex-shrink-0`}>
         <div>
           <p className="font-bold text-lg flex items-center gap-2"><MessageCircle size={18} /> WhatsApp</p>
