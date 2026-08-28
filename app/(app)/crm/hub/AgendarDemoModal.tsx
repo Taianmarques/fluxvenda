@@ -82,7 +82,7 @@ export function AgendarDemoModal({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
         onClick={e => e.stopPropagation()}
-        className="w-full max-w-2xl rounded-2xl border border-gray-200 bg-white text-gray-900 shadow-xl overflow-hidden"
+        className="w-full max-w-2xl rounded-2xl border border-gray-200 bg-white text-slate-900 shadow-xl overflow-hidden"
       >
         <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
           <div>

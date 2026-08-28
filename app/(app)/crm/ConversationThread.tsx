@@ -74,7 +74,7 @@ export function ConversationThread({ conversationId, dark, onClose, showHeader =
   }
 
   return (
-    <div className={`h-full flex flex-col overflow-hidden ${dark ? "text-white" : "text-gray-900"}`}>
+    <div className={`h-full flex flex-col overflow-hidden ${dark ? "text-white" : "text-slate-900"}`}>
       {showHeader && (
         <div className={`px-4 py-3 border-b flex items-center justify-between flex-shrink-0 ${dark ? "border-gray-800" : "border-gray-200"}`}>
           <div>
@@ -127,9 +127,9 @@ export function ConversationThread({ conversationId, dark, onClose, showHeader =
                 <div className={`flex ${isOutgoing ? "justify-end" : "justify-start"}`}>
                 <div
                   className={`max-w-[75%] rounded-lg px-3 py-2 text-sm ${
-                    m.role === "human" ? (dark ? "bg-green-700 text-white" : "bg-[#cfe9ff] text-gray-900") :
-                    m.role === "assistant" ? (dark ? "bg-[#005c4b] text-white" : "bg-[#d9fdd3] text-gray-900") :
-                    dark ? "bg-[#202c33] text-gray-100" : "bg-white text-gray-900"
+                    m.role === "human" ? (dark ? "bg-green-700 text-white" : "bg-[#cfe9ff] text-slate-900") :
+                    m.role === "assistant" ? (dark ? "bg-[#005c4b] text-white" : "bg-[#d9fdd3] text-slate-900") :
+                    dark ? "bg-[#202c33] text-gray-100" : "bg-white text-slate-900"
                   }`}
                 >
                   {m.forwarded && (
@@ -170,7 +170,7 @@ export function ConversationThread({ conversationId, dark, onClose, showHeader =
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === "Enter" && handleSend()}
           placeholder="Digite uma mensagem..."
-          className={`flex-1 text-sm rounded-xl px-3 py-2 border focus:outline-none ${dark ? "bg-gray-900 border-gray-800 text-white placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900 placeholder:text-gray-400"}`}
+          className={`flex-1 text-sm rounded-xl px-3 py-2 border focus:outline-none ${dark ? "bg-gray-900 border-gray-800 text-white placeholder:text-gray-500" : "bg-white border-gray-300 text-slate-900 placeholder:text-gray-400"}`}
         />
         <button onClick={handleSend} disabled={sending} className="bg-green-700 hover:bg-green-600 disabled:opacity-50 rounded-full px-4 py-2 text-sm font-medium text-white flex-shrink-0">
           Enviar

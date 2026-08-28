@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Radio, Clock, Bot, Instagram, MessageCircle, Sun, Moon } from "lucide-react";
+import { Radio, Clock, Bot, Instagram, MessageCircle } from "lucide-react";
+import { useCrmTheme } from "../CrmThemeContext";
 
 type AoVivoTheme = "dark" | "light";
-const THEME_STORAGE_KEY = "aovivo-theme";
 
 const THEMES = {
   dark: {
@@ -27,7 +27,7 @@ const THEMES = {
     destaqueIcon: "bg-red-900/60 text-red-300",
   },
   light: {
-    root: "bg-gray-50 text-gray-900",
+    root: "bg-gray-50 text-slate-900",
     headerBorder: "border-gray-200",
     subtitle: "text-gray-500",
     statLabel: "text-gray-500",
@@ -84,19 +84,8 @@ export function AoVivoClient({ agentId, atendentes }: { agentId: string; atenden
   const [loading, setLoading] = useState(true);
   const inFlightRef = useRef(false);
   const fingerprintRef = useRef("");
-  const [theme, setTheme] = useState<AoVivoTheme>("dark");
+  const { theme } = useCrmTheme();
   const t = THEMES[theme];
-
-  useEffect(() => {
-    const saved = localStorage.getItem(THEME_STORAGE_KEY);
-    if (saved === "light" || saved === "dark") setTheme(saved);
-  }, []);
-
-  function toggleTheme() {
-    const next: AoVivoTheme = theme === "dark" ? "light" : "dark";
-    setTheme(next);
-    localStorage.setItem(THEME_STORAGE_KEY, next);
-  }
 
   async function refresh(isPoll = false) {
     if (isPoll && inFlightRef.current) return;
@@ -240,13 +229,6 @@ export function AoVivoClient({ agentId, atendentes }: { agentId: string; atenden
               <span className="font-bold text-blue-400">{totalNaoLidas} não lida{totalNaoLidas === 1 ? "" : "s"}</span>
             )}
           </div>
-          <button
-            onClick={toggleTheme}
-            title={theme === "dark" ? "Mudar para fundo claro" : "Mudar para fundo escuro"}
-            className={`p-2 rounded-lg ${t.pillButton}`}
-          >
-            {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
-          </button>
         </div>
       </div>
 

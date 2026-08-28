@@ -359,7 +359,7 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-950 text-white p-4 md:p-6">
+    <div className="h-full overflow-y-auto bg-gray-950 p-4 md:p-6">
       <div className="max-w-4xl mx-auto space-y-5">
         <div className="flex items-end justify-between gap-3 flex-wrap">
           <div>

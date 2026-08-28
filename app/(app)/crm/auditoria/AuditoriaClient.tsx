@@ -86,7 +86,7 @@ export function AuditoriaClient({ agentId, atendentes }: { agentId: string; aten
   const atendenteNome = atendenteId ? (atendentes.find(a => a.id === atendenteId)?.name ?? "") : "Todos";
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-950 text-white p-4 md:p-6">
+    <div className="h-full overflow-y-auto bg-gray-950 p-4 md:p-6">
       <div className="max-w-3xl mx-auto space-y-5">
         <div>
           <p className="text-gray-400 text-sm">Gestão</p>

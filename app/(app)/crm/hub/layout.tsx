@@ -6,6 +6,7 @@ import { getMenuLogoDataUri } from "@/lib/branding";
 import { getEffectiveProducts, hasProduct } from "@/lib/products";
 import { CrmSidebar } from "../CrmSidebar";
 import { TrialBanner } from "../../TrialBanner";
+import { CrmThemeProvider, CrmThemeScope } from "../CrmThemeContext";
 
 // Diferente de crm/[agentId]/layout.tsx, esse layout funciona mesmo sem nenhum agente
 // criado ainda — é o único lugar do CRM alcançável nesse estado (CrmSidebar mostra só o
@@ -29,7 +30,11 @@ export default async function CrmHubLayout({ children }: { children: React.React
       <TrialBanner />
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
         <CrmSidebar agentId={result.configs[0]?.id ?? ""} agents={result.configs.map(c => ({ id: c.id, nome: c.nome }))} allowedPages={allowedPages} isManager={result.isManager} menuLogo={menuLogo} hasPlataforma={hasProduct(products, "PLATAFORMA")} />
-        <div className="flex-1 overflow-hidden">{children}</div>
+        <div className="flex-1 overflow-hidden">
+          <CrmThemeProvider>
+            <CrmThemeScope>{children}</CrmThemeScope>
+          </CrmThemeProvider>
+        </div>
       </div>
     </div>
   );

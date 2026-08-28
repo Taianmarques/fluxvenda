@@ -23,7 +23,7 @@ export default async function AjudaArtigoPage({ params }: { params: Promise<{ ke
   const pageHref = firstAgentId ? `/crm/${firstAgentId}${pageDef.suffix}` : "/crm/hub/canais";
 
   return (
-    <div className="min-h-full bg-gradient-to-br from-blue-50 via-white to-blue-50 text-gray-900 p-4 md:p-6 overflow-y-auto h-full">
+    <div className="min-h-full bg-gradient-to-br from-blue-50 via-white to-blue-50 text-slate-900 p-4 md:p-6 overflow-y-auto h-full">
       <div className="max-w-3xl mx-auto py-6">
         <Link href="/crm/hub/ajuda" className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 mb-4">
           <ArrowLeft size={13} /> Central de ajuda
@@ -58,7 +58,7 @@ export default async function AjudaArtigoPage({ params }: { params: Promise<{ ke
           <div className="space-y-4">
             {artigo.blocks.map((block, i) => (
               <div key={i}>
-                {block.heading && <p className="text-sm font-semibold text-gray-900 mb-1.5">{block.heading}</p>}
+                {block.heading && <p className="text-sm font-semibold text-slate-900 mb-1.5">{block.heading}</p>}
                 {block.text && <p className="text-sm text-gray-700 leading-relaxed">{block.text}</p>}
                 {block.bullets && (
                   <ul className="mt-1.5 space-y-1.5">

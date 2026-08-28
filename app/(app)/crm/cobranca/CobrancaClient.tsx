@@ -125,7 +125,7 @@ export function CobrancaClient({ agentId, initialCobrancaEnabled, initialCobranc
   ];
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-950 text-white p-6">
+    <div className="h-full overflow-y-auto bg-gray-950 p-6">
       <div className="max-w-5xl mx-auto space-y-6">
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>

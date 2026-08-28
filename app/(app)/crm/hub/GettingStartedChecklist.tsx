@@ -29,7 +29,7 @@ export function GettingStartedChecklist({ steps, name, dismissHref }: { steps: C
     <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-5 md:p-6 space-y-5">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h2 className="text-lg md:text-xl font-bold text-gray-900">
+          <h2 className="text-lg md:text-xl font-bold text-slate-900">
             {allDone ? `Tudo pronto, ${name}!` : `Seu CRM está pronto, ${name}`}
           </h2>
           <p className="text-sm text-gray-500 mt-0.5">
@@ -67,7 +67,7 @@ export function GettingStartedChecklist({ steps, name, dismissHref }: { steps: C
                 {step.done
                   ? <CheckCircle2 size={20} className="text-green-600 flex-shrink-0" />
                   : <Circle size={20} className="text-gray-300 flex-shrink-0" />}
-                <span className={`text-sm font-medium flex-1 ${step.done ? "text-gray-400 line-through" : "text-gray-900"}`}>
+                <span className={`text-sm font-medium flex-1 ${step.done ? "text-gray-400 line-through" : "text-slate-900"}`}>
                   {step.label}
                 </span>
                 <ChevronDown size={16} className={`text-gray-400 transition-transform flex-shrink-0 ${open ? "rotate-180" : ""}`} />

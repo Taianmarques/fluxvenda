@@ -95,7 +95,7 @@ export function PipelineFiltersPanel({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [onClose]);
 
-  const inputClass = `w-full text-xs rounded-lg px-2 py-1.5 border focus:outline-none ${dark ? "bg-gray-950 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`;
+  const inputClass = `w-full text-xs rounded-lg px-2 py-1.5 border focus:outline-none ${dark ? "bg-gray-950 border-gray-700 text-white" : "bg-white border-gray-300 text-slate-900"}`;
   const labelClass = `text-xs font-medium ${dark ? "text-gray-400" : "text-gray-500"}`;
   const checkboxRowClass = `flex items-center gap-2 text-xs ${dark ? "text-gray-300" : "text-gray-700"}`;
 

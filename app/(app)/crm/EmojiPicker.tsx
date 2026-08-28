@@ -94,7 +94,7 @@ export function EmojiPicker({ onSelect, onClose, dark }: { onSelect: (emoji: str
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Buscar emoji..."
-          className={`w-full text-xs rounded-lg px-2.5 py-1.5 border focus:outline-none ${dark ? "bg-gray-950 border-gray-700 text-white placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900 placeholder:text-gray-400"}`}
+          className={`w-full text-xs rounded-lg px-2.5 py-1.5 border focus:outline-none ${dark ? "bg-gray-950 border-gray-700 text-white placeholder:text-gray-500" : "bg-white border-gray-300 text-slate-900 placeholder:text-gray-400"}`}
         />
       </div>
 

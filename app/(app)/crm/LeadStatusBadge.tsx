@@ -84,7 +84,7 @@ export function LeadStatusBadge({
               onChange={e => setNewName(e.target.value)}
               onKeyDown={e => e.key === "Enter" && handleCreate()}
               placeholder="Nova tag..."
-              className={`flex-1 text-xs rounded-lg px-2 py-1 border focus:outline-none ${dark ? "bg-gray-950 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+              className={`flex-1 text-xs rounded-lg px-2 py-1 border focus:outline-none ${dark ? "bg-gray-950 border-gray-700 text-white" : "bg-white border-gray-300 text-slate-900"}`}
             />
             <button onClick={handleCreate} className="text-xs bg-blue-600 hover:bg-blue-500 text-white rounded-lg px-2">+</button>
           </div>

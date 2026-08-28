@@ -25,7 +25,7 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
 
   if (!config.systemPrompt) {
     return (
-      <div className="min-h-screen bg-gray-950 text-white p-6">
+      <div className="min-h-screen bg-gray-950 p-6">
         <div className="max-w-3xl mx-auto space-y-6">
           <div>
             <Link href="/crm/hub" className="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1 w-fit"><ArrowLeft size={12} /> Agentes de IA</Link>
@@ -69,7 +69,7 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
   // Só bloqueia na tela de conexão se NENHUM canal estiver conectado
   if (!instanceStatus.connected && !igConnection && !cloudApiConnected) {
     return (
-      <div className="min-h-screen bg-gray-950 text-white p-6">
+      <div className="min-h-screen bg-gray-950 p-6">
         <div className="max-w-2xl mx-auto space-y-6">
           <div>
             <Link href="/crm/hub" className="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1 w-fit"><ArrowLeft size={12} /> Agentes de IA</Link>
@@ -116,7 +116,7 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
   ].filter(Boolean).join(" e ");
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white p-6">
+    <div className="min-h-screen bg-gray-950 p-6">
       <div className="max-w-6xl mx-auto">
         <AgentSettingsShell
           agentId={config.id}

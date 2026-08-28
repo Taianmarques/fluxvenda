@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import {
   MessageCircle, Search, X, Lock, Unlock, Bot, User, UserPlus, UserCheck, Users, Eye,
-  FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap, StickyNote, ArrowRightLeft, HandCoins, CalendarClock, ListFilter, ListChecks, Instagram, ArrowLeft,
+  FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Smile, Zap, StickyNote, ArrowRightLeft, HandCoins, CalendarClock, ListFilter, ListChecks, Instagram, ArrowLeft,
   Reply, Forward, ChevronDown, Package, ImageOff, Pin, Maximize2, Download,
 } from "lucide-react";
+import { useCrmTheme } from "./CrmThemeContext";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { EmojiPicker } from "./EmojiPicker";
 import { QuickReplies, type QuickReply } from "./QuickReplies";
@@ -151,8 +152,6 @@ type ConversationDetail = {
 
 type ChatTheme = "dark" | "light";
 
-const THEME_STORAGE_KEY = "whatsapp-chat-theme";
-
 const THEMES = {
   dark: {
     root: "bg-gray-950 text-white",
@@ -179,12 +178,12 @@ const THEMES = {
     inputPlaceholder: "placeholder:text-gray-500",
   },
   light: {
-    root: "bg-gray-50 text-gray-900",
+    root: "bg-gray-50 text-slate-900",
     header: "border-gray-200",
     subtitle: "text-gray-500",
     toggleBar: "bg-gray-200",
-    toggleActive: "bg-white text-gray-900 shadow-sm",
-    toggleInactive: "text-gray-600 hover:text-gray-900",
+    toggleActive: "bg-white text-slate-900 shadow-sm",
+    toggleInactive: "text-gray-600 hover:text-slate-900",
     statusActive: "border-blue-500 bg-blue-50 text-blue-700",
     sidebar: "border-gray-200 bg-white",
     listItemBorder: "border-gray-100 hover:bg-gray-100",
@@ -195,11 +194,11 @@ const THEMES = {
     listTertiary: "text-gray-400",
     chatHeaderBorder: "border-gray-200",
     chatBg: "bg-[#e9edef]",
-    bubbleIncoming: "bg-white text-gray-900",
-    bubbleAssistant: "bg-[#d9fdd3] text-gray-900",
-    bubbleHuman: "bg-[#cfe9ff] text-gray-900",
+    bubbleIncoming: "bg-white text-slate-900",
+    bubbleAssistant: "bg-[#d9fdd3] text-slate-900",
+    bubbleHuman: "bg-[#cfe9ff] text-slate-900",
     inputBar: "border-gray-200",
-    inputField: "bg-white border-gray-300 text-gray-900 placeholder:text-gray-400",
+    inputField: "bg-white border-gray-300 text-slate-900 placeholder:text-gray-400",
     inputPlaceholder: "placeholder:text-gray-600",
   },
 } satisfies Record<ChatTheme, Record<string, string>>;
@@ -347,7 +346,7 @@ export function WhatsappInbox({
   isManager: boolean;
   initialSignatureEnabled: boolean;
 }) {
-  const [theme, setTheme] = useState<ChatTheme>("dark");
+  const { theme } = useCrmTheme();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ativos" | "pendentes" | "finalizados" | "grupos">("ativos");
   // Seleção múltipla + ações em lote — só faz sentido nas abas Ativos/Pendentes; os checkboxes
@@ -447,23 +446,12 @@ export function WhatsappInbox({
   const t = THEMES[theme];
 
   useEffect(() => {
-    const saved = localStorage.getItem(THEME_STORAGE_KEY);
-    if (saved === "light" || saved === "dark") setTheme(saved);
-  }, []);
-
-  useEffect(() => {
     fetch(`/api/agentes/${agentId}/atendentes`)
       .then(res => res.json())
       .then(data => { if (data.attendants) setAttendants(data.attendants); })
       .catch(() => {});
     refreshQuickReplies();
   }, []);
-
-  function toggleTheme() {
-    const next: ChatTheme = theme === "dark" ? "light" : "dark";
-    setTheme(next);
-    localStorage.setItem(THEME_STORAGE_KEY, next);
-  }
 
   async function refreshList(isPoll = false) {
     if (isPoll && listInFlightRef.current) return; // rede lenta: não acumula requisições
@@ -1209,13 +1197,6 @@ export function WhatsappInbox({
           <p className="font-bold text-lg flex items-center gap-2"><MessageCircle size={18} /> WhatsApp</p>
           <p className={`text-xs ${t.subtitle}`}>Agente: {agentName}</p>
         </div>
-        <button
-          onClick={toggleTheme}
-          title={theme === "dark" ? "Mudar para fundo claro" : "Mudar para fundo escuro"}
-          className={`p-2 rounded-lg ${t.toggleBar} ${t.toggleInactive}`}
-        >
-          {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
-        </button>
       </div>
 
       <div className="flex-1 flex overflow-hidden">
@@ -1538,7 +1519,7 @@ export function WhatsappInbox({
                         {showGroupVisibility && (
                           <>
                             <div className="fixed inset-0 z-10" onClick={() => setShowGroupVisibility(false)} />
-                            <div className={`absolute z-20 top-10 right-0 w-56 rounded-xl border shadow-xl p-3 space-y-2 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}>
+                            <div className={`absolute z-20 top-10 right-0 w-56 rounded-xl border shadow-xl p-3 space-y-2 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-slate-900"}`}>
                               <p className="text-xs font-semibold">Quem vê esse grupo</p>
                               <p className={`text-[11px] ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
                                 Ninguém marcado = visível pra equipe inteira.
@@ -1966,7 +1947,7 @@ export function WhatsappInbox({
       {/* Novo atendimento: busca rápida nos próprios contatos + iniciar com número novo */}
       {showNovoAtendimento && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className={`w-full max-w-sm rounded-2xl border p-5 space-y-3 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}>
+          <div className={`w-full max-w-sm rounded-2xl border p-5 space-y-3 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-slate-900"}`}>
             <div className="flex items-center justify-between">
               <p className="font-semibold">Novo atendimento</p>
               <button
@@ -1984,7 +1965,7 @@ export function WhatsappInbox({
                 value={novoQuery}
                 onChange={e => setNovoQuery(e.target.value)}
                 placeholder="Buscar nos seus contatos..."
-                className={`flex-1 bg-transparent text-sm focus:outline-none ${theme === "dark" ? "text-white placeholder:text-gray-500" : "text-gray-900 placeholder:text-gray-400"}`}
+                className={`flex-1 bg-transparent text-sm focus:outline-none ${theme === "dark" ? "text-white placeholder:text-gray-500" : "text-slate-900 placeholder:text-gray-400"}`}
               />
             </div>
 
@@ -2042,7 +2023,7 @@ export function WhatsappInbox({
       {/* Modal de encerramento com motivo */}
       {showEncerrar && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className={`w-full max-w-sm rounded-2xl border p-5 space-y-4 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}>
+          <div className={`w-full max-w-sm rounded-2xl border p-5 space-y-4 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-slate-900"}`}>
             <div className="flex items-center justify-between">
               <p className="font-semibold">Encerrar atendimento</p>
               <button onClick={() => setShowEncerrar(false)} className="text-gray-500 hover:text-gray-300"><X size={16} /></button>
@@ -2096,7 +2077,7 @@ export function WhatsappInbox({
       {/* Modal de mover etapa em lote */}
       {showMoverEtapa && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className={`w-full max-w-sm rounded-2xl border p-5 space-y-4 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}>
+          <div className={`w-full max-w-sm rounded-2xl border p-5 space-y-4 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-slate-900"}`}>
             <div className="flex items-center justify-between">
               <p className="font-semibold">Mover {selecionados.size} conversa{selecionados.size === 1 ? "" : "s"} pra etapa</p>
               <button onClick={() => setShowMoverEtapa(false)} className="text-gray-500 hover:text-gray-300"><X size={16} /></button>
@@ -2138,7 +2119,7 @@ export function WhatsappInbox({
       {/* Modal de encerramento em lote (mesma lista de motivos do encerramento individual) */}
       {showEncerrarLote && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className={`w-full max-w-sm rounded-2xl border p-5 space-y-4 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}>
+          <div className={`w-full max-w-sm rounded-2xl border p-5 space-y-4 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-slate-900"}`}>
             <div className="flex items-center justify-between">
               <p className="font-semibold">Encerrar {selecionados.size} conversa{selecionados.size === 1 ? "" : "s"}</p>
               <button onClick={() => setShowEncerrarLote(false)} className="text-gray-500 hover:text-gray-300"><X size={16} /></button>
@@ -2192,7 +2173,7 @@ export function WhatsappInbox({
       {/* Modal de encaminhar mensagem */}
       {forwardingMessage && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className={`w-full max-w-sm rounded-2xl border p-5 space-y-3 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}>
+          <div className={`w-full max-w-sm rounded-2xl border p-5 space-y-3 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-slate-900"}`}>
             <div className="flex items-center justify-between">
               <p className="font-semibold flex items-center gap-2"><Forward size={16} /> Encaminhar mensagem</p>
               <button onClick={() => setForwardingMessage(null)} className="text-gray-500 hover:text-gray-300"><X size={16} /></button>
@@ -2255,7 +2236,7 @@ export function WhatsappInbox({
       {/* Modal de enviar item do catálogo */}
       {pickingProduct && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className={`w-full max-w-sm rounded-2xl border p-5 space-y-3 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}>
+          <div className={`w-full max-w-sm rounded-2xl border p-5 space-y-3 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-slate-900"}`}>
             <div className="flex items-center justify-between">
               <p className="font-semibold flex items-center gap-2"><Package size={16} /> Enviar item do catálogo</p>
               <button onClick={() => setPickingProduct(false)} className="text-gray-500 hover:text-gray-300"><X size={16} /></button>

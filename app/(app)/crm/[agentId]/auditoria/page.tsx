@@ -17,7 +17,7 @@ export default async function AuditoriaPage({ params }: { params: Promise<{ agen
 
   if (!config?.active) {
     return (
-      <div className="h-full bg-gray-950 text-white p-6 flex items-center justify-center">
+      <div className="h-full bg-gray-950 p-6 flex items-center justify-center">
         <div className="max-w-md text-center space-y-4">
           <ClipboardCheck size={48} className="mx-auto text-blue-400" />
           <h1 className="text-2xl font-bold">Nenhum agente ativo</h1>
@@ -32,7 +32,7 @@ export default async function AuditoriaPage({ params }: { params: Promise<{ agen
   // Auditoria é ferramenta do gestor — atendentes não veem avaliações uns dos outros
   if (!isManager) {
     return (
-      <div className="h-full bg-gray-950 text-white p-6 flex items-center justify-center">
+      <div className="h-full bg-gray-950 p-6 flex items-center justify-center">
         <div className="max-w-md text-center space-y-4">
           <Lock size={48} className="mx-auto text-gray-600" />
           <h1 className="text-2xl font-bold">Restrito ao gestor</h1>

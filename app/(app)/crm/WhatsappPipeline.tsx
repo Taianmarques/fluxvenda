@@ -82,7 +82,7 @@ const PIPELINE_THEMES = {
     columnCount: "text-gray-500",
     input: "bg-white border-gray-300 text-green-700",
     nameInput: "bg-white border-gray-300",
-    addInput: "bg-white border-gray-300 text-gray-900 placeholder:text-gray-400",
+    addInput: "bg-white border-gray-300 text-slate-900 placeholder:text-gray-400",
     overlay: "bg-white border-blue-500",
   },
 } satisfies Record<PipelineTheme, Record<string, string>>;
@@ -192,7 +192,7 @@ function Card({
           onClick={e => { e.stopPropagation(); onOpenChat(opp.conversationId); }}
           onPointerDown={e => e.stopPropagation()}
           title="Abrir conversa"
-          className={`p-1 rounded flex-shrink-0 ${dark ? "text-gray-400 hover:text-white hover:bg-gray-800" : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"}`}
+          className={`p-1 rounded flex-shrink-0 ${dark ? "text-gray-400 hover:text-white hover:bg-gray-800" : "text-gray-500 hover:text-slate-900 hover:bg-gray-100"}`}
         >
           <MessageCircle size={14} />
         </button>
@@ -200,7 +200,7 @@ function Card({
           onClick={e => { e.stopPropagation(); onClick(); }}
           onPointerDown={e => e.stopPropagation()}
           title="Detalhes"
-          className={`p-1 rounded flex-shrink-0 ${dark ? "text-gray-400 hover:text-white hover:bg-gray-800" : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"}`}
+          className={`p-1 rounded flex-shrink-0 ${dark ? "text-gray-400 hover:text-white hover:bg-gray-800" : "text-gray-500 hover:text-slate-900 hover:bg-gray-100"}`}
         >
           <Briefcase size={14} />
         </button>
@@ -209,7 +209,7 @@ function Card({
           onClick={toggleMenu}
           onPointerDown={e => e.stopPropagation()}
           title="Mais opções"
-          className={`p-1 rounded flex-shrink-0 ${dark ? "text-gray-400 hover:text-white hover:bg-gray-800" : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"}`}
+          className={`p-1 rounded flex-shrink-0 ${dark ? "text-gray-400 hover:text-white hover:bg-gray-800" : "text-gray-500 hover:text-slate-900 hover:bg-gray-100"}`}
         >
           <MoreVertical size={14} />
         </button>
@@ -236,7 +236,7 @@ function Card({
         <>
           <div className="fixed inset-0 z-40" onClick={e => { e.stopPropagation(); closeMenu(); }} onPointerDown={e => e.stopPropagation()} />
           <div
-            className={`fixed z-50 w-48 rounded-xl border shadow-xl py-1 ${dark ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}
+            className={`fixed z-50 w-48 rounded-xl border shadow-xl py-1 ${dark ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-slate-900"}`}
             style={{ top: menuPos.top, left: menuPos.left }}
             onClick={e => e.stopPropagation()}
             onPointerDown={e => e.stopPropagation()}
@@ -878,7 +878,7 @@ export function WhatsappPipeline({
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setPerdaOppId(null)}>
         <div
           onClick={e => e.stopPropagation()}
-          className={`w-80 rounded-2xl border p-4 space-y-3 ${theme === "dark" ? "bg-gray-900 border-gray-800 text-white" : "bg-white border-gray-200 text-gray-900"}`}
+          className={`w-80 rounded-2xl border p-4 space-y-3 ${theme === "dark" ? "bg-gray-900 border-gray-800 text-white" : "bg-white border-gray-200 text-slate-900"}`}
         >
           <p className="text-sm font-semibold">Motivo da perda</p>
           {motivosPerda.length === 0 ? (

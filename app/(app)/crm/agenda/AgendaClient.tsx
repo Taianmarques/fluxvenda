@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Calendar, Users, Settings, ArrowLeft, ArrowRight, X, Sun, Moon, ChevronDown } from "lucide-react";
+import { Calendar, Users, Settings, ArrowLeft, ArrowRight, X, ChevronDown } from "lucide-react";
+import { useCrmTheme } from "../CrmThemeContext";
 
 type AgendaTheme = "dark" | "light";
-const THEME_STORAGE_KEY = "agenda-theme";
 
 const THEMES = {
   dark: {
@@ -25,17 +25,17 @@ const THEMES = {
     hourLabel: "text-gray-500",
   },
   light: {
-    root: "bg-gray-50 text-gray-900",
+    root: "bg-gray-50 text-slate-900",
     card: "bg-white border-gray-200",
     innerCard: "bg-gray-50 border-gray-200",
-    input: "bg-white border-gray-300 text-gray-900 placeholder:text-gray-400",
+    input: "bg-white border-gray-300 text-slate-900 placeholder:text-gray-400",
     border: "border-gray-200",
     subtitle: "text-gray-500",
     secondary: "text-gray-500",
     muted: "text-gray-400",
-    pillButton: "bg-gray-200 hover:bg-gray-300 text-gray-900",
+    pillButton: "bg-gray-200 hover:bg-gray-300 text-slate-900",
     pillBg: "bg-gray-200 hover:bg-gray-300",
-    navButton: "text-gray-600 hover:text-gray-900 bg-white border-gray-200",
+    navButton: "text-gray-600 hover:text-slate-900 bg-white border-gray-200",
     toggleBar: "bg-white border-gray-200",
     headerCellToday: "bg-blue-50",
     gridLine: "border-gray-200",
@@ -355,19 +355,8 @@ export function AgendaClient({
   agendaAccessToken?: string | null;
   bookingSlug?: string | null;
 }) {
-  const [theme, setTheme] = useState<AgendaTheme>("dark");
+  const { theme } = useCrmTheme();
   const t = THEMES[theme];
-
-  useEffect(() => {
-    const saved = localStorage.getItem(THEME_STORAGE_KEY);
-    if (saved === "light" || saved === "dark") setTheme(saved);
-  }, []);
-
-  function toggleTheme() {
-    const next: AgendaTheme = theme === "dark" ? "light" : "dark";
-    setTheme(next);
-    localStorage.setItem(THEME_STORAGE_KEY, next);
-  }
 
   const [showSettings, setShowSettings] = useState(false);
   const [showTeam, setShowTeam] = useState(false);
@@ -579,13 +568,6 @@ export function AgendaClient({
             </button>
             <button onClick={() => setShowSettings(s => !s)} className={`rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-1.5 ${t.pillButton}`}>
               <Settings size={15} /> Configurações
-            </button>
-            <button
-              onClick={toggleTheme}
-              title={theme === "dark" ? "Mudar para fundo claro" : "Mudar para fundo escuro"}
-              className={`p-2.5 rounded-xl ${t.pillButton}`}
-            >
-              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
             </button>
           </div>
         </div>

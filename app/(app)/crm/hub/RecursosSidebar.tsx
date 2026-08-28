@@ -31,7 +31,7 @@ export function RecursosSidebar() {
             <>
               <r.icon size={18} className="text-blue-600 flex-shrink-0" />
               <div className="min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">{r.label}</p>
+                <p className="text-sm font-medium text-slate-900 truncate">{r.label}</p>
                 <p className="text-xs text-gray-400 truncate">{r.description}</p>
               </div>
             </>

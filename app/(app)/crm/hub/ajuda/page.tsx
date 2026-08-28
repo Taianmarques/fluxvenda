@@ -26,7 +26,7 @@ export default async function AjudaPage() {
   })).filter(cat => cat.pages.length > 0);
 
   return (
-    <div className="min-h-full bg-gradient-to-br from-blue-50 via-white to-blue-50 text-gray-900 p-4 md:p-6 overflow-y-auto h-full">
+    <div className="min-h-full bg-gradient-to-br from-blue-50 via-white to-blue-50 text-slate-900 p-4 md:p-6 overflow-y-auto h-full">
       <div className="max-w-3xl mx-auto py-6">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">

@@ -21,7 +21,7 @@ export default async function HubPage() {
   if (configs.length === 0) {
     if (isManager) redirect("/crm/hub/inicio");
     return (
-      <div className="min-h-full bg-gray-950 text-white p-6 flex items-center justify-center">
+      <div className="min-h-full bg-gray-950 p-6 flex items-center justify-center">
         <div className="max-w-md w-full text-center space-y-3">
           <LayoutGrid size={48} className="mx-auto text-blue-400" />
           <h1 className="text-2xl font-bold">Nenhum agente ainda</h1>

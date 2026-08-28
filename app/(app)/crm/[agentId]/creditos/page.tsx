@@ -27,7 +27,7 @@ async function CrmCreditosPageContent() {
 
   if (!isGestor) {
     return (
-      <div className="min-h-full bg-gray-950 text-white p-6 flex items-center justify-center">
+      <div className="min-h-full bg-gray-950 p-6 flex items-center justify-center">
         <div className="max-w-md text-center space-y-4">
           <Lock size={48} className="mx-auto text-gray-600" />
           <h1 className="text-2xl font-bold">Restrito ao gestor</h1>
@@ -40,7 +40,7 @@ async function CrmCreditosPageContent() {
   const team = await prisma.team.findUnique({ where: { managerId: user.id } });
   if (!team) {
     return (
-      <div className="min-h-full bg-gray-950 text-white p-6 flex items-center justify-center">
+      <div className="min-h-full bg-gray-950 p-6 flex items-center justify-center">
         <div className="max-w-md text-center space-y-4">
           <Coins size={48} className="mx-auto text-blue-400" />
           <h1 className="text-2xl font-bold">Nenhuma equipe encontrada</h1>

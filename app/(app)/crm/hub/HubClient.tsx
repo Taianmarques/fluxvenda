@@ -5,11 +5,11 @@ import Link from "next/link";
 import {
   Headset, Calendar, ShoppingCart, Landmark, Target,
   MessageCircle, Instagram, Settings, ChevronRight, ChevronDown, HeartHandshake, RefreshCw,
-  LayoutGrid, ArrowLeft, Plus, Sun, Moon,
+  LayoutGrid, ArrowLeft, Plus,
 } from "lucide-react";
+import { useCrmTheme } from "../CrmThemeContext";
 
 type HubTheme = "dark" | "light";
-const THEME_STORAGE_KEY = "hub-theme";
 
 const THEMES = {
   dark: {
@@ -35,18 +35,18 @@ const THEMES = {
     secondary: "text-gray-500",
   },
   light: {
-    root: "bg-gray-50 text-gray-900",
+    root: "bg-gray-50 text-slate-900",
     backLink: "text-gray-500 hover:text-gray-700",
     subtitle: "text-gray-500",
     selectorBar: "bg-white border-gray-200",
-    input: "bg-white border-gray-300 text-gray-900",
+    input: "bg-white border-gray-300 text-slate-900",
     pillButton: "bg-white border border-gray-200 hover:bg-gray-100",
     badgeActive: "bg-green-50 text-green-700 border-green-200",
     badgeInactive: "bg-gray-200 text-gray-600 border-gray-300",
     badgeWaOn: "bg-green-50 text-green-700 border-green-200",
     badgeIgOn: "bg-purple-50 text-purple-700 border-purple-200",
     badgeChannelOff: "bg-gray-100 text-gray-400 border-gray-200",
-    manageLink: "border-gray-300 text-gray-500 hover:text-gray-900 hover:border-gray-400",
+    manageLink: "border-gray-300 text-gray-500 hover:text-slate-900 hover:border-gray-400",
     cardOn: "bg-white border-blue-300",
     cardOff: "bg-white/60 border-gray-200",
     iconOn: "bg-blue-50 text-blue-600",
@@ -83,20 +83,9 @@ export function HubClient({ agents, isManager }: { agents: HubAgent[]; isManager
   const [selectedId, setSelectedId] = useState(agents[0].id);
   const [overrides, setOverrides] = useState<Record<string, Partial<Record<ModuloKey, boolean>>>>({});
   const [saving, setSaving] = useState<string | null>(null);
-  const [theme, setTheme] = useState<HubTheme>("dark");
+  const { theme } = useCrmTheme();
   const [openSections, setOpenSections] = useState<Set<string>>(new Set(["atendimento"]));
   const t = THEMES[theme];
-
-  useEffect(() => {
-    const saved = localStorage.getItem(THEME_STORAGE_KEY);
-    if (saved === "light" || saved === "dark") setTheme(saved);
-  }, []);
-
-  function toggleTheme() {
-    const next: HubTheme = theme === "dark" ? "light" : "dark";
-    setTheme(next);
-    localStorage.setItem(THEME_STORAGE_KEY, next);
-  }
 
   function toggleSection(key: string) {
     setOpenSections(prev => {
@@ -214,13 +203,6 @@ export function HubClient({ agents, isManager }: { agents: HubAgent[]; isManager
                 <Plus size={15} /> Novo número
               </Link>
             )}
-            <button
-              onClick={toggleTheme}
-              title={theme === "dark" ? "Mudar para fundo claro" : "Mudar para fundo escuro"}
-              className={`p-2.5 rounded-xl ${t.pillButton}`}
-            >
-              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
-            </button>
           </div>
         </div>
 

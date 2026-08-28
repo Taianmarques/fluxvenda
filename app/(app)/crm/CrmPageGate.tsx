@@ -11,7 +11,7 @@ export async function CrmPageGate({ pageKey, children }: { pageKey: CrmPageKey; 
   if (await hasCrmPageAccess(user.id, pageKey)) return <>{children}</>;
 
   return (
-    <div className="min-h-full bg-gray-950 text-white p-6 flex items-center justify-center">
+    <div className="min-h-full bg-gray-950 p-6 flex items-center justify-center">
       <div className="max-w-md text-center space-y-4">
         <Lock size={48} className="mx-auto text-gray-600" />
         <h1 className="text-2xl font-bold">Sem acesso</h1>

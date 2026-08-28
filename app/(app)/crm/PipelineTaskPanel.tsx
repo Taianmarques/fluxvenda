@@ -87,7 +87,7 @@ export function PipelineTaskPanel({
     onTasksChange();
   }
 
-  const inputClass = `w-full text-xs rounded-lg px-2 py-1.5 border focus:outline-none ${dark ? "bg-gray-950 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`;
+  const inputClass = `w-full text-xs rounded-lg px-2 py-1.5 border focus:outline-none ${dark ? "bg-gray-950 border-gray-700 text-white" : "bg-white border-gray-300 text-slate-900"}`;
   const today = new Date(); today.setHours(0, 0, 0, 0);
 
   const body = (
@@ -164,7 +164,7 @@ export function PipelineTaskPanel({
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} onPointerDown={e => e.stopPropagation()} />
       <div
-        className={`fixed z-50 w-72 max-w-[calc(100vw-2rem)] max-h-[70vh] overflow-y-auto rounded-xl border shadow-xl p-3 ${dark ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}
+        className={`fixed z-50 w-72 max-w-[calc(100vw-2rem)] max-h-[70vh] overflow-y-auto rounded-xl border shadow-xl p-3 ${dark ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-slate-900"}`}
         style={pos}
         onClick={e => e.stopPropagation()}
         onPointerDown={e => e.stopPropagation()}

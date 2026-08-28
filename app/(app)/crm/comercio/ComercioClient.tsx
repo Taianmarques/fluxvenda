@@ -2,21 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ShoppingCart, Settings, Copy, Image as ImageIcon, ExternalLink, Check, ArrowLeft, Sun, Moon } from "lucide-react";
+import { ShoppingCart, Settings, Copy, Image as ImageIcon, ExternalLink, Check, ArrowLeft } from "lucide-react";
 import { parseCsv, parseCsvPrice, downloadCsvTemplate } from "@/lib/csv-parser";
+import { useCrmTheme } from "../CrmThemeContext";
 
 const MAX_PHOTO_MB = 2;
 
-type ComercioTheme = "dark" | "light";
-const THEME_STORAGE_KEY = "comercio-theme";
-
 // A maior parte do arquivo continua usando classes cinza cruas (bg-gray-900,
-// border-gray-800, text-gray-400...) — em vez de encher 1300 linhas de props de tema,
-// reskina via CSS var: Tailwind v4 já resolve essas classes através de
-// var(--color-gray-*), então redefinir essas variáveis dentro de
-// ".comercio-scope[data-theme=light]" (ver <style> no componente) troca o visual inteiro
-// sem tocar no JSX. Só as exceções que dependem de branco/inversão de hover (botões com
-// fundo colorido, hover:text-white) são tratadas caso a caso via `theme`/`hoverBright`.
+// border-gray-800, text-gray-400...) — reskinadas via CSS var pelo CrmThemeScope no layout
+// raiz do CRM (ver app/(app)/crm/CrmThemeContext.tsx). Só as exceções que dependem de
+// branco/inversão de hover (botões com fundo colorido, hover:text-white) são tratadas caso
+// a caso via `theme`/`hoverBright`.
 
 function readFileAsBase64(file: File): Promise<{ base64: string; mimeType: string }> {
   return new Promise((resolve, reject) => {
@@ -342,18 +338,7 @@ export function ComercioClient({
     deliveryZones: { name: string; fee: number }[];
   };
 }) {
-  const [theme, setTheme] = useState<ComercioTheme>("dark");
-
-  useEffect(() => {
-    const saved = localStorage.getItem(THEME_STORAGE_KEY);
-    if (saved === "light" || saved === "dark") setTheme(saved);
-  }, []);
-
-  function toggleTheme() {
-    const next: ComercioTheme = theme === "dark" ? "light" : "dark";
-    setTheme(next);
-    localStorage.setItem(THEME_STORAGE_KEY, next);
-  }
+  const { theme } = useCrmTheme();
 
   // Exceção ao reskin via CSS var: hover que vai pro branco puro no escuro precisa virar
   // escuro no claro (senão fica ilegível num card branco)
@@ -828,22 +813,7 @@ export function ComercioClient({
   }
 
   return (
-    <div
-      data-theme={theme}
-      className={`comercio-scope h-full overflow-y-auto p-6 ${theme === "dark" ? "bg-gray-950 text-white" : "bg-gray-50 text-slate-900"}`}
-    >
-      <style>{`
-        .comercio-scope[data-theme="light"] {
-          --color-gray-950: oklch(98.5% 0.002 247.839);
-          --color-gray-900: #fff;
-          --color-gray-800: oklch(92.8% 0.006 264.531);
-          --color-gray-700: oklch(87.2% 0.01 258.338);
-          --color-gray-600: oklch(70.7% 0.022 261.325);
-          --color-gray-400: oklch(44.6% 0.03 256.802);
-          --color-gray-300: oklch(37.3% 0.034 259.733);
-          --color-gray-200: oklch(27.8% 0.033 256.848);
-        }
-      `}</style>
+    <div className="h-full overflow-y-auto p-6">
       <div className="max-w-5xl mx-auto space-y-6">
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
@@ -859,13 +829,6 @@ export function ComercioClient({
             </button>
             <button onClick={() => setShowSettings(s => !s)} className="bg-gray-800 hover:bg-gray-700 rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-1.5">
               <Settings size={15} /> Configurar pagamento
-            </button>
-            <button
-              onClick={toggleTheme}
-              title={theme === "dark" ? "Mudar para fundo claro" : "Mudar para fundo escuro"}
-              className="p-2.5 rounded-xl bg-gray-800 hover:bg-gray-700"
-            >
-              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
             </button>
           </div>
         </div>

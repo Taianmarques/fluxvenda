@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Bot, X, ListFilter } from "lucide-react";
 import { WhatsappPipeline, type Stage, type PipelineOpportunity } from "../WhatsappPipeline";
+import { useCrmTheme } from "../CrmThemeContext";
 import { type LeadStatus } from "../LeadStatusBadge";
 import {
   PipelineFiltersPanel, EMPTY_PIPELINE_FILTERS, hasActivePipelineFilters, applyPipelineFilters,
@@ -10,9 +11,6 @@ import {
 } from "../PipelineFiltersPanel";
 
 type PipelineSummary = { id: string; name: string; order: number; agenteInstrucoes?: string; stages: Stage[] };
-type ChatTheme = "dark" | "light";
-
-const THEME_STORAGE_KEY = "whatsapp-chat-theme";
 
 export function PipelineBoard({
   agentId, initialPipelines, initialLeadStatuses, initialOpportunities, initialAutoAvancar,
@@ -23,7 +21,7 @@ export function PipelineBoard({
   initialOpportunities: PipelineOpportunity[];
   initialAutoAvancar?: boolean;
 }) {
-  const [theme, setTheme] = useState<ChatTheme>("dark");
+  const { theme } = useCrmTheme();
   const [pipelines, setPipelines] = useState(initialPipelines);
   const [activeId, setActiveId] = useState<string | null>(initialPipelines[0]?.id ?? null);
   const [leadStatuses, setLeadStatuses] = useState(initialLeadStatuses);
@@ -97,11 +95,6 @@ export function PipelineBoard({
     }
   }
 
-  useEffect(() => {
-    const saved = localStorage.getItem(THEME_STORAGE_KEY);
-    if (saved === "light" || saved === "dark") setTheme(saved);
-  }, []);
-
   async function refreshPipelines() {
     const res = await fetch(`/api/agentes/${agentId}/pipelines`);
     const data = await res.json();
@@ -167,7 +160,7 @@ export function PipelineBoard({
     : [];
 
   return (
-    <div className={`h-full flex flex-col ${theme === "dark" ? "bg-gray-950 text-white" : "bg-gray-50 text-gray-900"}`}>
+    <div className={`h-full flex flex-col ${theme === "dark" ? "bg-gray-950 text-white" : "bg-gray-50 text-slate-900"}`}>
       <div className={`px-4 py-3 border-b flex items-center justify-between flex-wrap gap-2 flex-shrink-0 ${theme === "dark" ? "border-gray-800" : "border-gray-200"}`}>
         <div className="flex items-center gap-1 flex-wrap">
           {pipelines.map(p => (
@@ -188,8 +181,8 @@ export function PipelineBoard({
                   title="Clique duplo para renomear"
                   className={`text-sm font-medium px-3 py-1.5 rounded-lg transition-colors ${
                     p.id === active?.id
-                      ? theme === "dark" ? "bg-gray-800 text-white" : "bg-white text-gray-900 shadow-sm"
-                      : theme === "dark" ? "text-gray-400 hover:text-gray-200" : "text-gray-600 hover:text-gray-900"
+                      ? theme === "dark" ? "bg-gray-800 text-white" : "bg-white text-slate-900 shadow-sm"
+                      : theme === "dark" ? "text-gray-400 hover:text-gray-200" : "text-gray-600 hover:text-slate-900"
                   }`}
                 >
                   {p.name}

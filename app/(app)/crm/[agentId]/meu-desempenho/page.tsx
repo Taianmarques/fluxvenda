@@ -26,7 +26,7 @@ async function MeuDesempenhoPageContent({ params }: { params: Promise<{ agentId:
 
   if (!config?.active) {
     return (
-      <div className="h-full bg-gray-950 text-white p-6 flex items-center justify-center">
+      <div className="h-full bg-gray-950 p-6 flex items-center justify-center">
         <div className="max-w-md text-center space-y-4">
           <User size={48} className="mx-auto text-blue-400" />
           <h1 className="text-2xl font-bold">Nenhum agente de WhatsApp ativo</h1>
@@ -40,7 +40,7 @@ async function MeuDesempenhoPageContent({ params }: { params: Promise<{ agentId:
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-950 text-white p-6">
+    <div className="h-full overflow-y-auto bg-gray-950 p-6">
       <div className="max-w-5xl mx-auto space-y-6">
         <div>
           <p className="text-gray-400 text-sm">Vendas</p>

@@ -174,20 +174,20 @@ export function OpportunitiesPanel({
               value={title}
               onChange={e => setTitle(e.target.value)}
               placeholder="Nome (opcional)"
-              className={`w-full text-xs rounded-lg px-2 py-1.5 border focus:outline-none ${dark ? "bg-gray-950 border-gray-700 text-white placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900 placeholder:text-gray-400"}`}
+              className={`w-full text-xs rounded-lg px-2 py-1.5 border focus:outline-none ${dark ? "bg-gray-950 border-gray-700 text-white placeholder:text-gray-500" : "bg-white border-gray-300 text-slate-900 placeholder:text-gray-400"}`}
             />
             <input
               value={value}
               onChange={e => setValue(e.target.value)}
               onKeyDown={e => e.key === "Enter" && handleSubmit()}
               placeholder="Valor, ex: 1500,00"
-              className={`w-full text-xs rounded-lg px-2 py-1.5 border focus:outline-none ${dark ? "bg-gray-950 border-gray-700 text-white placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900 placeholder:text-gray-400"}`}
+              className={`w-full text-xs rounded-lg px-2 py-1.5 border focus:outline-none ${dark ? "bg-gray-950 border-gray-700 text-white placeholder:text-gray-500" : "bg-white border-gray-300 text-slate-900 placeholder:text-gray-400"}`}
             />
             {pipelines.length > 1 && (
               <select
                 value={pipelineId}
                 onChange={e => handlePipelineChange(e.target.value)}
-                className={`w-full text-xs rounded-lg px-2 py-1.5 border focus:outline-none ${dark ? "bg-gray-950 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+                className={`w-full text-xs rounded-lg px-2 py-1.5 border focus:outline-none ${dark ? "bg-gray-950 border-gray-700 text-white" : "bg-white border-gray-300 text-slate-900"}`}
               >
                 {pipelines.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
@@ -196,7 +196,7 @@ export function OpportunitiesPanel({
               <select
                 value={stageId}
                 onChange={e => setStageId(e.target.value)}
-                className={`w-full text-xs rounded-lg px-2 py-1.5 border focus:outline-none ${dark ? "bg-gray-950 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+                className={`w-full text-xs rounded-lg px-2 py-1.5 border focus:outline-none ${dark ? "bg-gray-950 border-gray-700 text-white" : "bg-white border-gray-300 text-slate-900"}`}
               >
                 {selectedPipeline.stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>

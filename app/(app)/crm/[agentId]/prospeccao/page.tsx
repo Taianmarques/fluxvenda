@@ -25,7 +25,7 @@ async function ProspeccaoPageContent({ params }: { params: Promise<{ agentId: st
 
   if (!config?.active) {
     return (
-      <div className="h-full bg-gray-950 text-white p-6 flex items-center justify-center">
+      <div className="h-full bg-gray-950 p-6 flex items-center justify-center">
         <div className="max-w-md text-center space-y-4">
           <Target size={48} className="mx-auto text-blue-400" />
           <h1 className="text-2xl font-bold">Nenhum agente de WhatsApp ativo</h1>

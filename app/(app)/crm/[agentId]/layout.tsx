@@ -5,6 +5,7 @@ import { getCrmAllowedPages } from "@/lib/crm-access";
 import { getMenuLogoDataUri } from "@/lib/branding";
 import { getEffectiveProducts, hasProduct } from "@/lib/products";
 import { CrmSidebar } from "../CrmSidebar";
+import { CrmThemeProvider, CrmThemeScope } from "../CrmThemeContext";
 
 export default async function CrmAgentLayout({
   children, params,
@@ -27,7 +28,11 @@ export default async function CrmAgentLayout({
   return (
     <div className="h-full flex flex-col md:flex-row bg-gray-950">
       <CrmSidebar agentId={agentId} agents={result.configs.map(c => ({ id: c.id, nome: c.nome }))} allowedPages={allowedPages} isManager={result.isManager} menuLogo={menuLogo} hasPlataforma={hasProduct(products, "PLATAFORMA")} />
-      <div className="flex-1 overflow-hidden">{children}</div>
+      <div className="flex-1 overflow-hidden">
+        <CrmThemeProvider>
+          <CrmThemeScope>{children}</CrmThemeScope>
+        </CrmThemeProvider>
+      </div>
     </div>
   );
 }

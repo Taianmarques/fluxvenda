@@ -51,7 +51,7 @@ export function AjudaListClient({ categories }: { categories: Category[] }) {
                     >
                       {Icon && <Icon size={18} className="text-blue-600 flex-shrink-0 mt-0.5" />}
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-900">{p.label}</p>
+                        <p className="text-sm font-medium text-slate-900">{p.label}</p>
                         <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{p.summary}</p>
                       </div>
                     </Link>

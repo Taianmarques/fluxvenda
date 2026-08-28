@@ -116,7 +116,7 @@ export function PlanosModal({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
       <div
         onClick={e => e.stopPropagation()}
-        className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-2xl border border-gray-200 bg-white text-gray-900 shadow-xl p-6 md:p-8"
+        className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-2xl border border-gray-200 bg-white text-slate-900 shadow-xl p-6 md:p-8"
       >
         <div className="flex items-start justify-between gap-4 mb-6">
           <div className="mx-auto text-center flex-1">

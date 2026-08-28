@@ -312,7 +312,7 @@ export function CarteiraClient({ agentId, clientes, initialConfig, isManager, in
   ];
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-950 text-white p-4 md:p-6">
+    <div className="h-full overflow-y-auto bg-gray-950 p-4 md:p-6">
       <div className="max-w-5xl mx-auto space-y-5">
         <div className="flex items-start justify-between flex-wrap gap-3">
           <div>

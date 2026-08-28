@@ -302,4 +302,11 @@ export const CRM_HELP: Partial<Record<CrmPageKey, HelpArticle>> = {
       { text: "\"Investimento mensal em marketing/vendas\" é usado só pra calcular o CAC (custo por cliente adquirido) nos dashboards — não afeta a meta em si." },
     ],
   },
+
+  aparencia: {
+    summary: "Escolha entre tema claro e escuro para o CRM inteiro.",
+    blocks: [
+      { text: "A preferência vale pra todas as páginas do CRM (Mensagens, Pipeline, Dashboards, etc.) — fica salva só nesse navegador, então muda se você trocar de computador ou navegador." },
+    ],
+  },
 };

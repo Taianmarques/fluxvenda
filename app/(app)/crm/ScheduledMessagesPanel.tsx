@@ -95,13 +95,13 @@ export function ScheduledMessagesPanel({
               onChange={e => setContent(e.target.value)}
               placeholder="Texto da mensagem..."
               rows={2}
-              className={`w-full text-xs rounded-lg px-2 py-1.5 border focus:outline-none resize-none ${dark ? "bg-gray-950 border-gray-700 text-white placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900 placeholder:text-gray-400"}`}
+              className={`w-full text-xs rounded-lg px-2 py-1.5 border focus:outline-none resize-none ${dark ? "bg-gray-950 border-gray-700 text-white placeholder:text-gray-500" : "bg-white border-gray-300 text-slate-900 placeholder:text-gray-400"}`}
             />
             <input
               type="datetime-local"
               value={when}
               onChange={e => setWhen(e.target.value)}
-              className={`w-full text-xs rounded-lg px-2 py-1.5 border focus:outline-none ${dark ? "bg-gray-950 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+              className={`w-full text-xs rounded-lg px-2 py-1.5 border focus:outline-none ${dark ? "bg-gray-950 border-gray-700 text-white" : "bg-white border-gray-300 text-slate-900"}`}
             />
             <div className="flex gap-1.5">
               <button onClick={handleCreate} disabled={saving} className="flex-1 text-xs font-medium bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg py-1.5">

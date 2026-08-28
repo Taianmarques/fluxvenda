@@ -62,7 +62,7 @@ export function OpportunityDetailModal({
     <div className="fixed inset-0 z-40 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
       <div
         onClick={e => e.stopPropagation()}
-        className={`w-full max-w-4xl h-[70vh] rounded-2xl border flex flex-col overflow-hidden ${dark ? "bg-gray-950 border-gray-800 text-white" : "bg-white border-gray-200 text-gray-900"}`}
+        className={`w-full max-w-4xl h-[70vh] rounded-2xl border flex flex-col overflow-hidden ${dark ? "bg-gray-950 border-gray-800 text-white" : "bg-white border-gray-200 text-slate-900"}`}
       >
         <div className={`px-4 py-3 border-b flex items-center justify-between gap-3 flex-shrink-0 ${dark ? "border-gray-800" : "border-gray-200"}`}>
           <p className="font-semibold truncate">{opp.contactName || opp.contactNumber}</p>
@@ -370,7 +370,7 @@ function OpportunityNotesTab({ conversationId, dark }: { conversationId: string;
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === "Enter" && handleSave()}
           placeholder="Escreva uma anotação sobre esse cliente..."
-          className={`flex-1 text-sm rounded-xl px-3 py-2 border focus:outline-none ${dark ? "bg-gray-900 border-gray-800 text-white placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900 placeholder:text-gray-400"}`}
+          className={`flex-1 text-sm rounded-xl px-3 py-2 border focus:outline-none ${dark ? "bg-gray-900 border-gray-800 text-white placeholder:text-gray-500" : "bg-white border-gray-300 text-slate-900 placeholder:text-gray-400"}`}
         />
         <button onClick={handleSave} disabled={saving || !input.trim()} className="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 rounded-full px-4 py-2 text-sm font-medium text-white flex-shrink-0">
           Salvar
