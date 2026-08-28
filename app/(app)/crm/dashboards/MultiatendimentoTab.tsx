@@ -76,6 +76,7 @@ export async function MultiatendimentoTab({ agentId, config, from, to }: {
     const bucketEnd = new Date(Math.min(bucketStart.getTime() + bucketDays * DAY_MS, to.getTime() + DAY_MS));
     return { start: bucketStart, end: bucketEnd, semana: bucketStart.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }), total: 0 };
   });
+  const tickInterval = bucketCount > 20 ? Math.ceil(bucketCount / 15) - 1 : 0;
   const heatmap: number[][] = Array.from({ length: 7 }, () => Array(24).fill(0));
   for (const c of convsPeriodo) {
     const bucket = dayBuckets.find(b => c.createdAt >= b.start && c.createdAt < b.end);
@@ -183,12 +184,12 @@ export async function MultiatendimentoTab({ agentId, config, from, to }: {
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
           <p className="font-semibold mb-1">Tempo de resposta</p>
           <p className="text-xs text-gray-500 mb-3">Tempo médio das respostas (IA + humano) dentro do período.</p>
-          {temRespostaData ? <MinutesLineChart data={tempoRespostaSerie} dataKey="minutos" color="#3b82f6" /> : <p className="text-sm text-gray-600 py-10 text-center">Sem dados suficientes no período.</p>}
+          {temRespostaData ? <MinutesLineChart data={tempoRespostaSerie} dataKey="minutos" color="#3b82f6" tickInterval={tickInterval} /> : <p className="text-sm text-gray-600 py-10 text-center">Sem dados suficientes no período.</p>}
         </div>
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
           <p className="font-semibold mb-1">Tempo para iniciar atendimento</p>
           <p className="text-xs text-gray-500 mb-3">Tempo médio até a primeira resposta no período.</p>
-          {temInicioData ? <MinutesLineChart data={tempoInicioSerie} dataKey="minutos" color="#f59e0b" /> : <p className="text-sm text-gray-600 py-10 text-center">Sem dados suficientes no período.</p>}
+          {temInicioData ? <MinutesLineChart data={tempoInicioSerie} dataKey="minutos" color="#f59e0b" tickInterval={tickInterval} /> : <p className="text-sm text-gray-600 py-10 text-center">Sem dados suficientes no período.</p>}
         </div>
       </div>
 
