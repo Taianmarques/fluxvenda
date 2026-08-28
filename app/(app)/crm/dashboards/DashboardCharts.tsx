@@ -28,8 +28,13 @@ export function WeeklyBarChart({ data, color = "#3b82f6" }: { data: { semana: st
   );
 }
 
-// Barras diárias empilhadas ganho/perda — usado no dashboard de vendas aprofundado
-export function DailyWonLostChart({ data, tickInterval = 0 }: { data: { dia: string; ganho: number; perdido: number }[]; tickInterval?: number }) {
+// Barras diárias — usado no dashboard de vendas aprofundado. Sem `metric`, mostra ganho x
+// perdido empilhado (padrão); com `metric`, isola só aquela série (clique num card de KPI).
+export function DailyWonLostChart({ data, tickInterval = 0, metric = null }: {
+  data: { dia: string; ganho: number; perdido: number; criado: number }[];
+  tickInterval?: number;
+  metric?: "ganhos" | "perdidos" | "criados" | "aberto" | null;
+}) {
   const p = PALETTE[useDashboardTheme()];
   return (
     <ResponsiveContainer width="100%" height={260}>
@@ -42,8 +47,18 @@ export function DailyWonLostChart({ data, tickInterval = 0 }: { data: { dia: str
           formatter={(v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
         />
         <Legend wrapperStyle={{ fontSize: 12 }} />
-        <Bar dataKey="ganho" name="Ganho" stackId="a" fill="#22c55e" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="perdido" name="Perdido" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} />
+        {metric === "criados" ? (
+          <Bar dataKey="criado" name="Criado" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+        ) : metric === "ganhos" ? (
+          <Bar dataKey="ganho" name="Ganho" fill="#22c55e" radius={[4, 4, 0, 0]} />
+        ) : metric === "perdidos" ? (
+          <Bar dataKey="perdido" name="Perdido" fill="#ef4444" radius={[4, 4, 0, 0]} />
+        ) : (
+          <>
+            <Bar dataKey="ganho" name="Ganho" stackId="a" fill="#22c55e" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="perdido" name="Perdido" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} />
+          </>
+        )}
       </BarChart>
     </ResponsiveContainer>
   );

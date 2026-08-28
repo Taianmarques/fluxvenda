@@ -1,24 +1,14 @@
 import Link from "next/link";
-import { BarChart3, Wallet, TrendingUp, TrendingDown, Handshake, Users, KanbanSquare, DollarSign, Repeat, Percent } from "lucide-react";
+import { Users, KanbanSquare, DollarSign, Repeat, Percent } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import type { AgentConfig } from "@/app/generated/prisma/client";
-import { DailyWonLostChart, AttendantDonutChart, GaugeChart } from "./DashboardCharts";
+import { AttendantDonutChart } from "./DashboardCharts";
+import { VendasKpiChart } from "./VendasKpiChart";
 import { formatBRL, DAY_MS } from "./dashboard-utils";
 
 function pctChange(current: number, previous: number): number | null {
   if (previous === 0) return null;
   return ((current - previous) / previous) * 100;
-}
-
-function ChangeBadge({ pct }: { pct: number | null }) {
-  if (pct === null) return null;
-  const positive = pct >= 0;
-  return (
-    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5 ${positive ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
-      {positive ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-      {positive ? "+" : ""}{pct.toFixed(2)}%
-    </span>
-  );
 }
 
 export async function VendasTab({ agentId, config, from, to }: {
@@ -71,18 +61,11 @@ export async function VendasTab({ agentId, config, from, to }: {
   const sum = (list: typeof opportunities) => list.reduce((s, o) => s + o.dealValue, 0);
 
   const kpis = [
-    { label: "Total de negócios", count: createdCur.length, total: sum(createdCur), pct: pctChange(sum(createdCur), sum(createdPrev)), icon: BarChart3, color: "blue" },
-    { label: "Total ganhos", count: wonCur.length, total: sum(wonCur), pct: pctChange(sum(wonCur), sum(wonPrev)), icon: Handshake, color: "green" },
-    { label: "Total perdidos", count: lostCur.length, total: sum(lostCur), pct: pctChange(sum(lostCur), sum(lostPrev)), icon: TrendingDown, color: "red" },
-    { label: "Total em aberto", count: openNow.length, total: sum(openNow), pct: null, icon: Wallet, color: "amber" },
+    { key: "criados" as const, label: "Total de negócios", count: createdCur.length, total: sum(createdCur), pct: pctChange(sum(createdCur), sum(createdPrev)), color: "blue" },
+    { key: "ganhos" as const, label: "Total ganhos", count: wonCur.length, total: sum(wonCur), pct: pctChange(sum(wonCur), sum(wonPrev)), color: "green" },
+    { key: "perdidos" as const, label: "Total perdidos", count: lostCur.length, total: sum(lostCur), pct: pctChange(sum(lostCur), sum(lostPrev)), color: "red" },
+    { key: "aberto" as const, label: "Total em aberto", count: openNow.length, total: sum(openNow), pct: null, color: "amber" },
   ];
-  const COLOR_CLASSES: Record<string, string> = {
-    blue: "bg-blue-500/10 text-blue-400", green: "bg-green-500/10 text-green-400",
-    red: "bg-red-500/10 text-red-400", amber: "bg-amber-500/10 text-amber-400",
-  };
-  const TEXT_CLASSES: Record<string, string> = {
-    blue: "text-blue-400", green: "text-green-400", red: "text-red-400", amber: "text-amber-400",
-  };
 
   // Dados diários: valor ganho/perdido por dia dentro do período selecionado. Períodos longos
   // (>35 dias) agrupam por semana em vez de dia, senão o gráfico vira barras finas ilegíveis no celular.
@@ -92,7 +75,7 @@ export async function VendasTab({ agentId, config, from, to }: {
     const bucketStart = new Date(from.getTime() + i * bucketDays * DAY_MS);
     const bucketEnd = new Date(Math.min(bucketStart.getTime() + bucketDays * DAY_MS, to.getTime() + DAY_MS));
     const label = bucketStart.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-    return { start: bucketStart, end: bucketEnd, ganho: 0, perdido: 0, dia: label };
+    return { start: bucketStart, end: bucketEnd, ganho: 0, perdido: 0, criado: 0, dia: label };
   });
   for (const o of wonCur) {
     const bucket = dayBuckets.find(b => o.wonAt && o.wonAt >= b.start && o.wonAt < b.end);
@@ -101,6 +84,10 @@ export async function VendasTab({ agentId, config, from, to }: {
   for (const o of lostCur) {
     const bucket = dayBuckets.find(b => o.lostAt && o.lostAt >= b.start && o.lostAt < b.end);
     if (bucket) bucket.perdido += o.dealValue;
+  }
+  for (const o of createdCur) {
+    const bucket = dayBuckets.find(b => o.createdAt >= b.start && o.createdAt < b.end);
+    if (bucket) bucket.criado += o.dealValue;
   }
   const tickInterval = bucketCount > 20 ? Math.ceil(bucketCount / 15) - 1 : 0;
 
@@ -207,44 +194,16 @@ export async function VendasTab({ agentId, config, from, to }: {
 
   return (
     <>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {kpis.map(k => (
-          <div key={k.label} className="bg-gray-900 border border-gray-800 rounded-2xl p-5 min-w-0">
-            <div className="flex items-center justify-between mb-2">
-              <span className={`inline-flex p-2 rounded-xl ${COLOR_CLASSES[k.color]}`}><k.icon size={18} /></span>
-              <ChangeBadge pct={k.pct} />
-            </div>
-            <p className={`text-lg sm:text-xl md:text-2xl font-bold break-words ${TEXT_CLASSES[k.color]}`}>{formatBRL(k.total)}</p>
-            <p className="text-xs text-gray-500 mt-1">{k.label} · {k.count} {k.count === 1 ? "negócio" : "negócios"}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid md:grid-cols-3 gap-6">
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 flex flex-col items-center justify-center text-center">
-          <p className="font-semibold self-start mb-1">Meta geral do mês</p>
-          {metaPct === null ? (
-            <div className="py-8">
-              <p className="text-sm text-gray-600">Nenhuma meta configurada.</p>
-              <Link href={`/crm/${agentId}/metas`} className="text-xs text-blue-400 hover:text-blue-300">Configurar meta →</Link>
-            </div>
-          ) : (
-            <>
-              <GaugeChart pct={metaPct} />
-              <p className="text-xs text-gray-500 -mt-2 break-words text-center">{formatBRL(wonThisMonthTotal)} de {formatBRL(config.metaGeralMensal)}</p>
-            </>
-          )}
-        </div>
-
-        <div className="md:col-span-2 bg-gray-900 border border-gray-800 rounded-2xl p-5">
-          <p className="font-semibold mb-3">{bucketDays === 1 ? "Dados diários" : "Dados semanais"} — ganhos x perdidos</p>
-          {dayBuckets.every(d => d.ganho === 0 && d.perdido === 0) ? (
-            <p className="text-sm text-gray-600">Nenhuma negociação ganha ou perdida nesse período.</p>
-          ) : (
-            <DailyWonLostChart data={dayBuckets.map(b => ({ dia: b.dia, ganho: b.ganho, perdido: b.perdido }))} tickInterval={tickInterval} />
-          )}
-        </div>
-      </div>
+      <VendasKpiChart
+        agentId={agentId}
+        kpis={kpis}
+        dayBuckets={dayBuckets.map(b => ({ dia: b.dia, ganho: b.ganho, perdido: b.perdido, criado: b.criado }))}
+        bucketDays={bucketDays}
+        tickInterval={tickInterval}
+        metaPct={metaPct}
+        wonThisMonthTotal={wonThisMonthTotal}
+        metaGeralMensal={config.metaGeralMensal}
+      />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 min-w-0">
@@ -347,7 +306,7 @@ export async function VendasTab({ agentId, config, from, to }: {
         </div>
       </div>
 
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+      <div id="negocios-por-etapa" className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden scroll-mt-4">
         <div className="flex items-center justify-between p-5 pb-3">
           <p className="font-semibold flex items-center gap-2"><KanbanSquare size={17} className="text-amber-400" /> Negócios por etapa do funil</p>
           <span className="text-[10px] text-gray-500">Situação atual — não depende do período selecionado</span>
