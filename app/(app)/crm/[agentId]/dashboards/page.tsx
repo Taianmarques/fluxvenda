@@ -9,19 +9,17 @@ import { VisaoGeralTab } from "../../dashboards/VisaoGeralTab";
 import { MultiatendimentoTab } from "../../dashboards/MultiatendimentoTab";
 import { AgendamentosTab } from "../../dashboards/AgendamentosTab";
 import { VendasTab } from "../../dashboards/VendasTab";
-import { MeuDesempenhoTab } from "../../dashboards/MeuDesempenhoTab";
 import { FunilTab } from "../../dashboards/FunilTab";
 import { DashboardsShell } from "../../dashboards/DashboardsShell";
 import { DAY_MS } from "../../dashboards/dashboard-utils";
 
-const VIEWS: DashboardView[] = ["vendas", "visaogeral", "multiatendimento", "agendamentos", "meudesempenho", "funil"];
+const VIEWS: DashboardView[] = ["vendas", "visaogeral", "multiatendimento", "agendamentos", "funil"];
 
 const DESCRIPTIONS: Record<DashboardView, string> = {
   vendas: "Desempenho comercial no período, comparado ao período anterior de mesma duração.",
   visaogeral: "Resumo de atendimento, equipe, leads e vendas dos últimos 30 dias.",
   multiatendimento: "Volume de atendimentos, tempo de resposta e comparação entre IA e humano no período.",
   agendamentos: "Volume, status e desempenho dos agendamentos feitos pelo agente.",
-  meudesempenho: "Seus negócios e carteira de clientes — meta e negócios do mês atual.",
   funil: "Ampulheta: aquisição em cima, venda no meio, retenção e expansão embaixo.",
 };
 
@@ -75,7 +73,6 @@ async function DashboardsPageContent({ params, searchParams }: {
       {view === "visaogeral" && <VisaoGeralTab agentId={agentId} config={config} />}
       {view === "multiatendimento" && <MultiatendimentoTab agentId={agentId} config={config} from={from} to={to} />}
       {view === "agendamentos" && <AgendamentosTab agentId={agentId} config={config} />}
-      {view === "meudesempenho" && <MeuDesempenhoTab agentId={agentId} config={config} userId={user.id} />}
       {view === "funil" && <FunilTab agentId={agentId} config={config} />}
     </DashboardsShell>
   );

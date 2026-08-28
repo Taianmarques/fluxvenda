@@ -1,6 +1,6 @@
 import {
   MessageCircle, KanbanSquare, Calendar, Wallet, ShoppingCart, Landmark, Target,
-  Wifi, GitBranch, Briefcase, Zap, UserPlus, ClipboardCheck, Radio,
+  Wifi, GitBranch, Briefcase, Zap, UserPlus, ClipboardCheck, Radio, User,
   Megaphone, Phone, Coins, BookUser, BookOpen, LayoutDashboard, Goal, MessageSquareText, ThumbsDown, GraduationCap, type LucideIcon,
 } from "lucide-react";
 
@@ -8,12 +8,13 @@ import {
 // por página) e pela UI de perfis de acesso em EquipeClient (checklist), pra nunca ficar
 // dessincronizada entre essas três coisas.
 //
-// "dashboards" cobre as 5 visões (Vendas/Visão Geral/Agendamentos/Meu Desempenho/Funil) numa
-// página só, com abas internas (?view=) em vez de 5 entradas de menu — ver app/(app)/crm/dashboards/.
+// "dashboards" cobre as 4 visões (Vendas/Visão Geral/Multiatendimento/Agendamentos/Funil)
+// numa página só, com abas internas (?view=) em vez de várias entradas de menu — ver
+// app/(app)/crm/dashboards/. "Meu Desempenho" saiu de lá e virou página própria (abaixo).
 export type CrmPageKey =
   | "mensagens" | "aovivo"
   | "dashboards"
-  | "pipeline" | "agenda" | "vendas" | "comercio"
+  | "pipeline" | "agenda" | "vendas" | "comercio" | "meudesempenho"
   | "campanhas" | "ligacoes" | "prospeccao"
   | "cobranca" | "carteira" | "contatos"
   | "automacao" | "condicoes"
@@ -50,6 +51,7 @@ export const CRM_CATEGORIES: CrmCategoryDef[] = [
     { key: "pipeline", label: "Pipeline", suffix: "/pipeline", icon: KanbanSquare },
     { key: "vendas", label: "Vendas", suffix: "/vendas", icon: Wallet },
     { key: "comercio", label: "Produtos", suffix: "/comercio", icon: ShoppingCart },
+    { key: "meudesempenho", label: "Meu Desempenho", suffix: "/meu-desempenho", icon: User },
   ] },
   { key: "dashboards", label: "Dashboards", variant: "accordion", pages: [
     { key: "dashboards", label: "Visão Geral", suffix: "/dashboards", icon: LayoutDashboard },

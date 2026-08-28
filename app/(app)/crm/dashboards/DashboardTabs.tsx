@@ -1,16 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { LayoutDashboard, CalendarCheck, BarChart3, User, Filter, Headset, type LucideIcon } from "lucide-react";
+import { LayoutDashboard, CalendarCheck, BarChart3, Filter, Headset, type LucideIcon } from "lucide-react";
 
-export type DashboardView = "vendas" | "visaogeral" | "multiatendimento" | "agendamentos" | "meudesempenho" | "funil";
+export type DashboardView = "vendas" | "visaogeral" | "multiatendimento" | "agendamentos" | "funil";
 
 const TABS: { key: DashboardView; label: string; icon: LucideIcon }[] = [
   { key: "vendas", label: "Vendas", icon: BarChart3 },
   { key: "visaogeral", label: "Visão Geral", icon: LayoutDashboard },
   { key: "multiatendimento", label: "Multiatendimento", icon: Headset },
   { key: "agendamentos", label: "Agendamentos", icon: CalendarCheck },
-  { key: "meudesempenho", label: "Meu Desempenho", icon: User },
   { key: "funil", label: "Funil", icon: Filter },
 ];
 

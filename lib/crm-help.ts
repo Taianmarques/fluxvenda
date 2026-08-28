@@ -114,11 +114,26 @@ export const CRM_HELP: Partial<Record<CrmPageKey, HelpArticle>> = {
     ],
   },
 
+  meudesempenho: {
+    summary: "Seus próprios negócios, carteira e prospecção — não o da equipe inteira.",
+    blocks: [
+      { text: "Versão pessoal do dashboard: meta do mês, oportunidades criadas/ganhas/em aberto e clientes inativos, mas só considerando os contatos atribuídos a você." },
+      { heading: "Minha prospecção", text: "Mostra quantas conversas você mesmo iniciou (mandou a primeira mensagem) — diferente da prospecção automática por IA, que não conta aqui." },
+      { heading: "Sugestões de contato", text: "Lista seus clientes de maior prioridade (níveis A/B da carteira) que estão há mais tempo sem contato, pra você saber quem retomar primeiro." },
+    ],
+  },
+
   dashboards: {
     summary: "Visão geral dos números do CRM em um só lugar.",
     screenshot: "/ajuda/dashboards.png",
     blocks: [
-      { text: "Reúne várias visões por abas — Vendas, Visão Geral, Agendamentos, Meu Desempenho e Funil — sem precisar navegar entre páginas separadas. O período de comparação (7/30/90 dias ou datas customizadas) fica sempre no topo, ao lado das abas." },
+      { text: "Reúne várias visões por abas — Vendas, Visão Geral, Multiatendimento, Agendamentos e Funil — sem precisar navegar entre páginas separadas. O período de comparação (7/30/90 dias ou datas customizadas) fica sempre no topo, ao lado das abas." },
+      { heading: "Aba Multiatendimento", bullets: [
+        "Total de atendimentos, finalizados e em aberto (iniciados/aguardando resposta) no período",
+        "Volume diário e um mapa de calor de atendimentos por dia da semana e hora",
+        "Tempo médio de resposta e tempo médio até a primeira resposta",
+        "Comparação IA x humano: quantos atendimentos precisaram de um humano assumir, e a velocidade de resposta de cada um",
+      ] },
       { heading: "Aba Visão Geral", bullets: [
         "Total de negócios, ganhos, perdidos e em aberto no período",
         "Meta geral do mês (configurada em Configurações > Metas) comparada ao realizado",
