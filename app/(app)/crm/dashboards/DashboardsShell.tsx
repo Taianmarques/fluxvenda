@@ -78,7 +78,7 @@ export function DashboardsShell({ agentId, view, description, from, to, children
                 {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
               </button>
             </div>
-            {view === "vendas" && <DateRangePicker from={from} to={to} />}
+            {(view === "vendas" || view === "multiatendimento") && <DateRangePicker from={from} to={to} />}
           </div>
 
           {children}

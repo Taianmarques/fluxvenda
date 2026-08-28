@@ -2,7 +2,7 @@
 
 import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, Legend, PieChart, Pie, Cell,
-  RadialBarChart, RadialBar, PolarAngleAxis,
+  RadialBarChart, RadialBar, PolarAngleAxis, LineChart, Line,
 } from "recharts";
 import { useDashboardTheme, type DashboardTheme } from "./DashboardThemeContext";
 
@@ -61,6 +61,64 @@ export function DailyWonLostChart({ data, tickInterval = 0, metric = null }: {
         )}
       </BarChart>
     </ResponsiveContainer>
+  );
+}
+
+// Linha simples pra métricas de tempo (minutos) por dia — atendimentos/multiatendimento.
+export function MinutesLineChart({ data, dataKey, color = "#3b82f6", tickInterval = 0 }: {
+  data: Record<string, number | string>[];
+  dataKey: string;
+  color?: string;
+  tickInterval?: number;
+}) {
+  const p = PALETTE[useDashboardTheme()];
+  return (
+    <ResponsiveContainer width="100%" height={220}>
+      <LineChart data={data}>
+        <CartesianGrid strokeDasharray="3 3" stroke={p.grid} />
+        <XAxis dataKey="dia" stroke={p.axis} fontSize={11} interval={tickInterval} />
+        <YAxis stroke={p.axis} fontSize={12} tickFormatter={v => `${v}m`} />
+        <Tooltip
+          contentStyle={{ background: p.tooltipBg, border: `1px solid ${p.tooltipBorder}`, borderRadius: 8, color: p.tooltipText }}
+          formatter={(v: number) => `${v.toFixed(1)} min`}
+        />
+        <Line type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2} dot={false} />
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
+
+const HEAT_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+// Heatmap dia-da-semana x hora — quantos atendimentos começaram em cada slot, somado no
+// período inteiro. Cor mais forte = mais volume (estilo GitHub contributions).
+export function HourHeatmap({ data }: { data: number[][] }) {
+  const max = Math.max(1, ...data.flat());
+  return (
+    <div className="overflow-x-auto">
+      <div className="inline-grid gap-[3px]" style={{ gridTemplateColumns: "32px repeat(24, 1fr)" }}>
+        <div />
+        {Array.from({ length: 24 }, (_, h) => (
+          <div key={h} className="text-[9px] text-gray-500 text-center">{h}</div>
+        ))}
+        {HEAT_LABELS.map((label, weekday) => (
+          <>
+            <div key={`label-${weekday}`} className="text-[10px] text-gray-500 flex items-center">{label}</div>
+            {data[weekday].map((count, hour) => {
+              const intensity = count === 0 ? 0 : 0.15 + (count / max) * 0.85;
+              return (
+                <div
+                  key={`${weekday}-${hour}`}
+                  title={`${label} ${hour}h — ${count}`}
+                  className="w-[14px] h-[14px] rounded-sm"
+                  style={{ backgroundColor: count === 0 ? "var(--color-gray-800)" : `rgba(59, 130, 246, ${intensity})` }}
+                />
+              );
+            })}
+          </>
+        ))}
+      </div>
+    </div>
   );
 }
 
