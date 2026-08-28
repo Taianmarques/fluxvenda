@@ -177,7 +177,7 @@ export function PlanosModal({ onClose }: { onClose: () => void }) {
             </div>
           </>
         ) : (
-          <div className="max-w-sm mx-auto">
+          <div className={`mx-auto ${cobranca && formaPagamento === "CARTAO" && !pago ? "max-w-2xl" : "max-w-sm"}`}>
             <button onClick={() => setTierSelecionado(null)} className="text-xs text-gray-400 hover:text-gray-700 mb-3">
               ← Voltar pros planos
             </button>
@@ -211,14 +211,21 @@ export function PlanosModal({ onClose }: { onClose: () => void }) {
                       </button>
                     </>
                   ) : cobranca.invoiceUrl ? (
-                    <a
-                      href={cobranca.invoiceUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full flex items-center justify-center gap-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-500 rounded-xl py-2.5"
-                    >
-                      <ExternalLink size={14} /> Abrir link de pagamento
-                    </a>
+                    <div className="space-y-2">
+                      <iframe
+                        src={cobranca.invoiceUrl}
+                        className="w-full h-[560px] rounded-xl border border-gray-200"
+                        title="Pagamento com cartão"
+                      />
+                      <a
+                        href={cobranca.invoiceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-1.5 text-xs text-gray-400 hover:text-gray-600"
+                      >
+                        <ExternalLink size={12} /> Não carregou? Abrir em outra aba
+                      </a>
+                    </div>
                   ) : null}
                   <p className="text-xs text-gray-400 flex items-center gap-1.5 justify-center">
                     <Loader2 size={12} className="animate-spin" /> Aguardando confirmação do pagamento...

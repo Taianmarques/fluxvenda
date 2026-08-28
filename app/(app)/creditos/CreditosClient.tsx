@@ -209,7 +209,9 @@ export function CreditosClient({ status, compras }: { status: Status; compras: C
       {/* Modal de pagamento */}
       {packSelecionado && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-sm space-y-4 relative">
+          <div className={`bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full space-y-4 relative ${
+            cobranca && formaPagamento === "CARTAO" && !pago ? "max-w-2xl" : "max-w-sm"
+          }`}>
             <button onClick={fecharModal} className="absolute top-4 right-4 text-gray-500 hover:text-white"><X size={18} /></button>
             <div>
               <p className="font-semibold">{packSelecionado.label}</p>
@@ -238,14 +240,21 @@ export function CreditosClient({ status, compras }: { status: Status; compras: C
                     </button>
                   </>
                 ) : cobranca.invoiceUrl ? (
-                  <a
-                    href={cobranca.invoiceUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full flex items-center justify-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-500 rounded-xl py-2.5"
-                  >
-                    <ExternalLink size={14} /> Abrir link de pagamento
-                  </a>
+                  <div className="space-y-2">
+                    <iframe
+                      src={cobranca.invoiceUrl}
+                      className="w-full h-[560px] rounded-xl border border-gray-800 bg-white"
+                      title="Pagamento com cartão"
+                    />
+                    <a
+                      href={cobranca.invoiceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-1.5 text-xs text-gray-500 hover:text-gray-300"
+                    >
+                      <ExternalLink size={12} /> Não carregou? Abrir em outra aba
+                    </a>
+                  </div>
                 ) : null}
                 <p className="text-xs text-gray-500 flex items-center gap-1.5 justify-center">
                   <Loader2 size={12} className="animate-spin" /> Aguardando confirmação do pagamento...
