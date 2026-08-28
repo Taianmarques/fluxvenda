@@ -193,7 +193,12 @@ export function CreditosClient({ status, compras }: { status: Status; compras: C
                     <p className="font-medium">{c.tokens.toLocaleString("pt-BR")} tokens</p>
                     <p className="text-xs text-gray-500">{new Date(c.createdAt).toLocaleString("pt-BR")}</p>
                   </div>
-                  <p className="font-semibold text-green-400">{brl(c.valorCentavos)}</p>
+                  <div className="flex items-center gap-2.5">
+                    <span className="flex items-center gap-1 text-[11px] font-medium text-green-400 bg-green-900/30 border border-green-800/50 rounded-full px-2 py-0.5">
+                      <CheckCircle2 size={11} /> Pago
+                    </span>
+                    <p className="font-semibold text-green-400">{brl(c.valorCentavos)}</p>
+                  </div>
                 </div>
               ))}
             </div>
