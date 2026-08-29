@@ -73,6 +73,24 @@ export async function sendDemoBookingNotification(teamName: string, requesterNam
   );
 }
 
+// Aviso interno pra equipe comercial quando uma conta em teste grátis do CRM mostra sinal de
+// interesse forte (3+ membros na equipe, abriu a tela de planos, ou importou muitos contatos
+// de uma vez) — ver lib/hot-lead-alert.ts, que garante 1 aviso só por equipe.
+export async function sendHotLeadAlertEmail(teamName: string, gestorNome: string, gestorEmail: string, motivo: string): Promise<boolean> {
+  const to = process.env.DEMO_NOTIFY_EMAIL ?? "";
+  if (!to) {
+    console.warn("[email] DEMO_NOTIFY_EMAIL não configurado — aviso de lead quente não enviado");
+    return false;
+  }
+  return send(
+    to,
+    `Lead quente no teste grátis — ${teamName}`,
+    `<p>A equipe <strong>${teamName}</strong> (gestor: ${gestorNome}, ${gestorEmail}) está em teste grátis do CRM e mostrou sinal de interesse forte:</p>
+     <p><strong>${motivo}</strong></p>
+     <p>Vale um contato comercial proativo.</p>`
+  );
+}
+
 export async function sendPasswordResetEmail(to: string, name: string, token: string, isMigration = false): Promise<boolean> {
   const url = `${APP_URL}/redefinir-senha?token=${token}`;
   const intro = isMigration

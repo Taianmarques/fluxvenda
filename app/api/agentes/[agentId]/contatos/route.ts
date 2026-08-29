@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { getAgentConfigWithRole } from "@/lib/team";
+import { maybeAlertHotLead } from "@/lib/hot-lead-alert";
 import { z } from "zod";
+
+// Volume que sinaliza uma importação "grande" o suficiente pra avisar o comercial durante o
+// teste grátis (ver lib/hot-lead-alert.ts) — abaixo disso é digitação manual normal.
+const IMPORTACAO_GRANDE = 50;
 
 const schema = z.object({
   contatos: z.array(z.object({
@@ -83,6 +88,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
       await prisma.conversation.update({ where: { id: existente.id }, data });
       atualizados++;
     }
+  }
+
+  if (novos.length + atualizados >= IMPORTACAO_GRANDE) {
+    maybeAlertHotLead(config.teamId, `Importou ${novos.length + atualizados} contatos de uma vez durante o teste grátis.`).catch(() => {});
   }
 
   return NextResponse.json({ criados: novos.length, atualizados, ignorados });

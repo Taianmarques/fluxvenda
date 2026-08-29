@@ -553,6 +553,10 @@ model Team {
   // Plano do CRM comprado via aba Recursos > Ver planos (lib/crm-plans.ts) — null = ainda
   // não comprou nenhum (trial/sem plano definido). Cobrança avulsa, sem renovação automática.
   crmPlanTier String?
+
+  // Marca quando o comercial já foi avisado de sinal de interesse forte durante o teste
+  // grátis (ver lib/hot-lead-alert.ts) — evita avisar de novo a cada gatilho subsequente.
+  hotLeadAlertedAt DateTime?
 }
 
 model TeamMember {

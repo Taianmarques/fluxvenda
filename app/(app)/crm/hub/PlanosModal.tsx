@@ -39,6 +39,7 @@ export function PlanosModal({ onClose }: { onClose: () => void }) {
       .then(data => setTiers(data.tiers ?? []))
       .catch(() => setTiers([]))
       .finally(() => setLoadingTiers(false));
+    fetch("/api/planos-view", { method: "POST" }).catch(() => {});
   }, []);
 
   function abrirPagamento(tier: CrmPlanTier) {

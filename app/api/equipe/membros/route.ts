@@ -6,6 +6,7 @@ import { generateToken, passwordResetExpiry } from "@/lib/auth/tokens";
 import { sendTeamMemberAddedEmail } from "@/lib/email";
 import { formatPhone, sendWhatsAppText, getWelcomeMessage } from "@/lib/whatsapp";
 import { getManagedTeam } from "@/lib/team";
+import { maybeAlertHotLead } from "@/lib/hot-lead-alert";
 
 const schema = z.object({
   name: z.string().trim().min(2, { message: "Informe o nome." }),
@@ -74,6 +75,10 @@ export async function POST(req: NextRequest) {
     }
 
     await prisma.teamMember.create({ data: { teamId: team.id, profileId: profile.id, coManager: coManager ?? false } });
+
+    prisma.teamMember.count({ where: { teamId: team.id } }).then(count => {
+      if (count >= 3) maybeAlertHotLead(team.id, `Adicionou ${count} pessoas na equipe durante o teste grátis.`);
+    }).catch(() => {});
 
     sendTeamMemberAddedEmail(profile.email, profile.name, team.name, passwordResetToken).catch(() => {});
     if (formattedPhone) {

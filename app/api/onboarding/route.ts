@@ -4,6 +4,7 @@ import { updateSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { sendWhatsAppText, getWelcomeMessage } from "@/lib/whatsapp";
+import { maybeAlertHotLead } from "@/lib/hot-lead-alert";
 
 const schema = z.object({
   role: z.enum(["VENDEDOR", "FUNCIONARIO", "GESTOR"]),
@@ -74,6 +75,9 @@ export async function POST(req: NextRequest) {
           await prisma.teamMember.create({
             data: { teamId: team.id, profileId: userId },
           });
+          prisma.teamMember.count({ where: { teamId: team.id } }).then(count => {
+            if (count >= 3) maybeAlertHotLead(team.id, `Adicionou ${count} pessoas na equipe durante o teste grátis.`);
+          }).catch(() => {});
         }
         teamJoined = true;
       }
