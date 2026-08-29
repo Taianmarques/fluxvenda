@@ -32,7 +32,7 @@ async function CarteiraPageContent({ params }: { params: Promise<{ agentId: stri
           <Briefcase size={48} className="mx-auto text-blue-400" />
           <h1 className="text-2xl font-bold">Nenhum agente ativo</h1>
           <p className="text-gray-400">Configure e conecte seu agente para construir a carteira de clientes.</p>
-          <Link href={`/crm/${agentId}/configurar`} className="inline-block bg-blue-600 hover:bg-blue-500 rounded-xl px-5 py-2.5 text-sm font-medium">
+          <Link href={`/crm/${agentId}/configurar`} className="inline-block bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-5 py-2.5 text-sm font-medium">
             Configurar agente
           </Link>
         </div>

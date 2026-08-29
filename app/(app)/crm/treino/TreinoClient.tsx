@@ -211,7 +211,7 @@ export function TreinoClient({
               {exemplos.length < MAX_EXEMPLOS && (
                 <button
                   onClick={() => setShowNovo(s => !s)}
-                  className="flex items-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-2 transition-colors"
+                  className="flex items-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-4 py-2 transition-colors"
                 >
                   <Plus size={14} /> Novo exemplo
                 </button>
@@ -253,7 +253,7 @@ export function TreinoClient({
               <button
                 onClick={handleSalvarConfig}
                 disabled={salvandoConfig}
-                className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium"
+                className="bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium"
               >
                 {salvandoConfig ? "Salvando..." : "Salvar"}
               </button>
@@ -276,7 +276,7 @@ export function TreinoClient({
               <button
                 onClick={handleCriar}
                 disabled={salvando || !novoCenario.trim() || !turnosValidos(novoTurnos)}
-                className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium"
+                className="bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium"
               >
                 {salvando ? "Salvando..." : "Salvar"}
               </button>
@@ -309,7 +309,7 @@ export function TreinoClient({
                       <button
                         onClick={handleSalvarEdicao}
                         disabled={salvando || !editCenario.trim() || !turnosValidos(editTurnos)}
-                        className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium"
+                        className="bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium"
                       >
                         {salvando ? "Salvando..." : "Salvar"}
                       </button>

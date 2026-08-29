@@ -32,7 +32,7 @@ async function ContatosPageContent({ params }: { params: Promise<{ agentId: stri
         <div className="max-w-md text-center space-y-4">
           <BookUser size={48} className="mx-auto text-blue-400" />
           <h1 className="text-2xl font-bold">Agente não encontrado</h1>
-          <Link href="/crm" className="inline-block bg-blue-600 hover:bg-blue-500 rounded-xl px-5 py-2.5 text-sm font-medium">
+          <Link href="/crm" className="inline-block bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-5 py-2.5 text-sm font-medium">
             Voltar ao CRM
           </Link>
         </div>

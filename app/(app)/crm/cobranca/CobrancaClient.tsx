@@ -133,7 +133,7 @@ export function CobrancaClient({ agentId, initialCobrancaEnabled, initialCobranc
             <h1 className="text-3xl font-bold mt-1 flex items-center gap-2"><Landmark size={28} className="text-blue-400" /> Cobranças</h1>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => setShowForm(s => !s)} className="bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-2.5 text-sm font-medium">+ Nova cobrança</button>
+            <button onClick={() => setShowForm(s => !s)} className="bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-4 py-2.5 text-sm font-medium">+ Nova cobrança</button>
             <button onClick={() => setShowSettings(s => !s)} className="bg-gray-800 hover:bg-gray-700 rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-1.5">
               <Settings size={15} /> Configurar
             </button>
@@ -171,7 +171,7 @@ export function CobrancaClient({ agentId, initialCobrancaEnabled, initialCobranc
               </div>
             </div>
 
-            <button onClick={handleSaveSettings} disabled={savingSettings} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl px-5 py-2 text-sm font-medium">
+            <button onClick={handleSaveSettings} disabled={savingSettings} className="bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 rounded-xl px-5 py-2 text-sm font-medium">
               {savingSettings ? "Salvando..." : "Salvar"}
             </button>
           </div>
@@ -195,7 +195,7 @@ export function CobrancaClient({ agentId, initialCobrancaEnabled, initialCobranc
             </div>
             <input placeholder="Descrição (opcional)" value={descricao} onChange={e => setDescricao(e.target.value)} className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
             {formError && <p className="text-xs text-red-400">{formError}</p>}
-            <button onClick={handleAddCobranca} disabled={saving} className="bg-green-700 hover:bg-green-600 disabled:opacity-50 rounded-xl px-4 py-2 text-sm font-medium">
+            <button onClick={handleAddCobranca} disabled={saving} className="bg-green-700 hover:bg-green-600 text-white disabled:opacity-50 rounded-xl px-4 py-2 text-sm font-medium">
               {saving ? "Cadastrando..." : "Cadastrar e enviar boleto"}
             </button>
           </div>

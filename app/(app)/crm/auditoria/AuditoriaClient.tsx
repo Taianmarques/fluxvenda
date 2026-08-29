@@ -142,7 +142,7 @@ export function AuditoriaClient({ agentId, atendentes }: { agentId: string; aten
           <button
             onClick={handleGerar}
             disabled={gerando}
-            className="flex items-center gap-2 bg-purple-700 hover:bg-purple-600 disabled:opacity-60 rounded-xl px-5 py-2.5 text-sm font-medium"
+            className="flex items-center gap-2 bg-purple-700 hover:bg-purple-600 text-white disabled:opacity-60 rounded-xl px-5 py-2.5 text-sm font-medium"
           >
             <Sparkles size={15} />
             {gerando ? "Analisando conversas..." : "Gerar auditoria"}

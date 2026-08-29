@@ -100,7 +100,7 @@ export function AutomacaoClient({ agentId }: { agentId: string }) {
           </div>
           <button
             onClick={() => { setShowForm(s => !s); setError(""); }}
-            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-2.5 text-sm font-medium"
+            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-4 py-2.5 text-sm font-medium"
           >
             <Plus size={15} /> Nova automação
           </button>
@@ -161,7 +161,7 @@ export function AutomacaoClient({ agentId }: { agentId: string }) {
             </div>
 
             <div className="flex gap-2">
-              <button onClick={handleCreate} disabled={saving} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl px-4 py-2 text-sm font-medium">
+              <button onClick={handleCreate} disabled={saving} className="bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 rounded-xl px-4 py-2 text-sm font-medium">
                 {saving ? "Criando..." : "Criar automação"}
               </button>
               <button onClick={() => setShowForm(false)} className="text-sm text-gray-400 hover:text-gray-200 px-3 py-2">Cancelar</button>

@@ -89,7 +89,7 @@ export function MensagensRapidasClient({ agentId, quickReplies }: { agentId: str
           </div>
           <button
             onClick={() => setShowNovo(s => !s)}
-            className="flex items-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-2 transition-colors flex-shrink-0"
+            className="flex items-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-4 py-2 transition-colors flex-shrink-0"
           >
             <Plus size={14} /> Nova mensagem
           </button>
@@ -119,7 +119,7 @@ export function MensagensRapidasClient({ agentId, quickReplies }: { agentId: str
                 <button
                   onClick={handleCriar}
                   disabled={salvando || !novoTitulo.trim() || !novoConteudo.trim()}
-                  className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium"
+                  className="bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium"
                 >
                   {salvando ? "Salvando..." : "Salvar"}
                 </button>
@@ -159,7 +159,7 @@ export function MensagensRapidasClient({ agentId, quickReplies }: { agentId: str
                         <button
                           onClick={handleSalvarEdicao}
                           disabled={salvando || !editTitulo.trim() || !editConteudo.trim()}
-                          className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium"
+                          className="bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium"
                         >
                           {salvando ? "Salvando..." : "Salvar"}
                         </button>

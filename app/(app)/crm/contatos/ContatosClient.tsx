@@ -381,7 +381,7 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
             />
             <button
               onClick={() => setShowNovo(s => !s)}
-              className="flex items-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-2 transition-colors"
+              className="flex items-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-4 py-2 transition-colors"
             >
               <Plus size={14} /> Adicionar contato
             </button>
@@ -455,7 +455,7 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
               <button
                 onClick={handleCriarEtiqueta}
                 disabled={salvandoEtiqueta || !novaEtiquetaNome.trim()}
-                className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl px-4 py-2 text-sm font-medium"
+                className="bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 rounded-xl px-4 py-2 text-sm font-medium"
               >
                 {salvandoEtiqueta ? "Criando..." : "Criar"}
               </button>
@@ -494,7 +494,7 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
               <button
                 onClick={handleCriarContato}
                 disabled={criando || novoNumero.replace(/\D/g, "").length < 10}
-                className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium"
+                className="bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium"
               >
                 {criando ? "Adicionando..." : "Adicionar"}
               </button>
@@ -521,7 +521,7 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
               <button
                 onClick={() => fileRef.current?.click()}
                 disabled={importando}
-                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium"
+                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium"
               >
                 <Upload size={13} /> {importando ? "Importando..." : "Escolher arquivo .csv"}
               </button>
@@ -629,7 +629,7 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
               <button
                 onClick={() => executarAcao({ acao: "vincular_atendente", atendenteId: acaoAtendente === "__remover__" ? null : acaoAtendente })}
                 disabled={executandoAcao || !acaoAtendente}
-                className="text-xs font-medium bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-3 py-1.5"
+                className="text-xs font-medium bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 rounded-lg px-3 py-1.5"
               >
                 Vincular
               </button>
@@ -647,7 +647,7 @@ export function ContatosClient({ agentId, contatos, etiquetas }: { agentId: stri
               <button
                 onClick={() => executarAcao({ acao: "aplicar_etiqueta", etiquetaId: acaoEtiqueta })}
                 disabled={executandoAcao || !acaoEtiqueta}
-                className="text-xs font-medium bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-3 py-1.5"
+                className="text-xs font-medium bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 rounded-lg px-3 py-1.5"
               >
                 Aplicar
               </button>

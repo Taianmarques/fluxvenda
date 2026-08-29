@@ -202,7 +202,7 @@ export function CreditosClient({ status, compras }: { status: Status; compras: C
                 <button
                   onClick={() => abrirModal(pack)}
                   className={`mt-4 rounded-xl py-2.5 text-sm font-medium transition-colors ${
-                    pack.destaque ? "bg-blue-600 hover:bg-blue-500" : "bg-gray-800 hover:bg-gray-700"
+                    pack.destaque ? "bg-blue-600 hover:bg-blue-500 text-white" : "bg-gray-800 hover:bg-gray-700"
                   }`}
                 >
                   Comprar
@@ -303,7 +303,7 @@ export function CreditosClient({ status, compras }: { status: Status; compras: C
                     <button
                       onClick={handleGerarCobranca}
                       disabled={gerando}
-                      className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl py-2.5 text-sm font-medium"
+                      className="w-full bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 rounded-xl py-2.5 text-sm font-medium"
                     >
                       {gerando ? "Gerando cobrança..." : "Continuar"}
                     </button>

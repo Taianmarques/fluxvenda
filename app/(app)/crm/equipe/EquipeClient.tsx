@@ -317,7 +317,7 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
                   <div className="flex gap-2 flex-wrap">
                     <button
                       onClick={copyLink}
-                      className="flex items-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-2 transition-colors"
+                      className="flex items-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-4 py-2 transition-colors"
                     >
                       {copied ? <Check size={14} /> : <Copy size={14} />}
                       {copied ? "Copiado!" : "Copiar link"}
@@ -368,7 +368,7 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
                 <button
                   onClick={handleAdicionarMembro}
                   disabled={salvandoMembro || !novoNome.trim() || !novoEmail.trim()}
-                  className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-4 py-2 text-sm font-medium"
+                  className="bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 rounded-lg px-4 py-2 text-sm font-medium"
                 >
                   {salvandoMembro ? "Adicionando..." : "Adicionar à equipe"}
                 </button>
@@ -424,7 +424,7 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
                     maxLength={300}
                   />
                   <div className="flex gap-2">
-                    <button onClick={handleCriarDepartamento} disabled={salvandoDep || !depNome.trim()} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium">
+                    <button onClick={handleCriarDepartamento} disabled={salvandoDep || !depNome.trim()} className="bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium">
                       {salvandoDep ? "Criando..." : "Criar"}
                     </button>
                     <button onClick={() => setShowNovoDep(false)} className="text-xs text-gray-400 hover:text-gray-200 px-2">Cancelar</button>
@@ -495,7 +495,7 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
                       maxLength={40}
                     />
                     <div className="flex gap-2">
-                      <button onClick={handleCriarPerfil} disabled={salvandoPerfil || !perfilNome.trim()} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium">
+                      <button onClick={handleCriarPerfil} disabled={salvandoPerfil || !perfilNome.trim()} className="bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium">
                         {salvandoPerfil ? "Criando..." : "Criar"}
                       </button>
                       <button onClick={() => setShowNovoPerfil(false)} className="text-xs text-gray-400 hover:text-gray-200 px-2">Cancelar</button>
@@ -652,7 +652,7 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
                           <button
                             onClick={() => handleSalvarEdicao(m.memberId)}
                             disabled={salvandoEdicao || !editNome.trim() || !editEmail.trim()}
-                            className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium"
+                            className="bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium"
                           >
                             {salvandoEdicao ? "Salvando..." : "Salvar"}
                           </button>

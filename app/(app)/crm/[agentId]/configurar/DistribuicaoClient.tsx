@@ -169,7 +169,7 @@ export function DistribuicaoClient({
               <button
                 onClick={adicionarCondicao}
                 disabled={!novaCondicao.trim()}
-                className="flex items-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl px-3 py-2 flex-shrink-0"
+                className="flex items-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 rounded-xl px-3 py-2 flex-shrink-0"
               >
                 <Plus size={14} /> Adicionar
               </button>

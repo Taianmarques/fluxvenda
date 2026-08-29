@@ -230,7 +230,7 @@ export function ProspeccaoClient({
             <p className="text-gray-400 text-sm">Atendimento</p>
             <h1 className="text-3xl font-bold mt-1 flex items-center gap-2"><Target size={28} className="text-blue-400" /> Prospecção</h1>
           </div>
-          <button onClick={() => { setShowImport(s => !s); setShowManual(false); setShowSettings(false); }} className="bg-blue-600 hover:bg-blue-500 rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-1.5">
+          <button onClick={() => { setShowImport(s => !s); setShowManual(false); setShowSettings(false); }} className="bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-1.5">
             <Upload size={15} /> Importar planilha
           </button>
           <button onClick={() => { setShowManual(s => !s); setShowImport(false); setShowSettings(false); }} className="bg-gray-700 hover:bg-gray-600 rounded-xl px-4 py-2.5 text-sm font-medium">
@@ -268,7 +268,7 @@ export function ProspeccaoClient({
               <input value={followupDias} onChange={e => setFollowupDias(e.target.value)} placeholder="3, 7, 14" className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
               <p className="text-xs text-gray-500 mt-1">Ex: "3, 7, 14" = follow-up 3 dias depois, depois mais 7, depois mais 14.</p>
             </div>
-            <button onClick={handleSaveSettings} disabled={savingSettings} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl px-5 py-2 text-sm font-medium">
+            <button onClick={handleSaveSettings} disabled={savingSettings} className="bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 rounded-xl px-5 py-2 text-sm font-medium">
               {savingSettings ? "Salvando..." : "Salvar configurações"}
             </button>
           </div>
@@ -329,7 +329,7 @@ export function ProspeccaoClient({
                     </tbody>
                   </table>
                 </div>
-                <button onClick={handleImport} disabled={importing} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl px-5 py-2 text-sm font-medium">
+                <button onClick={handleImport} disabled={importing} className="bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 rounded-xl px-5 py-2 text-sm font-medium">
                   {importing ? "Importando..." : `Importar ${csvRows.length} contatos`}
                 </button>
               </div>
@@ -356,7 +356,7 @@ export function ProspeccaoClient({
             </div>
             {manError && <p className="text-sm text-red-400">{manError}</p>}
             <div className="flex gap-2">
-              <button onClick={handleAddManual} disabled={savingManual} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl px-4 py-2 text-sm font-medium">
+              <button onClick={handleAddManual} disabled={savingManual} className="bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 rounded-xl px-4 py-2 text-sm font-medium">
                 {savingManual ? "Salvando..." : "Salvar prospect"}
               </button>
               <button onClick={() => { setShowManual(false); setManError(""); }} className="text-sm text-gray-400 hover:text-white">Cancelar</button>
@@ -372,7 +372,7 @@ export function ProspeccaoClient({
             <input value={scrapeRegiao} onChange={e => setScrapeRegiao(e.target.value)} placeholder="Cidade/região" className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
             <input type="number" min={1} max={50} value={scrapeMax} onChange={e => setScrapeMax(Math.min(50, Math.max(1, Number(e.target.value))))} placeholder="Qtde" className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm" />
           </div>
-          <button onClick={handleScrape} disabled={scraping || !scrapeSegmento || !scrapeRegiao} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl px-5 py-2 text-sm font-medium">
+          <button onClick={handleScrape} disabled={scraping || !scrapeSegmento || !scrapeRegiao} className="bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 rounded-xl px-5 py-2 text-sm font-medium">
             {scraping ? "Buscando (pode levar 1-2 min)..." : "Buscar prospects"}
           </button>
           {scrapeResult && <p className="text-sm text-green-400">{scrapeResult.novos} novos prospects encontrados ({scrapeResult.duplicatas} já existiam).</p>}

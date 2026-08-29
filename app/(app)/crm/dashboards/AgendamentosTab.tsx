@@ -27,7 +27,7 @@ export async function AgendamentosTab({ agentId, config }: { agentId: string; co
           <p className="font-semibold">Agendamentos não configurados</p>
           <p className="text-sm text-gray-500 mt-1">Ative o agendamento na página Agenda para começar a receber marcações e ver os dados aqui.</p>
         </div>
-        <Link href={`/crm/${agentId}/agenda`} className="inline-block bg-blue-600 hover:bg-blue-500 rounded-xl px-5 py-2.5 text-sm font-medium">
+        <Link href={`/crm/${agentId}/agenda`} className="inline-block bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-5 py-2.5 text-sm font-medium">
           Ir para Agenda
         </Link>
       </div>

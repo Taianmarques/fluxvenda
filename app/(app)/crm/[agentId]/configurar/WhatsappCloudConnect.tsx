@@ -162,7 +162,7 @@ export function WhatsappCloudConnect({
             <button
               onClick={save}
               disabled={saving}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors"
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors"
             >
               {saved ? <CheckCircle size={16} /> : <Save size={16} />}
               {saving ? "Salvando..." : saved ? "Salvo!" : "Salvar credenciais"}

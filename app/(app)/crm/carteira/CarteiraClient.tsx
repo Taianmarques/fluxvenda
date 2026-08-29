@@ -326,7 +326,7 @@ export function CarteiraClient({ agentId, clientes, initialConfig, isManager, in
               <button
                 onClick={handleAnalisar}
                 disabled={analisando}
-                className="flex items-center gap-1.5 bg-purple-700 hover:bg-purple-600 disabled:opacity-60 rounded-xl px-4 py-2.5 text-sm font-medium"
+                className="flex items-center gap-1.5 bg-purple-700 hover:bg-purple-600 text-white disabled:opacity-60 rounded-xl px-4 py-2.5 text-sm font-medium"
               >
                 <Sparkles size={15} />
                 {analisando ? "Analisando..." : "Análise da IA"}
@@ -334,7 +334,7 @@ export function CarteiraClient({ agentId, clientes, initialConfig, isManager, in
               <button
                 onClick={() => setShowConfig(s => !s)}
                 className={`flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
-                  cfg.posVendaEnabled || cfg.recompraEnabled ? "bg-green-700 hover:bg-green-600" : "bg-gray-800 hover:bg-gray-700"
+                  cfg.posVendaEnabled || cfg.recompraEnabled ? "bg-green-700 hover:bg-green-600 text-white" : "bg-gray-800 hover:bg-gray-700"
                 }`}
               >
                 <Bot size={15} />
@@ -473,7 +473,7 @@ export function CarteiraClient({ agentId, clientes, initialConfig, isManager, in
             </div>
 
             <div className="flex items-center gap-3">
-              <button onClick={handleSaveConfig} disabled={savingCfg} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl px-5 py-2 text-sm font-medium">
+              <button onClick={handleSaveConfig} disabled={savingCfg} className="bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 rounded-xl px-5 py-2 text-sm font-medium">
                 {savingCfg ? "Salvando..." : "Salvar"}
               </button>
               {cfgSaved && <span className="text-xs text-green-400">Salvo!</span>}
