@@ -548,6 +548,7 @@ model Team {
   tokenUsageLogs    TokenUsageLog[]
   demoBookings      DemoBooking[]
   planPurchases     PlanPurchase[]
+  trialFunnelSent   TrialFunnelSent[]
 
   // Plano do CRM comprado via aba Recursos > Ver planos (lib/crm-plans.ts) — null = ainda
   // não comprou nenhum (trial/sem plano definido). Cobrança avulsa, sem renovação automática.
@@ -1829,6 +1830,7 @@ model CrmPlanTier {
 // corpo — a substituição de verdade acontece em lib/message-templates.ts.
 model MessageTemplate {
   id          String   @id // WELCOME_GESTOR | WELCOME_VENDEDOR | WELCOME_FUNCIONARIO | DEMO_CONFIRMACAO
+                            // | TRIAL_CHECKLIST_NUDGE | TRIAL_DEMO_INVITE | TRIAL_SOCIAL_PROOF_1/2/3
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -1836,6 +1838,20 @@ model MessageTemplate {
   description  String @default("")
   body         String @db.Text
   placeholders Json   @default("[]") // string[] — nomes dos placeholders aceitos, ex: ["name","companyName"]
+}
+
+// Marca quais etapas do funil de acompanhamento do teste grátis (ver lib/trial-funnel.ts)
+// já foram processadas pra cada equipe — evita reenviar a mesma etapa a cada execução do
+// cron. Gravado mesmo quando a etapa é pulada por condição (ex: checklist já em andamento),
+// não só quando a mensagem sai de fato, pra não ficar reavaliando a condição pra sempre.
+model TrialFunnelSent {
+  id     String   @id @default(cuid())
+  teamId String
+  team   Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  stepId String
+  sentAt DateTime @default(now())
+
+  @@unique([teamId, stepId])
 }
 
 // ─── Agente de Ligação (Twilio + ElevenLabs) ─────────────────────────────────
