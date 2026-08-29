@@ -1,7 +1,13 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Target, Settings, Search, Upload, X, Download } from "lucide-react";
+import { Target, Settings, Search, Upload, X, Download, Play, Pause, ShieldCheck } from "lucide-react";
+
+const RITMOS = [
+  { key: "seguro", label: "Seguro", desc: "2 a 5 min entre mensagens — menor risco de bloqueio, recomendado" },
+  { key: "moderado", label: "Moderado", desc: "1 a 2,5 min entre mensagens" },
+  { key: "rapido", label: "Rápido", desc: "30 a 90s entre mensagens — só para poucos leads e números já aquecidos" },
+] as const;
 
 type Prospect = {
   id: string; nome: string; empresa: string; telefone: string;
@@ -23,7 +29,7 @@ const ALL_STATUSES = Object.keys(STATUS_LABEL);
 
 export function ProspeccaoClient({
   agentId, initialProspeccaoEnabled, initialSegmento, initialRegiao,
-  initialMensagemInicial, initialFollowupDias, initialProspects,
+  initialMensagemInicial, initialFollowupDias, initialRitmo, initialProspects,
 }: {
   agentId: string;
   initialProspeccaoEnabled: boolean;
@@ -31,14 +37,17 @@ export function ProspeccaoClient({
   initialRegiao: string;
   initialMensagemInicial: string;
   initialFollowupDias: number[];
+  initialRitmo: "seguro" | "moderado" | "rapido";
   initialProspects: Prospect[];
 }) {
   const [showSettings, setShowSettings] = useState(false);
   const [prospeccaoEnabled, setProspeccaoEnabled] = useState(initialProspeccaoEnabled);
+  const [togglingEnabled, setTogglingEnabled] = useState(false);
   const [segmento, setSegmento] = useState(initialSegmento);
   const [regiao, setRegiao] = useState(initialRegiao);
   const [mensagemInicial, setMensagemInicial] = useState(initialMensagemInicial);
   const [followupDias, setFollowupDias] = useState(initialFollowupDias.join(", "));
+  const [ritmo, setRitmo] = useState<"seguro" | "moderado" | "rapido">(initialRitmo);
   const [savingSettings, setSavingSettings] = useState(false);
 
   const [prospects, setProspects] = useState<Prospect[]>(initialProspects);
@@ -179,11 +188,32 @@ export function ProspeccaoClient({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prospeccaoEnabled, prospeccaoSegmento: segmento, prospeccaoRegiao: regiao,
+          prospeccaoSegmento: segmento, prospeccaoRegiao: regiao,
           prospeccaoMensagemInicial: mensagemInicial, prospeccaoFollowupDias: dias,
+          prospeccaoRitmo: ritmo,
         }),
       });
     } finally { setSavingSettings(false); }
+  }
+
+  // Liga/pausa a prospecção sem precisar abrir o painel de configurações inteiro. Sem uma
+  // mensagem inicial configurada o cron nunca aborda ninguém mesmo com o agente "ligado" —
+  // aqui a gente abre a configuração em vez de deixar isso acontecer em silêncio.
+  async function handleToggleEnabled() {
+    if (!prospeccaoEnabled && !mensagemInicial.trim()) {
+      setShowSettings(true);
+      return;
+    }
+    const novoValor = !prospeccaoEnabled;
+    setTogglingEnabled(true);
+    try {
+      const res = await fetch(`/api/agentes/${agentId}/prospeccao`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prospeccaoEnabled: novoValor }),
+      });
+      if (res.ok) setProspeccaoEnabled(novoValor);
+    } finally { setTogglingEnabled(false); }
   }
 
   async function handleScrape() {
@@ -228,25 +258,58 @@ export function ProspeccaoClient({
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
             <p className="text-gray-400 text-sm">Atendimento</p>
-            <h1 className="text-3xl font-bold mt-1 flex items-center gap-2"><Target size={28} className="text-blue-400" /> Prospecção</h1>
+            <h1 className="text-3xl font-bold mt-1 flex items-center gap-2">
+              <Target size={28} className="text-blue-400" /> Prospecção
+              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${prospeccaoEnabled ? "bg-green-900/40 text-green-300 border-green-800/50" : "bg-gray-800 text-gray-400 border-gray-700"}`}>
+                {prospeccaoEnabled ? "Rodando" : "Pausada"}
+              </span>
+            </h1>
           </div>
-          <button onClick={() => { setShowImport(s => !s); setShowManual(false); setShowSettings(false); }} className="bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-1.5">
-            <Upload size={15} /> Importar planilha
-          </button>
-          <button onClick={() => { setShowManual(s => !s); setShowImport(false); setShowSettings(false); }} className="bg-gray-700 hover:bg-gray-600 rounded-xl px-4 py-2.5 text-sm font-medium">
-            + Adicionar 1
-          </button>
-          <button onClick={() => { setShowSettings(s => !s); setShowManual(false); }} className="bg-gray-800 hover:bg-gray-700 rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-1.5">
-            <Settings size={15} /> Configurar
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={handleToggleEnabled}
+              disabled={togglingEnabled}
+              className={`rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-1.5 disabled:opacity-50 ${
+                prospeccaoEnabled ? "bg-amber-900/40 text-amber-300 border border-amber-800/50 hover:bg-amber-900/60" : "bg-green-600 hover:bg-green-500 text-white"
+              }`}
+            >
+              {prospeccaoEnabled ? <><Pause size={15} /> Pausar</> : <><Play size={15} /> Iniciar prospecção</>}
+            </button>
+            <button onClick={() => { setShowImport(s => !s); setShowManual(false); setShowSettings(false); }} className="bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-1.5">
+              <Upload size={15} /> Importar planilha
+            </button>
+            <button onClick={() => { setShowManual(s => !s); setShowImport(false); setShowSettings(false); }} className="bg-gray-700 hover:bg-gray-600 rounded-xl px-4 py-2.5 text-sm font-medium">
+              + Adicionar 1
+            </button>
+            <button onClick={() => { setShowSettings(s => !s); setShowManual(false); }} className="bg-gray-800 hover:bg-gray-700 rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-1.5">
+              <Settings size={15} /> Configurar
+            </button>
+          </div>
         </div>
 
         {showSettings && (
           <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-4">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={prospeccaoEnabled} onChange={e => setProspeccaoEnabled(e.target.checked)} className="w-4 h-4" />
-              <span className="text-sm font-medium">Ativar agente de prospecção</span>
-            </label>
+            {!mensagemInicial.trim() && (
+              <p className="text-xs text-amber-300 bg-amber-900/30 border border-amber-800/50 rounded-xl px-3 py-2">
+                Escreva a mensagem inicial abaixo antes de iniciar a prospecção — sem ela, o agente não aborda ninguém.
+              </p>
+            )}
+            <div>
+              <p className="text-xs text-gray-400 font-medium flex items-center gap-1.5 mb-2"><ShieldCheck size={12} /> Ritmo de envio</p>
+              <div className="grid sm:grid-cols-3 gap-2">
+                {RITMOS.map(r => (
+                  <label key={r.key} className={`flex items-start gap-2 rounded-xl border p-3 cursor-pointer transition-colors ${
+                    ritmo === r.key ? "border-blue-500 bg-blue-500/10" : "border-gray-800 hover:border-gray-600"
+                  }`}>
+                    <input type="radio" checked={ritmo === r.key} onChange={() => setRitmo(r.key)} className="mt-0.5 w-3.5 h-3.5" />
+                    <span>
+                      <span className="text-sm font-medium block">{r.label}</span>
+                      <span className="text-xs text-gray-500">{r.desc}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
             <div className="grid md:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-gray-400 block mb-1">Segmento padrão</label>

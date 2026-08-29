@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppTextAsTeam } from "@/lib/whatsapp";
 
-// Prospecção é abordagem fria a desconhecidos — o intervalo é mais generoso que o de
-// campanhas (que manda pra base própria) porque o risco de denúncia/banimento é maior aqui.
-const PROSPECCAO_INTERVALO_MIN_SEG = 60;
-const PROSPECCAO_INTERVALO_MAX_SEG = 300;
+// Prospecção é abordagem fria a desconhecidos — as faixas são mais espaçadas que as de
+// Campanha (que manda pra base própria) porque o risco de denúncia/banimento é maior aqui.
+// Mesmas 3 chaves que a tela de Campanhas usa, pra manter o vocabulário consistente no CRM.
+const RITMOS: Record<string, { min: number; max: number }> = {
+  seguro: { min: 120, max: 300 },
+  moderado: { min: 60, max: 150 },
+  rapido: { min: 30, max: 90 },
+};
 
 function daysSince(date: Date): number {
   return Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
@@ -113,7 +117,8 @@ export async function POST(req: NextRequest) {
     // Só escalona o próximo envio se de fato enviou — se falhou (catch acima), deixa
     // prospeccaoNextSendAt como está pra tentar de novo já na próxima execução do cron.
     if (enviouAgora) {
-      const delay = randomDelaySeconds(PROSPECCAO_INTERVALO_MIN_SEG, PROSPECCAO_INTERVALO_MAX_SEG);
+      const ritmo = RITMOS[config.prospeccaoRitmo] ?? RITMOS.seguro;
+      const delay = randomDelaySeconds(ritmo.min, ritmo.max);
       await prisma.agentConfig.update({
         where: { id: config.id },
         data: { prospeccaoNextSendAt: new Date(Date.now() + delay * 1000) },

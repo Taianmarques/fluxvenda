@@ -10,6 +10,7 @@ const schema = z.object({
   prospeccaoRegiao: z.string().optional(),
   prospeccaoMensagemInicial: z.string().optional(),
   prospeccaoFollowupDias: z.array(z.number().int().min(1)).optional(),
+  prospeccaoRitmo: z.enum(["seguro", "moderado", "rapido"]).optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {
@@ -34,5 +35,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
     prospeccaoRegiao: updated.prospeccaoRegiao,
     prospeccaoMensagemInicial: updated.prospeccaoMensagemInicial,
     prospeccaoFollowupDias: updated.prospeccaoFollowupDias,
+    prospeccaoRitmo: updated.prospeccaoRitmo,
   });
 }

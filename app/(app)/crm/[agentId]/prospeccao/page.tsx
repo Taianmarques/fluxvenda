@@ -51,6 +51,7 @@ async function ProspeccaoPageContent({ params }: { params: Promise<{ agentId: st
       initialRegiao={config.prospeccaoRegiao}
       initialMensagemInicial={config.prospeccaoMensagemInicial}
       initialFollowupDias={(config.prospeccaoFollowupDias as number[]) ?? [3, 7, 14]}
+      initialRitmo={config.prospeccaoRitmo as "seguro" | "moderado" | "rapido"}
       initialProspects={prospects.map(p => ({
         id: p.id, nome: p.nome, empresa: p.empresa, telefone: p.telefone,
         segmento: p.segmento, regiao: p.regiao, status: p.status,
