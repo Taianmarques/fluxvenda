@@ -296,13 +296,13 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
             <div className="flex gap-1.5 border-b border-gray-800 -mb-1">
               <button
                 onClick={() => setShowAdicionar(false)}
-                className={`text-sm font-medium px-3 py-2 border-b-2 transition-colors ${!showAdicionar ? "text-white border-blue-500" : "text-gray-500 border-transparent hover:text-gray-300"}`}
+                className={`text-sm font-medium px-3 py-2 border-b-2 transition-colors ${!showAdicionar ? "border-blue-500" : "text-gray-500 border-transparent hover:text-gray-300"}`}
               >
                 Link de convite
               </button>
               <button
                 onClick={() => setShowAdicionar(true)}
-                className={`text-sm font-medium px-3 py-2 border-b-2 transition-colors ${showAdicionar ? "text-white border-blue-500" : "text-gray-500 border-transparent hover:text-gray-300"}`}
+                className={`text-sm font-medium px-3 py-2 border-b-2 transition-colors ${showAdicionar ? "border-blue-500" : "text-gray-500 border-transparent hover:text-gray-300"}`}
               >
                 Adicionar direto
               </button>
