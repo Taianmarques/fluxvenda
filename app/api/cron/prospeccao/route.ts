@@ -2,13 +2,27 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppTextAsTeam } from "@/lib/whatsapp";
 
+// Prospecção é abordagem fria a desconhecidos — o intervalo é mais generoso que o de
+// campanhas (que manda pra base própria) porque o risco de denúncia/banimento é maior aqui.
+const PROSPECCAO_INTERVALO_MIN_SEG = 60;
+const PROSPECCAO_INTERVALO_MAX_SEG = 300;
+
 function daysSince(date: Date): number {
   return Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function randomDelaySeconds(min: number, max: number): number {
+  return Math.floor(min + Math.random() * (max - min));
 }
 
 // Cron de prospecção ativa: envia a 1ª mensagem aos prospects NOVO e
 // follow-ups automáticos aos que não responderam (ABORDADO).
 // Disparado externamente com: Authorization: Bearer <CRON_SECRET>
+//
+// Processa no máximo 1 abordagem/follow-up POR AGENTE a cada execução, e só volta a mandar
+// pra esse agente depois de um intervalo aleatório (prospeccaoNextSendAt) — sem isso, importar
+// uma planilha de centenas de leads e ativar a prospecção disparava todas as mensagens de uma
+// vez, na velocidade do fetch, o cenário clássico de banimento do número.
 export async function POST(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
   const auth = req.headers.get("authorization");
@@ -29,36 +43,12 @@ export async function POST(req: NextRequest) {
 
     if (!mensagemInicial) continue; // sem mensagem configurada, não aborda ninguém
 
-    // 1. Prospects NOVO — envia a 1ª abordagem
-    const novos = await prisma.prospect.findMany({
-      where: { agentConfigId: config.id, status: "NOVO" },
-    });
-
-    for (const p of novos) {
-      try {
-        const msg = mensagemInicial
-          .replace("{nome}", p.nome)
-          .replace("{empresa}", p.empresa || p.nome)
-          .replace("{segmento}", p.segmento);
-        const sentId = await sendWhatsAppTextAsTeam(config.uazapiToken!, p.telefone, msg);
-        // sendWhatsAppTextAsTeam não lança em erro de API — sem checar o retorno, o prospect
-        // seria marcado ABORDADO mesmo quando a 1ª mensagem nunca chegou a sair.
-        if (!sentId) throw new Error("Instância de WhatsApp não confirmou o envio");
-        await prisma.prospect.update({
-          where: { id: p.id },
-          data: { status: "ABORDADO", abordagemCount: 1, lastAbordagemAt: new Date() },
-        });
-        enviados++;
-      } catch (err) {
-        console.error(`[cron/prospeccao] erro ao abordar ${p.telefone}:`, err);
-      }
-    }
-
-    // 2. Prospects ABORDADO — follow-up se passou o prazo
+    // Follow-up esgotado é só uma troca de status (nenhuma mensagem sai) — roda sempre, sem
+    // entrar no throttle abaixo, que existe só pra limitar mensagens de fato enviadas.
     const abordados = await prisma.prospect.findMany({
       where: { agentConfigId: config.id, status: "ABORDADO" },
     });
-
+    const pendentesFollowup: typeof abordados = [];
     for (const p of abordados) {
       if (!p.lastAbordagemAt) continue;
       const diasEsperados = followupDias[p.abordagemCount - 1]; // índice baseado em quantas já foram enviadas
@@ -69,7 +59,42 @@ export async function POST(req: NextRequest) {
         continue;
       }
       if (daysSince(p.lastAbordagemAt) < diasEsperados) continue;
+      pendentesFollowup.push(p);
+    }
 
+    const podeEnviarAgora = !config.prospeccaoNextSendAt || config.prospeccaoNextSendAt <= new Date();
+    if (!podeEnviarAgora) continue;
+
+    // Prioriza a 1ª abordagem de quem é NOVO (fila mais antiga primeiro); só passa pro
+    // follow-up se não houver ninguém novo esperando.
+    const novo = await prisma.prospect.findFirst({
+      where: { agentConfigId: config.id, status: "NOVO" },
+      orderBy: { createdAt: "asc" },
+    });
+
+    let enviouAgora = false;
+
+    if (novo) {
+      try {
+        const msg = mensagemInicial
+          .replaceAll("{nome}", novo.nome)
+          .replaceAll("{empresa}", novo.empresa || novo.nome)
+          .replaceAll("{segmento}", novo.segmento);
+        const sentId = await sendWhatsAppTextAsTeam(config.uazapiToken!, novo.telefone, msg);
+        // sendWhatsAppTextAsTeam não lança em erro de API — sem checar o retorno, o prospect
+        // seria marcado ABORDADO mesmo quando a 1ª mensagem nunca chegou a sair.
+        if (!sentId) throw new Error("Instância de WhatsApp não confirmou o envio");
+        await prisma.prospect.update({
+          where: { id: novo.id },
+          data: { status: "ABORDADO", abordagemCount: 1, lastAbordagemAt: new Date() },
+        });
+        enviados++;
+        enviouAgora = true;
+      } catch (err) {
+        console.error(`[cron/prospeccao] erro ao abordar ${novo.telefone}:`, err);
+      }
+    } else if (pendentesFollowup.length > 0) {
+      const p = pendentesFollowup[0];
       try {
         const followupMsg = `Olá ${p.nome}! Passando para reforçar o contato sobre ${p.segmento}. Posso tirar alguma dúvida?`;
         const sentId = await sendWhatsAppTextAsTeam(config.uazapiToken!, p.telefone, followupMsg);
@@ -79,9 +104,20 @@ export async function POST(req: NextRequest) {
           data: { abordagemCount: { increment: 1 }, lastAbordagemAt: new Date() },
         });
         enviados++;
+        enviouAgora = true;
       } catch (err) {
         console.error(`[cron/prospeccao] erro no follow-up de ${p.telefone}:`, err);
       }
+    }
+
+    // Só escalona o próximo envio se de fato enviou — se falhou (catch acima), deixa
+    // prospeccaoNextSendAt como está pra tentar de novo já na próxima execução do cron.
+    if (enviouAgora) {
+      const delay = randomDelaySeconds(PROSPECCAO_INTERVALO_MIN_SEG, PROSPECCAO_INTERVALO_MAX_SEG);
+      await prisma.agentConfig.update({
+        where: { id: config.id },
+        data: { prospeccaoNextSendAt: new Date(Date.now() + delay * 1000) },
+      });
     }
   }
 
