@@ -64,12 +64,21 @@ export async function POST(req: NextRequest) {
       if (!followup) continue;
       logTokenUsage({ teamId: config.teamId, provider: "openai", model: "gpt-4o-mini", feature: "followup", ...usage });
 
+      // Envia antes de gravar: sendWhatsAppTextAsTeam não lança em erro de API (só loga e
+      // retorna null) — confirmando o envio antes de tocar no banco, uma falha simplesmente
+      // deixa o followupCount como está, e o mesmo candidato volta a ser elegível na próxima
+      // execução, em vez de a mensagem "existir" no CRM sem nunca ter saído de verdade.
+      const sentId = await sendWhatsAppTextAsTeam(config.uazapiToken, conversation.contactNumber, followup);
+      if (!sentId) {
+        console.error(`[cron/followup] falha ao enviar follow-up da conversa ${conversation.id} — tenta de novo na próxima execução`);
+        continue;
+      }
+
       await prisma.message.create({ data: { conversationId: conversation.id, role: "assistant", content: followup } });
       await prisma.conversation.update({
         where: { id: conversation.id },
         data: { followupCount: { increment: 1 }, lastFollowupAt: new Date() },
       });
-      await sendWhatsAppTextAsTeam(config.uazapiToken, conversation.contactNumber, followup);
       sent++;
     }
   }
@@ -136,12 +145,17 @@ O lead está na etapa "${stage.name}" do funil "${stage.pipeline.name}". Siga es
       if (!followup) continue;
       logTokenUsage({ teamId: config.teamId, provider: "openai", model: "gpt-4o-mini", feature: "followup", ...usage });
 
+      const sentId = await sendWhatsAppTextAsTeam(config.uazapiToken, conversation.contactNumber, followup);
+      if (!sentId) {
+        console.error(`[cron/followup] falha ao enviar follow-up de etapa da oportunidade ${opp.id} — tenta de novo na próxima execução`);
+        continue;
+      }
+
       await prisma.message.create({ data: { conversationId: conversation.id, role: "assistant", content: followup } });
       await prisma.opportunity.update({
         where: { id: opp.id },
         data: { stageFollowupCount: { increment: 1 }, lastStageFollowupAt: new Date() },
       });
-      await sendWhatsAppTextAsTeam(config.uazapiToken, conversation.contactNumber, followup);
       stageFollowupSent++;
     }
   }
@@ -172,11 +186,16 @@ O lead está na etapa "${stage.name}" do funil "${stage.pipeline.name}". Siga es
       const timeStr = appointment.scheduledAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
       const message = `Olá! Passando para confirmar seu agendamento de ${dateStr} às ${timeStr}. Você confirma presença?`;
 
+      const sentId = await sendWhatsAppTextAsTeam(config.uazapiToken, appointment.contactNumber, message);
+      if (!sentId) {
+        console.error(`[cron/followup] falha ao enviar lembrete do agendamento ${appointment.id} — tenta de novo na próxima execução`);
+        continue;
+      }
+
       if (appointment.conversationId) {
         await prisma.message.create({ data: { conversationId: appointment.conversationId, role: "assistant", content: message } });
       }
       await prisma.appointment.update({ where: { id: appointment.id }, data: { reminderSentAt: new Date() } });
-      await sendWhatsAppTextAsTeam(config.uazapiToken, appointment.contactNumber, message);
       remindersSent++;
     }
   }
@@ -202,7 +221,12 @@ O lead está na etapa "${stage.name}" do funil "${stage.pipeline.name}". Siga es
       if (sender?.name) signaturePrefix = `*${sender.name}:*\n`;
     }
 
-    await sendWhatsAppTextAsTeam(config.uazapiToken, conversation.contactNumber, `${signaturePrefix}${scheduled.content}`, undefined, conversation.isGroup);
+    const sentId = await sendWhatsAppTextAsTeam(config.uazapiToken, conversation.contactNumber, `${signaturePrefix}${scheduled.content}`, undefined, conversation.isGroup);
+    if (!sentId) {
+      console.error(`[cron/followup] falha ao enviar mensagem agendada ${scheduled.id} — tenta de novo na próxima execução`);
+      continue;
+    }
+
     await prisma.message.create({
       data: { conversationId: conversation.id, role: "human", content: scheduled.content, senderId: scheduled.createdById },
     });

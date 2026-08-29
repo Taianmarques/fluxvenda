@@ -40,7 +40,10 @@ export async function POST(req: NextRequest) {
           .replace("{nome}", p.nome)
           .replace("{empresa}", p.empresa || p.nome)
           .replace("{segmento}", p.segmento);
-        await sendWhatsAppTextAsTeam(config.uazapiToken!, p.telefone, msg);
+        const sentId = await sendWhatsAppTextAsTeam(config.uazapiToken!, p.telefone, msg);
+        // sendWhatsAppTextAsTeam não lança em erro de API — sem checar o retorno, o prospect
+        // seria marcado ABORDADO mesmo quando a 1ª mensagem nunca chegou a sair.
+        if (!sentId) throw new Error("Instância de WhatsApp não confirmou o envio");
         await prisma.prospect.update({
           where: { id: p.id },
           data: { status: "ABORDADO", abordagemCount: 1, lastAbordagemAt: new Date() },
@@ -69,7 +72,8 @@ export async function POST(req: NextRequest) {
 
       try {
         const followupMsg = `Olá ${p.nome}! Passando para reforçar o contato sobre ${p.segmento}. Posso tirar alguma dúvida?`;
-        await sendWhatsAppTextAsTeam(config.uazapiToken!, p.telefone, followupMsg);
+        const sentId = await sendWhatsAppTextAsTeam(config.uazapiToken!, p.telefone, followupMsg);
+        if (!sentId) throw new Error("Instância de WhatsApp não confirmou o envio");
         await prisma.prospect.update({
           where: { id: p.id },
           data: { abordagemCount: { increment: 1 }, lastAbordagemAt: new Date() },

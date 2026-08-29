@@ -100,7 +100,10 @@ export async function POST(req: NextRequest) {
             logTokenUsage({ teamId: campanha.agentConfig.teamId, provider: "openai", model: "gpt-4o-mini", feature: "campanha_variacao", ...result.usage });
           }
 
-          await sendWhatsAppTextAsTeam(campanha.agentConfig.uazapiToken!, dest.contactNumber, texto);
+          const sentId = await sendWhatsAppTextAsTeam(campanha.agentConfig.uazapiToken!, dest.contactNumber, texto);
+          // sendWhatsAppTextAsTeam não lança em erro de API (só loga e retorna null) — sem essa
+          // checagem, o destinatário seria marcado ENVIADO mesmo quando a mensagem nunca saiu.
+          if (!sentId) throw new Error("Instância de WhatsApp não confirmou o envio");
           await prisma.campanhaDestinatario.update({
             where: { id: dest.id },
             data: { status: "ENVIADO", mensagemEnviada: texto, sentAt: new Date() },
