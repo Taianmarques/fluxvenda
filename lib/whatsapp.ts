@@ -1,3 +1,5 @@
+import { renderMessageTemplate } from "@/lib/message-templates";
+
 const UAZAPI_URL = process.env.UAZAPI_URL ?? "";
 const UAZAPI_TOKEN = process.env.UAZAPI_TOKEN ?? "";
 const UAZAPI_ADMIN_TOKEN = process.env.UAZAPI_ADMIN_TOKEN ?? "";
@@ -243,35 +245,30 @@ export async function registerAgentWebhook(token: string, webhookUrl: string): P
   if (!res.ok) throw new Error(`Erro ao registrar webhook: ${res.status}`);
 }
 
-export function buildWelcomeMessage(name: string, role: "GESTOR" | "VENDEDOR" | "FUNCIONARIO", companyName?: string): string {
+// Texto editável pelo super admin em /admin/mensagens (model MessageTemplate) — o literal
+// abaixo é só o fallback caso o registro do banco não exista por algum motivo.
+export async function getWelcomeMessage(name: string, role: "GESTOR" | "VENDEDOR" | "FUNCIONARIO", companyName?: string): Promise<string> {
   if (role === "GESTOR") {
-    return [
-      `Olá, ${name}! 👋`,
-      ``,
-      `Seu cadastro na plataforma foi realizado com sucesso.`,
-      companyName ? `A empresa *${companyName}* já está configurada.` : "",
-      ``,
-      `Acesse o painel do gestor e comece a estruturar o treinamento da sua equipe de vendas. 🚀`,
-    ].filter(l => l !== undefined).join("\n");
+    return renderMessageTemplate(
+      "WELCOME_GESTOR",
+      { name, companyName: companyName ?? "" },
+      `Olá, ${name}! 👋\n\nSeu cadastro na plataforma foi realizado com sucesso.\n${companyName ? `A empresa *${companyName}* já está configurada.\n\n` : "\n"}Acesse o painel do gestor e comece a estruturar o treinamento da sua equipe de vendas. 🚀`
+    );
   }
 
   if (role === "FUNCIONARIO") {
-    return [
-      `Olá, ${name}! 👋`,
-      ``,
-      `Bem-vindo(a) à plataforma!`,
-      ``,
-      `Seu acesso como funcionário foi criado. Acesse seu dashboard e comece os treinamentos personalizados para a sua equipe. 🎯`,
-    ].join("\n");
+    return renderMessageTemplate(
+      "WELCOME_FUNCIONARIO",
+      { name },
+      `Olá, ${name}! 👋\n\nBem-vindo(a) à plataforma!\n\nSeu acesso como funcionário foi criado. Acesse seu dashboard e comece os treinamentos personalizados para a sua equipe. 🎯`
+    );
   }
 
-  return [
-    `Olá, ${name}! 👋`,
-    ``,
-    `Bem-vindo(a) à plataforma!`,
-    ``,
-    `Seu perfil de vendedor foi criado. Acesse seu dashboard e comece os treinamentos personalizados para o seu segmento. 🎯`,
-  ].join("\n");
+  return renderMessageTemplate(
+    "WELCOME_VENDEDOR",
+    { name },
+    `Olá, ${name}! 👋\n\nBem-vindo(a) à plataforma!\n\nSeu perfil de vendedor foi criado. Acesse seu dashboard e comece os treinamentos personalizados para o seu segmento. 🎯`
+  );
 }
 
 export function buildOtpMessage(code: string): string {
@@ -279,18 +276,14 @@ export function buildOtpMessage(code: string): string {
 }
 
 // Confirmação enviada a quem agendou (aba Recursos > Agendar uma demonstração), pela
-// instância global da plataforma — mesmo canal do buildWelcomeMessage/OTP.
-export function buildDemoConfirmationMessage(name: string, scheduledAt: Date, durationMinutes: number): string {
+// instância global da plataforma — mesmo canal do getWelcomeMessage/OTP. Texto editável em
+// /admin/mensagens (id DEMO_CONFIRMACAO).
+export async function getDemoConfirmationMessage(name: string, scheduledAt: Date, durationMinutes: number): Promise<string> {
   const dataFormatada = scheduledAt.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" });
   const horaFormatada = scheduledAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-  return [
-    `Olá, ${name}! 👋`,
-    ``,
-    `Sua demonstração do CRM FluxVenda está confirmada:`,
-    ``,
-    `📅 ${dataFormatada}`,
-    `🕐 ${horaFormatada} (${durationMinutes} min)`,
-    ``,
-    `Qualquer imprevisto, é só responder esta mensagem.`,
-  ].join("\n");
+  return renderMessageTemplate(
+    "DEMO_CONFIRMACAO",
+    { name, data: dataFormatada, hora: horaFormatada, duracao: String(durationMinutes) },
+    `Olá, ${name}! 👋\n\nSua demonstração do CRM FluxVenda está confirmada:\n\n📅 ${dataFormatada}\n🕐 ${horaFormatada} (${durationMinutes} min)\n\nQualquer imprevisto, é só responder esta mensagem.`
+  );
 }

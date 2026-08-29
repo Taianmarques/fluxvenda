@@ -1821,6 +1821,23 @@ model CrmPlanTier {
   @@index([active, order])
 }
 
+// Textos das mensagens automáticas que a PRÓPRIA plataforma dispara pelo WhatsApp da
+// instância global (UAZAPI_TOKEN, não a de cada equipe) durante o funil de venda/onboarding
+// do CRM — cadastro de conta e agendamento de demonstração. Editável pelo super admin em
+// /admin/mensagens. `id` é fixo por evento (não criável/removível pelo admin, só o texto
+// muda); `placeholders` é só documentação exibida na tela pra saber o que dá pra usar no
+// corpo — a substituição de verdade acontece em lib/message-templates.ts.
+model MessageTemplate {
+  id          String   @id // WELCOME_GESTOR | WELCOME_VENDEDOR | WELCOME_FUNCIONARIO | DEMO_CONFIRMACAO
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  label        String
+  description  String @default("")
+  body         String @db.Text
+  placeholders Json   @default("[]") // string[] — nomes dos placeholders aceitos, ex: ["name","companyName"]
+}
+
 // ─── Agente de Ligação (Twilio + ElevenLabs) ─────────────────────────────────
 
 enum PhoneCallStatus {

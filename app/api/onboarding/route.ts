@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth/server";
 import { updateSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
-import { sendWhatsAppText, buildWelcomeMessage } from "@/lib/whatsapp";
+import { sendWhatsAppText, getWelcomeMessage } from "@/lib/whatsapp";
 
 const schema = z.object({
   role: z.enum(["VENDEDOR", "FUNCIONARIO", "GESTOR"]),
@@ -85,8 +85,9 @@ export async function POST(req: NextRequest) {
 
     // Dispara WhatsApp de boas-vindas em background — telefone já verificado no cadastro
     if (profile.phone) {
-      const message = buildWelcomeMessage(name, role, companyName);
-      sendWhatsAppText(profile.phone, message).catch(() => {});
+      getWelcomeMessage(name, role, companyName)
+        .then(message => sendWhatsAppText(profile.phone!, message))
+        .catch(() => {});
     }
 
     return NextResponse.json({ ok: true, teamJoined });

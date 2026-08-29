@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { generateToken, passwordResetExpiry } from "@/lib/auth/tokens";
 import { sendTeamMemberAddedEmail } from "@/lib/email";
-import { formatPhone, sendWhatsAppText, buildWelcomeMessage } from "@/lib/whatsapp";
+import { formatPhone, sendWhatsAppText, getWelcomeMessage } from "@/lib/whatsapp";
 import { getManagedTeam } from "@/lib/team";
 
 const schema = z.object({
@@ -77,7 +77,9 @@ export async function POST(req: NextRequest) {
 
     sendTeamMemberAddedEmail(profile.email, profile.name, team.name, passwordResetToken).catch(() => {});
     if (formattedPhone) {
-      sendWhatsAppText(formattedPhone, buildWelcomeMessage(profile.name, "FUNCIONARIO", team.name)).catch(() => {});
+      getWelcomeMessage(profile.name, "FUNCIONARIO", team.name)
+        .then(message => sendWhatsAppText(formattedPhone, message))
+        .catch(() => {});
     }
 
     return NextResponse.json({ ok: true, needsPassword });
