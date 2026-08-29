@@ -1796,6 +1796,31 @@ model PlanPurchase {
   @@index([teamId, createdAt])
 }
 
+// Planos do CRM oferecidos na aba Recursos > Ver planos — editável pelo super admin em
+// /admin/planos. `id` é o slug usado como referência solta em PlanPurchase.tier (sem FK,
+// então excluir um tier não quebra o histórico de quem já comprou, mas o rótulo some da
+// tela; por isso o campo `active` existe pra "aposentar" um plano sem perder esse histórico).
+// Preço de cada ciclo é o total cobrado à vista (não parcelado); o valor "por mês" exibido
+// pro semestral/anual é sempre derivado (total / meses do ciclo), nunca guardado à parte.
+model CrmPlanTier {
+  id          String   @id // slug: STARTER, ESSENTIAL, PRO, BUSINESS, ou um novo criado pelo admin
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  label       String
+  description String  @default("")
+  destaque    Boolean @default(false) // selo "Recomendado" na grade de planos
+  order       Int     @default(0)
+  active      Boolean @default(true)  // desmarcado = some da grade pública, mas continua existindo
+  features    Json    @default("[]")  // string[] — lista de bullets exibidos no card
+
+  precoMensalCentavos    Int @default(0) // total do ciclo MENSAL
+  precoSemestralCentavos Int @default(0) // total à vista do ciclo SEMESTRAL (6 meses)
+  precoAnualCentavos     Int @default(0) // total à vista do ciclo ANUAL (12 meses)
+
+  @@index([active, order])
+}
+
 // ─── Agente de Ligação (Twilio + ElevenLabs) ─────────────────────────────────
 
 enum PhoneCallStatus {

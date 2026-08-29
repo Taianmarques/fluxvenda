@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Preencha os dados do cartão." }, { status: 400 });
   }
 
-  const tier = getCrmPlanTier(body.data.tierId);
+  const tier = await getCrmPlanTier(body.data.tierId);
   if (!tier) return NextResponse.json({ error: "Plano inválido" }, { status: 400 });
 
   const cpfCnpj = body.data.cpfCnpj.replace(/\D/g, "");

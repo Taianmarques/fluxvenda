@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X, Check, Copy, Loader2, CheckCircle2 } from "lucide-react";
-import { CRM_PLAN_TIERS, BILLING_CYCLES, getSavingsCentavos, type CrmPlanTier, type BillingCycle } from "@/lib/crm-plans";
+import { BILLING_CYCLES, getSavingsCentavos, type CrmPlanTier, type BillingCycle } from "@/lib/crm-plans-shared";
 import { CartaoForm, type CartaoFormData } from "@/app/(app)/CartaoForm";
 
 const brl = (centavos: number) => (centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -13,6 +13,8 @@ const brl = (centavos: number) => (centavos / 100).toLocaleString("pt-BR", { sty
 // Cobrança é sempre à vista pelo ciclo escolhido (sem parcelamento, sem renovação automática).
 export function PlanosModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
+  const [tiers, setTiers] = useState<CrmPlanTier[]>([]);
+  const [loadingTiers, setLoadingTiers] = useState(true);
   const [cycle, setCycle] = useState<BillingCycle>("MENSAL");
   const [tierSelecionado, setTierSelecionado] = useState<CrmPlanTier | null>(null);
   const [formaPagamento, setFormaPagamento] = useState<"PIX" | "CARTAO">("PIX");
@@ -28,6 +30,16 @@ export function PlanosModal({ onClose }: { onClose: () => void }) {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
   }
   useEffect(() => () => stopPoll(), []);
+
+  // Planos são editáveis pelo super admin — carregados do banco em vez de importados
+  // estaticamente, pra sempre refletir preço/features atuais sem precisar de novo deploy.
+  useEffect(() => {
+    fetch("/api/planos")
+      .then(res => res.json())
+      .then(data => setTiers(data.tiers ?? []))
+      .catch(() => setTiers([]))
+      .finally(() => setLoadingTiers(false));
+  }, []);
 
   function abrirPagamento(tier: CrmPlanTier) {
     setTierSelecionado(tier);
@@ -144,8 +156,15 @@ export function PlanosModal({ onClose }: { onClose: () => void }) {
               </div>
             </div>
 
+            {loadingTiers ? (
+              <div className="flex items-center justify-center py-16 text-gray-400 gap-2">
+                <Loader2 size={18} className="animate-spin" /> Carregando planos...
+              </div>
+            ) : tiers.length === 0 ? (
+              <p className="text-center text-sm text-gray-500 py-16">Nenhum plano disponível no momento.</p>
+            ) : (
             <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
-              {CRM_PLAN_TIERS.map(tier => {
+              {tiers.map(tier => {
                 const preco = tier.pricing[cycle];
                 const savings = getSavingsCentavos(tier, cycle);
                 const cicloInfo = BILLING_CYCLES.find(c => c.id === cycle)!;
@@ -206,6 +225,7 @@ export function PlanosModal({ onClose }: { onClose: () => void }) {
                 );
               })}
             </div>
+            )}
           </>
         ) : (
           <div className={`mx-auto ${formaPagamento === "CARTAO" && !pago && !cobranca ? "max-w-md" : "max-w-sm"}`}>
