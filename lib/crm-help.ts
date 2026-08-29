@@ -309,4 +309,10 @@ export const CRM_HELP: Partial<Record<CrmPageKey, HelpArticle>> = {
       { text: "A preferência vale pra todas as páginas do CRM (Mensagens, Pipeline, Dashboards, etc.) — fica salva só nesse navegador, então muda se você trocar de computador ou navegador." },
     ],
   },
+  perfil: {
+    summary: "Seus dados de acesso (nome, e-mail, senha, contato) e o nome da empresa.",
+    blocks: [
+      { text: "Nome de perfil e contato qualquer membro da equipe edita o próprio. Trocar e-mail ou senha exige confirmar a senha atual, já que são credenciais de login. O nome da empresa só aparece aqui pra quem administra a equipe (dono ou co-gestor) — afeta e-mails e mensagens automáticas enviadas em nome dela." },
+    ],
+  },
 };

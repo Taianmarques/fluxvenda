@@ -1,6 +1,6 @@
 import {
   MessageCircle, KanbanSquare, Calendar, Wallet, ShoppingCart, Landmark, Target,
-  Wifi, GitBranch, Briefcase, Zap, UserPlus, ClipboardCheck, Radio, User, SunMoon,
+  Wifi, GitBranch, Briefcase, Zap, UserPlus, ClipboardCheck, Radio, User, SunMoon, UserCog,
   Megaphone, Phone, Coins, BookUser, BookOpen, LayoutDashboard, Goal, MessageSquareText, ThumbsDown, GraduationCap, type LucideIcon,
 } from "lucide-react";
 
@@ -18,7 +18,7 @@ export type CrmPageKey =
   | "campanhas" | "ligacoes" | "prospeccao"
   | "cobranca" | "carteira" | "contatos"
   | "automacao" | "condicoes"
-  | "canais" | "equipe" | "auditoria" | "creditos" | "conhecimento" | "treino" | "metas" | "mensagensrapidas" | "motivosperda" | "aparencia";
+  | "canais" | "equipe" | "auditoria" | "creditos" | "conhecimento" | "treino" | "metas" | "mensagensrapidas" | "motivosperda" | "aparencia" | "perfil";
 
 export type CrmPageDef = {
   key: CrmPageKey;
@@ -81,6 +81,7 @@ export const CRM_CATEGORIES: CrmCategoryDef[] = [
     { key: "creditos", label: "Créditos de IA", suffix: "/creditos", icon: Coins },
     { key: "metas", label: "Metas", suffix: "/metas", icon: Goal, managerOnly: true },
     { key: "aparencia", label: "Aparência", suffix: "/aparencia", icon: SunMoon },
+    { key: "perfil", label: "Perfil", suffix: "/perfil", icon: UserCog },
   ] },
 ];
 
