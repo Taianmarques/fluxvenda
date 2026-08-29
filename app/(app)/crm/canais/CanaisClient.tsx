@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useCrmTheme } from "../CrmThemeContext";
 import {
   Wifi, Pause, Play, Plus, RefreshCw, X,
   CheckCircle2, Smartphone, Instagram, Link2Off,
@@ -194,6 +195,7 @@ export function CanaisClient({
   initialChannels: Omit<Channel, "whatsapp">[];
   isManager: boolean;
 }) {
+  const { theme } = useCrmTheme();
   const [channels, setChannels] = useState<Channel[]>(
     initialChannels.map((c) => ({ ...c, whatsapp: null }))
   );
@@ -677,7 +679,7 @@ export function CanaisClient({
                     <div className="flex items-center gap-2.5 min-w-0">
                       <GraduationCap size={15} className="text-blue-400 flex-shrink-0" />
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-blue-300">Modo aprendizado</p>
+                        <p className={`text-sm font-medium ${theme === "dark" ? "text-blue-300" : "text-blue-700"}`}>Modo aprendizado</p>
                         <p className="text-xs text-gray-400">
                           As conversas chegam e são salvas normalmente, mas a IA ainda não responde em nenhum canal.
                         </p>

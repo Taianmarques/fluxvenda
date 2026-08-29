@@ -127,7 +127,7 @@ export function CreditosClient({ status, compras }: { status: Status; compras: C
   const pctUsado = status.monthlyTokenLimit ? Math.min(100, (status.monthlyUsed / status.monthlyTokenLimit) * 100) : null;
 
   return (
-    <div className="min-h-full bg-gray-950 text-white p-4 md:p-6">
+    <div className="min-h-full bg-gray-950 p-4 md:p-6">
       <div className="max-w-4xl mx-auto space-y-5">
         <div>
           <p className="text-gray-400 text-sm">Plataforma</p>
@@ -243,7 +243,7 @@ export function CreditosClient({ status, compras }: { status: Status; compras: C
           <div className={`bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full space-y-4 relative ${
             formaPagamento === "CARTAO" && !pago && !cobranca ? "max-w-md" : "max-w-sm"
           }`}>
-            <button onClick={fecharModal} className="absolute top-4 right-4 text-gray-500 hover:text-white"><X size={18} /></button>
+            <button onClick={fecharModal} className="absolute top-4 right-4 text-gray-500 hover:text-gray-200"><X size={18} /></button>
             <div>
               <p className="font-semibold">{packSelecionado.label}</p>
               <p className="text-sm text-gray-400">{packSelecionado.tokens.toLocaleString("pt-BR")} tokens — {brl(packSelecionado.valorCentavos)}</p>

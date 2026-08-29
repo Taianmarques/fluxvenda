@@ -27,7 +27,7 @@ export function CartaoForm({ onSubmit, submitting, error, dark }: {
   });
 
   const inputCls = `w-full rounded-lg px-3 py-2 text-sm ${
-    dark ? "bg-gray-950 border border-gray-800 text-white placeholder:text-gray-600" : "bg-white border border-gray-200 text-gray-900 placeholder:text-gray-400"
+    dark ? "bg-gray-950 border border-gray-800 placeholder:text-gray-600" : "bg-white border border-gray-200 text-slate-900 placeholder:text-gray-400"
   }`;
   const labelCls = `text-xs block mb-1 ${dark ? "text-gray-400" : "text-gray-500"}`;
 
