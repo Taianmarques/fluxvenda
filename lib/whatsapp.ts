@@ -247,12 +247,26 @@ export async function registerAgentWebhook(token: string, webhookUrl: string): P
 
 // Texto editável pelo super admin em /admin/mensagens (model MessageTemplate) — o literal
 // abaixo é só o fallback caso o registro do banco não exista por algum motivo.
-export async function getWelcomeMessage(name: string, role: "GESTOR" | "VENDEDOR" | "FUNCIONARIO", companyName?: string): Promise<string> {
+export async function getWelcomeMessage(
+  name: string,
+  role: "GESTOR" | "VENDEDOR" | "FUNCIONARIO",
+  companyName?: string,
+  productsOwned?: ("CRM" | "PLATAFORMA")[]
+): Promise<string> {
   if (role === "GESTOR") {
+    // Gestor que contratou os dois produtos recebe só a de CRM (evita mandar 2 boas-vindas
+    // seguidas) — é o produto com trial/urgência, prioridade natural no primeiro contato.
+    if (productsOwned?.includes("CRM") ?? true) {
+      return renderMessageTemplate(
+        "WELCOME_GESTOR_CRM",
+        { name, companyName: companyName ?? "" },
+        `Olá, ${name}! 👋\n\nSeu cadastro na plataforma foi realizado com sucesso.\nA empresa *${companyName ?? ""}* já está configurada.\n\nAcesse o painel do gestor e comece a configurar seu CRM: conecte o WhatsApp da sua empresa, monte seu pipeline de vendas e deixe a IA atendendo seus leads automaticamente. 🚀`
+      );
+    }
     return renderMessageTemplate(
-      "WELCOME_GESTOR",
+      "WELCOME_GESTOR_PLATAFORMA",
       { name, companyName: companyName ?? "" },
-      `Olá, ${name}! 👋\n\nSeu cadastro na plataforma foi realizado com sucesso.\n${companyName ? `A empresa *${companyName}* já está configurada.\n\n` : "\n"}Acesse o painel do gestor e comece a estruturar o treinamento da sua equipe de vendas. 🚀`
+      `Olá, ${name}! 👋\n\nSeu cadastro na plataforma foi realizado com sucesso.\nA empresa *${companyName ?? ""}* já está configurada.\n\nAcesse o painel do gestor e comece a estruturar o treinamento da sua equipe de vendas. 🚀`
     );
   }
 

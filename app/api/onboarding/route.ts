@@ -39,12 +39,15 @@ export async function POST(req: NextRequest) {
 
     let teamJoined = false;
 
+    // Produtos contratados — se não vier nada (fluxo antigo/API direta), assume os dois.
+    // Usado tanto pra criar a equipe (só GESTOR) quanto pra escolher a boas-vindas certa
+    // (WELCOME_GESTOR_CRM ou WELCOME_GESTOR_PLATAFORMA) mais abaixo.
+    const productsOwned: ("CRM" | "PLATAFORMA")[] = products && products.length > 0 ? products : ["CRM", "PLATAFORMA"];
+
     // GESTOR — cria a equipe
     if (role === "GESTOR") {
       const existing = await prisma.team.findUnique({ where: { managerId: userId } });
       if (!existing) {
-        // Produtos contratados — se não vier nada (fluxo antigo/API direta), assume os dois
-        const productsOwned: ("CRM" | "PLATAFORMA")[] = products && products.length > 0 ? products : ["CRM", "PLATAFORMA"];
         // Cadastro self-serve com CRM ainda não tem cobrança automática — libera 7 dias de
         // teste grátis automaticamente; o super admin remove o limite ao confirmar o pagamento
         const crmTrialEndsAt = productsOwned.includes("CRM") ? new Date(Date.now() + 7 * 86_400_000) : null;
@@ -89,7 +92,7 @@ export async function POST(req: NextRequest) {
 
     // Dispara WhatsApp de boas-vindas em background — telefone já verificado no cadastro
     if (profile.phone) {
-      getWelcomeMessage(name, role, companyName)
+      getWelcomeMessage(name, role, companyName, productsOwned)
         .then(message => sendWhatsAppText(profile.phone!, message))
         .catch(() => {});
     }
