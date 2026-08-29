@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import {
   runAgent, runAgentWithImage, runAgentWithTools, classifyLeadQualified,
   SCHEDULING_TOOLS, COMMERCE_TOOLS, BILLING_TOOLS, PROSPECTING_TOOLS, POSVENDA_TOOLS, PIPELINE_TOOLS, DEPARTAMENTO_TOOLS,
-  PREVENDA_VEICULO_TOOLS, TRANSFERIR_FOTO_TOOLS, TRANSFERIR_CONDICAO_TOOLS,
+  PREVENDA_VEICULO_TOOLS, TRANSFERIR_FOTO_TOOLS, TRANSFERIR_CONDICAO_TOOLS, MUDAR_AREA_TOOLS,
 } from "@/lib/agent-engine";
 import { textToSpeech } from "@/lib/elevenlabs";
 import { logTokenUsage, isOverQuota } from "@/lib/token-usage";
@@ -198,6 +198,16 @@ ${lista}
 - Se o cliente pedir para falar com um setor/humano, ou o assunto for claramente de um departamento acima e você não conseguir resolver, chame transferir_departamento com o nome exato e um resumo do que ele precisa.
 - Antes de transferir, avise o cliente com naturalidade (ex: "vou te passar para o nosso financeiro, um instante").
 - NÃO transfira por qualquer coisa — só quando o atendimento humano daquele setor for realmente necessário.`;
+}
+
+// Modo multi-agente (AgentConfig.multiAgenteDepartamentos): lista as áreas que a própria IA
+// pode assumir, sem passar pra humano — complementa (não substitui) buildDepartamentosContext.
+function buildAreasIAContext(areas: { nome: string; descricao: string }[]): string {
+  const lista = areas.map(a => `- ${a.nome}${a.descricao ? `: ${a.descricao}` : ""}`).join("\n");
+  return `\n\nÁREAS DE ATENDIMENTO (você mesma pode trocar de área, sem passar pra humano):
+${lista}
+- Chame mudar_area_atendimento quando o assunto migrar claramente pra outra área acima.
+- Use transferir_departamento em vez disso só quando o caso REALMENTE precisar de um humano (reclamação grave, aprovação fora do padrão).`;
 }
 
 // Lista as etapas do funil e ensina o agente a mover o lead conforme a conversa evolui.
@@ -778,6 +788,25 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       emitChatEvent(agentConfigId, conversationId);
 
       return `Conversa transferida para "${dep.nome}"${assignedName ? ` (atendente: ${assignedName})` : ""}. Na SUA RESPOSTA, avise o cliente com naturalidade que o setor vai atendê-lo em instantes. Depois desta mensagem você para de responder — o atendimento é humano a partir daqui.`;
+    }
+
+    if (name === "mudar_area_atendimento") {
+      const areaNome = typeof args?.area === "string" ? args.area.trim() : "";
+      if (!areaNome) return "Erro: informe a área de destino.";
+
+      const areas = await prisma.departamento.findMany({ where: { teamId: config.teamId } });
+      const lower = areaNome.toLowerCase();
+      const area = areas.find(d => d.nome.toLowerCase() === lower)
+        ?? areas.find(d => d.nome.toLowerCase().includes(lower) || lower.includes(d.nome.toLowerCase()));
+      if (!area) return `Erro: área "${areaNome}" não existe. Disponíveis: ${areas.map(d => d.nome).join(", ")}.`;
+
+      await prisma.conversation.update({ where: { id: conversationId }, data: { departamentoId: area.id } });
+      await prisma.message.create({
+        data: { conversationId, role: "note", content: `IA trocou de área para "${area.nome}".` },
+      });
+      emitChatEvent(agentConfigId, conversationId);
+
+      return `Você agora está atuando como o agente de ${area.nome}. Continue a conversa com o cliente já considerando essa área — não avise explicitamente sobre a troca, apenas responda de acordo com o novo assunto.`;
     }
 
     if (name === "transferir_atendente_foto") {
@@ -1459,8 +1488,19 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
     : null;
   const departamentos = await prisma.departamento.findMany({
     where: { teamId: config.teamId },
-    select: { nome: true, descricao: true },
+    select: { id: true, nome: true, descricao: true, agenteInstrucoes: true },
   });
+
+  // Modo multi-agente: conversa nova entra pelo setor de entrada (SDR, ou o primeiro
+  // cadastrado se não houver um "SDR") — a partir daí a própria IA troca de área sozinha
+  // via mudar_area_atendimento (ver handler acima e o tool em lib/agent-engine.ts).
+  let areaAtualId = conversation.departamentoId;
+  if (config.multiAgenteDepartamentos && !areaAtualId && departamentos.length > 0) {
+    const entrada = departamentos.find(d => d.nome.toLowerCase() === "sdr") ?? departamentos[0];
+    areaAtualId = entrada.id;
+    await prisma.conversation.update({ where: { id: conversation.id }, data: { departamentoId: entrada.id } });
+  }
+  const areaAtual = config.multiAgenteDepartamentos ? departamentos.find(d => d.id === areaAtualId) : undefined;
 
   // Modo link: a IA só mantém cancelar_agendamento (pros lembretes de confirmação);
   // o resto do fluxo acontece na página pública /agendar
@@ -1475,6 +1515,7 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
     ...(config.posVendaEnabled ? POSVENDA_TOOLS : []),
     ...(config.pipelineAutoAvancar ? PIPELINE_TOOLS : []),
     ...(departamentos.length > 0 ? DEPARTAMENTO_TOOLS : []),
+    ...(config.multiAgenteDepartamentos && departamentos.length > 1 ? MUDAR_AREA_TOOLS : []),
     ...(config.transferirAoPedirFoto ? TRANSFERIR_FOTO_TOOLS : []),
     ...(config.transferenciaCondicoes.length > 0 ? TRANSFERIR_CONDICAO_TOOLS : []),
     ...(isProspect ? PROSPECTING_TOOLS : []),
@@ -1494,6 +1535,11 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
   const emojiInstruction = config.emojiEnabled
     ? "\n\nEmojis: você PODE e DEVE usar emojis nas respostas para tornar a conversa mais amigável e expressiva."
     : "\n\nEmojis: NUNCA use emojis nas respostas. Mantenha o texto limpo, sem símbolos especiais.";
+
+  // Modo multi-agente: instrução da persona/setor que a IA está atuando como agora.
+  const areaInstruction = areaAtual?.agenteInstrucoes?.trim()
+    ? `\n\nVOCÊ ESTÁ ATUANDO COMO O AGENTE DE: ${areaAtual.nome}\n${areaAtual.agenteInstrucoes.trim()}\n\nSiga essa persona com prioridade. Se o assunto migrar claramente pra outra área, chame mudar_area_atendimento.`
+    : "";
 
   // Agente do funil e da etapa: instruções que moldam a IA conforme onde o lead está.
   // Pipeline vale para o funil inteiro; a etapa refina por cima.
@@ -1531,7 +1577,7 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
   // caminhos de resposta (tools, texto puro e imagem) consomem o system prompt
   const conhecimentoContext = await buildConhecimentoContext(config.id);
   const treinoContext = await buildTreinoContext(config, text);
-  const activeSystemPrompt = config.systemPrompt + BUBBLE_INSTRUCTION + emojiInstruction + instrucoesExtrasBlock + transferenciaCondicoesBlock + stageInstruction + conhecimentoContext + treinoContext;
+  const activeSystemPrompt = config.systemPrompt + BUBBLE_INSTRUCTION + emojiInstruction + instrucoesExtrasBlock + transferenciaCondicoesBlock + areaInstruction + stageInstruction + conhecimentoContext + treinoContext;
 
   if (await isOverQuota(config.teamId)) {
     await adapter.sendText(contactNumber, "Serviço de IA temporariamente indisponível. Por favor, aguarde ou entre em contato com nossa equipe.");
@@ -1555,6 +1601,7 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
       + (config.posVendaEnabled ? buildPosVendaContext(config.posVendaReviewLink) : "")
       + (config.pipelineAutoAvancar ? await buildPipelineContext(config.id, conversation.id) : "")
       + (departamentos.length > 0 ? buildDepartamentosContext(departamentos) : "")
+      + (config.multiAgenteDepartamentos && departamentos.length > 1 ? buildAreasIAContext(departamentos) : "")
       + (isProspect ? (await buildProspeccaoContext(config.id, contactNumber) ?? "") : "");
     const result = await runAgentWithTools(
       activeSystemPrompt + extraContext,

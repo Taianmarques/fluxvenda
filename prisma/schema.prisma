@@ -596,6 +596,12 @@ model Departamento {
   nome      String
   descricao String @default("") // o que esse departamento atende — a IA usa pra rotear
 
+  // Persona/instrução da IA quando está "atuando como" esse setor — só usado no modo
+  // multi-agente (AgentConfig.multiAgenteDepartamentos), onde a própria IA assume o setor
+  // em vez de passar pra um humano (ver mudar_area_atendimento em lib/whatsapp-inbound.ts).
+  // Vazio = setor é só destino de transferência humana (comportamento de sempre).
+  agenteInstrucoes String @default("")
+
   membros       TeamMember[]
   conversations Conversation[]
 
@@ -742,6 +748,13 @@ model AgentConfig {
   // — quando a situação bate com alguma delas, a IA chama transferir_atendente_condicao. Expõe
   // a tool só quando a lista não está vazia (ver whatsapp-inbound.ts).
   transferenciaCondicoes String[] @default([])
+
+  // Modo multi-agente: cada Departamento vira uma persona de IA própria (seu próprio
+  // agenteInstrucoes) — a IA troca de setor sozinha via mudar_area_atendimento em vez de
+  // passar pra um humano (transferir_departamento continua existindo, só pra casos que
+  // precisam mesmo de humano). Pensado pro agente interno da própria FluxVenda; default
+  // false não muda nada pros agentes de clientes.
+  multiAgenteDepartamentos Boolean @default(false)
 
   // Vendedor que recebe os leads que a IA transfere (hoje só transferirAoPedirFoto) — só entra
   // em ação se a conversa ainda não tem dono, nunca rouba de quem já assumiu.

@@ -347,6 +347,26 @@ export const DEPARTAMENTO_TOOLS = [
   },
 ];
 
+// Só exposta quando AgentConfig.multiAgenteDepartamentos está ativo — modo multi-agente: a
+// própria IA assume a persona/instruções de outro setor e CONTINUA respondendo, ao contrário
+// de transferir_departamento (que sempre passa pra um humano e para a IA).
+export const MUDAR_AREA_TOOLS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "mudar_area_atendimento",
+      description: "Muda você mesmo (a IA) para atuar como o agente especializado de outra área/setor da empresa, continuando a conversa sem passar para um humano. Use quando o assunto migrar claramente pra outra área (ex: de vendas pra suporte técnico). Para casos que realmente precisam de um humano, use transferir_departamento em vez desta.",
+      parameters: {
+        type: "object",
+        properties: {
+          area: { type: "string", description: "Nome EXATO da área, igual à lista do contexto" },
+        },
+        required: ["area"],
+      },
+    },
+  },
+];
+
 // Só exposta quando AgentConfig.transferirAoPedirFoto está ativo (ver whatsapp-inbound.ts)
 export const TRANSFERIR_FOTO_TOOLS = [
   {
