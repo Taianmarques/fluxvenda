@@ -210,6 +210,46 @@ ${lista}
 - Use transferir_departamento em vez disso só quando o caso REALMENTE precisar de um humano (reclamação grave, aprovação fora do padrão).`;
 }
 
+// Só pro agente multi-setor da própria FluxVenda (config.multiAgenteDepartamentos): o contato
+// que está mandando mensagem pode já ser um Gestor cadastrado na plataforma (quem recebeu
+// boas-vindas/OTP/funil de trial nesse mesmo número) — nesses casos a IA já deve saber quem é,
+// em vez de pedir nome/telefone/empresa de novo como se fosse um lead anônimo.
+async function buildContatoPlataformaContext(phone: string): Promise<string> {
+  const profile = await prisma.profile.findFirst({
+    where: { phone },
+    select: {
+      name: true,
+      managedTeam: {
+        select: {
+          name: true,
+          crmTrialEndsAt: true,
+          planPurchases: { where: { status: "PAGO" }, select: { id: true }, take: 1 },
+        },
+      },
+    },
+  });
+  if (!profile) return "";
+
+  const team = profile.managedTeam;
+  let status = "Cadastrado na FluxVenda, sem equipe/trial associado.";
+  if (team) {
+    if (team.planPurchases.length > 0) {
+      status = `Cliente pagante — equipe "${team.name}".`;
+    } else if (team.crmTrialEndsAt && team.crmTrialEndsAt.getTime() > Date.now()) {
+      const dias = Math.ceil((team.crmTrialEndsAt.getTime() - Date.now()) / 86_400_000);
+      status = `Em teste grátis do CRM — equipe "${team.name}", termina em ${dias} dia(s).`;
+    } else if (team.crmTrialEndsAt) {
+      status = `Teste grátis do CRM já terminou — equipe "${team.name}", sem plano ativo ainda.`;
+    }
+  }
+
+  return `\n\nCONTATO JÁ CADASTRADO NA FLUXVENDA — NÃO peça nome, telefone ou nome da empresa de novo, já temos:
+Nome: ${profile.name}
+Status: ${status}
+
+Se ele confirmar interesse em agendar uma demonstração com especialista, colete só a preferência de dia/horário — o resto dos dados já está com a gente.`;
+}
+
 // Lista as etapas do funil e ensina o agente a mover o lead conforme a conversa evolui.
 // Usa o pipeline da oportunidade aberta do lead — ou o pipeline padrão (primeiro) se ele
 // ainda não está no funil.
@@ -1501,6 +1541,9 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
     await prisma.conversation.update({ where: { id: conversation.id }, data: { departamentoId: entrada.id } });
   }
   const areaAtual = config.multiAgenteDepartamentos ? departamentos.find(d => d.id === areaAtualId) : undefined;
+  const contatoPlataformaContext = config.multiAgenteDepartamentos
+    ? await buildContatoPlataformaContext(contactNumber)
+    : "";
 
   // Modo link: a IA só mantém cancelar_agendamento (pros lembretes de confirmação);
   // o resto do fluxo acontece na página pública /agendar
@@ -1577,7 +1620,7 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
   // caminhos de resposta (tools, texto puro e imagem) consomem o system prompt
   const conhecimentoContext = await buildConhecimentoContext(config.id);
   const treinoContext = await buildTreinoContext(config, text);
-  const activeSystemPrompt = config.systemPrompt + BUBBLE_INSTRUCTION + emojiInstruction + instrucoesExtrasBlock + transferenciaCondicoesBlock + areaInstruction + stageInstruction + conhecimentoContext + treinoContext;
+  const activeSystemPrompt = config.systemPrompt + BUBBLE_INSTRUCTION + emojiInstruction + instrucoesExtrasBlock + transferenciaCondicoesBlock + contatoPlataformaContext + areaInstruction + stageInstruction + conhecimentoContext + treinoContext;
 
   if (await isOverQuota(config.teamId)) {
     await adapter.sendText(contactNumber, "Serviço de IA temporariamente indisponível. Por favor, aguarde ou entre em contato com nossa equipe.");
