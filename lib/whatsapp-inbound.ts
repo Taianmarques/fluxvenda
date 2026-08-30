@@ -247,7 +247,7 @@ async function buildContatoPlataformaContext(phone: string): Promise<string> {
 Nome: ${profile.name}
 Status: ${status}
 
-Se ele confirmar interesse em agendar uma demonstração com especialista, colete só a preferência de dia/horário — o resto dos dados já está com a gente.`;
+Se ele quiser agendar uma demonstração com especialista, NÃO tente coletar dia/horário pela conversa — o agendamento de verdade só acontece pelo Hub. Oriente ele a acessar app.fluxvenda.com.br/crm/hub/inicio (ou só "o Hub", se ele já sabe entrar) e clicar em "Agendar uma demonstração" na barra de Recursos, onde escolhe o dia/horário e confirma sozinho.`;
 }
 
 // Lista as etapas do funil e ensina o agente a mover o lead conforme a conversa evolui.
