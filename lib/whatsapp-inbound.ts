@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import {
   runAgent, runAgentWithImage, runAgentWithTools, classifyLeadQualified,
   SCHEDULING_TOOLS, COMMERCE_TOOLS, BILLING_TOOLS, PROSPECTING_TOOLS, POSVENDA_TOOLS, PIPELINE_TOOLS, DEPARTAMENTO_TOOLS,
-  PREVENDA_VEICULO_TOOLS, TRANSFERIR_FOTO_TOOLS, TRANSFERIR_CONDICAO_TOOLS, MUDAR_AREA_TOOLS,
+  PREVENDA_VEICULO_TOOLS, TRANSFERIR_FOTO_TOOLS, TRANSFERIR_CONDICAO_TOOLS, MUDAR_AREA_TOOLS, AGENDAR_DEMO_TOOLS,
 } from "@/lib/agent-engine";
 import { textToSpeech } from "@/lib/elevenlabs";
 import { logTokenUsage, isOverQuota } from "@/lib/token-usage";
@@ -20,6 +20,8 @@ import { notifyProfessionalOfAppointment } from "@/lib/appointment-notify";
 import { notifyUsers } from "@/lib/onesignal";
 import { emitChatEvent } from "@/lib/realtime";
 import { generateEmbedding, cosineSimilarity } from "@/lib/embeddings";
+import { getDemoSlotDays, isDemoSlotAvailable, DEMO_SLOT_MINUTES, DEFAULT_DEMO_TIMES } from "@/lib/demo-scheduling";
+import { sendDemoBookingNotification } from "@/lib/email";
 
 type AgentConfigFull = NonNullable<Awaited<ReturnType<typeof prisma.agentConfig.findFirst>>>;
 
@@ -210,44 +212,63 @@ ${lista}
 - Use transferir_departamento em vez disso só quando o caso REALMENTE precisar de um humano (reclamação grave, aprovação fora do padrão).`;
 }
 
-// Só pro agente multi-setor da própria FluxVenda (config.multiAgenteDepartamentos): o contato
-// que está mandando mensagem pode já ser um Gestor cadastrado na plataforma (quem recebeu
-// boas-vindas/OTP/funil de trial nesse mesmo número) — nesses casos a IA já deve saber quem é,
-// em vez de pedir nome/telefone/empresa de novo como se fosse um lead anônimo.
-async function buildContatoPlataformaContext(phone: string): Promise<string> {
+type ContatoPlataforma = {
+  profile: { id: string; name: string; email: string; phone: string | null };
+  team: { id: string; name: string; crmTrialEndsAt: Date | null; pago: boolean } | null;
+};
+
+// Busca o Profile da plataforma dono desse telefone (quem já se cadastrou como
+// Gestor/Vendedor/Funcionário) — usado tanto pro contexto de "contato conhecido" quanto pra
+// registrar de quem é a demonstração quando o agente multi-setor agenda uma (tools
+// consultar_horarios_demo / agendar_demo_especialista, mais abaixo).
+async function lookupContatoPlataforma(phone: string): Promise<ContatoPlataforma | null> {
+  const teamSelect = {
+    id: true, name: true, crmTrialEndsAt: true,
+    planPurchases: { where: { status: "PAGO" as const }, select: { id: true }, take: 1 },
+  };
   const profile = await prisma.profile.findFirst({
     where: { phone },
-    select: {
-      name: true,
-      managedTeam: {
-        select: {
-          name: true,
-          crmTrialEndsAt: true,
-          planPurchases: { where: { status: "PAGO" }, select: { id: true }, take: 1 },
-        },
-      },
-    },
+    select: { id: true, name: true, email: true, phone: true, managedTeam: { select: teamSelect } },
   });
-  if (!profile) return "";
+  if (!profile) return null;
 
-  const team = profile.managedTeam;
-  let status = "Cadastrado na FluxVenda, sem equipe/trial associado.";
-  if (team) {
-    if (team.planPurchases.length > 0) {
-      status = `Cliente pagante — equipe "${team.name}".`;
-    } else if (team.crmTrialEndsAt && team.crmTrialEndsAt.getTime() > Date.now()) {
-      const dias = Math.ceil((team.crmTrialEndsAt.getTime() - Date.now()) / 86_400_000);
-      status = `Em teste grátis do CRM — equipe "${team.name}", termina em ${dias} dia(s).`;
-    } else if (team.crmTrialEndsAt) {
-      status = `Teste grátis do CRM já terminou — equipe "${team.name}", sem plano ativo ainda.`;
+  let teamRow = profile.managedTeam;
+  if (!teamRow) {
+    const membership = await prisma.teamMember.findUnique({
+      where: { profileId: profile.id },
+      select: { team: { select: teamSelect } },
+    });
+    teamRow = membership?.team ?? null;
+  }
+
+  return {
+    profile: { id: profile.id, name: profile.name, email: profile.email, phone: profile.phone },
+    team: teamRow ? { id: teamRow.id, name: teamRow.name, crmTrialEndsAt: teamRow.crmTrialEndsAt, pago: teamRow.planPurchases.length > 0 } : null,
+  };
+}
+
+// Só pro agente multi-setor da própria FluxVenda (config.multiAgenteDepartamentos): o contato
+// que está mandando mensagem pode já ser um Gestor/Vendedor/Funcionário cadastrado na
+// plataforma — nesses casos a IA já deve saber quem é, em vez de pedir nome/telefone/empresa
+// de novo como se fosse um lead anônimo.
+function buildContatoPlataformaContext(contato: ContatoPlataforma): string {
+  let status = "Cadastrado na FluxVenda, sem equipe associada.";
+  if (contato.team) {
+    if (contato.team.pago) {
+      status = `Cliente pagante — equipe "${contato.team.name}".`;
+    } else if (contato.team.crmTrialEndsAt && contato.team.crmTrialEndsAt.getTime() > Date.now()) {
+      const dias = Math.ceil((contato.team.crmTrialEndsAt.getTime() - Date.now()) / 86_400_000);
+      status = `Em teste grátis do CRM — equipe "${contato.team.name}", termina em ${dias} dia(s).`;
+    } else if (contato.team.crmTrialEndsAt) {
+      status = `Teste grátis do CRM já terminou — equipe "${contato.team.name}", sem plano ativo ainda.`;
     }
   }
 
   return `\n\nCONTATO JÁ CADASTRADO NA FLUXVENDA — NÃO peça nome, telefone ou nome da empresa de novo, já temos:
-Nome: ${profile.name}
+Nome: ${contato.profile.name}
 Status: ${status}
 
-Se ele quiser agendar uma demonstração com especialista, NÃO tente coletar dia/horário pela conversa — o agendamento de verdade só acontece pelo Hub. Oriente ele a acessar app.fluxvenda.com.br/crm/hub/inicio (ou só "o Hub", se ele já sabe entrar) e clicar em "Agendar uma demonstração" na barra de Recursos, onde escolhe o dia/horário e confirma sozinho.`;
+Se ele quiser agendar uma demonstração com especialista, chame consultar_horarios_demo pra ver os horários livres, sugira 2-3 opções, e depois de ele confirmar uma, chame agendar_demo_especialista com a data/hora exatas.`;
 }
 
 // Lista as etapas do funil e ensina o agente a mover o lead conforme a conversa evolui.
@@ -847,6 +868,50 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       emitChatEvent(agentConfigId, conversationId);
 
       return `Você agora está atuando como o agente de ${area.nome}. Continue a conversa com o cliente já considerando essa área — não avise explicitamente sobre a troca, apenas responda de acordo com o novo assunto.`;
+    }
+
+    if (name === "consultar_horarios_demo") {
+      const [settings, busy] = await Promise.all([
+        prisma.platformSettings.findUnique({ where: { id: "singleton" }, select: { demoAvailableTimes: true } }),
+        prisma.demoBooking.findMany({ where: { status: "AGENDADO", scheduledAt: { gte: new Date() } }, select: { scheduledAt: true, durationMinutes: true } }),
+      ]);
+      const times = (settings?.demoAvailableTimes as string[] | undefined) ?? DEFAULT_DEMO_TIMES;
+      const dias = getDemoSlotDays(times, busy, new Date(), 14).slice(0, 5);
+      if (dias.length === 0) return "Nenhum horário disponível nos próximos dias — avise o contato e ofereça transferir pra um humano marcar manualmente.";
+      const texto = dias.map(d => `${d.weekday} (${d.date}): ${d.slots.join(", ")}`).join("\n");
+      return `Horários disponíveis pra demonstração (${DEMO_SLOT_MINUTES} min):\n${texto}\n\nSugira 2-3 opções pro contato. Depois que ele confirmar uma data e hora exatas dessa lista, chame agendar_demo_especialista.`;
+    }
+
+    if (name === "agendar_demo_especialista") {
+      const data = typeof args?.data === "string" ? args.data.trim() : "";
+      const hora = typeof args?.hora === "string" ? args.hora.trim() : "";
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || !/^\d{2}:\d{2}$/.test(hora)) {
+        return "Erro: informe data (AAAA-MM-DD) e hora (HH:MM) exatamente como apareceram em consultar_horarios_demo.";
+      }
+
+      const contato = await lookupContatoPlataforma(contactNumber);
+      if (!contato?.team) {
+        return "Erro: não encontrei uma equipe cadastrada pra esse contato, não é possível agendar automaticamente. Oriente a acessar o Hub (app.fluxvenda.com.br/crm/hub/inicio > Agendar uma demonstração) ou chame transferir_departamento.";
+      }
+
+      const scheduledAt = new Date(`${data}T${hora}:00`);
+      const [settings, busy] = await Promise.all([
+        prisma.platformSettings.findUnique({ where: { id: "singleton" }, select: { demoAvailableTimes: true } }),
+        prisma.demoBooking.findMany({ where: { status: "AGENDADO", scheduledAt: { gte: new Date() } }, select: { scheduledAt: true, durationMinutes: true } }),
+      ]);
+      const times = (settings?.demoAvailableTimes as string[] | undefined) ?? DEFAULT_DEMO_TIMES;
+      if (!isDemoSlotAvailable(times, busy, scheduledAt)) {
+        return "Erro: esse horário não está mais disponível. Chame consultar_horarios_demo de novo pra ver os horários atuais e ofereça outra opção.";
+      }
+
+      await prisma.demoBooking.create({
+        data: { teamId: contato.team.id, requestedById: contato.profile.id, scheduledAt, durationMinutes: DEMO_SLOT_MINUTES },
+      });
+      sendDemoBookingNotification(contato.team.name, contato.profile.name, contato.profile.email, scheduledAt).catch(() => {});
+
+      const dataFormatada = scheduledAt.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" });
+      const horaFormatada = scheduledAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      return `Demonstração agendada com sucesso pra ${dataFormatada} às ${horaFormatada} (${DEMO_SLOT_MINUTES} min). Confirme isso pro contato de forma natural.`;
     }
 
     if (name === "transferir_atendente_foto") {
@@ -1541,9 +1606,8 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
     await prisma.conversation.update({ where: { id: conversation.id }, data: { departamentoId: entrada.id } });
   }
   const areaAtual = config.multiAgenteDepartamentos ? departamentos.find(d => d.id === areaAtualId) : undefined;
-  const contatoPlataformaContext = config.multiAgenteDepartamentos
-    ? await buildContatoPlataformaContext(contactNumber)
-    : "";
+  const contatoPlataforma = config.multiAgenteDepartamentos ? await lookupContatoPlataforma(contactNumber) : null;
+  const contatoPlataformaContext = contatoPlataforma ? buildContatoPlataformaContext(contatoPlataforma) : "";
 
   // Modo link: a IA só mantém cancelar_agendamento (pros lembretes de confirmação);
   // o resto do fluxo acontece na página pública /agendar
@@ -1559,6 +1623,7 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
     ...(config.pipelineAutoAvancar ? PIPELINE_TOOLS : []),
     ...(departamentos.length > 0 ? DEPARTAMENTO_TOOLS : []),
     ...(config.multiAgenteDepartamentos && departamentos.length > 1 ? MUDAR_AREA_TOOLS : []),
+    ...(config.multiAgenteDepartamentos ? AGENDAR_DEMO_TOOLS : []),
     ...(config.transferirAoPedirFoto ? TRANSFERIR_FOTO_TOOLS : []),
     ...(config.transferenciaCondicoes.length > 0 ? TRANSFERIR_CONDICAO_TOOLS : []),
     ...(isProspect ? PROSPECTING_TOOLS : []),

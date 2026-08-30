@@ -367,6 +367,35 @@ export const MUDAR_AREA_TOOLS = [
   },
 ];
 
+// Só exposta quando AgentConfig.multiAgenteDepartamentos está ativo — deixa o agente da
+// própria FluxVenda consultar e agendar de verdade uma demonstração do CRM (mesmo
+// DemoBooking usado pela tela do Hub > Recursos > Agendar uma demonstração).
+export const AGENDAR_DEMO_TOOLS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "consultar_horarios_demo",
+      description: "Consulta os próximos horários livres pra agendar uma demonstração do CRM com um especialista. Chame antes de sugerir dia/horário pro contato.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "agendar_demo_especialista",
+      description: "Confirma o agendamento de uma demonstração do CRM no dia/horário escolhido pelo contato — use só depois de consultar_horarios_demo e o contato confirmar uma opção real da lista.",
+      parameters: {
+        type: "object",
+        properties: {
+          data: { type: "string", description: "Data no formato AAAA-MM-DD, igual apareceu em consultar_horarios_demo" },
+          hora: { type: "string", description: "Horário no formato HH:MM, igual apareceu em consultar_horarios_demo" },
+        },
+        required: ["data", "hora"],
+      },
+    },
+  },
+];
+
 // Só exposta quando AgentConfig.transferirAoPedirFoto está ativo (ver whatsapp-inbound.ts)
 export const TRANSFERIR_FOTO_TOOLS = [
   {
