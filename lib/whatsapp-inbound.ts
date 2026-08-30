@@ -217,6 +217,29 @@ type ContatoPlataforma = {
   team: { id: string; name: string; crmTrialEndsAt: Date | null; pago: boolean } | null;
 };
 
+// Números de celular brasileiros oscilam entre 10 e 11 dígitos (o "nono dígito") dependendo
+// de onde/quando foram cadastrados — o WhatsApp às vezes reporta o contato SEM o 9 mesmo que
+// o número tenha sido salvo COM o 9 no cadastro (ou vice-versa). Sem considerar as duas
+// variantes, uma busca exata por telefone falha silenciosamente pra parte dos contatos.
+function brazilPhoneVariants(raw: string): string[] {
+  const digits = raw.replace(/\D/g, "");
+  const withCountry = digits.startsWith("55") ? digits : `55${digits}`;
+  const national = withCountry.slice(2);
+  const variantes = new Set([withCountry]);
+
+  if (national.length === 10) {
+    const ddd = national.slice(0, 2);
+    const resto = national.slice(2);
+    variantes.add(`55${ddd}9${resto}`);
+  } else if (national.length === 11 && national[2] === "9") {
+    const ddd = national.slice(0, 2);
+    const resto = national.slice(3);
+    variantes.add(`55${ddd}${resto}`);
+  }
+
+  return Array.from(variantes);
+}
+
 // Busca o Profile da plataforma dono desse telefone (quem já se cadastrou como
 // Gestor/Vendedor/Funcionário) — usado tanto pro contexto de "contato conhecido" quanto pra
 // registrar de quem é a demonstração quando o agente multi-setor agenda uma (tools
@@ -227,7 +250,7 @@ async function lookupContatoPlataforma(phone: string): Promise<ContatoPlataforma
     planPurchases: { where: { status: "PAGO" as const }, select: { id: true }, take: 1 },
   };
   const profile = await prisma.profile.findFirst({
-    where: { phone },
+    where: { phone: { in: brazilPhoneVariants(phone) } },
     select: { id: true, name: true, email: true, phone: true, managedTeam: { select: teamSelect } },
   });
   if (!profile) return null;
