@@ -212,6 +212,17 @@ ${lista}
 - Use transferir_departamento em vez disso só quando o caso REALMENTE precisar de um humano (reclamação grave, aprovação fora do padrão).`;
 }
 
+// Sem isso a IA não tem como saber que dia é "hoje" (o modelo não sabe a data real do
+// sistema) e erra o cálculo de datas relativas tipo "segunda" ou "amanhã" ao chamar
+// agendar_demo_especialista — mesmo problema que buildSchedulingContext já resolve pro
+// agendamento genérico de cada tenant, replicado aqui pro agendamento de demo da FluxVenda.
+function buildDataAtualContext(): string {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("pt-BR");
+  const weekday = now.toLocaleDateString("pt-BR", { weekday: "long" });
+  return `\n\nHoje é ${dateStr} (${weekday}). Use isso pra calcular datas relativas ("segunda", "amanhã", etc.) antes de chamar agendar_demo_especialista — sempre com a data exata (AAAA-MM-DD) que veio de consultar_horarios_demo, nunca calculada de cabeça.`;
+}
+
 type ContatoPlataforma = {
   profile: { id: string; name: string; email: string; phone: string | null };
   team: { id: string; name: string; crmTrialEndsAt: Date | null; pago: boolean } | null;
@@ -1736,6 +1747,7 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
       + (config.pipelineAutoAvancar ? await buildPipelineContext(config.id, conversation.id) : "")
       + (departamentos.length > 0 ? buildDepartamentosContext(departamentos) : "")
       + (config.multiAgenteDepartamentos && departamentos.length > 1 ? buildAreasIAContext(departamentos) : "")
+      + (config.multiAgenteDepartamentos ? buildDataAtualContext() : "")
       + (isProspect ? (await buildProspeccaoContext(config.id, contactNumber) ?? "") : "");
     const result = await runAgentWithTools(
       activeSystemPrompt + extraContext,
