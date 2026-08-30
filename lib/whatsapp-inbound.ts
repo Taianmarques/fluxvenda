@@ -217,26 +217,29 @@ type ContatoPlataforma = {
   team: { id: string; name: string; crmTrialEndsAt: Date | null; pago: boolean } | null;
 };
 
-// Números de celular brasileiros oscilam entre 10 e 11 dígitos (o "nono dígito") dependendo
-// de onde/quando foram cadastrados — o WhatsApp às vezes reporta o contato SEM o 9 mesmo que
-// o número tenha sido salvo COM o 9 no cadastro (ou vice-versa). Sem considerar as duas
-// variantes, uma busca exata por telefone falha silenciosamente pra parte dos contatos.
+// Telefones no banco são inconsistentes de duas formas independentes: (1) alguns têm o
+// código do país "55" na frente, outros não (depende de qual fluxo salvou — nem todo lugar
+// usa formatPhone()); (2) celulares brasileiros oscilam entre 10 e 11 dígitos (o "nono
+// dígito"), e o WhatsApp às vezes reporta o contato numa forma diferente da que foi salva no
+// cadastro. Gera todas as combinações (com/sem 55 × com/sem o 9) pra busca exata não falhar.
 function brazilPhoneVariants(raw: string): string[] {
   const digits = raw.replace(/\D/g, "");
-  const withCountry = digits.startsWith("55") ? digits : `55${digits}`;
-  const national = withCountry.slice(2);
-  const variantes = new Set([withCountry]);
+  // Só remove o "55" quando o tamanho indica país+DDD+número (12-13 dígitos) — evita confundir
+  // com DDD 55 (SC/RS), que sozinho já tem 10-11 dígitos.
+  const national = digits.length >= 12 && digits.startsWith("55") ? digits.slice(2) : digits;
 
+  const nationals = new Set([national]);
   if (national.length === 10) {
-    const ddd = national.slice(0, 2);
-    const resto = national.slice(2);
-    variantes.add(`55${ddd}9${resto}`);
+    nationals.add(`${national.slice(0, 2)}9${national.slice(2)}`);
   } else if (national.length === 11 && national[2] === "9") {
-    const ddd = national.slice(0, 2);
-    const resto = national.slice(3);
-    variantes.add(`55${ddd}${resto}`);
+    nationals.add(`${national.slice(0, 2)}${national.slice(3)}`);
   }
 
+  const variantes = new Set<string>();
+  for (const n of nationals) {
+    variantes.add(n);
+    variantes.add(`55${n}`);
+  }
   return Array.from(variantes);
 }
 
