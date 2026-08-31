@@ -54,6 +54,8 @@ type WhatsappAgentConfig = {
   enderecoContato: string;
   followupEnabled: boolean;
   followupDelaysMinutes: number[];
+  horarioEnvioInicio: string;
+  horarioEnvioFim: string;
   emojiEnabled: boolean;
   responseDelaySeconds: number;
   agentSignatureEnabled: boolean;
@@ -270,6 +272,8 @@ export function AgentSettingsShell({
               agentId={agentId}
               initialFollowupEnabled={whatsappAgentConfig.followupEnabled}
               initialFollowupDelaysMinutes={whatsappAgentConfig.followupDelaysMinutes}
+              initialHorarioEnvioInicio={whatsappAgentConfig.horarioEnvioInicio}
+              initialHorarioEnvioFim={whatsappAgentConfig.horarioEnvioFim}
             />
           </div>
         )}

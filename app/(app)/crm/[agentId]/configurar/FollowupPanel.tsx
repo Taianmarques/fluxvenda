@@ -5,17 +5,21 @@ import { useRouter } from "next/navigation";
 import { FollowupDelaysEditor, minutesToRow, rowToMinutes, type DelayRow } from "./WhatsappAgentClient";
 
 export function FollowupPanel({
-  agentId, initialFollowupEnabled, initialFollowupDelaysMinutes,
+  agentId, initialFollowupEnabled, initialFollowupDelaysMinutes, initialHorarioEnvioInicio, initialHorarioEnvioFim,
 }: {
   agentId: string;
   initialFollowupEnabled: boolean;
   initialFollowupDelaysMinutes: number[];
+  initialHorarioEnvioInicio: string;
+  initialHorarioEnvioFim: string;
 }) {
   const router = useRouter();
   const [followupEnabled, setFollowupEnabled] = useState(initialFollowupEnabled);
   const [followupDelays, setFollowupDelays] = useState<DelayRow[]>(
     (initialFollowupDelaysMinutes.length ? initialFollowupDelaysMinutes : [1440, 1440]).map(minutesToRow)
   );
+  const [horarioInicio, setHorarioInicio] = useState(initialHorarioEnvioInicio);
+  const [horarioFim, setHorarioFim] = useState(initialHorarioEnvioFim);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
@@ -45,6 +49,8 @@ export function FollowupPanel({
         body: JSON.stringify({
           followupEnabled,
           followupDelaysMinutes: followupDelays.map(rowToMinutes),
+          horarioEnvioInicio: horarioInicio,
+          horarioEnvioFim: horarioFim,
         }),
       });
       if (!res.ok) throw new Error();
@@ -79,6 +85,28 @@ export function FollowupPanel({
           onUpdate={updateFollowupAttempt}
         />
       )}
+
+      <div className="pt-2 border-t border-gray-800 space-y-2">
+        <p className="text-sm font-medium">Horário de envio</p>
+        <p className="text-xs text-gray-500">
+          Follow-up, prospecção e campanhas só disparam dentro dessa janela — fora dela, o envio é adiado pro próximo horário permitido, nunca perdido.
+        </p>
+        <div className="flex items-center gap-2">
+          <input
+            type="time"
+            value={horarioInicio}
+            onChange={e => { setHorarioInicio(e.target.value); setSaved(false); }}
+            className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+          />
+          <span className="text-sm text-gray-500">até</span>
+          <input
+            type="time"
+            value={horarioFim}
+            onChange={e => { setHorarioFim(e.target.value); setSaved(false); }}
+            className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+          />
+        </div>
+      </div>
 
       {error && <p className="text-sm text-red-400">{error}</p>}
 

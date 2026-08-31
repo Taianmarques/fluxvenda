@@ -150,6 +150,7 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
             nome: config.nome, tom: config.tom, servicos: config.servicos, objecoes: config.objecoes, horario: config.horario,
             descricaoEmpresa: config.descricaoEmpresa, precos: config.precos, enderecoContato: config.enderecoContato,
             followupEnabled: config.followupEnabled, followupDelaysMinutes: config.followupDelaysMinutes as unknown as number[], emojiEnabled: config.emojiEnabled,
+            horarioEnvioInicio: config.horarioEnvioInicio, horarioEnvioFim: config.horarioEnvioFim,
             responseDelaySeconds: config.responseDelaySeconds, agentSignatureEnabled: config.agentSignatureEnabled,
             instrucoesExtras: config.instrucoesExtras,
           }}
