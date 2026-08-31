@@ -4,6 +4,7 @@ import { runAgent } from "@/lib/agent-engine";
 import { sendWhatsAppTextAsTeam } from "@/lib/whatsapp";
 import { sendCloudTemplate, type TemplateComponent } from "@/lib/whatsapp-cloud";
 import { logTokenUsage, isOverQuota } from "@/lib/token-usage";
+import { dentroHorarioEnvio } from "@/lib/sending-hours";
 
 // Máximo de destinatários processados por execução do cron — o intervalo entre eles
 // é o que protege contra bloqueio, não o tamanho do lote
@@ -31,7 +32,10 @@ export async function POST(req: NextRequest) {
     where: { status: "ENVIANDO", nextSendAt: { lte: new Date() } },
     include: {
       agentConfig: {
-        select: { uazapiToken: true, teamId: true, whatsappProvider: true, cloudApiPhoneNumberId: true, cloudApiAccessToken: true },
+        select: {
+          uazapiToken: true, teamId: true, whatsappProvider: true, cloudApiPhoneNumberId: true, cloudApiAccessToken: true,
+          horarioEnvioInicio: true, horarioEnvioFim: true,
+        },
       },
     },
   });
@@ -39,6 +43,8 @@ export async function POST(req: NextRequest) {
   let processadas = 0;
 
   for (const campanha of campanhas) {
+    if (!dentroHorarioEnvio(campanha.agentConfig.horarioEnvioInicio, campanha.agentConfig.horarioEnvioFim)) continue;
+
     const isCloudApi = campanha.agentConfig.whatsappProvider === "CLOUD_API";
     const isConnected = isCloudApi
       ? Boolean(campanha.agentConfig.cloudApiPhoneNumberId && campanha.agentConfig.cloudApiAccessToken)

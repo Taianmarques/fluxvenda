@@ -712,6 +712,13 @@ model AgentConfig {
   followupEnabled       Boolean @default(true)
   followupDelaysMinutes Json    @default("[1440]") // minutos de espera por tentativa, ex: [1440, 720] = 24h, depois +12h. O número de tentativas é o tamanho do array.
 
+  // Janela de horário (hora local) em que follow-up/prospecção/campanha podem disparar —
+  // fora dela, o envio é adiado pra próxima execução do cron, não perdido. Não vale pro funil
+  // do teste grátis (lib/trial-funnel-shared.ts, lógica própria de dia/hora) nem pra lembretes
+  // de agendamento/mensagens agendadas por um humano (esses têm hora própria por natureza).
+  horarioEnvioInicio String @default("08:00")
+  horarioEnvioFim    String @default("20:00")
+
   schedulingEnabled        Boolean @default(false)
   slotDurationMinutes      Int     @default(30)
   availability             Json    @default("[]") // [{ dayOfWeek: 0-6, start: "09:00", end: "18:00" }]

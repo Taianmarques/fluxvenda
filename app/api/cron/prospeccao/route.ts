@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppTextAsTeam } from "@/lib/whatsapp";
+import { dentroHorarioEnvio } from "@/lib/sending-hours";
 
 // Prospecção é abordagem fria a desconhecidos — as faixas são mais espaçadas que as de
 // Campanha (que manda pra base própria) porque o risco de denúncia/banimento é maior aqui.
@@ -68,6 +69,7 @@ export async function POST(req: NextRequest) {
 
     const podeEnviarAgora = !config.prospeccaoNextSendAt || config.prospeccaoNextSendAt <= new Date();
     if (!podeEnviarAgora) continue;
+    if (!dentroHorarioEnvio(config.horarioEnvioInicio, config.horarioEnvioFim)) continue;
 
     // Prioriza a 1ª abordagem de quem é NOVO (fila mais antiga primeiro); só passa pro
     // follow-up se não houver ninguém novo esperando.

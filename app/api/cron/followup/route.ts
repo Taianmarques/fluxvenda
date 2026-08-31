@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { generateFollowupMessage } from "@/lib/agent-engine";
 import { sendWhatsAppTextAsTeam } from "@/lib/whatsapp";
 import { logTokenUsage } from "@/lib/token-usage";
+import { dentroHorarioEnvio } from "@/lib/sending-hours";
 
 function hoursFromNow(n: number) {
   const d = new Date();
@@ -27,6 +28,8 @@ export async function POST(req: NextRequest) {
   let checked = 0;
 
   for (const config of configs) {
+    if (!dentroHorarioEnvio(config.horarioEnvioInicio, config.horarioEnvioFim)) continue;
+
     const delays = config.followupDelaysMinutes as unknown as number[];
     if (!Array.isArray(delays) || delays.length === 0) continue;
 
@@ -100,6 +103,7 @@ export async function POST(req: NextRequest) {
 
     const config = stage.pipeline.agentConfig;
     if (!config.systemPrompt || !config.uazapiToken) continue;
+    if (!dentroHorarioEnvio(config.horarioEnvioInicio, config.horarioEnvioFim)) continue;
 
     const pipelineInstr = stage.pipeline.agenteInstrucoes?.trim();
     const stageInstr = stage.agenteInstrucoes?.trim();
