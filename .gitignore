@@ -45,4 +45,4 @@ next-env.d.ts
 
 # mídia do WhatsApp baixada e guardada localmente (ver lib/media-storage.ts) — dado de runtime,
 # não código; cada deploy tem o seu
-/public/uploads
+/media-storage

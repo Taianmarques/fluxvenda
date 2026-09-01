@@ -1,20 +1,35 @@
 // Mídia recebida/enviada pelo WhatsApp (UazAPI ou Cloud API) só existe, do lado do provedor, num
 // link temporário — a UazAPI apaga o arquivo original depois de poucos dias, e o link vira 404 pra
 // sempre, mesmo a mensagem continuando salva no nosso histórico. Baixa o arquivo e guarda uma
-// cópia permanente em disco (public/uploads/media), assim a mídia continua acessível mesmo depois
-// do provedor apagar a dele.
+// cópia permanente em disco, servida por app/api/midia/[filename]/route.ts.
+//
+// Importante: o arquivo NÃO fica em public/ — o `next start` dessa versão do Next.js só enxerga,
+// na pasta public, os arquivos que já existiam quando o processo iniciou (confirmado: um arquivo
+// escrito ali depois do boot do servidor dá 404 pra sempre até o próximo restart). Servir por uma
+// rota de API normal lê o arquivo do disco a cada requisição, sem essa limitação.
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 
-const MEDIA_DIR = path.join(process.cwd(), "public", "uploads", "media");
+export const MEDIA_DIR = path.join(process.cwd(), "media-storage");
+
+const CONTENT_TYPE_BY_EXTENSION: Record<string, string> = {
+  mp3: "audio/mpeg", ogg: "audio/ogg", wav: "audio/wav", aac: "audio/aac", webm: "audio/webm",
+  jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif",
+  mp4: "video/mp4", "3gp": "video/3gpp", mov: "video/quicktime",
+  pdf: "application/pdf",
+};
 
 const EXTENSION_BY_MIMETYPE: Record<string, string> = {
-  "audio/mpeg": "mp3", "audio/mp3": "mp3", "audio/ogg": "ogg", "audio/opus": "ogg", "audio/wav": "wav", "audio/aac": "aac",
+  "audio/mpeg": "mp3", "audio/mp3": "mp3", "audio/ogg": "ogg", "audio/opus": "ogg", "audio/wav": "wav", "audio/aac": "aac", "audio/webm": "webm",
   "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif",
   "video/mp4": "mp4", "video/3gpp": "3gp", "video/quicktime": "mov",
   "application/pdf": "pdf",
 };
+
+export function contentTypeForExtension(ext: string): string {
+  return CONTENT_TYPE_BY_EXTENSION[ext.toLowerCase()] ?? "application/octet-stream";
+}
 
 function guessExtension(mimetype: string | null | undefined, url: string): string {
   if (mimetype) {
@@ -26,8 +41,8 @@ function guessExtension(mimetype: string | null | undefined, url: string): strin
   return "bin";
 }
 
-// Retorna a URL local própria (ex: "/uploads/media/<id>.mp3") ou null se o download falhar — quem
-// chama deve usar a URL remota original como fallback nesse caso, pra não bloquear a mensagem.
+// Retorna a URL própria (servida por /api/midia/<id>) ou null se o download falhar — quem chama
+// deve usar a URL remota original como fallback nesse caso, pra não bloquear a mensagem.
 export async function downloadAndStoreMedia(remoteUrl: string, mimetypeHint?: string): Promise<string | null> {
   try {
     const res = await fetch(remoteUrl);
@@ -58,7 +73,5 @@ async function saveBuffer(buffer: Buffer, ext: string): Promise<string> {
   const fileName = `${randomUUID()}.${ext}`;
   await mkdir(MEDIA_DIR, { recursive: true });
   await writeFile(path.join(MEDIA_DIR, fileName), buffer);
-  // URL absoluta (não relativa) — precisa funcionar tanto num <audio src> no navegador quanto
-  // num fetch() do lado do servidor (ex: reencaminhar mensagem pra outra conversa).
-  return `${process.env.NEXT_PUBLIC_APP_URL}/uploads/media/${fileName}`;
+  return `${process.env.NEXT_PUBLIC_APP_URL}/api/midia/${fileName}`;
 }
