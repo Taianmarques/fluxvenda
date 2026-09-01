@@ -27,6 +27,8 @@ const isPublicRoute = createRouteMatcher([
   "/agendar(.*)",           // página pública de auto-agendamento (PWA) — clientes finais, sem login
   "/api/agendar(.*)",       // horários livres + criação de agendamento da página pública
   "/api/branding/icon(.*)", // ícones do manifest do PWA — navegador/instalador busca sem sessão
+  "/uploads(.*)",           // mídia do WhatsApp guardada localmente — nome de arquivo é um uuid
+                            // imprevisível, mesmo modelo de acesso por token que /agenda e /agendar
 ]);
 
 const isGestorRoute = createRouteMatcher(["/gestor(.*)", "/ferramentas(.*)"]);
