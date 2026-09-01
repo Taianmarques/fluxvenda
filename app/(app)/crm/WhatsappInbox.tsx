@@ -32,6 +32,7 @@ type ConversationSummary = {
   pinned: boolean;
   isGroup: boolean;
   groupVisibleToIds: string[];
+  isTestNumber: boolean;
 };
 
 type Attendant = { id: string; name: string; isManager: boolean };
@@ -158,6 +159,7 @@ type ConversationDetail = {
   messages: Message[];
   isGroup: boolean;
   groupVisibleToIds: string[];
+  isTestNumber: boolean;
 };
 
 type ChatTheme = "dark" | "light";
@@ -546,6 +548,7 @@ export function WhatsappInbox({
           pinned: Boolean(c.pinned),
           isGroup: Boolean(c.isGroup),
           groupVisibleToIds: c.groupVisibleToIds ?? [],
+          isTestNumber: Boolean(c.isTestNumber),
         }));
         // Só re-renderiza a lista se algo realmente mudou
         const fp = JSON.stringify(next.map((c: any) => [
@@ -1489,6 +1492,9 @@ export function WhatsappInbox({
                       <div className="flex items-center justify-between gap-2">
                         <p className="font-medium truncate">{c.contactName || c.contactNumber}</p>
                         <div className="flex items-center gap-1 flex-shrink-0">
+                          {c.isTestNumber && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-900/40 text-amber-300 border border-amber-700/50">teste</span>
+                          )}
                           {c.status === "FINALIZADO" && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-700/50 text-gray-300 border border-gray-600">encerrado</span>
                           )}
@@ -1591,6 +1597,9 @@ export function WhatsappInbox({
                         ? <Instagram size={14} className="text-pink-400 flex-shrink-0" />
                         : <WhatsAppIcon size={14} />}
                       {detail.contactName || (isIgContact(detail.contactNumber) ? "Instagram DM" : detail.contactNumber)}
+                      {detail.isTestNumber && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-900/40 text-amber-300 border border-amber-700/50 flex-shrink-0">teste</span>
+                      )}
                       {!detail.contactName && (
                         <button
                           onClick={handleSalvarContato}

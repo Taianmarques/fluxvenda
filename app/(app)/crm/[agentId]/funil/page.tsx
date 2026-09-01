@@ -45,11 +45,11 @@ async function FunilPageContent({ params }: { params: Promise<{ agentId: string 
       include: { stages: { orderBy: { order: "asc" }, select: { id: true, name: true, color: true } } },
     }),
     prisma.conversation.findMany({
-      where: { agentConfigId: config.id, isSandbox: false, isGroup: false },
+      where: { agentConfigId: config.id, isSandbox: false, isTestNumber: false, isGroup: false },
       select: { id: true, contactNumber: true, createdAt: true },
     }),
     prisma.opportunity.findMany({
-      where: { conversation: { agentConfigId: config.id, isSandbox: false, isGroup: false } },
+      where: { conversation: { agentConfigId: config.id, isSandbox: false, isTestNumber: false, isGroup: false } },
       select: { id: true, conversationId: true, stageId: true, dealValue: true, wonAt: true, createdAt: true },
     }),
     prisma.prospect.findMany({

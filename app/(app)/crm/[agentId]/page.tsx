@@ -142,6 +142,7 @@ async function WhatsappInboxPageContent({
         pinned: c.pinned,
         isGroup: c.isGroup,
         groupVisibleToIds: c.groupVisibleToIds,
+        isTestNumber: c.isTestNumber,
       }))}
     />
   );

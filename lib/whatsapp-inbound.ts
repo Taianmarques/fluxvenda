@@ -1499,11 +1499,16 @@ const SESSION_WINDOW_MS = 24 * 60 * 60 * 1000;
 export async function processIncomingMessage(config: AgentConfigFull, msg: IncomingMessage, adapter: ChannelAdapter, opts?: { enforceSessionWindow?: boolean; sandbox?: boolean }): Promise<void> {
   const { text, caption, contactNumber, contactName, mediaUrl, mediaType, imageUrl } = msg;
 
+  // Número cadastrado em Configurações pra testar o agente direto pelo celular — passa pelo
+  // mesmo pipeline real (IA, ferramentas, RAG), só fica marcado pra não poluir relatório/funil/
+  // métrica de venda de verdade (ver isTestNumber nas queries de vendas/funil/dashboards/etc).
+  const isTestNumber = config.testPhoneNumbers.includes(contactNumber);
+
   // Cliente respondeu — zera o contador de follow-up e marca prospect como RESPONDEU se aplicável
   const conversation = await prisma.conversation.upsert({
     where: { agentConfigId_contactNumber: { agentConfigId: config.id, contactNumber } },
-    update: { status: "ATIVO", followupCount: 0, ...(contactName && { contactName }) },
-    create: { agentConfigId: config.id, contactNumber, contactName, status: "ATIVO", isGroup: msg.isGroup ?? false },
+    update: { status: "ATIVO", followupCount: 0, isTestNumber, ...(contactName && { contactName }) },
+    create: { agentConfigId: config.id, contactNumber, contactName, status: "ATIVO", isGroup: msg.isGroup ?? false, isTestNumber },
   });
   if (config.prospeccaoEnabled) {
     await prisma.prospect.updateMany({

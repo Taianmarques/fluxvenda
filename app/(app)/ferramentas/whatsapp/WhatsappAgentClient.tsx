@@ -33,6 +33,7 @@ type InitialConfig = {
   fineTunedModelId: string | null;
   ragSimilarityThreshold: number;
   ragMaxResults: number;
+  testPhoneNumbers: string[];
 } | null;
 
 type Attendant = { id: string; name: string; isManager: boolean };
@@ -230,6 +231,13 @@ export function WhatsappAgentClient({
   const [savingRag, setSavingRag] = useState(false);
   const [ragError, setRagError] = useState("");
 
+  // Números de WhatsApp cadastrados pra testar o agente direto pelo celular, com o pipeline
+  // real — a conversa fica visível no chat com etiqueta "Teste", fora de relatórios/métricas.
+  const [testPhoneNumbersText, setTestPhoneNumbersText] = useState((initialConfig?.testPhoneNumbers ?? []).join("\n"));
+  const [showTestNumbers, setShowTestNumbers] = useState(false);
+  const [savingTestNumbers, setSavingTestNumbers] = useState(false);
+  const [testNumbersError, setTestNumbersError] = useState("");
+
   useEffect(() => {
     fetch(`/api/agentes/${agentId}/atendentes`)
       .then(res => res.json())
@@ -291,6 +299,7 @@ export function WhatsappAgentClient({
           transferirAoPedirFoto, iaLeadAttendantId: iaLeadAttendantId || null,
           fineTunedModelId: fineTunedModelId || null,
           ragSimilarityThreshold, ragMaxResults,
+          testPhoneNumbers: splitLines(testPhoneNumbersText),
         }),
       });
       if (!res.ok) throw new Error();
@@ -333,6 +342,7 @@ export function WhatsappAgentClient({
           transferirAoPedirFoto, iaLeadAttendantId: iaLeadAttendantId || null,
           fineTunedModelId: fineTunedModelId.trim() || null,
           ragSimilarityThreshold, ragMaxResults,
+          testPhoneNumbers: splitLines(testPhoneNumbersText),
         }),
       });
       if (!res.ok) throw new Error();
@@ -376,6 +386,7 @@ export function WhatsappAgentClient({
           transferirAoPedirFoto, iaLeadAttendantId: iaLeadAttendantId || null,
           fineTunedModelId: fineTunedModelId.trim() || null,
           ragSimilarityThreshold, ragMaxResults,
+          testPhoneNumbers: splitLines(testPhoneNumbersText),
         }),
       });
       if (!res.ok) throw new Error();
@@ -385,6 +396,49 @@ export function WhatsappAgentClient({
       setRagError("Não foi possível salvar. Tente novamente.");
     } finally {
       setSavingRag(false);
+    }
+  }
+
+  function cancelTestNumbers() {
+    setTestPhoneNumbersText((initialConfig?.testPhoneNumbers ?? []).join("\n"));
+    setTestNumbersError("");
+    setShowTestNumbers(false);
+  }
+
+  async function handleSaveTestNumbers() {
+    setSavingTestNumbers(true);
+    setTestNumbersError("");
+    try {
+      const res = await fetch(`/api/agentes/${agentId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nome, tom,
+          descricaoEmpresa, enderecoContato, precos,
+          objetivo, fluxoAtendimento, comportamento,
+          fluxoGatilhos: fluxoGatilhos.filter(r => r.gatilho.trim() && r.resposta.trim()),
+          sdrMateriaisEnabled,
+          servicos: splitLines(servicos),
+          objecoes: splitLines(objecoes),
+          horario,
+          followupEnabled,
+          followupDelaysMinutes: followupDelays.map(rowToMinutes),
+          emojiEnabled,
+          iaIgnoraAtribuidos, iaNiveisCarteiraExcluidos, iaPerfisExcluidos,
+          iaNumerosBloqueados: splitLines(iaNumerosBloqueadosText),
+          transferirAoPedirFoto, iaLeadAttendantId: iaLeadAttendantId || null,
+          fineTunedModelId: fineTunedModelId.trim() || null,
+          ragSimilarityThreshold, ragMaxResults,
+          testPhoneNumbers: splitLines(testPhoneNumbersText),
+        }),
+      });
+      if (!res.ok) throw new Error();
+      setShowTestNumbers(false);
+      router.refresh();
+    } catch {
+      setTestNumbersError("Não foi possível salvar. Tente novamente.");
+    } finally {
+      setSavingTestNumbers(false);
     }
   }
 
@@ -452,6 +506,7 @@ export function WhatsappAgentClient({
           transferirAoPedirFoto, iaLeadAttendantId: iaLeadAttendantId || null,
           fineTunedModelId: fineTunedModelId || null,
           ragSimilarityThreshold, ragMaxResults,
+          testPhoneNumbers: splitLines(testPhoneNumbersText),
         }),
       });
       if (!res.ok) throw new Error();
@@ -606,6 +661,42 @@ export function WhatsappAgentClient({
                   {savingRag ? "Salvando..." : "Salvar"}
                 </button>
                 <button onClick={cancelRag} className="text-sm text-gray-400 hover:text-gray-200">Cancelar</button>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between gap-2 border-t border-gray-800 pt-3">
+            <p className="text-sm text-gray-400">
+              Números de teste: <span className="text-gray-300">{(initialConfig?.testPhoneNumbers ?? []).length === 0 ? "nenhum cadastrado" : `${(initialConfig?.testPhoneNumbers ?? []).length} número${(initialConfig?.testPhoneNumbers ?? []).length === 1 ? "" : "s"}`}</span>
+            </p>
+            {!showTestNumbers && (
+              <button onClick={() => setShowTestNumbers(true)} className="text-xs text-amber-400 hover:text-amber-300 flex-shrink-0">Ajustar</button>
+            )}
+          </div>
+
+          {showTestNumbers && (
+            <div className="border-t border-gray-800 pt-3 space-y-3">
+              <p className="text-xs text-gray-500">
+                Mensagens vindas desses números passam pelo atendimento real (IA, ferramentas, RAG) igual a qualquer
+                cliente, mas a conversa fica com uma etiqueta &quot;Teste&quot; no chat e fora do funil, vendas, dashboards,
+                contatos, carteira e metas — pra você testar perguntas direto pelo WhatsApp sem sujar dado real.
+              </p>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Números de teste (um por linha, com DDD)</label>
+                <textarea
+                  value={testPhoneNumbersText}
+                  onChange={e => setTestPhoneNumbersText(e.target.value)}
+                  rows={3}
+                  placeholder={"84999990000\n11988887777"}
+                  className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:border-amber-600"
+                />
+              </div>
+              {testNumbersError && <p className="text-sm text-red-400">{testNumbersError}</p>}
+              <div className="flex gap-3">
+                <button onClick={handleSaveTestNumbers} disabled={savingTestNumbers} className="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 rounded-xl px-4 py-2 text-sm font-medium">
+                  {savingTestNumbers ? "Salvando..." : "Salvar"}
+                </button>
+                <button onClick={cancelTestNumbers} className="text-sm text-gray-400 hover:text-gray-200">Cancelar</button>
               </div>
             </div>
           )}

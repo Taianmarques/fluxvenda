@@ -43,6 +43,7 @@ async function ContatosPageContent({ params }: { params: Promise<{ agentId: stri
       where: {
         agentConfigId: config.id,
         isSandbox: false, // conversa de teste do simulador nunca aparece na lista real
+        isTestNumber: false, // nem número cadastrado pra testar o agente
         isGroup: false, // grupo do WhatsApp não é lead, fica só na aba Grupos do chat
         // Atendente vê os contatos das conversas dele (mesma regra da caixa de entrada)
         ...(isManager ? {} : { OR: [{ assignedToId: user.id }, { assignedToId: null }] }),

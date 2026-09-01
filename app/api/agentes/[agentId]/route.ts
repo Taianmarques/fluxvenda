@@ -53,6 +53,8 @@ const schema = z.object({
   // Parâmetros do RAG sobre a tela de Treino (ver lib/training-rag.ts)
   ragSimilarityThreshold: z.number().min(0).max(1).default(0.5),
   ragMaxResults: z.number().int().min(0).max(10).default(2),
+  // Números pra testar o agente direto pelo WhatsApp real (ver testPhoneNumbers no schema)
+  testPhoneNumbers: z.array(z.string().transform(v => v.replace(/\D/g, ""))).max(20).default([]),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {
@@ -72,7 +74,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
     followupEnabled, followupDelaysMinutes, emojiEnabled,
     iaIgnoraAtribuidos, iaNiveisCarteiraExcluidos, iaNumerosBloqueados, iaPerfisExcluidos,
     transferirAoPedirFoto, iaLeadAttendantId, fineTunedModelId,
-    ragSimilarityThreshold, ragMaxResults,
+    ragSimilarityThreshold, ragMaxResults, testPhoneNumbers,
   } = body.data;
 
   const team = await prisma.team.findUnique({ where: { id: existing.teamId } });
@@ -111,7 +113,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
       iaIgnoraAtribuidos, iaNiveisCarteiraExcluidos, iaNumerosBloqueados, iaPerfisExcluidos,
       transferirAoPedirFoto, iaLeadAttendantId: resolvedIaLeadAttendantId,
       fineTunedModelId: fineTunedModelId || null,
-      ragSimilarityThreshold, ragMaxResults,
+      ragSimilarityThreshold, ragMaxResults, testPhoneNumbers,
     },
   });
 

@@ -682,6 +682,12 @@ model AgentConfig {
   // Quantos exemplos (no máximo) entram no prompt por mensagem, mesmo que mais passem do limiar.
   ragMaxResults          Int   @default(2)
 
+  // Números de WhatsApp (só dígitos) usados pra testar o agente direto pelo celular, com o
+  // pipeline real (IA, ferramentas, RAG) — a conversa fica marcada (Conversation.isTestNumber),
+  // visível no chat com uma etiqueta própria, mas fora de funil/vendas/dashboards/contatos/
+  // carteira/metas, pra não poluir dado real.
+  testPhoneNumbers String[] @default([])
+
   // Estado inicial de todo agente novo: mensagens são salvas normalmente mas a IA não
   // responde em nenhum canal, até o gestor clicar em "Ativar IA" (vê/valida antes de ir ao ar).
   learningMode Boolean @default(false)
@@ -1467,6 +1473,11 @@ model Conversation {
   // Conversa de teste do simulador (Ferramentas > Treino) — uma por gestor, reaproveitada entre
   // sessões. Nunca deve aparecer na caixa de entrada nem em relatórios/métricas reais.
   isSandbox Boolean @default(false)
+
+  // Conversa de um número cadastrado em AgentConfig.testPhoneNumbers — ao contrário de
+  // isSandbox, é uma conversa real de WhatsApp (fica visível no chat, com etiqueta "Teste"), só
+  // fora de relatórios/métricas reais pra não poluir dado de venda de verdade.
+  isTestNumber Boolean @default(false)
 
   leadStatusId String?
   leadStatus   LeadStatus? @relation(fields: [leadStatusId], references: [id], onDelete: SetNull)
