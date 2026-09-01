@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Calendar, CalendarCheck, ChevronLeft, Clock, Copy, Check, Loader2, MessageCircle, QrCode, Scissors, User } from "lucide-react";
+import { Calendar, CalendarCheck, ChevronLeft, Clock, Copy, Check, Loader2, MessageCircle, QrCode, User } from "lucide-react";
+import { getServiceIcon } from "@/lib/segment-icons";
 
 type Service = { id: string; name: string; durationMinutes: number };
 type Professional = { id: string; name: string };
@@ -23,7 +24,7 @@ function formatDateLong(iso: string): string {
   return new Date(y, m - 1, d).toLocaleDateString("pt-BR", { day: "2-digit", month: "long" });
 }
 
-export function AgendarClient({ agentId, businessName, whatsappNumber, logo, services, professionals, askProfessionalEnabled, defaultDurationMinutes, formFields, sinalValor }: {
+export function AgendarClient({ agentId, businessName, whatsappNumber, logo, services, professionals, askProfessionalEnabled, defaultDurationMinutes, formFields, sinalValor, segmento, subsegmento }: {
   agentId: string;
   businessName: string;
   whatsappNumber: string | null;
@@ -34,8 +35,11 @@ export function AgendarClient({ agentId, businessName, whatsappNumber, logo, ser
   defaultDurationMinutes: number;
   formFields: { label: string; obrigatorio: boolean }[];
   sinalValor: number | null;
+  segmento?: string | null;
+  subsegmento?: string | null;
 }) {
   const temServicos = services.length > 0;
+  const ServiceIcon = getServiceIcon(segmento, subsegmento);
   const pedeProfissional = professionals.length > 1 && askProfessionalEnabled;
 
   const [step, setStep] = useState<Step>(temServicos ? "servico" : (pedeProfissional ? "profissional" : "horario"));
@@ -226,7 +230,7 @@ export function AgendarClient({ agentId, businessName, whatsappNumber, logo, ser
                   }`}
                 >
                   <span className="flex items-center gap-3 min-w-0">
-                    <span className="p-2 rounded-xl bg-blue-50 text-blue-600 flex-shrink-0"><Scissors size={16} /></span>
+                    <span className="p-2 rounded-xl bg-blue-50 text-blue-600 flex-shrink-0"><ServiceIcon size={16} /></span>
                     <span className="font-medium text-sm truncate">{s.name}</span>
                   </span>
                   <span className="text-xs text-gray-500 flex items-center gap-1 flex-shrink-0"><Clock size={12} /> {formatDuration(s.durationMinutes)}</span>

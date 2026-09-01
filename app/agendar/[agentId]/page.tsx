@@ -17,6 +17,8 @@ async function findBooking(idOrSlug: string) {
       id: true,
       schedulingEnabled: true,
       slotDurationMinutes: true,
+      segmento: true,
+      subsegmento: true,
       askProfessionalEnabled: true,
       bookingFormFields: true,
       agendamentoCobrancaEnabled: true,
@@ -101,6 +103,8 @@ export default async function AgendarPage({ params }: { params: Promise<{ agentI
       defaultDurationMinutes={config.slotDurationMinutes}
       formFields={(config.bookingFormFields as { label: string; obrigatorio: boolean }[]) ?? []}
       sinalValor={config.agendamentoCobrancaEnabled && config.agendamentoSinalValor > 0 && config.asaasApiKey ? config.agendamentoSinalValor : null}
+      segmento={config.segmento}
+      subsegmento={config.subsegmento}
     />
   );
 }
