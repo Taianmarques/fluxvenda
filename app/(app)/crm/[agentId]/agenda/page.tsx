@@ -69,6 +69,7 @@ async function AgendaPageContent({ params }: { params: Promise<{ agentId: string
       initialAgendamentoSinalValor={config.agendamentoSinalValor}
       hasAsaasApiKey={Boolean(config.asaasApiKey)}
       initialBookingFormFields={(config.bookingFormFields as { label: string; obrigatorio: boolean }[]) ?? []}
+      initialAgendamentoIcone={config.agendamentoIcone}
       agendaAccessToken={agendaAccessToken}
       bookingSlug={bookingSlug}
     />

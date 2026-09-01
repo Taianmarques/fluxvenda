@@ -24,7 +24,7 @@ function formatDateLong(iso: string): string {
   return new Date(y, m - 1, d).toLocaleDateString("pt-BR", { day: "2-digit", month: "long" });
 }
 
-export function AgendarClient({ agentId, businessName, whatsappNumber, logo, services, professionals, askProfessionalEnabled, defaultDurationMinutes, formFields, sinalValor, segmento, subsegmento }: {
+export function AgendarClient({ agentId, businessName, whatsappNumber, logo, services, professionals, askProfessionalEnabled, defaultDurationMinutes, formFields, sinalValor, segmento, subsegmento, iconeOverride }: {
   agentId: string;
   businessName: string;
   whatsappNumber: string | null;
@@ -37,9 +37,10 @@ export function AgendarClient({ agentId, businessName, whatsappNumber, logo, ser
   sinalValor: number | null;
   segmento?: string | null;
   subsegmento?: string | null;
+  iconeOverride?: string | null;
 }) {
   const temServicos = services.length > 0;
-  const ServiceIcon = getServiceIcon(segmento, subsegmento);
+  const ServiceIcon = getServiceIcon(segmento, subsegmento, iconeOverride);
   const pedeProfissional = professionals.length > 1 && askProfessionalEnabled;
 
   const [step, setStep] = useState<Step>(temServicos ? "servico" : (pedeProfissional ? "profissional" : "horario"));

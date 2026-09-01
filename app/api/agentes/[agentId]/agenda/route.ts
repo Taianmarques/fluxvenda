@@ -17,6 +17,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ age
     slotDurationMinutes: config.slotDurationMinutes,
     availability: config.availability,
     appointmentReminderHours: config.appointmentReminderHours,
+    agendamentoIcone: config.agendamentoIcone,
   });
 }
 
@@ -45,6 +46,7 @@ const schema = z.object({
     label: z.string().trim().min(1).max(60),
     obrigatorio: z.boolean(),
   })).max(10).optional(),
+  agendamentoIcone: z.string().max(40).nullable().optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {
@@ -68,5 +70,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
     slotDurationMinutes: updated.slotDurationMinutes,
     availability: updated.availability,
     appointmentReminderHours: updated.appointmentReminderHours,
+    agendamentoIcone: updated.agendamentoIcone,
   });
 }

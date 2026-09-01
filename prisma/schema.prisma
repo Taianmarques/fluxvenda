@@ -735,6 +735,9 @@ model AgentConfig {
   agendamentoSinalValor        Float   @default(0) // valor do sinal em reais
   bookingFormFields            Json    @default("[]") // campos extras do agendamento pelo link: [{ label, obrigatorio }] — nome e WhatsApp são sempre pedidos
   agendaAccessToken            String? @unique // link da agenda geral da empresa (/agenda/[token], PWA)
+  // Ícone dos serviços na página pública de agendamento (chave de lib/segment-icons.ts,
+  // ex: "wrench") — null = automático, escolhido pelo segmento/subsegmento do agente.
+  agendamentoIcone             String?
 
   // Como conversas novas são distribuídas entre os atendentes da equipe
   leadDistributionMode LeadDistributionMode @default(MANUAL)

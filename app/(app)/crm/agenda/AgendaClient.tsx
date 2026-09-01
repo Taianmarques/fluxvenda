@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Calendar, Users, Settings, ArrowLeft, ArrowRight, X, ChevronDown } from "lucide-react";
 import { useCrmTheme } from "../CrmThemeContext";
+import { ICON_OPTIONS } from "@/lib/segment-icons";
 
 type AgendaTheme = "dark" | "light";
 
@@ -334,6 +335,7 @@ export function AgendaClient({
   agentId, initialSchedulingEnabled, initialSlotDurationMinutes, initialAvailability, initialAppointmentReminderHours, initialRequisitosAgendamento, initialRestricoesAgendamento, initialAtendimentoEspecialEnabled, initialAtendimentoEspecialDescricao,
   initialAskProfessionalEnabled, initialSchedulingViaLink, initialAgendarAteEncerramento, initialVagasSimultaneas,
   initialAgendamentoCobrancaEnabled, initialAgendamentoSinalValor, hasAsaasApiKey, initialBookingFormFields, agendaAccessToken, bookingSlug,
+  initialAgendamentoIcone,
 }: {
   agentId: string;
   initialSchedulingEnabled: boolean;
@@ -354,6 +356,7 @@ export function AgendaClient({
   initialBookingFormFields?: { label: string; obrigatorio: boolean }[];
   agendaAccessToken?: string | null;
   bookingSlug?: string | null;
+  initialAgendamentoIcone?: string | null;
 }) {
   const { theme } = useCrmTheme();
   const t = THEMES[theme];
@@ -382,6 +385,7 @@ export function AgendaClient({
   const [agendamentoCobrancaEnabled, setAgendamentoCobrancaEnabled] = useState(initialAgendamentoCobrancaEnabled ?? false);
   const [agendamentoSinalValor, setAgendamentoSinalValor] = useState(initialAgendamentoSinalValor ?? 0);
   const [bookingFormFields, setBookingFormFields] = useState<{ label: string; obrigatorio: boolean }[]>(initialBookingFormFields ?? []);
+  const [agendamentoIcone, setAgendamentoIcone] = useState<string | null>(initialAgendamentoIcone ?? null);
   const [newFieldLabel, setNewFieldLabel] = useState("");
   const [rules, setRules] = useState(() => rulesFromAvailability(initialAvailability));
   const [savingSettings, setSavingSettings] = useState(false);
@@ -500,7 +504,7 @@ export function AgendaClient({
       await fetch(`/api/agentes/${agentId}/agenda`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ schedulingEnabled, slotDurationMinutes, availability, appointmentReminderHours, requisitosAgendamento, restricoesAgendamento, atendimentoEspecialEnabled, atendimentoEspecialDescricao, askProfessionalEnabled, schedulingViaLink, agendarAteEncerramento, vagasSimultaneas, agendamentoCobrancaEnabled, agendamentoSinalValor, bookingFormFields }),
+        body: JSON.stringify({ schedulingEnabled, slotDurationMinutes, availability, appointmentReminderHours, requisitosAgendamento, restricoesAgendamento, atendimentoEspecialEnabled, atendimentoEspecialDescricao, askProfessionalEnabled, schedulingViaLink, agendarAteEncerramento, vagasSimultaneas, agendamentoCobrancaEnabled, agendamentoSinalValor, bookingFormFields, agendamentoIcone }),
       });
     } finally {
       setSavingSettings(false);
@@ -624,6 +628,24 @@ export function AgendaClient({
             <div className={`border rounded-2xl p-5 space-y-3 ${t.card}`}>
               <p className="font-semibold">Serviços</p>
               <p className={`text-xs ${t.secondary}`}>Cada serviço tem sua própria duração. Se não cadastrar nenhum, o agendamento usa a duração padrão configurada acima.</p>
+
+              <div>
+                <label className={`text-xs ${t.secondary} block mb-1`}>Ícone na página de agendamento</label>
+                <select
+                  value={agendamentoIcone ?? ""}
+                  onChange={e => setAgendamentoIcone(e.target.value || null)}
+                  className={`w-full border rounded-xl px-3 py-2 text-sm ${t.input}`}
+                >
+                  <option value="">Automático (pelo segmento do agente)</option>
+                  {ICON_OPTIONS.map(opt => (
+                    <option key={opt.key} value={opt.key}>{opt.label}</option>
+                  ))}
+                </select>
+                <button onClick={handleSaveSettings} disabled={savingSettings} className="mt-2 text-xs text-blue-400 hover:text-blue-300 disabled:opacity-50">
+                  {savingSettings ? "Salvando..." : "Salvar ícone"}
+                </button>
+              </div>
+
               <div className="space-y-2">
                 {services.map(s => (
                   <div key={s.id} className={`border rounded-xl p-3 flex items-center justify-between gap-2 ${t.innerCard}`}>
