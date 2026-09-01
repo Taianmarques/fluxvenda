@@ -688,6 +688,12 @@ model AgentConfig {
   // carteira/metas, pra não poluir dado real.
   testPhoneNumbers String[] @default([])
 
+  // Regras específicas em texto livre, cadastradas pelo gestor, sobre o que a IA NUNCA deve
+  // fazer (ex: "nunca informe preço de MDF, sempre transfira pro vendedor") — injetadas
+  // verbatim (sem passar por reescrita de IA) na posição de maior atenção do prompt, pra cobrir
+  // caso a caso sem precisar de um ajuste de código a cada novo comportamento indesejado.
+  regrasProibidas String[] @default([])
+
   // Estado inicial de todo agente novo: mensagens são salvas normalmente mas a IA não
   // responde em nenhum canal, até o gestor clicar em "Ativar IA" (vê/valida antes de ir ao ar).
   learningMode Boolean @default(false)

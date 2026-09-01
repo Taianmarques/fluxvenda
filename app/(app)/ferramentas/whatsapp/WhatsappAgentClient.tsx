@@ -34,6 +34,7 @@ type InitialConfig = {
   ragSimilarityThreshold: number;
   ragMaxResults: number;
   testPhoneNumbers: string[];
+  regrasProibidas: string[];
 } | null;
 
 type Attendant = { id: string; name: string; isManager: boolean };
@@ -238,6 +239,13 @@ export function WhatsappAgentClient({
   const [savingTestNumbers, setSavingTestNumbers] = useState(false);
   const [testNumbersError, setTestNumbersError] = useState("");
 
+  // Regras de texto livre sobre o que a IA nunca deve fazer (ex: "nunca informe preço de MDF") —
+  // vão verbatim pro prompt, na posição de maior atenção, sem depender de ajuste de código.
+  const [regrasProibidasText, setRegrasProibidasText] = useState((initialConfig?.regrasProibidas ?? []).join("\n"));
+  const [showRegrasProibidas, setShowRegrasProibidas] = useState(false);
+  const [savingRegrasProibidas, setSavingRegrasProibidas] = useState(false);
+  const [regrasProibidasError, setRegrasProibidasError] = useState("");
+
   useEffect(() => {
     fetch(`/api/agentes/${agentId}/atendentes`)
       .then(res => res.json())
@@ -300,6 +308,7 @@ export function WhatsappAgentClient({
           fineTunedModelId: fineTunedModelId || null,
           ragSimilarityThreshold, ragMaxResults,
           testPhoneNumbers: splitLines(testPhoneNumbersText),
+          regrasProibidas: splitLines(regrasProibidasText),
         }),
       });
       if (!res.ok) throw new Error();
@@ -343,6 +352,7 @@ export function WhatsappAgentClient({
           fineTunedModelId: fineTunedModelId.trim() || null,
           ragSimilarityThreshold, ragMaxResults,
           testPhoneNumbers: splitLines(testPhoneNumbersText),
+          regrasProibidas: splitLines(regrasProibidasText),
         }),
       });
       if (!res.ok) throw new Error();
@@ -387,6 +397,7 @@ export function WhatsappAgentClient({
           fineTunedModelId: fineTunedModelId.trim() || null,
           ragSimilarityThreshold, ragMaxResults,
           testPhoneNumbers: splitLines(testPhoneNumbersText),
+          regrasProibidas: splitLines(regrasProibidasText),
         }),
       });
       if (!res.ok) throw new Error();
@@ -430,6 +441,7 @@ export function WhatsappAgentClient({
           fineTunedModelId: fineTunedModelId.trim() || null,
           ragSimilarityThreshold, ragMaxResults,
           testPhoneNumbers: splitLines(testPhoneNumbersText),
+          regrasProibidas: splitLines(regrasProibidasText),
         }),
       });
       if (!res.ok) throw new Error();
@@ -439,6 +451,50 @@ export function WhatsappAgentClient({
       setTestNumbersError("Não foi possível salvar. Tente novamente.");
     } finally {
       setSavingTestNumbers(false);
+    }
+  }
+
+  function cancelRegrasProibidas() {
+    setRegrasProibidasText((initialConfig?.regrasProibidas ?? []).join("\n"));
+    setRegrasProibidasError("");
+    setShowRegrasProibidas(false);
+  }
+
+  async function handleSaveRegrasProibidas() {
+    setSavingRegrasProibidas(true);
+    setRegrasProibidasError("");
+    try {
+      const res = await fetch(`/api/agentes/${agentId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nome, tom,
+          descricaoEmpresa, enderecoContato, precos,
+          objetivo, fluxoAtendimento, comportamento,
+          fluxoGatilhos: fluxoGatilhos.filter(r => r.gatilho.trim() && r.resposta.trim()),
+          sdrMateriaisEnabled,
+          servicos: splitLines(servicos),
+          objecoes: splitLines(objecoes),
+          horario,
+          followupEnabled,
+          followupDelaysMinutes: followupDelays.map(rowToMinutes),
+          emojiEnabled,
+          iaIgnoraAtribuidos, iaNiveisCarteiraExcluidos, iaPerfisExcluidos,
+          iaNumerosBloqueados: splitLines(iaNumerosBloqueadosText),
+          transferirAoPedirFoto, iaLeadAttendantId: iaLeadAttendantId || null,
+          fineTunedModelId: fineTunedModelId.trim() || null,
+          ragSimilarityThreshold, ragMaxResults,
+          testPhoneNumbers: splitLines(testPhoneNumbersText),
+          regrasProibidas: splitLines(regrasProibidasText),
+        }),
+      });
+      if (!res.ok) throw new Error();
+      setShowRegrasProibidas(false);
+      router.refresh();
+    } catch {
+      setRegrasProibidasError("Não foi possível salvar. Tente novamente.");
+    } finally {
+      setSavingRegrasProibidas(false);
     }
   }
 
@@ -507,6 +563,7 @@ export function WhatsappAgentClient({
           fineTunedModelId: fineTunedModelId || null,
           ragSimilarityThreshold, ragMaxResults,
           testPhoneNumbers: splitLines(testPhoneNumbersText),
+          regrasProibidas: splitLines(regrasProibidasText),
         }),
       });
       if (!res.ok) throw new Error();
@@ -661,6 +718,43 @@ export function WhatsappAgentClient({
                   {savingRag ? "Salvando..." : "Salvar"}
                 </button>
                 <button onClick={cancelRag} className="text-sm text-gray-400 hover:text-gray-200">Cancelar</button>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between gap-2 border-t border-gray-800 pt-3">
+            <p className="text-sm text-gray-400">
+              Regras proibidas: <span className="text-gray-300">{(initialConfig?.regrasProibidas ?? []).length === 0 ? "nenhuma cadastrada" : `${(initialConfig?.regrasProibidas ?? []).length} regra${(initialConfig?.regrasProibidas ?? []).length === 1 ? "" : "s"}`}</span>
+            </p>
+            {!showRegrasProibidas && (
+              <button onClick={() => setShowRegrasProibidas(true)} className="text-xs text-red-400 hover:text-red-300 flex-shrink-0">Ajustar</button>
+            )}
+          </div>
+
+          {showRegrasProibidas && (
+            <div className="border-t border-gray-800 pt-3 space-y-3">
+              <p className="text-xs text-gray-500">
+                O que a IA NUNCA deve fazer, uma regra por linha, em português simples — ex: &quot;nunca informe preço de
+                MDF, sempre transfira pro vendedor&quot; ou &quot;nunca calcule ou multiplique valores, só repita o que
+                está escrito&quot;. Essas regras têm prioridade máxima e valem imediatamente ao salvar, sem precisar
+                mexer em mais nada.
+              </p>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Regras (uma por linha)</label>
+                <textarea
+                  value={regrasProibidasText}
+                  onChange={e => setRegrasProibidasText(e.target.value)}
+                  rows={4}
+                  placeholder={"Nunca informe preço de MDF, sempre transfira pro vendedor\nNunca calcule ou some valores, só repita o que está escrito"}
+                  className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-red-600"
+                />
+              </div>
+              {regrasProibidasError && <p className="text-sm text-red-400">{regrasProibidasError}</p>}
+              <div className="flex gap-3">
+                <button onClick={handleSaveRegrasProibidas} disabled={savingRegrasProibidas} className="bg-red-600 hover:bg-red-500 disabled:opacity-50 rounded-xl px-4 py-2 text-sm font-medium">
+                  {savingRegrasProibidas ? "Salvando..." : "Salvar"}
+                </button>
+                <button onClick={cancelRegrasProibidas} className="text-sm text-gray-400 hover:text-gray-200">Cancelar</button>
               </div>
             </div>
           )}

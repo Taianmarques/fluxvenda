@@ -1730,7 +1730,17 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
       + gatilhosValidos.map(r => `- Quando "${r.gatilho.trim()}" → ${r.resposta.trim()}`).join("\n")
     : "";
 
-  const brevityInstruction = "\n\nLEMBRETE FINAL, SEMPRE VÁLIDO: cada mensagem que você escrever vira uma bolha separada no WhatsApp, exatamente como uma pessoa mandando várias mensagens seguidas. Formato obrigatório: cada bolha tem no máximo 2-3 linhas curtas, e bolhas diferentes são separadas por uma linha em branco (pulo de linha duplo) na sua resposta. REGRA MAIS IMPORTANTE: você só pode fazer UMA pergunta por resposta, e ponto final — não é sobre formatar em bolhas diferentes, é sobre PARAR depois de fazer essa pergunta e esperar o cliente responder antes de perguntar a próxima coisa. Se precisar de várias informações (ex: espessura, medida, quantidade), pergunte só a primeira agora; as outras ficam pra depois que o cliente responder essa, uma de cada vez, mesmo que isso alongue a conversa em mais mensagens. Isso vale mesmo quando o pedido não usa \"?\": frases como \"me informe a espessura e a quantidade\" também são dois pedidos — se for perguntar, pergunte só o primeiro." + humanizationInstruction + gatilhosReinforcement;
+  // Regras de texto livre cadastradas pelo gestor sobre o que a IA NUNCA deve fazer — cobre caso
+  // a caso (ex: um material sem preço cadastrado que a IA insiste em inventar) sem precisar de
+  // ajuste de código a cada novo comportamento indesejado. Vai verbatim, sem passar por nenhuma
+  // reescrita, e na posição de maior atenção do prompt (bem no final).
+  const regrasProibidasValidas = (config.regrasProibidas ?? []).filter(r => r.trim());
+  const regrasProibidasReinforcement = regrasProibidasValidas.length > 0
+    ? "\n\nREGRAS DESSA EMPRESA CONFIGURADAS PELO GESTOR (prioridade máxima — nunca quebre nenhuma delas, mesmo que outra instrução acima pareça permitir):\n"
+      + regrasProibidasValidas.map(r => `- ${r.trim()}`).join("\n")
+    : "";
+
+  const brevityInstruction = "\n\nLEMBRETE FINAL, SEMPRE VÁLIDO: cada mensagem que você escrever vira uma bolha separada no WhatsApp, exatamente como uma pessoa mandando várias mensagens seguidas. Formato obrigatório: cada bolha tem no máximo 2-3 linhas curtas, e bolhas diferentes são separadas por uma linha em branco (pulo de linha duplo) na sua resposta. REGRA MAIS IMPORTANTE: você só pode fazer UMA pergunta por resposta, e ponto final — não é sobre formatar em bolhas diferentes, é sobre PARAR depois de fazer essa pergunta e esperar o cliente responder antes de perguntar a próxima coisa. Se precisar de várias informações (ex: espessura, medida, quantidade), pergunte só a primeira agora; as outras ficam pra depois que o cliente responder essa, uma de cada vez, mesmo que isso alongue a conversa em mais mensagens. Isso vale mesmo quando o pedido não usa \"?\": frases como \"me informe a espessura e a quantidade\" também são dois pedidos — se for perguntar, pergunte só o primeiro." + humanizationInstruction + gatilhosReinforcement + regrasProibidasReinforcement;
 
   if (await isOverQuota(config.teamId)) {
     await adapter.sendText(contactNumber, "Serviço de IA temporariamente indisponível. Por favor, aguarde ou entre em contato com nossa equipe.");

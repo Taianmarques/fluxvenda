@@ -55,6 +55,7 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
               ragSimilarityThreshold: config.ragSimilarityThreshold,
               ragMaxResults: config.ragMaxResults,
               testPhoneNumbers: config.testPhoneNumbers,
+              regrasProibidas: config.regrasProibidas,
             }}
           />
         </div>
@@ -124,6 +125,7 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
               ragSimilarityThreshold: config.ragSimilarityThreshold,
               ragMaxResults: config.ragMaxResults,
               testPhoneNumbers: config.testPhoneNumbers,
+              regrasProibidas: config.regrasProibidas,
               }}
             />
           </div>
@@ -254,6 +256,7 @@ export default async function WhatsappAgentPage({ params }: { params: Promise<{ 
               ragSimilarityThreshold: config.ragSimilarityThreshold,
               ragMaxResults: config.ragMaxResults,
               testPhoneNumbers: config.testPhoneNumbers,
+              regrasProibidas: config.regrasProibidas,
             }}
           />
         </div>
