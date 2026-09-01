@@ -195,24 +195,42 @@ function buildPosVendaContext(reviewLink: string): string {
 - Se o cliente relatar problema com o pedido (defeito, atraso, item errado), demonstre empatia, colete os detalhes e registre a avaliação com nota baixa e o problema no comentário — a equipe é avisada automaticamente.${reviewLink ? `\n- Link público de avaliação da empresa: ${reviewLink} — só envie quando a ferramenta orientar (nota alta).` : ""}`;
 }
 
-// Pinus é vendido em tábua bruta, sem variação de cor/acabamento nem espessura padrão, e não
-// tem serviço de corte/fitamento de borda — perguntar isso só confunde o cliente e alonga a
+// Nem todo material aceita as mesmas especificações: pinus é tábua bruta (sem cor, sem espessura
+// variável, sem corte/fitamento); compensado não tem acabamento colorido nem corte/fitamento, mas
+// varia de espessura normalmente. Perguntar o que não se aplica só confunde o cliente e alonga a
 // qualificação à toa. Centralizado aqui porque tanto o fluxo base (antes do material ser
-// conhecido) quanto o retorno da ferramenta de especificações (depois) precisam do mesmo critério.
-async function isMaterialPinus(conversationId: string): Promise<boolean> {
+// conhecido) quanto os retornos das ferramentas de material/especificações (depois) precisam do
+// mesmo critério — adicionar um novo material com regra própria é só uma linha nova aqui.
+type MaterialRules = { skipCor: boolean; skipEspessura: boolean; skipServicos: boolean };
+
+function getMaterialRules(material: string): MaterialRules {
+  if (/pinus/i.test(material)) return { skipCor: true, skipEspessura: true, skipServicos: true };
+  if (/compensado/i.test(material)) return { skipCor: true, skipEspessura: false, skipServicos: true };
+  return { skipCor: false, skipEspessura: false, skipServicos: false };
+}
+
+async function getConversationMaterialRules(conversationId: string): Promise<MaterialRules> {
   const materialNote = await prisma.message.findFirst({
     where: { conversationId, role: "note", content: { startsWith: "SDR: material de interesse" } },
     orderBy: { createdAt: "desc" },
   });
-  return /pinus/i.test(materialNote?.content ?? "");
+  return getMaterialRules(materialNote?.content ?? "");
 }
 
-function buildSdrMateriaisContext(materialEhPinus: boolean): string {
-  const passo3 = materialEhPinus
-    ? "3. Pinus é vendido em tábua bruta: NÃO pergunte cor nem espessura, isso não se aplica a esse material. Colete só medidas e quantidade, chamando registrar_especificacoes_tecnicas (pode chamar mais de uma vez, conforme as respostas forem chegando)."
-    : "3. Colete especificações técnicas (cor, espessura, medidas, quantidade) — pode chamar registrar_especificacoes_tecnicas mais de uma vez, conforme as respostas forem chegando.";
-  const passo4 = materialEhPinus
-    ? "4. Pinus não tem serviço de corte nem fitamento de borda — NÃO pergunte isso ao cliente, nem chame registrar_servicos_adicionais. Pule direto pro passo 5."
+// Campos de especificação que ainda fazem sentido pedir, e o aviso de quais NÃO perguntar —
+// compartilhados entre o fluxo base e a confirmação de material pra não divergir o texto.
+function describeEspecCampos(rules: MaterialRules): string {
+  return [!rules.skipCor && "cor", !rules.skipEspessura && "espessura", "medidas", "quantidade"].filter(Boolean).join(", ");
+}
+function describeEspecAviso(rules: MaterialRules): string {
+  const bloqueados = [rules.skipCor && "cor", rules.skipEspessura && "espessura"].filter(Boolean).join(" nem ");
+  return bloqueados ? ` NÃO pergunte ${bloqueados} — isso não se aplica a esse material.` : "";
+}
+
+function buildSdrMateriaisContext(rules: MaterialRules): string {
+  const passo3 = `3. Colete especificações técnicas (${describeEspecCampos(rules)}) — pode chamar registrar_especificacoes_tecnicas mais de uma vez, conforme as respostas forem chegando.${describeEspecAviso(rules)}`;
+  const passo4 = rules.skipServicos
+    ? "4. Esse material não tem serviço de corte nem fitamento de borda — NÃO pergunte isso ao cliente, nem chame registrar_servicos_adicionais. Pule direto pro passo 5."
     : "4. Pergunte se precisa de corte e/ou fitamento de borda e chame registrar_servicos_adicionais.";
   return `\n\nFLUXO DE PRÉ-VENDAS (SDR) — siga essa ordem; só pule uma etapa quando ela mesma disser explicitamente que não se aplica:
 1. Identifique o perfil do cliente (marceneiro, arquiteto, empresa ou consumidor final) e chame registrar_perfil_lead.
@@ -884,9 +902,8 @@ function makeExecuteTool(config: AgentConfigFull, conversationId: string, contac
       });
       emitChatEvent(agentConfigId, conversationId);
 
-      return /pinus/i.test(material)
-        ? "OK, salvo internamente — isso é só pra você, NÃO mencione ao cliente que anotou/registrou nada. Pinus é tábua bruta: NÃO pergunte cor nem espessura, isso não se aplica. Continue perguntando só medidas e quantidade, uma de cada vez."
-        : "OK, salvo internamente — isso é só pra você, NÃO mencione ao cliente que anotou/registrou nada. Continue naturalmente perguntando UMA especificação técnica de cada vez (cor, espessura, medidas ou quantidade).";
+      const rulesNovoMaterial = getMaterialRules(material);
+      return `OK, salvo internamente — isso é só pra você, NÃO mencione ao cliente que anotou/registrou nada. Continue naturalmente perguntando UMA especificação técnica de cada vez (${describeEspecCampos(rulesNovoMaterial)}).${describeEspecAviso(rulesNovoMaterial)}`;
     }
 
     if (name === "registrar_especificacoes_tecnicas") {
@@ -906,15 +923,20 @@ function makeExecuteTool(config: AgentConfigFull, conversationId: string, contac
       await prisma.message.create({ data: { conversationId, role: "note", content: `SDR: especificações técnicas — ${linhas}` } });
       emitChatEvent(agentConfigId, conversationId);
 
-      // Pinus não tem serviço de corte/fitamento nem varia por cor/espessura, e na prática a IA
-      // seguia perguntando isso mesmo com a regra no prompt base — checar aqui, colado no retorno
-      // da própria ferramenta (o ponto de maior atenção do modelo), é bem mais confiável do que só
-      // uma regra distante no prompt.
-      const materialEhPinus = await isMaterialPinus(conversationId);
+      // Pinus e compensado não variam por cor (e pinus nem por espessura) e não têm serviço de
+      // corte/fitamento — na prática a IA seguia perguntando isso mesmo com a regra no prompt
+      // base, checar aqui, colado no retorno da própria ferramenta (o ponto de maior atenção do
+      // modelo), é bem mais confiável do que só uma regra distante no prompt.
+      const rules = await getConversationMaterialRules(conversationId);
+      const bloqueados = [rules.skipCor && "cor", rules.skipEspessura && "espessura"].filter(Boolean).join(" ou ");
+      const avisoFaltando = bloqueados
+        ? `Se ainda faltar alguma especificação, pergunte só ela agora (nunca ${bloqueados}, isso não se aplica a esse material);`
+        : "Se ainda faltar alguma especificação, pergunte só ela agora;";
+      const avisoServicos = rules.skipServicos
+        ? "senão, NÃO pergunte sobre corte ou fitamento (esse material não tem esse serviço) — chame concluir_qualificacao_sdr direto."
+        : "senão, pergunte se ele precisa de corte ou fitamento de borda.";
 
-      return materialEhPinus
-        ? "OK, salvo internamente — isso é só pra você, NÃO mencione ao cliente que anotou/registrou nada. Se ainda faltar medidas ou quantidade, pergunte só isso agora (nunca cor ou espessura, pinus não tem isso); senão, NÃO pergunte sobre corte ou fitamento (pinus não tem esse serviço) — chame concluir_qualificacao_sdr direto."
-        : "OK, salvo internamente — isso é só pra você, NÃO mencione ao cliente que anotou/registrou nada. Se ainda faltar alguma especificação, pergunte só ela agora; senão, pergunte se ele precisa de corte ou fitamento de borda.";
+      return `OK, salvo internamente — isso é só pra você, NÃO mencione ao cliente que anotou/registrou nada. ${avisoFaltando} ${avisoServicos}`;
     }
 
     if (name === "registrar_servicos_adicionais") {
@@ -1739,7 +1761,7 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
       + (config.pipelineAutoAvancar ? await buildPipelineContext(config.id, conversation.id) : "")
       + (departamentos.length > 0 ? buildDepartamentosContext(departamentos) : "")
       + (isProspect ? (await buildProspeccaoContext(config.id, contactNumber) ?? "") : "")
-      + (config.sdrMateriaisEnabled ? buildSdrMateriaisContext(await isMaterialPinus(conversation.id)) : "");
+      + (config.sdrMateriaisEnabled ? buildSdrMateriaisContext(await getConversationMaterialRules(conversation.id)) : "");
 
     // Reforço do fluxo de qualificação na posição MAIS FINAL de todas (depois até do
     // brevityInstruction) — é a regra de negócio mais crítica desse agente, e o risco real
