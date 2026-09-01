@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { userBelongsToAgentConfig } from "@/lib/team";
-import { sendWhatsAppTextAsTeam, sendMediaAsTeam, downloadMessageMedia } from "@/lib/whatsapp";
+import { sendWhatsAppTextAsTeam, sendMediaAsTeam } from "@/lib/whatsapp";
+import { storeBase64Media } from "@/lib/media-storage";
 import { sendInstagramDM } from "@/lib/instagram";
 import { emitChatEvent } from "@/lib/realtime";
 import { z } from "zod";
@@ -121,13 +122,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
       waMessageId = sent.messageid ?? null;
 
-      try {
-        const media = await downloadMessageMedia(config.uazapiToken, sent.messageid);
-        mediaUrl = media.fileURL;
-        mediaType = type;
-      } catch (err) {
-        console.error("[mensagem] erro ao obter url da mídia enviada:", err);
-      }
+      // Guarda a mídia que o atendente acabou de enviar — já temos os bytes (base64 do upload),
+      // não precisa buscar de volta na UazAPI (cujo link, além de temporário, às vezes falha
+      // logo depois do envio).
+      mediaUrl = await storeBase64Media(base64, fileName);
+      mediaType = type;
 
       if (!content) content = fileName ? `[${type}] ${fileName}` : `[${type}]`;
     } else {

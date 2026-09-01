@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { transcribeAudio } from "@/lib/agent-engine";
 import { sendWhatsAppTextAsTeam, sendMediaAsTeam, downloadMessageMedia } from "@/lib/whatsapp";
 import { processIncomingMessage, type ChannelAdapter } from "@/lib/whatsapp-inbound";
+import { downloadAndStoreMedia } from "@/lib/media-storage";
 
 function mediaMimetype(message: any): string | null {
   return typeof message?.content === "object" && typeof message.content?.mimetype === "string"
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest) {
     try {
       const media = await downloadMessageMedia(config.uazapiToken, message.id || message.messageid);
       text = await transcribeAudio(media.fileURL, media.mimetype);
-      mediaUrl = media.fileURL;
+      mediaUrl = (await downloadAndStoreMedia(media.fileURL, media.mimetype)) ?? media.fileURL;
       mediaType = "audio";
     } catch (err) {
       console.error("[whatsapp-webhook] erro ao transcrever áudio:", err);
@@ -57,8 +58,8 @@ export async function POST(req: NextRequest) {
   } else if (mimetype?.startsWith("image/")) {
     try {
       const media = await downloadMessageMedia(config.uazapiToken, message.id || message.messageid);
-      imageUrl = media.fileURL;
-      mediaUrl = media.fileURL;
+      imageUrl = media.fileURL; // link ainda válido, usado na hora pela IA — não precisa ser o local
+      mediaUrl = (await downloadAndStoreMedia(media.fileURL, media.mimetype)) ?? media.fileURL;
       mediaType = "image";
       // Sem prefixo "[Imagem] " na legenda de verdade — a UI trata qualquer content começando
       // com "[" como texto genérico (sem legenda) e não mostra, então a legenda real sumia.
@@ -69,7 +70,7 @@ export async function POST(req: NextRequest) {
   } else if (mimetype?.startsWith("video/")) {
     try {
       const media = await downloadMessageMedia(config.uazapiToken, message.id || message.messageid);
-      mediaUrl = media.fileURL;
+      mediaUrl = (await downloadAndStoreMedia(media.fileURL, media.mimetype)) ?? media.fileURL;
       mediaType = "video";
       text = caption || "[Vídeo enviado pelo cliente]";
     } catch (err) {
@@ -80,7 +81,7 @@ export async function POST(req: NextRequest) {
     // ficava sem texto e era descartada silenciosamente pelo "if (!text) return" logo abaixo.
     try {
       const media = await downloadMessageMedia(config.uazapiToken, message.id || message.messageid);
-      mediaUrl = media.fileURL;
+      mediaUrl = (await downloadAndStoreMedia(media.fileURL, media.mimetype)) ?? media.fileURL;
       mediaType = "document";
       text = caption || "[Documento enviado pelo cliente]";
     } catch (err) {
