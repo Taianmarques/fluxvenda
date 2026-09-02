@@ -475,7 +475,7 @@ export function AgendaClient({
     await fetch(`/api/agentes/${agentId}/servicos`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newServiceName.trim(), durationMinutes: newServiceDuration }),
+      body: JSON.stringify({ name: newServiceName.trim(), durationMinutes: Math.min(480, Math.max(5, newServiceDuration)) }),
     });
     setNewServiceName("");
     loadServices();
@@ -504,7 +504,16 @@ export function AgendaClient({
       await fetch(`/api/agentes/${agentId}/agenda`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ schedulingEnabled, slotDurationMinutes, availability, appointmentReminderHours, requisitosAgendamento, restricoesAgendamento, atendimentoEspecialEnabled, atendimentoEspecialDescricao, askProfessionalEnabled, schedulingViaLink, agendarAteEncerramento, vagasSimultaneas, agendamentoCobrancaEnabled, agendamentoSinalValor, bookingFormFields, agendamentoIcone }),
+        body: JSON.stringify({
+          schedulingEnabled,
+          slotDurationMinutes: Math.min(480, Math.max(5, slotDurationMinutes || 5)),
+          availability, requisitosAgendamento, restricoesAgendamento, atendimentoEspecialEnabled, atendimentoEspecialDescricao, askProfessionalEnabled, schedulingViaLink, agendarAteEncerramento,
+          appointmentReminderHours: Math.min(168, Math.max(1, appointmentReminderHours || 1)),
+          vagasSimultaneas: Math.min(50, Math.max(1, vagasSimultaneas || 1)),
+          agendamentoCobrancaEnabled,
+          agendamentoSinalValor: Math.max(0, agendamentoSinalValor || 0),
+          bookingFormFields, agendamentoIcone,
+        }),
       });
     } finally {
       setSavingSettings(false);
@@ -659,7 +668,7 @@ export function AgendaClient({
               </div>
               <div className="flex gap-2">
                 <input placeholder="Nome do serviço" value={newServiceName} onChange={e => setNewServiceName(e.target.value)} className={`flex-1 border rounded-xl px-3 py-2 text-sm ${t.input}`} />
-                <input type="number" min={5} max={480} value={newServiceDuration} onChange={e => setNewServiceDuration(Math.max(5, Number(e.target.value)))} className={`w-20 border rounded-xl px-3 py-2 text-sm ${t.input}`} />
+                <input type="number" min={5} max={480} value={newServiceDuration} onChange={e => setNewServiceDuration(Number(e.target.value))} className={`w-20 border rounded-xl px-3 py-2 text-sm ${t.input}`} />
                 <button onClick={handleAddService} className="bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-4 py-2 text-sm font-medium">Adicionar</button>
               </div>
             </div>
@@ -745,7 +754,7 @@ export function AgendaClient({
                 <label className={`text-sm block mb-1 ${t.subtitle}`}>Duração de cada atendimento (minutos)</label>
                 <input
                   type="number" min={5} max={480} value={slotDurationMinutes}
-                  onChange={e => setSlotDurationMinutes(Math.max(5, Number(e.target.value)))}
+                  onChange={e => setSlotDurationMinutes(Number(e.target.value))}
                   className={`w-32 border rounded-xl px-3 py-2 text-sm ${t.input}`}
                 />
               </div>
@@ -754,7 +763,7 @@ export function AgendaClient({
                 <label className={`text-sm block mb-1 ${t.subtitle}`}>Atendimentos simultâneos</label>
                 <input
                   type="number" min={1} max={50} value={vagasSimultaneas}
-                  onChange={e => setVagasSimultaneas(Math.min(50, Math.max(1, Number(e.target.value))))}
+                  onChange={e => setVagasSimultaneas(Number(e.target.value))}
                   className={`w-32 border rounded-xl px-3 py-2 text-sm ${t.input}`}
                 />
                 <p className={`text-xs mt-1 ${t.secondary}`}>
@@ -767,7 +776,7 @@ export function AgendaClient({
                 <label className={`text-sm block mb-1 ${t.subtitle}`}>Enviar lembrete de confirmação quantas horas antes do compromisso</label>
                 <input
                   type="number" min={1} max={168} value={appointmentReminderHours}
-                  onChange={e => setAppointmentReminderHours(Math.max(1, Number(e.target.value)))}
+                  onChange={e => setAppointmentReminderHours(Number(e.target.value))}
                   className={`w-32 border rounded-xl px-3 py-2 text-sm ${t.input}`}
                 />
                 <p className={`text-xs mt-1 ${t.secondary}`}>O agente pergunta se o cliente confirma presença. Se ele disser que não pode ir, a IA cancela e já oferece reagendar.</p>
@@ -909,7 +918,7 @@ export function AgendaClient({
                     <label className={`text-sm block mb-1 ${t.subtitle}`}>Valor do sinal (R$)</label>
                     <input
                       type="number" min={0} step={0.01} value={agendamentoSinalValor}
-                      onChange={e => setAgendamentoSinalValor(Math.max(0, Number(e.target.value)))}
+                      onChange={e => setAgendamentoSinalValor(Number(e.target.value))}
                       className={`w-32 border rounded-xl px-3 py-2 text-sm ${t.input}`}
                     />
                   </div>
