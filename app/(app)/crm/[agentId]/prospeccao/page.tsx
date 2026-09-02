@@ -23,15 +23,15 @@ async function ProspeccaoPageContent({ params }: { params: Promise<{ agentId: st
   const result = await getAgentConfigWithRole(user.id, agentId);
   const config = result?.config;
 
-  if (!config?.active) {
+  if (!config) {
     return (
       <div className="h-full bg-gray-950 p-6 flex items-center justify-center">
         <div className="max-w-md text-center space-y-4">
           <Target size={48} className="mx-auto text-blue-400" />
-          <h1 className="text-2xl font-bold">Nenhum agente de WhatsApp ativo</h1>
-          <p className="text-gray-400">Configure e conecte seu agente antes de usar a prospecção.</p>
-          <Link href={`/crm/${agentId}/configurar`} className="inline-block bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-5 py-2.5 text-sm font-medium">
-            Configurar agente
+          <h1 className="text-2xl font-bold">Agente não encontrado</h1>
+          <p className="text-gray-400">Esse agente não existe ou você não tem acesso a ele.</p>
+          <Link href="/crm/hub" className="inline-block bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-5 py-2.5 text-sm font-medium">
+            Voltar ao Hub
           </Link>
         </div>
       </div>
