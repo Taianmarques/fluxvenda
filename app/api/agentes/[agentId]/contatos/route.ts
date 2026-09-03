@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getAgentConfigWithRole } from "@/lib/team";
+import { normalizePhoneBR } from "@/lib/phone";
 import { z } from "zod";
 
 const schema = z.object({
   contatos: z.array(z.object({
     nome: z.string().trim().max(80).optional(),
-    numero: z.string().transform(v => v.replace(/\D/g, "")),
+    numero: z.string().transform(v => normalizePhoneBR(v)),
   })).min(1).max(1000),
   atendenteId: z.string().optional(), // vincula esse atendente a todo mundo do lote (novos + já existentes)
   nivelCarteira: z.enum(["A", "B", "C", "INATIVO", "PERDIDO"]).optional(), // override manual do nível pra todo o lote

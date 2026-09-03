@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getAgentConfigWithRole, negadaParaAtendente } from "@/lib/team";
 import { emitChatEvent } from "@/lib/realtime";
 import { Prisma } from "@/app/generated/prisma/client";
+import { normalizePhoneBR } from "@/lib/phone";
 import { z } from "zod";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ agentId: string }> }) {
@@ -84,7 +85,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ agentId
 }
 
 const createSchema = z.object({
-  numero: z.string().trim().transform(v => v.replace(/\D/g, "")),
+  numero: z.string().trim().transform(v => normalizePhoneBR(v)),
   nome: z.string().trim().max(80).optional(),
 });
 

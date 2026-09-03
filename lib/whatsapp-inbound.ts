@@ -20,6 +20,7 @@ import { notifyOrderWebhook } from "@/lib/order-webhook";
 import { notifyProfessionalOfAppointment } from "@/lib/appointment-notify";
 import { notifyUsers } from "@/lib/onesignal";
 import { emitChatEvent } from "@/lib/realtime";
+import { normalizePhoneBR } from "@/lib/phone";
 
 type AgentConfigFull = NonNullable<Awaited<ReturnType<typeof prisma.agentConfig.findFirst>>>;
 
@@ -1497,12 +1498,21 @@ function resolveHandoffAssignee(config: AgentConfigFull, currentAssignedToId: st
 const SESSION_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export async function processIncomingMessage(config: AgentConfigFull, msg: IncomingMessage, adapter: ChannelAdapter, opts?: { enforceSessionWindow?: boolean; sandbox?: boolean }): Promise<void> {
-  const { text, caption, contactNumber, contactName, mediaUrl, mediaType, imageUrl } = msg;
+  const { text, caption, contactName, mediaUrl, mediaType, imageUrl } = msg;
+
+  // A UazAPI às vezes reporta o mesmo contato com/sem o DDI "55" e com/sem o nono dígito do
+  // celular — sem normalizar, isso criava uma Conversation NOVA a cada variação de formato pro
+  // mesmo número real (ver lib/phone.ts). Grupo mantém o chatid como está (não é telefone), e
+  // o número fake do sandbox ("sandbox-<userId>") não pode ser tocado — normalizar extrairia só
+  // os dígitos do cuid e quebraria o match com a conversa de teste já existente.
+  const contactNumber = (msg.isGroup || msg.contactNumber.startsWith("sandbox-"))
+    ? msg.contactNumber
+    : normalizePhoneBR(msg.contactNumber);
 
   // Número cadastrado em Configurações pra testar o agente direto pelo celular — passa pelo
   // mesmo pipeline real (IA, ferramentas, RAG), só fica marcado pra não poluir relatório/funil/
   // métrica de venda de verdade (ver isTestNumber nas queries de vendas/funil/dashboards/etc).
-  const isTestNumber = config.testPhoneNumbers.includes(contactNumber);
+  const isTestNumber = config.testPhoneNumbers.some(n => normalizePhoneBR(n) === contactNumber);
 
   // Cliente respondeu — zera o contador de follow-up e marca prospect como RESPONDEU se aplicável
   const conversation = await prisma.conversation.upsert({

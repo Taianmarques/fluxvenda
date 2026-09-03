@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getAgentConfigWithRole, negadaParaAtendente } from "@/lib/team";
 import { emitChatEvent } from "@/lib/realtime";
+import { normalizePhoneBR } from "@/lib/phone";
 import { z } from "zod";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -51,7 +52,7 @@ const patchSchema = z.object({
   status: z.enum(["ATIVO", "AGUARDANDO", "FINALIZADO"]).optional(),
   motivoEncerramento: z.string().max(200).optional(), // enviado junto com status FINALIZADO
   contactName: z.string().trim().min(1).max(80).optional(), // salvar/renomear o contato
-  contactNumber: z.string().trim().transform(v => v.replace(/\D/g, "")).refine(v => v.length >= 10 && v.length <= 13, { message: "Número inválido — use DDD + número" }).optional(),
+  contactNumber: z.string().trim().transform(v => normalizePhoneBR(v)).refine(v => v.length >= 10 && v.length <= 13, { message: "Número inválido — use DDD + número" }).optional(),
   pinned: z.boolean().optional(),
   groupVisibleToIds: z.array(z.string()).max(200).optional(), // só grupo, só gestor — ver checagem abaixo
 });
