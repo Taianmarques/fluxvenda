@@ -32,32 +32,11 @@ type Origem = "todos" | "inbound" | "outbound";
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 const AZUL = "#3b82f6";
-const VERDES = ["#22c55e", "#16a34a", "#0d9488", "#0891b2"];
-const FLOOR = 12; // largura mínima (%) para uma etapa continuar visível mesmo com 0
+const VERDE = "#22c55e";
 
-// Luminância aproximada — decide se o texto em cima da cor precisa ser claro ou escuro
-function textOn(hex: string) {
-  const n = parseInt(hex.slice(1), 16);
-  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.62 ? "#111827" : "#fff";
-}
+type LinhaFunil = { id: string; nome: string; count: number; sub?: string };
 
-// Escala em raiz quadrada: comprime a cauda longa (ex: 25 vs 0) sem esconder diferenças médias
-function largura(count: number, max: number) {
-  const ratio = Math.sqrt(Math.min(1, count / Math.max(1, max)));
-  return FLOOR + (100 - FLOOR) * ratio;
-}
-
-function corConversao(pct: number) {
-  if (pct >= 70) return "text-green-400 border-green-800 bg-green-950/60";
-  if (pct >= 40) return "text-amber-400 border-amber-800 bg-amber-950/60";
-  return "text-red-400 border-red-800 bg-red-950/60";
-}
-
-type LinhaFunil = { id: string; nome: string; count: number; sub?: string; color: string };
-
-// Fatia trapezoidal do funil — as larguras (top/bottom em %) desenham o triângulo, proporcionais ao valor real
+// Fatia trapezoidal do funil — as larguras (top/bottom em %) desenham o triângulo
 function Fatia({ wTop, wBot, color, count, label, sub, labelSide }: {
   wTop: number; wBot: number; color: string; count: number;
   label: string; sub?: string; labelSide: "left" | "right";
@@ -70,31 +49,23 @@ function Fatia({ wTop, wBot, color, count, label, sub, labelSide }: {
     </div>
   );
   return (
-    <div className="flex items-center">
+    <div className="flex items-center mb-1 group">
       {labelSide === "left" ? labelEl : <div className="w-28 md:w-40 flex-shrink-0" />}
       <div className="flex-1 relative h-10 md:h-11">
         <div
-          className="absolute inset-0 transition-[clip-path] duration-300"
-          style={{ clipPath: clip, backgroundColor: color, backgroundImage: "linear-gradient(180deg, rgba(255,255,255,.16), rgba(0,0,0,.10))" }}
+          className="absolute inset-0 transition-transform duration-200 ease-out group-hover:scale-y-105"
+          style={{
+            clipPath: clip,
+            backgroundColor: color,
+            backgroundImage: "linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,0) 45%, rgba(0,0,0,.12))",
+            filter: "drop-shadow(0 3px 5px rgba(0,0,0,.35))",
+          }}
         />
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-sm font-bold drop-shadow" style={{ color: textOn(color) }}>{count}</span>
+          <span className="text-sm font-bold text-white drop-shadow">{count}</span>
         </div>
       </div>
       {labelSide === "right" ? labelEl : <div className="w-28 md:w-40 flex-shrink-0" />}
-    </div>
-  );
-}
-
-// Badge de conversão entre duas etapas consecutivas — fica sempre sobre a faixa da barra, entre os dois espaços reservados ao label
-function Conversao({ de, para }: { de: number; para: number }) {
-  if (de <= 0) return <div className="h-4" />;
-  const pct = Math.round((para / de) * 100);
-  return (
-    <div className="flex items-center justify-center h-4 px-28 md:px-40">
-      <span className={`text-[9px] font-bold px-1.5 rounded-full border leading-tight -translate-y-1/2 ${corConversao(pct)}`}>
-        {pct}%
-      </span>
     </div>
   );
 }
@@ -164,26 +135,25 @@ export function FunilVisualization({ pipelines, leads, opportunities, compras, f
   const linhasTopo: LinhaFunil[] = useMemo(() => {
     if (!pipeline) return [];
     return [
-      { id: "__leads__", nome: "Leads", count: dados.totalLeads, color: AZUL },
+      { id: "__leads__", nome: "Leads", count: dados.totalLeads },
       ...pipeline.stages.map(s => {
         const d = dados.porEtapa.get(s.id) ?? { count: 0, valor: 0 };
-        return { id: s.id, nome: s.name, count: d.count, sub: d.valor > 0 ? brl(d.valor) : undefined, color: s.color || AZUL };
+        return { id: s.id, nome: s.name, count: d.count, sub: d.valor > 0 ? brl(d.valor) : undefined };
       }),
     ];
   }, [pipeline, dados]);
 
   const linhasBaixo: LinhaFunil[] = [
-    { id: "compraram", nome: "Retenção", count: dados.compraram, sub: `compraram${dados.receitaTotal > 0 ? ` · ${brl(dados.receitaTotal)}` : ""}`, color: VERDES[0] },
-    { id: "avaliaram", nome: "Satisfação", count: dados.avaliaram, sub: dados.notaMedia !== null ? `nota média ${dados.notaMedia.toFixed(1)}/5` : "avaliaram no pós-venda", color: VERDES[1] },
-    { id: "recompraram", nome: "Lealdade", count: dados.recompraram, sub: "recompraram (2+)", color: VERDES[2] },
-    { id: "fieis", nome: "Indicação", count: dados.fieis, sub: "clientes fiéis (3+)", color: VERDES[3] },
+    { id: "compraram", nome: "Retenção", count: dados.compraram, sub: `compraram${dados.receitaTotal > 0 ? ` · ${brl(dados.receitaTotal)}` : ""}` },
+    { id: "avaliaram", nome: "Satisfação", count: dados.avaliaram, sub: dados.notaMedia !== null ? `nota média ${dados.notaMedia.toFixed(1)}/5` : "avaliaram no pós-venda" },
+    { id: "recompraram", nome: "Lealdade", count: dados.recompraram, sub: "recompraram (2+)" },
+    { id: "fieis", nome: "Indicação", count: dados.fieis, sub: "clientes fiéis (3+)" },
   ];
 
-  // Larguras proporcionais aos valores reais (escala em raiz quadrada), numa única referência
-  // pra todo o funil — assim "Perdido" e "Novo Lead" só ficam do mesmo tamanho se tiverem o mesmo valor.
-  const maxGeral = Math.max(dados.totalLeads, 1);
-  const wTopo = (i: number) => (i < linhasTopo.length ? largura(linhasTopo[i].count, maxGeral) : FLOOR);
-  const wBaixo = (i: number) => (i < linhasBaixo.length ? largura(linhasBaixo[i].count, maxGeral) : FLOOR);
+  // Larguras do desenho: topo afunila de 100% até 26%; base abre de 26% até 100%
+  const W_MAX = 100, W_MIN = 26;
+  const wTopo = (i: number) => W_MAX - ((W_MAX - W_MIN) * i) / Math.max(1, linhasTopo.length);
+  const wBaixo = (i: number) => W_MIN + ((W_MAX - W_MIN) * i) / Math.max(1, linhasBaixo.length);
 
   const conversaoGeral = dados.totalLeads > 0 ? (dados.compraram / dados.totalLeads) * 100 : 0;
   const taxaRecompra = dados.compraram > 0 ? (dados.recompraram / dados.compraram) * 100 : 0;
@@ -200,12 +170,21 @@ export function FunilVisualization({ pipelines, leads, opportunities, compras, f
           <button
             key={o.key}
             onClick={() => setOrigem(o.key)}
-            className={`rounded-xl border p-3 text-left transition-colors ${
-              origem === o.key ? "border-blue-500 bg-blue-500/10" : "border-gray-800 bg-gray-900 hover:border-gray-600"
+            className={`rounded-2xl border p-3.5 text-left transition-all duration-150 ${
+              origem === o.key
+                ? "border-blue-500/70 bg-blue-500/10 shadow-[0_0_0_1px_rgba(59,130,246,.35)]"
+                : "border-gray-800 bg-gray-900/60 hover:border-gray-700 hover:bg-gray-900"
             }`}
           >
-            <p className="text-sm font-semibold flex items-center gap-1.5"><o.icon size={14} /> {o.label}</p>
-            <p className="text-[10px] text-gray-500 mt-0.5">{o.desc}</p>
+            <p className="text-sm font-semibold flex items-center gap-2">
+              <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg flex-shrink-0 ${
+                origem === o.key ? "bg-blue-500/20 text-blue-400" : "bg-gray-800 text-gray-400"
+              }`}>
+                <o.icon size={13} />
+              </span>
+              {o.label}
+            </p>
+            <p className="text-[10px] text-gray-500 mt-1 pl-8">{o.desc}</p>
           </button>
         ))}
       </div>
@@ -223,11 +202,17 @@ export function FunilVisualization({ pipelines, leads, opportunities, compras, f
         ) : (
           <p className="text-sm font-medium text-gray-400">{pipeline?.name ?? "Sem pipeline"}</p>
         )}
-        <p className="text-xs text-gray-500">
-          Lead → cliente: <span className="font-bold text-green-400">{conversaoGeral.toFixed(1)}%</span>
-          {" · "}Recompra: <span className="font-bold text-blue-400">{taxaRecompra.toFixed(0)}%</span>
-          {" · "}Receita: <span className="font-bold text-green-400">{brl(dados.receitaTotal)}</span>
-        </p>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-green-500/10 text-green-400 border border-green-900/60">
+            Lead → cliente {conversaoGeral.toFixed(1)}%
+          </span>
+          <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-900/60">
+            Recompra {taxaRecompra.toFixed(0)}%
+          </span>
+          <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-green-500/10 text-green-400 border border-green-900/60">
+            {brl(dados.receitaTotal)}
+          </span>
+        </div>
       </div>
 
       {!pipeline ? (
@@ -239,50 +224,46 @@ export function FunilVisualization({ pipelines, leads, opportunities, compras, f
           </Link>
         </div>
       ) : (
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 md:p-8">
+        <div className="bg-gray-900 border border-gray-800 rounded-3xl p-5 md:p-8 shadow-xl shadow-black/20">
           {/* Triângulo invertido — aquisição */}
           <div>
             {linhasTopo.map((linha, i) => (
-              <div key={linha.id}>
-                <Fatia
-                  wTop={wTopo(i)}
-                  wBot={wTopo(i + 1)}
-                  color={linha.color}
-                  count={linha.count}
-                  label={linha.nome}
-                  sub={linha.sub}
-                  labelSide="right"
-                />
-                {i < linhasTopo.length - 1 && <Conversao de={linha.count} para={linhasTopo[i + 1].count} />}
-              </div>
+              <Fatia
+                key={linha.id}
+                wTop={wTopo(i)}
+                wBot={wTopo(i + 1)}
+                color={AZUL}
+                count={linha.count}
+                label={linha.nome}
+                sub={linha.sub}
+                labelSide="right"
+              />
             ))}
           </div>
 
           {/* Venda / Conversão */}
-          <div className="my-3 flex items-center gap-3">
-            <div className="flex-1 border-t border-dashed border-gray-600" />
-            <span className="text-xs font-semibold text-gray-300">
+          <div className="my-4 flex items-center gap-3">
+            <div className="flex-1 border-t border-gray-800" />
+            <span className="text-[11px] font-semibold px-3 py-1 rounded-full bg-gray-800/70 border border-gray-700 text-gray-300 whitespace-nowrap">
               Venda / Conversão
               <span className="text-gray-500 font-normal"> — {dados.ganhos} ganho{dados.ganhos === 1 ? "" : "s"}{dados.ganhoValor > 0 ? ` · ${brl(dados.ganhoValor)}` : ""}</span>
             </span>
-            <div className="flex-1 border-t border-dashed border-gray-600" />
+            <div className="flex-1 border-t border-gray-800" />
           </div>
 
-          {/* Camadas de fidelização — retenção, satisfação, recompra, indicação */}
+          {/* Pirâmide — retenção e expansão */}
           <div>
             {linhasBaixo.map((linha, i) => (
-              <div key={linha.id}>
-                <Fatia
-                  wTop={wBaixo(i)}
-                  wBot={wBaixo(i + 1)}
-                  color={linha.color}
-                  count={linha.count}
-                  label={linha.nome}
-                  sub={linha.sub}
-                  labelSide="left"
-                />
-                {i < linhasBaixo.length - 1 && <Conversao de={linha.count} para={linhasBaixo[i + 1].count} />}
-              </div>
+              <Fatia
+                key={linha.id}
+                wTop={wBaixo(i)}
+                wBot={wBaixo(i + 1)}
+                color={VERDE}
+                count={linha.count}
+                label={linha.nome}
+                sub={linha.sub}
+                labelSide="left"
+              />
             ))}
           </div>
         </div>
