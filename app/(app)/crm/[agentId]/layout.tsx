@@ -1,6 +1,7 @@
 import { currentUser } from "@/lib/auth/server";
 import { redirect } from "next/navigation";
-import { listMyAgentConfigs } from "@/lib/team";
+import { prisma } from "@/lib/prisma";
+import { listMyAgentConfigs, getAgentConfigWithRole } from "@/lib/team";
 import { getCrmAllowedPages } from "@/lib/crm-access";
 import { getMenuLogoDataUri } from "@/lib/branding";
 import { getEffectiveProducts, hasProduct } from "@/lib/products";
@@ -17,13 +18,22 @@ export default async function CrmAgentLayout({
   if (!user) redirect("/sign-in");
 
   const { agentId } = await params;
-  const [result, allowedPages, menuLogo, products] = await Promise.all([
+  let [result, allowedPages, menuLogo, products] = await Promise.all([
     listMyAgentConfigs(user.id),
     getCrmAllowedPages(user.id),
     getMenuLogoDataUri(),
     getEffectiveProducts(user.id),
   ]);
-  if (!result || !result.configs.some(c => c.id === agentId)) redirect("/crm");
+
+  if (!result || !result.configs.some(c => c.id === agentId)) {
+    // Não é da equipe real do usuário — pode ser um super admin visitando uma conta de
+    // exemplo (Team.isDemo). Nesse caso o menu lateral mostra os agentes DAQUELA equipe
+    // fictícia, não da equipe real do admin (ver lib/team.ts).
+    const demoAccess = await getAgentConfigWithRole(user.id, agentId);
+    if (!demoAccess) redirect("/crm");
+    const demoConfigs = await prisma.agentConfig.findMany({ where: { teamId: demoAccess.config.teamId }, orderBy: { createdAt: "asc" } });
+    result = { isManager: true, teamId: demoAccess.config.teamId, configs: demoConfigs };
+  }
 
   return (
     <div className="h-full flex flex-col md:flex-row bg-gray-950">
