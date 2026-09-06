@@ -21,6 +21,23 @@ export async function GET(req: NextRequest) {
   return new Response("Forbidden", { status: 403 });
 }
 
+// A Meta só permite UMA URL de webhook por app — instâncias dedicadas (banco separado, ex: SF
+// Madeiras) usam o MESMO app Meta pra login/OAuth, mas nunca recebem o evento direto. Repassa o
+// corpo bruto (com a assinatura original, sem recalcular) pra cada URL configurada; cada lado só
+// reconhece e processa as conexões que são dele e ignora o resto — não tem problema mandar sempre,
+// mesmo quando o evento é só de uma conexão local. Fire-and-forget: nunca atrasa nem derruba a
+// resposta principal por causa de uma instância secundária fora do ar.
+function relayToSecondaryDeployments(rawBody: string, signature: string | null) {
+  const urls = (process.env.INSTAGRAM_WEBHOOK_RELAY_URLS ?? "").split(",").map((u) => u.trim()).filter(Boolean);
+  for (const url of urls) {
+    fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(signature ? { "x-hub-signature-256": signature } : {}) },
+      body: rawBody,
+    }).catch((err) => console.error("[ig-webhook] erro ao repassar pra", url, err));
+  }
+}
+
 // POST: eventos de mensagem enviados pela Meta
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
@@ -29,6 +46,8 @@ export async function POST(req: NextRequest) {
   if (!verifyMetaSignature(rawBody, signature, process.env.META_APP_SECRET)) {
     return new Response("Invalid signature", { status: 401 });
   }
+
+  relayToSecondaryDeployments(rawBody, signature);
 
   let body: any;
   try { body = JSON.parse(rawBody); } catch { return NextResponse.json({ ok: true }); }
