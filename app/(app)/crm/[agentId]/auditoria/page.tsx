@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ClipboardCheck, Lock } from "lucide-react";
 import { getAgentConfigWithRole } from "@/lib/team";
+import { isChannelConnected } from "@/lib/channel-status";
 import { AuditoriaClient } from "../../auditoria/AuditoriaClient";
 
 export default async function AuditoriaPage({ params }: { params: Promise<{ agentId: string }> }) {
@@ -15,14 +16,14 @@ export default async function AuditoriaPage({ params }: { params: Promise<{ agen
   const config = result?.config;
   const isManager = result?.isManager ?? false;
 
-  if (!config?.active) {
+  if (!config || !(await isChannelConnected(config))) {
     return (
       <div className="h-full bg-gray-950 p-6 flex items-center justify-center">
         <div className="max-w-md text-center space-y-4">
           <ClipboardCheck size={48} className="mx-auto text-blue-400" />
-          <h1 className="text-2xl font-bold">Nenhum agente ativo</h1>
-          <Link href={`/crm/${agentId}/configurar`} className="inline-block bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-5 py-2.5 text-sm font-medium">
-            Configurar agente
+          <h1 className="text-2xl font-bold">Nenhum canal conectado</h1>
+          <Link href={`/crm/${agentId}/canais`} className="inline-block bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-5 py-2.5 text-sm font-medium">
+            Conectar canal
           </Link>
         </div>
       </div>

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { MessageCircle } from "lucide-react";
 import { getAgentConfigWithRole } from "@/lib/team";
+import { isChannelConnected } from "@/lib/channel-status";
 import { podeVerNaoAtribuidos } from "@/lib/crm-access";
 import { CrmPageGate } from "@/app/(app)/crm/CrmPageGate";
 import { WhatsappInbox } from "../WhatsappInbox";
@@ -34,15 +35,15 @@ async function WhatsappInboxPageContent({
   const config = result?.config;
   const isManager = result?.isManager ?? false;
 
-  if (!config?.active) {
+  if (!config || !(await isChannelConnected(config))) {
     return (
       <div className="h-full bg-gray-950 p-6 flex items-center justify-center">
         <div className="max-w-md text-center space-y-4">
           <MessageCircle size={48} className="mx-auto text-blue-400" />
-          <h1 className="text-2xl font-bold">Nenhum agente de WhatsApp ativo</h1>
-          <p className="text-gray-400">Configure e conecte seu agente de atendimento para ver as conversas aqui.</p>
-          <Link href={`/crm/${agentId}/configurar`} className="inline-block bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-5 py-2.5 text-sm font-medium">
-            Configurar agente
+          <h1 className="text-2xl font-bold">Nenhum canal conectado</h1>
+          <p className="text-gray-400">Conecte o WhatsApp ou Instagram do seu agente para ver as conversas aqui.</p>
+          <Link href={`/crm/${agentId}/canais`} className="inline-block bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-5 py-2.5 text-sm font-medium">
+            Conectar canal
           </Link>
         </div>
       </div>
