@@ -339,7 +339,7 @@ export const DEPARTAMENTO_TOOLS = [
         type: "object",
         properties: {
           departamento: { type: "string", description: "Nome EXATO do departamento, igual à lista do contexto" },
-          motivo: { type: "string", description: "Resumo em uma frase do que o cliente precisa (o atendente lê isso)" },
+          motivo: { type: "string", description: "Resumo do que o cliente precisa (o atendente lê isso). Se o departamento tiver itens de qualificação a confirmar, inclua a resposta de cada um aqui." },
         },
         required: ["departamento"],
       },

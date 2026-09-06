@@ -207,7 +207,7 @@ function buildDepartamentosContext(departamentos: { nome: string; descricao: str
   return `\n\nDEPARTAMENTOS HUMANOS (transferência):
 ${lista}
 - Se o cliente pedir para falar com um setor/humano, ou o assunto for claramente de um departamento acima e você não conseguir resolver, chame transferir_departamento com o nome exato e um resumo do que ele precisa.
-- Se o departamento de destino tiver uma lista de itens a confirmar, faça essas perguntas na conversa ANTES de chamar a ferramenta — só transfira depois de ter as respostas. Se o cliente não quiser responder ou insistir em falar com humano direto, transfira mesmo assim, sem travar o atendimento.
+- Se o departamento de destino tiver uma lista de itens a confirmar, faça essas perguntas na conversa ANTES de chamar a ferramenta — só transfira depois de ter as respostas. No campo "motivo" da ferramenta, inclua a resposta de cada item confirmado (ex: "Orçamento: R$ 5 mil. Prazo: 2 semanas.") — o atendente lê isso e não precisa perguntar de novo. Se o cliente não quiser responder ou insistir em falar com humano direto, transfira mesmo assim (avise no motivo que não foi possível confirmar), sem travar o atendimento.
 - Antes de transferir, avise o cliente com naturalidade (ex: "vou te passar para o nosso financeiro, um instante").
 - NÃO transfira por qualquer coisa — só quando o atendimento humano daquele setor for realmente necessário.`;
 }
