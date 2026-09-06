@@ -46,7 +46,7 @@ async function EquipeCrmPageContent({ params }: { params: Promise<{ agentId: str
         include: { profile: { select: { id: true, name: true, email: true, phone: true } } },
         orderBy: { joinedAt: "asc" },
       },
-      departamentos: { orderBy: { createdAt: "asc" }, select: { id: true, nome: true, descricao: true, agenteInstrucoes: true } },
+      departamentos: { orderBy: { createdAt: "asc" }, select: { id: true, nome: true, descricao: true, agenteInstrucoes: true, criteriosQualificacao: true } },
       crmAccessProfiles: { orderBy: { createdAt: "asc" }, select: { id: true, nome: true, allowedPages: true, verNaoAtribuidos: true } },
     },
   });

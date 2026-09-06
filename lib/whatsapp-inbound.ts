@@ -191,14 +191,23 @@ async function buildTreinoContext(config: AgentConfigFull, mensagemCliente: stri
   return `\n\nEXEMPLOS DE ATENDIMENTOS REAIS PARECIDOS COM A SITUAÇÃO ATUAL (adapte ao contexto, não copie literalmente se não encaixar):\n${blocks.join("\n\n")}`;
 }
 
-// Lista os departamentos humanos e ensina o agente a transferir quando o assunto exigir
-function buildDepartamentosContext(departamentos: { nome: string; descricao: string }[]): string {
+// Lista os departamentos humanos e ensina o agente a transferir quando o assunto exigir —
+// cada um pode ter uma lista de critérios que precisam estar confirmados ANTES da
+// transferência (pensado pro SDR qualificar o lead antes de passar pra vendas, mas vale pra
+// qualquer departamento).
+function buildDepartamentosContext(departamentos: { nome: string; descricao: string; criteriosQualificacao: string[] }[]): string {
   const lista = departamentos
-    .map(d => `- ${d.nome}${d.descricao ? `: ${d.descricao}` : ""}`)
+    .map(d => {
+      const criterios = d.criteriosQualificacao.length > 0
+        ? `\n  Antes de transferir pra "${d.nome}", confirme com o cliente: ${d.criteriosQualificacao.join("; ")}.`
+        : "";
+      return `- ${d.nome}${d.descricao ? `: ${d.descricao}` : ""}${criterios}`;
+    })
     .join("\n");
   return `\n\nDEPARTAMENTOS HUMANOS (transferência):
 ${lista}
 - Se o cliente pedir para falar com um setor/humano, ou o assunto for claramente de um departamento acima e você não conseguir resolver, chame transferir_departamento com o nome exato e um resumo do que ele precisa.
+- Se o departamento de destino tiver uma lista de itens a confirmar, faça essas perguntas na conversa ANTES de chamar a ferramenta — só transfira depois de ter as respostas. Se o cliente não quiser responder ou insistir em falar com humano direto, transfira mesmo assim, sem travar o atendimento.
 - Antes de transferir, avise o cliente com naturalidade (ex: "vou te passar para o nosso financeiro, um instante").
 - NÃO transfira por qualquer coisa — só quando o atendimento humano daquele setor for realmente necessário.`;
 }
@@ -1631,7 +1640,7 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
     : null;
   const departamentos = await prisma.departamento.findMany({
     where: { teamId: config.teamId },
-    select: { id: true, nome: true, descricao: true, agenteInstrucoes: true },
+    select: { id: true, nome: true, descricao: true, agenteInstrucoes: true, criteriosQualificacao: true },
     orderBy: { createdAt: "asc" },
   });
 

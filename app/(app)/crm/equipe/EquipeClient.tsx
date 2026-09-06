@@ -18,7 +18,7 @@ type Membro = {
   coManager: boolean;
 };
 
-type Departamento = { id: string; nome: string; descricao: string; agenteInstrucoes: string };
+type Departamento = { id: string; nome: string; descricao: string; agenteInstrucoes: string; criteriosQualificacao: string[] };
 type Perfil = { id: string; nome: string; allowedPages: string[]; verNaoAtribuidos: boolean };
 
 export function EquipeClient({ teamName, isManager, inviteLink, manager, members, departamentos, perfis, currentUserId }: {
@@ -56,11 +56,15 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
   const [depNome, setDepNome] = useState("");
   const [depDescricao, setDepDescricao] = useState("");
   const [depInstrucoes, setDepInstrucoes] = useState("");
+  const [depCriterios, setDepCriterios] = useState<string[]>([]);
+  const [depNovoCriterio, setDepNovoCriterio] = useState("");
   const [salvandoDep, setSalvandoDep] = useState(false);
   const [editingDepId, setEditingDepId] = useState<string | null>(null);
   const [editDepNome, setEditDepNome] = useState("");
   const [editDepDescricao, setEditDepDescricao] = useState("");
   const [editDepInstrucoes, setEditDepInstrucoes] = useState("");
+  const [editDepCriterios, setEditDepCriterios] = useState<string[]>([]);
+  const [editDepNovoCriterio, setEditDepNovoCriterio] = useState("");
   const [salvandoEdicaoDep, setSalvandoEdicaoDep] = useState(false);
 
   // Perfis de acesso
@@ -88,12 +92,22 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
       const res = await fetch(`/api/equipe/departamentos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nome: depNome.trim(), descricao: depDescricao.trim(), agenteInstrucoes: depInstrucoes.trim() }),
+        body: JSON.stringify({ nome: depNome.trim(), descricao: depDescricao.trim(), agenteInstrucoes: depInstrucoes.trim(), criteriosQualificacao: depCriterios }),
       });
-      if (res.ok) { setDepNome(""); setDepDescricao(""); setDepInstrucoes(""); setShowNovoDep(false); router.refresh(); }
+      if (res.ok) { setDepNome(""); setDepDescricao(""); setDepInstrucoes(""); setDepCriterios([]); setDepNovoCriterio(""); setShowNovoDep(false); router.refresh(); }
     } finally {
       setSalvandoDep(false);
     }
+  }
+
+  function addCriterio(lista: string[], setLista: (v: string[]) => void, valor: string, setValor: (v: string) => void) {
+    const v = valor.trim();
+    if (!v) return;
+    setLista([...lista, v]);
+    setValor("");
+  }
+  function removeCriterio(lista: string[], setLista: (v: string[]) => void, i: number) {
+    setLista(lista.filter((_, idx) => idx !== i));
   }
 
   async function handleExcluirDepartamento(d: Departamento) {
@@ -107,6 +121,8 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
     setEditDepNome(d.nome);
     setEditDepDescricao(d.descricao);
     setEditDepInstrucoes(d.agenteInstrucoes);
+    setEditDepCriterios(d.criteriosQualificacao);
+    setEditDepNovoCriterio("");
   }
 
   async function handleSalvarEdicaoDepartamento(id: string) {
@@ -116,7 +132,7 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
       const res = await fetch(`/api/equipe/departamentos/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nome: editDepNome.trim(), descricao: editDepDescricao.trim(), agenteInstrucoes: editDepInstrucoes.trim() }),
+        body: JSON.stringify({ nome: editDepNome.trim(), descricao: editDepDescricao.trim(), agenteInstrucoes: editDepInstrucoes.trim(), criteriosQualificacao: editDepCriterios }),
       });
       if (res.ok) { setEditingDepId(null); router.refresh(); }
     } finally {
@@ -459,6 +475,32 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
                     className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm resize-y"
                     maxLength={4000}
                   />
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1.5">Antes de transferir pra esse setor, a IA precisa confirmar (opcional):</p>
+                    {depCriterios.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mb-1.5">
+                        {depCriterios.map((c, i) => (
+                          <span key={i} className="flex items-center gap-1 bg-gray-900 border border-gray-800 rounded-full pl-2.5 pr-1 py-1 text-xs">
+                            {c}
+                            <button onClick={() => removeCriterio(depCriterios, setDepCriterios, i)} className="text-gray-500 hover:text-red-400"><X size={11} /></button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex gap-1.5">
+                      <input
+                        value={depNovoCriterio}
+                        onChange={e => setDepNovoCriterio(e.target.value)}
+                        onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addCriterio(depCriterios, setDepCriterios, depNovoCriterio, setDepNovoCriterio); } }}
+                        placeholder="Ex: orçamento aproximado"
+                        className="flex-1 bg-gray-900 border border-gray-800 rounded-lg px-3 py-1.5 text-xs"
+                        maxLength={200}
+                      />
+                      <button onClick={() => addCriterio(depCriterios, setDepCriterios, depNovoCriterio, setDepNovoCriterio)} className="text-xs text-blue-400 hover:text-blue-300 border border-blue-800/50 rounded-lg px-2.5">
+                        Adicionar
+                      </button>
+                    </div>
+                  </div>
                   <div className="flex gap-2">
                     <button onClick={handleCriarDepartamento} disabled={salvandoDep || !depNome.trim()} className="bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium">
                       {salvandoDep ? "Criando..." : "Criar"}
@@ -496,6 +538,32 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
                           className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm resize-y"
                           maxLength={4000}
                         />
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1.5">Antes de transferir pra esse setor, a IA precisa confirmar (opcional):</p>
+                          {editDepCriterios.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mb-1.5">
+                              {editDepCriterios.map((c, i) => (
+                                <span key={i} className="flex items-center gap-1 bg-gray-900 border border-gray-800 rounded-full pl-2.5 pr-1 py-1 text-xs">
+                                  {c}
+                                  <button onClick={() => removeCriterio(editDepCriterios, setEditDepCriterios, i)} className="text-gray-500 hover:text-red-400"><X size={11} /></button>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <div className="flex gap-1.5">
+                            <input
+                              value={editDepNovoCriterio}
+                              onChange={e => setEditDepNovoCriterio(e.target.value)}
+                              onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addCriterio(editDepCriterios, setEditDepCriterios, editDepNovoCriterio, setEditDepNovoCriterio); } }}
+                              placeholder="Ex: orçamento aproximado"
+                              className="flex-1 bg-gray-900 border border-gray-800 rounded-lg px-3 py-1.5 text-xs"
+                              maxLength={200}
+                            />
+                            <button onClick={() => addCriterio(editDepCriterios, setEditDepCriterios, editDepNovoCriterio, setEditDepNovoCriterio)} className="text-xs text-blue-400 hover:text-blue-300 border border-blue-800/50 rounded-lg px-2.5">
+                              Adicionar
+                            </button>
+                          </div>
+                        </div>
                         <div className="flex gap-2">
                           <button onClick={() => handleSalvarEdicaoDepartamento(d.id)} disabled={salvandoEdicaoDep || !editDepNome.trim()} className="bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium">
                             {salvandoEdicaoDep ? "Salvando..." : "Salvar"}
@@ -513,6 +581,11 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
                           </p>
                           {d.descricao && <p className="text-xs text-gray-500 truncate">{d.descricao}</p>}
                         </div>
+                        {d.criteriosQualificacao.length > 0 && (
+                          <span className="text-[10px] text-amber-400 border border-amber-800/50 rounded px-1.5 py-0.5 flex-shrink-0">
+                            {d.criteriosQualificacao.length} critério{d.criteriosQualificacao.length === 1 ? "" : "s"}
+                          </span>
+                        )}
                         <span className="text-[10px] text-gray-500 flex-shrink-0">
                           {members.filter(m => m.departamentoId === d.id).length} membro{members.filter(m => m.departamentoId === d.id).length === 1 ? "" : "s"}
                         </span>

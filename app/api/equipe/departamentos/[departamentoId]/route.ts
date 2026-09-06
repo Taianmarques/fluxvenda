@@ -8,6 +8,7 @@ const patchSchema = z.object({
   nome: z.string().min(1).max(40).optional(),
   descricao: z.string().max(300).optional(),
   agenteInstrucoes: z.string().max(4000).optional(),
+  criteriosQualificacao: z.array(z.string().trim().min(1).max(200)).max(15).optional(),
 });
 
 async function assertManager(userId: string, departamentoId: string) {

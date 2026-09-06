@@ -607,6 +607,11 @@ model Departamento {
   // Vazio = setor é só destino de transferência humana (comportamento de sempre).
   agenteInstrucoes String @default("")
 
+  // O que a IA precisa ter confirmado com o cliente antes de transferir a conversa pra esse
+  // departamento (ex: "orçamento aproximado", "prazo de decisão") — pensado pro setor de SDR,
+  // mas vale pra qualquer departamento. Vazio = transfere sem exigir qualificação prévia.
+  criteriosQualificacao String[] @default([])
+
   membros       TeamMember[]
   conversations Conversation[]
 
