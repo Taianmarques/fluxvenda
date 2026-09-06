@@ -10,16 +10,17 @@ export default async function AdminEmpresasPage({
   const query = (q ?? "").trim();
 
   const teams = await prisma.team.findMany({
-    where: query
-      ? {
-          OR: [
-            { name: { contains: query, mode: "insensitive" } },
-            { segment: { contains: query, mode: "insensitive" } },
-            { manager: { name: { contains: query, mode: "insensitive" } } },
-            { manager: { email: { contains: query, mode: "insensitive" } } },
-          ],
-        }
-      : undefined,
+    where: {
+      isDemo: false,
+      ...(query && {
+        OR: [
+          { name: { contains: query, mode: "insensitive" } },
+          { segment: { contains: query, mode: "insensitive" } },
+          { manager: { name: { contains: query, mode: "insensitive" } } },
+          { manager: { email: { contains: query, mode: "insensitive" } } },
+        ],
+      }),
+    },
     orderBy: { createdAt: "desc" },
     include: {
       manager: { select: { name: true, email: true, plan: true } },

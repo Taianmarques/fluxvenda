@@ -39,9 +39,19 @@ export async function getManagedTeam(userId: string) {
 // config junto com a flag de papel — usado pra escopar CRM/Ferramentas num agente específico.
 export async function getAgentConfigWithRole(userId: string, agentConfigId: string) {
   const result = await listMyAgentConfigs(userId);
-  if (!result) return null;
-  const config = result.configs.find(c => c.id === agentConfigId);
-  return config ? { config, isManager: result.isManager } : null;
+  if (result) {
+    const config = result.configs.find(c => c.id === agentConfigId);
+    if (config) return { config, isManager: result.isManager };
+  }
+
+  // Super admin pode abrir contas de exemplo (Team.isDemo) pra demonstração, mesmo sem ser
+  // gestor/membro delas — nunca vale pra equipes reais de cliente.
+  const config = await prisma.agentConfig.findUnique({ where: { id: agentConfigId } });
+  if (!config) return null;
+  const team = await prisma.team.findUnique({ where: { id: config.teamId }, select: { isDemo: true } });
+  if (!team?.isDemo) return null;
+  const profile = await prisma.profile.findUnique({ where: { id: userId }, select: { role: true } });
+  return profile?.role === "ADMIN" ? { config, isManager: true } : null;
 }
 
 // Configuração do agente (Ferramentas > WhatsApp): só o gestor pode editar nome, tom,

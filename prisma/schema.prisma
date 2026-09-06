@@ -557,6 +557,11 @@ model Team {
   // Marca quando o comercial já foi avisado de sinal de interesse forte durante o teste
   // grátis (ver lib/hot-lead-alert.ts) — evita avisar de novo a cada gatilho subsequente.
   hotLeadAlertedAt DateTime?
+
+  // Conta de exemplo criada pelo super admin (lib/demo-accounts.ts) — pipeline e conversas
+  // simuladas por segmento, pra demonstração comercial. Excluída das métricas/crons reais
+  // (contagem de empresas no /admin, funil de trial, alerta de lead quente).
+  isDemo Boolean @default(false)
 }
 
 model TeamMember {

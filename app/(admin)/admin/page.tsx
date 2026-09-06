@@ -19,15 +19,16 @@ export default async function AdminDashboardPage() {
     novosUsuarios7d,
     ultimasEmpresas,
   ] = await Promise.all([
-    prisma.team.count(),
+    prisma.team.count({ where: { isDemo: false } }),
     prisma.profile.count(),
     prisma.profile.groupBy({ by: ["role"], _count: { _all: true } }),
     prisma.profile.groupBy({ by: ["plan"], _count: { _all: true } }),
     prisma.profile.count({ where: { stripeSubscriptionId: { not: null } } }),
-    prisma.team.count({ where: { createdAt: { gte: daysAgo(30) } } }),
+    prisma.team.count({ where: { isDemo: false, createdAt: { gte: daysAgo(30) } } }),
     prisma.profile.count({ where: { createdAt: { gte: daysAgo(30) } } }),
     prisma.profile.count({ where: { createdAt: { gte: daysAgo(7) } } }),
     prisma.team.findMany({
+      where: { isDemo: false },
       orderBy: { createdAt: "desc" },
       take: 5,
       include: { manager: { select: { name: true, email: true } }, members: { select: { id: true } } },
