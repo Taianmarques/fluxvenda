@@ -18,6 +18,9 @@ export function ContasExemploAdminClient({ initialContas }: { initialContas: Con
   const [contas, setContas] = useState<Conta[]>(initialContas);
   const [segmento, setSegmento] = useState<string>(SEGMENTS[0]);
   const [subsegmento, setSubsegmento] = useState<string>(SUBSEGMENTS[SEGMENTS[0]][0]);
+  const [conversasPorEtapa, setConversasPorEtapa] = useState(1);
+  const [valorMin, setValorMin] = useState(500);
+  const [valorMax, setValorMax] = useState(4500);
   const [criando, setCriando] = useState(false);
   const [excluindoId, setExcluindoId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -34,7 +37,12 @@ export function ContasExemploAdminClient({ initialContas }: { initialContas: Con
       const res = await fetch("/api/admin/contas-exemplo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ segmento, subsegmento }),
+        body: JSON.stringify({
+          segmento, subsegmento,
+          conversasPorEtapa: Math.min(5, Math.max(1, conversasPorEtapa || 1)),
+          valorMin: Math.max(0, valorMin || 0),
+          valorMax: Math.max(0, valorMax || 0),
+        }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Erro ao criar conta de exemplo."); return; }
@@ -86,6 +94,33 @@ export function ContasExemploAdminClient({ initialContas }: { initialContas: Con
             </select>
           </div>
         </div>
+        <div className="grid sm:grid-cols-3 gap-3">
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">Conversas por etapa</label>
+            <input
+              type="number" min={1} max={5} value={conversasPorEtapa}
+              onChange={e => setConversasPorEtapa(Number(e.target.value))}
+              className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">Valor mínimo (R$)</label>
+            <input
+              type="number" min={0} step={50} value={valorMin}
+              onChange={e => setValorMin(Number(e.target.value))}
+              className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">Valor máximo (R$)</label>
+            <input
+              type="number" min={0} step={50} value={valorMax}
+              onChange={e => setValorMax(Number(e.target.value))}
+              className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+        <p className="text-xs text-gray-500 -mt-1">O pipeline padrão tem 5 etapas — com N conversas por etapa, o total gerado é 5×N (cada uma leva alguns segundos pra gerar).</p>
         {error && <p className="text-sm text-red-400">{error}</p>}
         <button onClick={handleCriar} disabled={criando} className="bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 rounded-xl px-4 py-2 text-sm font-medium flex items-center gap-1.5">
           {criando ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}

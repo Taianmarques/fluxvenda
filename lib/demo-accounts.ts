@@ -52,11 +52,21 @@ function fakePhoneNumber(seed: number): string {
   return `5511900${String(seed).padStart(6, "0")}`;
 }
 
+export type DemoAccountOptions = {
+  conversasPorEtapa: number; // quantas conversas/oportunidades simuladas por etapa do funil
+  valorMin: number; // faixa de dealValue sorteado pra cada oportunidade (R$)
+  valorMax: number;
+};
+
+export const DEMO_ACCOUNT_DEFAULTS: DemoAccountOptions = { conversasPorEtapa: 1, valorMin: 500, valorMax: 4500 };
+
 // Cria uma conta de exemplo completa: Profile (dono fictício) + Team (isDemo) + AgentConfig
 // (sem WhatsApp real conectado — token fixo só pra passar no gate de "canal conectado" das
-// telas do CRM, nunca chega a mandar mensagem de verdade) + Pipeline padrão + uma conversa
-// simulada por etapa, com diálogo gerado por IA. Chamado por app/api/admin/contas-exemplo.
-export async function createDemoAccount(segmento: string, subsegmento: string): Promise<{ teamId: string; agentId: string }> {
+// telas do CRM, nunca chega a mandar mensagem de verdade) + Pipeline padrão + N conversas
+// simuladas por etapa, com diálogo gerado por IA e valor de negociação na faixa escolhida.
+// Chamado por app/api/admin/contas-exemplo.
+export async function createDemoAccount(segmento: string, subsegmento: string, options: DemoAccountOptions = DEMO_ACCOUNT_DEFAULTS): Promise<{ teamId: string; agentId: string }> {
+  const { conversasPorEtapa, valorMin, valorMax } = options;
   const suffix = randomUUID().slice(0, 8);
   const teamName = `Exemplo — ${segmento} (${subsegmento})`;
 
@@ -100,42 +110,46 @@ export async function createDemoAccount(segmento: string, subsegmento: string): 
   const stages = await prisma.pipelineStage.findMany({ where: { pipelineId: pipeline.id }, orderBy: { order: "asc" } });
 
   let seed = Math.floor(Math.random() * 900000);
+  let conversaIndex = 0;
   for (const stage of stages) {
-    seed++;
-    const dialogo = await generateDemoDialogue({ teamName, segmento, subsegmento, stageName: stage.name });
-    if (dialogo.messages.length === 0) continue;
+    for (let n = 0; n < conversasPorEtapa; n++) {
+      seed++;
+      conversaIndex++;
+      const dialogo = await generateDemoDialogue({ teamName, segmento, subsegmento, stageName: stage.name });
+      if (dialogo.messages.length === 0) continue;
 
-    const conversation = await prisma.conversation.create({
-      data: {
-        agentConfigId: agent.id,
-        contactNumber: fakePhoneNumber(seed),
-        contactName: dialogo.contactName,
-      },
-    });
+      const conversation = await prisma.conversation.create({
+        data: {
+          agentConfigId: agent.id,
+          contactNumber: fakePhoneNumber(seed),
+          contactName: dialogo.contactName,
+        },
+      });
 
-    const baseTime = Date.now() - stages.length * 86_400_000; // espalha as conversas nos últimos dias
-    for (let i = 0; i < dialogo.messages.length; i++) {
-      const m = dialogo.messages[i];
-      await prisma.message.create({
+      const baseTime = Date.now() - (stages.length * conversasPorEtapa - conversaIndex) * 3_600_000; // espalha ao longo dos últimos dias
+      for (let i = 0; i < dialogo.messages.length; i++) {
+        const m = dialogo.messages[i];
+        await prisma.message.create({
+          data: {
+            conversationId: conversation.id,
+            role: m.role,
+            content: m.content,
+            createdAt: new Date(baseTime + i * 4 * 60_000), // ~4 min entre mensagens
+          },
+        });
+      }
+
+      const { wonAt, lostAt } = resolveStageOutcome(stage.name);
+      await prisma.opportunity.create({
         data: {
           conversationId: conversation.id,
-          role: m.role,
-          content: m.content,
-          createdAt: new Date(baseTime + i * 4 * 60_000), // ~4 min entre mensagens
+          stageId: stage.id,
+          dealValue: Math.round((valorMin + Math.random() * (valorMax - valorMin)) * 100) / 100,
+          wonAt,
+          lostAt,
         },
       });
     }
-
-    const { wonAt, lostAt } = resolveStageOutcome(stage.name);
-    await prisma.opportunity.create({
-      data: {
-        conversationId: conversation.id,
-        stageId: stage.id,
-        dealValue: Math.round((500 + Math.random() * 4500) * 100) / 100,
-        wonAt,
-        lostAt,
-      },
-    });
   }
 
   return { teamId: team.id, agentId: agent.id };

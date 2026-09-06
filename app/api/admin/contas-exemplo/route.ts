@@ -37,7 +37,10 @@ export async function GET() {
 const schema = z.object({
   segmento: z.enum(SEGMENTS),
   subsegmento: z.string().trim().min(1),
-});
+  conversasPorEtapa: z.number().int().min(1).max(5).default(1),
+  valorMin: z.number().min(0).max(1_000_000).default(500),
+  valorMax: z.number().min(0).max(1_000_000).default(4500),
+}).refine(d => d.valorMax >= d.valorMin, { message: "Valor máximo deve ser maior ou igual ao mínimo", path: ["valorMax"] });
 
 // Cria uma conta de exemplo completa (equipe + agente + pipeline + conversas simuladas por
 // IA) — ver lib/demo-accounts.ts. Chamada síncrona: leva alguns segundos por causa da geração
@@ -57,7 +60,11 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { teamId, agentId } = await createDemoAccount(body.data.segmento, body.data.subsegmento);
+    const { teamId, agentId } = await createDemoAccount(body.data.segmento, body.data.subsegmento, {
+      conversasPorEtapa: body.data.conversasPorEtapa,
+      valorMin: body.data.valorMin,
+      valorMax: body.data.valorMax,
+    });
     return NextResponse.json({ teamId, agentId });
   } catch (err) {
     console.error("[admin/contas-exemplo] erro ao criar conta de exemplo:", err);
