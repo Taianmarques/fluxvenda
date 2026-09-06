@@ -7,6 +7,7 @@ import { isTeamManager } from "@/lib/team";
 const patchSchema = z.object({
   nome: z.string().min(1).max(40).optional(),
   descricao: z.string().max(300).optional(),
+  agenteInstrucoes: z.string().max(4000).optional(),
 });
 
 async function assertManager(userId: string, departamentoId: string) {

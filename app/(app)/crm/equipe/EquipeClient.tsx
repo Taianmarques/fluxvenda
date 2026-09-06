@@ -18,7 +18,7 @@ type Membro = {
   coManager: boolean;
 };
 
-type Departamento = { id: string; nome: string; descricao: string };
+type Departamento = { id: string; nome: string; descricao: string; agenteInstrucoes: string };
 type Perfil = { id: string; nome: string; allowedPages: string[]; verNaoAtribuidos: boolean };
 
 export function EquipeClient({ teamName, isManager, inviteLink, manager, members, departamentos, perfis, currentUserId }: {
@@ -55,7 +55,13 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
   const [showNovoDep, setShowNovoDep] = useState(false);
   const [depNome, setDepNome] = useState("");
   const [depDescricao, setDepDescricao] = useState("");
+  const [depInstrucoes, setDepInstrucoes] = useState("");
   const [salvandoDep, setSalvandoDep] = useState(false);
+  const [editingDepId, setEditingDepId] = useState<string | null>(null);
+  const [editDepNome, setEditDepNome] = useState("");
+  const [editDepDescricao, setEditDepDescricao] = useState("");
+  const [editDepInstrucoes, setEditDepInstrucoes] = useState("");
+  const [salvandoEdicaoDep, setSalvandoEdicaoDep] = useState(false);
 
   // Perfis de acesso
   const [showNovoPerfil, setShowNovoPerfil] = useState(false);
@@ -82,9 +88,9 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
       const res = await fetch(`/api/equipe/departamentos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nome: depNome.trim(), descricao: depDescricao.trim() }),
+        body: JSON.stringify({ nome: depNome.trim(), descricao: depDescricao.trim(), agenteInstrucoes: depInstrucoes.trim() }),
       });
-      if (res.ok) { setDepNome(""); setDepDescricao(""); setShowNovoDep(false); router.refresh(); }
+      if (res.ok) { setDepNome(""); setDepDescricao(""); setDepInstrucoes(""); setShowNovoDep(false); router.refresh(); }
     } finally {
       setSalvandoDep(false);
     }
@@ -94,6 +100,28 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
     if (!confirm(`Excluir o departamento "${d.nome}"? Membros e conversas dele ficam sem departamento.`)) return;
     await fetch(`/api/equipe/departamentos/${d.id}`, { method: "DELETE" });
     router.refresh();
+  }
+
+  function startEditarDepartamento(d: Departamento) {
+    setEditingDepId(d.id);
+    setEditDepNome(d.nome);
+    setEditDepDescricao(d.descricao);
+    setEditDepInstrucoes(d.agenteInstrucoes);
+  }
+
+  async function handleSalvarEdicaoDepartamento(id: string) {
+    if (!editDepNome.trim()) return;
+    setSalvandoEdicaoDep(true);
+    try {
+      const res = await fetch(`/api/equipe/departamentos/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nome: editDepNome.trim(), descricao: editDepDescricao.trim(), agenteInstrucoes: editDepInstrucoes.trim() }),
+      });
+      if (res.ok) { setEditingDepId(null); router.refresh(); }
+    } finally {
+      setSalvandoEdicaoDep(false);
+    }
   }
 
   async function handleSetDepartamento(memberId: string, departamentoId: string) {
@@ -391,7 +419,7 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
                   <span className="text-gray-500 font-normal">({departamentos.length})</span>
                 </p>
                 <p className="text-xs text-gray-500 mt-0.5 truncate">
-                  A IA transfere a conversa para o departamento certo com base na descrição do que cada um atende.
+                  A IA transfere a conversa para o departamento certo com base na descrição do que cada um atende — ou, no modo multi-agente (Configurar agente), assume a persona de cada um sozinha.
                 </p>
               </div>
             </button>
@@ -423,6 +451,14 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
                     className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm"
                     maxLength={300}
                   />
+                  <textarea
+                    value={depInstrucoes}
+                    onChange={e => setDepInstrucoes(e.target.value)}
+                    placeholder="Instrução de IA pra esse setor (só usada se o modo multi-agente estiver ativo — ver Configurar agente)"
+                    rows={3}
+                    className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm resize-y"
+                    maxLength={4000}
+                  />
                   <div className="flex gap-2">
                     <button onClick={handleCriarDepartamento} disabled={salvandoDep || !depNome.trim()} className="bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium">
                       {salvandoDep ? "Criando..." : "Criar"}
@@ -436,23 +472,63 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
                 <p className="text-xs text-gray-600">Nenhum departamento ainda. Sem departamentos, a IA não oferece transferência por setor.</p>
               ) : (
                 <div className="space-y-1.5">
-                  {departamentos.map(d => (
-                    <div key={d.id} className="flex items-center gap-3 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2.5">
-                      <Building2 size={14} className="text-gray-500 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium">{d.nome}</p>
-                        {d.descricao && <p className="text-xs text-gray-500 truncate">{d.descricao}</p>}
+                  {departamentos.map((d, i) =>
+                    editingDepId === d.id ? (
+                      <div key={d.id} className="bg-gray-950 border border-gray-800 rounded-xl p-3 space-y-2">
+                        <input
+                          value={editDepNome}
+                          onChange={e => setEditDepNome(e.target.value)}
+                          className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm"
+                          maxLength={40}
+                        />
+                        <input
+                          value={editDepDescricao}
+                          onChange={e => setEditDepDescricao(e.target.value)}
+                          placeholder="O que esse setor atende"
+                          className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm"
+                          maxLength={300}
+                        />
+                        <textarea
+                          value={editDepInstrucoes}
+                          onChange={e => setEditDepInstrucoes(e.target.value)}
+                          placeholder="Instrução de IA pra esse setor (modo multi-agente)"
+                          rows={3}
+                          className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm resize-y"
+                          maxLength={4000}
+                        />
+                        <div className="flex gap-2">
+                          <button onClick={() => handleSalvarEdicaoDepartamento(d.id)} disabled={salvandoEdicaoDep || !editDepNome.trim()} className="bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs font-medium">
+                            {salvandoEdicaoDep ? "Salvando..." : "Salvar"}
+                          </button>
+                          <button onClick={() => setEditingDepId(null)} className="text-xs text-gray-400 hover:text-gray-200 px-2">Cancelar</button>
+                        </div>
                       </div>
-                      <span className="text-[10px] text-gray-500 flex-shrink-0">
-                        {members.filter(m => m.departamentoId === d.id).length} membro{members.filter(m => m.departamentoId === d.id).length === 1 ? "" : "s"}
-                      </span>
-                      {isManager && (
-                        <button onClick={() => handleExcluirDepartamento(d)} className="text-gray-600 hover:text-red-400 flex-shrink-0">
-                          <X size={13} />
-                        </button>
-                      )}
-                    </div>
-                  ))}
+                    ) : (
+                      <div key={d.id} className="flex items-center gap-3 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2.5">
+                        <Building2 size={14} className="text-gray-500 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium flex items-center gap-1.5">
+                            {d.nome}
+                            {i === 0 && <span className="text-[10px] font-normal text-blue-400 border border-blue-800/50 rounded px-1.5 py-0.5">Setor de entrada</span>}
+                          </p>
+                          {d.descricao && <p className="text-xs text-gray-500 truncate">{d.descricao}</p>}
+                        </div>
+                        <span className="text-[10px] text-gray-500 flex-shrink-0">
+                          {members.filter(m => m.departamentoId === d.id).length} membro{members.filter(m => m.departamentoId === d.id).length === 1 ? "" : "s"}
+                        </span>
+                        {isManager && (
+                          <>
+                            <button onClick={() => startEditarDepartamento(d)} className="text-gray-600 hover:text-blue-400 flex-shrink-0">
+                              <Pencil size={13} />
+                            </button>
+                            <button onClick={() => handleExcluirDepartamento(d)} className="text-gray-600 hover:text-red-400 flex-shrink-0">
+                              <X size={13} />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )
+                  )}
                 </div>
               )}
             </div>

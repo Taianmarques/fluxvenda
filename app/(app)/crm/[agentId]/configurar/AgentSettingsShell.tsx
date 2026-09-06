@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  ArrowLeft, ArrowRight, Bot, SlidersHorizontal, Sparkles, Building2, Tag, Clock, Shuffle, BookOpen, GraduationCap, BarChart3, ChevronRight, ChevronDown, MessageCircle,
+  ArrowLeft, ArrowRight, Bot, SlidersHorizontal, Sparkles, Building2, Tag, Clock, Shuffle, BookOpen, GraduationCap, BarChart3, ChevronRight, ChevronDown, MessageCircle, Users2,
   type LucideIcon,
 } from "lucide-react";
 import { AgentActions } from "./AgentActions";
@@ -15,11 +15,12 @@ import { SobreEmpresaPanel } from "./SobreEmpresaPanel";
 import { ConfiguracaoComercialPanel } from "./ConfiguracaoComercialPanel";
 import { FollowupPanel } from "./FollowupPanel";
 import { InstrucoesPanel } from "./InstrucoesPanel";
+import { MultiAgentePanel } from "./MultiAgentePanel";
 import { TestAgentChat } from "./TestAgentChat";
 
 type Section =
   | "agente" | "basico" | "personalidade" | "sobre-empresa" | "comercial" | "followup"
-  | "distribuicao" | "conhecimento" | "treino" | "analytics";
+  | "distribuicao" | "multiagente" | "conhecimento" | "treino" | "analytics";
 
 const SECTIONS: { key: Section; label: string; icon: LucideIcon }[] = [
   { key: "agente", label: "O Agente", icon: Bot },
@@ -29,6 +30,7 @@ const SECTIONS: { key: Section; label: string; icon: LucideIcon }[] = [
   { key: "comercial", label: "Configuração comercial", icon: Tag },
   { key: "followup", label: "Follow-up", icon: Clock },
   { key: "distribuicao", label: "Distribuição", icon: Shuffle },
+  { key: "multiagente", label: "Multi-agente", icon: Users2 },
   { key: "conhecimento", label: "Conhecimento", icon: BookOpen },
   { key: "treino", label: "Treino", icon: GraduationCap },
   { key: "analytics", label: "Analytics", icon: BarChart3 },
@@ -60,6 +62,7 @@ type WhatsappAgentConfig = {
   responseDelaySeconds: number;
   agentSignatureEnabled: boolean;
   instrucoesExtras: string;
+  multiAgenteDepartamentos: boolean;
 };
 
 type DistribuicaoConfig = {
@@ -290,6 +293,13 @@ export function AgentSettingsShell({
               initialIaNiveisCarteiraExcluidos={distribuicaoConfig.iaNiveisCarteiraExcluidos}
               initialTransferenciaCondicoes={distribuicaoConfig.transferenciaCondicoes}
             />
+          </div>
+        )}
+
+        {section === "multiagente" && (
+          <div className="space-y-4">
+            <SectionHeader title="Multi-agente" desc="Um único número, vários especialistas — a IA assume a persona do setor certo conforme a conversa." />
+            <MultiAgentePanel agentId={agentId} initialEnabled={whatsappAgentConfig.multiAgenteDepartamentos} />
           </div>
         )}
 

@@ -42,6 +42,7 @@ const schema = z.object({
   instrucoesExtras: z.string().max(4000).optional(),
   treinoSimilaridadeMinima: z.number().min(0).max(1).optional(),
   treinoMaxExemplos: z.number().int().min(0).max(10).optional(),
+  multiAgenteDepartamentos: z.boolean().optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {
@@ -96,6 +97,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
       ...(d.instrucoesExtras !== undefined && { instrucoesExtras: d.instrucoesExtras }),
       ...(d.treinoSimilaridadeMinima !== undefined && { treinoSimilaridadeMinima: d.treinoSimilaridadeMinima }),
       ...(d.treinoMaxExemplos !== undefined && { treinoMaxExemplos: d.treinoMaxExemplos }),
+      ...(d.multiAgenteDepartamentos !== undefined && { multiAgenteDepartamentos: d.multiAgenteDepartamentos }),
     },
   });
 

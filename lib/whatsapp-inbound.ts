@@ -22,6 +22,7 @@ import { emitChatEvent } from "@/lib/realtime";
 import { generateEmbedding, cosineSimilarity } from "@/lib/embeddings";
 import { getDemoSlotDays, isDemoSlotAvailable, DEMO_SLOT_MINUTES, DEFAULT_DEMO_TIMES } from "@/lib/demo-scheduling";
 import { sendDemoBookingNotification } from "@/lib/email";
+import { FLUXVENDA_TEAM_ID } from "@/lib/internal-agent";
 
 type AgentConfigFull = NonNullable<Awaited<ReturnType<typeof prisma.agentConfig.findFirst>>>;
 
@@ -1631,19 +1632,26 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
   const departamentos = await prisma.departamento.findMany({
     where: { teamId: config.teamId },
     select: { id: true, nome: true, descricao: true, agenteInstrucoes: true },
+    orderBy: { createdAt: "asc" },
   });
 
-  // Modo multi-agente: conversa nova entra pelo setor de entrada (SDR, ou o primeiro
-  // cadastrado se não houver um "SDR") — a partir daí a própria IA troca de área sozinha
-  // via mudar_area_atendimento (ver handler acima e o tool em lib/agent-engine.ts).
+  // Só a equipe interna da própria FluxVenda usa o reconhecimento de contato da plataforma e
+  // o agendamento de demonstração — pra qualquer outro tenant, esses dois vazariam dados da
+  // plataforma (Profile/PlanPurchase) e ofereceriam agendar uma demo do CRM pros CLIENTES
+  // DELE, o que não faz sentido nenhum. O modo multi-agente em si (troca de setor) é genérico.
+  const isFluxVendaInterno = config.multiAgenteDepartamentos && config.teamId === FLUXVENDA_TEAM_ID;
+
+  // Modo multi-agente: conversa nova entra pelo primeiro setor cadastrado — a partir daí a
+  // própria IA troca de área sozinha via mudar_area_atendimento (ver handler acima e o tool
+  // em lib/agent-engine.ts). Por isso o setor de entrada é sempre o primeiro que o gestor cria.
   let areaAtualId = conversation.departamentoId;
   if (config.multiAgenteDepartamentos && !areaAtualId && departamentos.length > 0) {
-    const entrada = departamentos.find(d => d.nome.toLowerCase() === "sdr") ?? departamentos[0];
+    const entrada = departamentos[0];
     areaAtualId = entrada.id;
     await prisma.conversation.update({ where: { id: conversation.id }, data: { departamentoId: entrada.id } });
   }
   const areaAtual = config.multiAgenteDepartamentos ? departamentos.find(d => d.id === areaAtualId) : undefined;
-  const contatoPlataforma = config.multiAgenteDepartamentos ? await lookupContatoPlataforma(contactNumber) : null;
+  const contatoPlataforma = isFluxVendaInterno ? await lookupContatoPlataforma(contactNumber) : null;
   const contatoPlataformaContext = contatoPlataforma ? buildContatoPlataformaContext(contatoPlataforma) : "";
 
   // Modo link: a IA só mantém cancelar_agendamento (pros lembretes de confirmação);
@@ -1660,7 +1668,7 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
     ...(config.pipelineAutoAvancar ? PIPELINE_TOOLS : []),
     ...(departamentos.length > 0 ? DEPARTAMENTO_TOOLS : []),
     ...(config.multiAgenteDepartamentos && departamentos.length > 1 ? MUDAR_AREA_TOOLS : []),
-    ...(config.multiAgenteDepartamentos ? AGENDAR_DEMO_TOOLS : []),
+    ...(isFluxVendaInterno ? AGENDAR_DEMO_TOOLS : []),
     ...(config.transferirAoPedirFoto ? TRANSFERIR_FOTO_TOOLS : []),
     ...(config.transferenciaCondicoes.length > 0 ? TRANSFERIR_CONDICAO_TOOLS : []),
     ...(isProspect ? PROSPECTING_TOOLS : []),
@@ -1747,7 +1755,7 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
       + (config.pipelineAutoAvancar ? await buildPipelineContext(config.id, conversation.id) : "")
       + (departamentos.length > 0 ? buildDepartamentosContext(departamentos) : "")
       + (config.multiAgenteDepartamentos && departamentos.length > 1 ? buildAreasIAContext(departamentos) : "")
-      + (config.multiAgenteDepartamentos ? buildDataAtualContext() : "")
+      + (isFluxVendaInterno ? buildDataAtualContext() : "")
       + (isProspect ? (await buildProspeccaoContext(config.id, contactNumber) ?? "") : "");
     const result = await runAgentWithTools(
       activeSystemPrompt + extraContext,

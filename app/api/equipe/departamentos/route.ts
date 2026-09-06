@@ -20,13 +20,16 @@ export async function GET(_req: NextRequest) {
     include: { _count: { select: { membros: true } } },
   });
   return NextResponse.json({
-    departamentos: departamentos.map(d => ({ id: d.id, nome: d.nome, descricao: d.descricao, membros: d._count.membros })),
+    departamentos: departamentos.map(d => ({ id: d.id, nome: d.nome, descricao: d.descricao, agenteInstrucoes: d.agenteInstrucoes, membros: d._count.membros })),
   });
 }
 
 const schema = z.object({
   nome: z.string().min(1).max(40),
   descricao: z.string().max(300).default(""),
+  // Só usada no modo multi-agente (AgentConfig.multiAgenteDepartamentos) — instrução de
+  // persona que a IA assume quando está "atuando como" esse setor, ver lib/whatsapp-inbound.ts.
+  agenteInstrucoes: z.string().max(4000).default(""),
 });
 
 export async function POST(req: NextRequest) {
@@ -40,7 +43,7 @@ export async function POST(req: NextRequest) {
   if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
 
   const departamento = await prisma.departamento.create({
-    data: { teamId: team.id, nome: body.data.nome, descricao: body.data.descricao },
+    data: { teamId: team.id, ...body.data },
   });
   return NextResponse.json({ departamento });
 }
