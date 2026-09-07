@@ -38,11 +38,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
   const body = schema.safeParse(await req.json());
   if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
 
+  // Faz merge com o que já existia — a tela só manda os vendedores atualmente na equipe,
+  // então um replace direto apagaria a meta de quem saiu da equipe mas ainda tem vendas no histórico.
+  const metasExistentes = (config.metasPorVendedor as Record<string, number>) ?? {};
+  const metasMescladas = { ...metasExistentes, ...body.data.metasPorVendedor };
+
   const updated = await prisma.agentConfig.update({
     where: { id: config.id },
     data: {
       metaGeralMensal: body.data.metaGeralMensal,
-      metasPorVendedor: body.data.metasPorVendedor,
+      metasPorVendedor: metasMescladas,
       investimentoMensal: body.data.investimentoMensal,
     },
   });
