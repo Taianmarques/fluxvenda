@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { EditEmpresaForm } from "./EditEmpresaForm";
+import { RedefinirSenhaButton } from "./RedefinirSenhaButton";
 
 export default async function AdminEmpresaDetailPage({
   params,
@@ -99,9 +100,12 @@ export default async function AdminEmpresaDetailPage({
               <p className="font-semibold">{team.manager.name}</p>
               <p className="text-sm text-gray-400">{team.manager.email}{team.manager.phone ? ` • ${team.manager.phone}` : ""}</p>
             </div>
-            <div className="text-right text-sm text-gray-400">
-              <p>{team.manager.xp.toLocaleString("pt-BR")} XP • Nível {team.manager.level}</p>
-              <p>Desde {new Date(team.manager.createdAt).toLocaleDateString("pt-BR")}</p>
+            <div className="flex items-center gap-4">
+              <div className="text-right text-sm text-gray-400">
+                <p>{team.manager.xp.toLocaleString("pt-BR")} XP • Nível {team.manager.level}</p>
+                <p>Desde {new Date(team.manager.createdAt).toLocaleDateString("pt-BR")}</p>
+              </div>
+              <RedefinirSenhaButton profileId={team.manager.id} />
             </div>
           </div>
         </div>
@@ -141,6 +145,7 @@ export default async function AdminEmpresaDetailPage({
                     <span className="text-xs font-semibold px-2 py-1 rounded-full bg-gray-800 text-gray-300">{m.profile.role}</span>
                     <span>{m.profile.xp.toLocaleString("pt-BR")} XP</span>
                     <span className="text-xs text-gray-500">entrou em {new Date(m.joinedAt).toLocaleDateString("pt-BR")}</span>
+                    <RedefinirSenhaButton profileId={m.profile.id} />
                   </div>
                 </div>
               ))}
