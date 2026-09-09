@@ -1,5 +1,6 @@
 import { currentUser } from "@/lib/auth/server";
 import { redirect } from "next/navigation";
+import { prisma } from "@/lib/prisma";
 import { listMyAgentConfigs } from "@/lib/team";
 import { getCrmAllowedPages } from "@/lib/crm-access";
 import { getMenuLogoDataUri } from "@/lib/branding";
@@ -15,11 +16,12 @@ export default async function CrmHubLayout({ children }: { children: React.React
   const user = await currentUser();
   if (!user) redirect("/sign-in");
 
-  const [result, allowedPages, menuLogo, products] = await Promise.all([
+  const [result, allowedPages, menuLogo, products, profile] = await Promise.all([
     listMyAgentConfigs(user.id),
     getCrmAllowedPages(user.id),
     getMenuLogoDataUri(),
     getEffectiveProducts(user.id),
+    prisma.profile.findUnique({ where: { id: user.id }, select: { name: true } }),
   ]);
   // Defensivo: só chega aqui sem time nenhum se o ProductGate("CRM") de /crm falhar em
   // barrar antes — evita loop com o redirect de /crm pro Hub quando não há agentes.
@@ -29,7 +31,7 @@ export default async function CrmHubLayout({ children }: { children: React.React
     <div className="h-full flex flex-col bg-gray-950">
       <TrialBanner />
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-        <CrmSidebar agentId={result.configs[0]?.id ?? ""} agents={result.configs.map(c => ({ id: c.id, nome: c.nome }))} allowedPages={allowedPages} isManager={result.isManager} menuLogo={menuLogo} hasPlataforma={hasProduct(products, "PLATAFORMA")} />
+        <CrmSidebar agentId={result.configs[0]?.id ?? ""} agents={result.configs.map(c => ({ id: c.id, nome: c.nome }))} allowedPages={allowedPages} isManager={result.isManager} menuLogo={menuLogo} hasPlataforma={hasProduct(products, "PLATAFORMA")} userName={profile?.name ?? ""} />
         <div className="flex-1 overflow-hidden">
           <CrmThemeProvider>
             <CrmThemeScope>

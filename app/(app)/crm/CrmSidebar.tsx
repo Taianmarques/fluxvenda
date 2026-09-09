@@ -7,6 +7,7 @@ import { ArrowLeft, ChevronDown, Bot, Megaphone, TrendingUp, Zap, Settings, Head
 import { useEffect, useRef, useState } from "react";
 import { CRM_CATEGORIES, type CrmPageDef, type CrmPageKey } from "@/lib/crm-nav-config";
 import { NotificationsButton } from "./NotificationsButton";
+import { UserMenu } from "../UserMenu";
 
 type NavItem = { href: string; label: string; icon: LucideIcon; isHub?: boolean };
 type NavCategory = { key: string; label: string; variant: "accordion" | "flyout"; items: NavItem[] };
@@ -140,7 +141,7 @@ function CategoryFlyout({ label, icon: Icon, items, isActive, pathname, onNaviga
   );
 }
 
-export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo, hasPlataforma }: {
+export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo, hasPlataforma, userName }: {
   agentId: string;
   agents: { id: string; nome: string }[];
   // null = acesso total (gestor, ou membro sem perfil atribuído)
@@ -151,6 +152,8 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo,
   menuLogo?: string | null;
   // Link "Plataforma B2B" só aparece se o Super Admin ativou o módulo PLATAFORMA pra essa equipe
   hasPlataforma: boolean;
+  // Nome de quem está logado — mostrado no menu de usuário (avatar + "Sair"), no rodapé do menu
+  userName: string;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -296,7 +299,10 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo,
             );
           })}
         </nav>
-        <NotificationsButton compact />
+        <div className="flex items-center gap-1 px-2 flex-shrink-0">
+          <NotificationsButton compact />
+          <UserMenu name={userName} openDirection="down" align="end" />
+        </div>
       </div>
     </div>
 
@@ -447,6 +453,10 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo,
       </nav>
 
       <div className={`py-4 border-t border-gray-800 space-y-0.5 ${collapsed ? "px-2" : "px-3"}`}>
+        <div className={collapsed ? "flex justify-center pb-2" : "flex items-center gap-2.5 px-1 pb-3"}>
+          <UserMenu name={userName} />
+          {!collapsed && <span className="text-sm font-medium text-gray-300 truncate">{userName}</span>}
+        </div>
         <div className={collapsed ? "flex justify-center" : ""}>
           <NotificationsButton compact={collapsed} />
         </div>

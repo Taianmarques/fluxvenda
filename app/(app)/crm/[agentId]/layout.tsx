@@ -18,11 +18,12 @@ export default async function CrmAgentLayout({
   if (!user) redirect("/sign-in");
 
   const { agentId } = await params;
-  let [result, allowedPages, menuLogo, products] = await Promise.all([
+  let [result, allowedPages, menuLogo, products, profile] = await Promise.all([
     listMyAgentConfigs(user.id),
     getCrmAllowedPages(user.id),
     getMenuLogoDataUri(),
     getEffectiveProducts(user.id),
+    prisma.profile.findUnique({ where: { id: user.id }, select: { name: true } }),
   ]);
 
   if (!result || !result.configs.some(c => c.id === agentId)) {
@@ -37,7 +38,7 @@ export default async function CrmAgentLayout({
 
   return (
     <div className="h-full flex flex-col md:flex-row bg-gray-950">
-      <CrmSidebar agentId={agentId} agents={result.configs.map(c => ({ id: c.id, nome: c.nome }))} allowedPages={allowedPages} isManager={result.isManager} menuLogo={menuLogo} hasPlataforma={hasProduct(products, "PLATAFORMA")} />
+      <CrmSidebar agentId={agentId} agents={result.configs.map(c => ({ id: c.id, nome: c.nome }))} allowedPages={allowedPages} isManager={result.isManager} menuLogo={menuLogo} hasPlataforma={hasProduct(products, "PLATAFORMA")} userName={profile?.name ?? ""} />
       <div className="flex-1 overflow-hidden">
         <CrmThemeProvider>
           <CrmThemeScope>{children}</CrmThemeScope>
