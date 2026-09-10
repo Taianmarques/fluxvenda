@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import Script from "next/script";
 import { ArrowUp, Check } from "lucide-react";
 
 export type LeadFormQuestion = { key: string; label: string; type: "TEXTO" | "WHATSAPP" | "EMAIL" | "NUMERO" };
@@ -15,7 +16,15 @@ const INPUT_MODE: Record<LeadFormQuestion["type"], string> = {
   NUMERO: "numeric",
 };
 
-export function FormularioClient({ slug, headline, questions }: { slug: string; headline: string; questions: LeadFormQuestion[] }) {
+// Dispara evento pro Meta Pixel, se ele já tiver carregado (formulário sem pixelId não injeta
+// o script, então fbq nunca existe — a checagem evita erro nesse caso).
+function trackPixel(event: string) {
+  if (typeof window !== "undefined" && typeof (window as unknown as { fbq?: (...a: unknown[]) => void }).fbq === "function") {
+    (window as unknown as { fbq: (...a: unknown[]) => void }).fbq("track", event);
+  }
+}
+
+export function FormularioClient({ slug, headline, questions, pixelId }: { slug: string; headline: string; questions: LeadFormQuestion[]; pixelId: string | null }) {
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
   const [step, setStep] = useState(0); // índice da pergunta atual em `questions`
   const [showInput, setShowInput] = useState(false);
@@ -69,12 +78,15 @@ export function FormularioClient({ slug, headline, questions }: { slug: string; 
       // segue o fluxo mesmo se o registro falhar — não trava o lead numa tela de erro
     }
 
+    if (current.type === "WHATSAPP") trackPixel("Lead");
+
     if (next < questions.length) {
       setBubbles(prev => [...prev, { from: "bot", text: nextMessage || questions[next].label }]);
       setStep(next);
       setTimeout(() => setShowInput(true), 250);
       setSending(false);
     } else {
+      trackPixel("CompleteRegistration");
       setDone(true);
       setSending(false);
     }
@@ -82,6 +94,26 @@ export function FormularioClient({ slug, headline, questions }: { slug: string; 
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
+      {pixelId && (
+        <>
+          <Script id="meta-pixel" strategy="afterInteractive">
+            {`!function(f,b,e,v,n,t,s)
+            {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+            n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+            if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+            n.queue=[];t=b.createElement(e);t.async=!0;
+            t.src=v;s=b.getElementsByTagName(e)[0];
+            s.parentNode.insertBefore(t,s)}(window, document,'script',
+            'https://connect.facebook.net/en_US/fbevents.js');
+            fbq('init', '${pixelId}');
+            fbq('track', 'PageView');`}
+          </Script>
+          <noscript>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img height="1" width="1" style={{ display: "none" }} src={`https://www.facebook.com/tr?id=${pixelId}&ev=PageView&noscript=1`} alt="" />
+          </noscript>
+        </>
+      )}
       <header className="bg-gray-950 flex-shrink-0">
         <div className="max-w-3xl mx-auto px-6 h-16 flex items-center justify-between">
           <Image src="/iconefluxvenda.png" alt="FluxVenda" width={26} height={26} />

@@ -19,6 +19,7 @@ const createSchema = z.object({
   title: z.string().min(1).max(120),
   headline: z.string().min(1).max(1000),
   questions: z.array(questionSchema).min(1).max(10),
+  pixelId: z.string().max(40).optional(),
 });
 
 export async function GET() {

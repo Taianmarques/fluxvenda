@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Plus, Trash2, Save, Check, ExternalLink, Copy } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Save, Check, ExternalLink, Copy, Target } from "lucide-react";
 
 export type LeadFormQuestion = { key: string; label: string; type: "TEXTO" | "WHATSAPP" | "EMAIL" | "NUMERO" };
 type Submission = { id: string; nome: string | null; whatsapp: string | null; answers: Record<string, string>; inviteSentAt: string | null; createdAt: string };
@@ -10,15 +10,16 @@ type Submission = { id: string; nome: string | null; whatsapp: string | null; an
 const TYPE_LABEL: Record<LeadFormQuestion["type"], string> = { TEXTO: "Texto", WHATSAPP: "WhatsApp", EMAIL: "E-mail", NUMERO: "Número" };
 
 export function FormularioEditorClient({
-  id, initialSlug, initialTitle, initialHeadline, initialActive, initialQuestions, submissions,
+  id, initialSlug, initialTitle, initialHeadline, initialActive, initialPixelId, initialQuestions, submissions,
 }: {
   id: string; initialSlug: string; initialTitle: string; initialHeadline: string; initialActive: boolean;
-  initialQuestions: LeadFormQuestion[]; submissions: Submission[];
+  initialPixelId: string; initialQuestions: LeadFormQuestion[]; submissions: Submission[];
 }) {
   const [slug, setSlug] = useState(initialSlug);
   const [title, setTitle] = useState(initialTitle);
   const [headline, setHeadline] = useState(initialHeadline);
   const [active, setActive] = useState(initialActive);
+  const [pixelId, setPixelId] = useState(initialPixelId);
   const [questions, setQuestions] = useState<LeadFormQuestion[]>(initialQuestions);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -47,7 +48,7 @@ export function FormularioEditorClient({
       const res = await fetch(`/api/admin/formularios/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug, title, headline, active, questions }),
+        body: JSON.stringify({ slug, title, headline, active, questions, pixelId: pixelId.trim() || null }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Erro ao salvar."); return; }
@@ -106,6 +107,21 @@ export function FormularioEditorClient({
             rows={3}
             className="w-full mt-1 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
           />
+        </div>
+
+        <div>
+          <label className="text-xs text-gray-500 uppercase tracking-wide flex items-center gap-1.5"><Target size={12} /> Pixel do Facebook (opcional)</label>
+          <input
+            value={pixelId}
+            onChange={e => { setPixelId(e.target.value.replace(/\D/g, "")); setSaved(false); }}
+            placeholder="Ex: 1234567890123456"
+            inputMode="numeric"
+            className="w-full mt-1 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:border-blue-600"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Cola aqui o ID do pixel (Gerenciador de Eventos do Meta). Dispara <span className="font-mono">PageView</span> ao abrir,{" "}
+            <span className="font-mono">Lead</span> quando responde o WhatsApp e <span className="font-mono">CompleteRegistration</span> ao terminar o formulário.
+          </p>
         </div>
 
         <div className="space-y-2">

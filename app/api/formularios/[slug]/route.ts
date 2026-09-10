@@ -7,7 +7,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
   const { slug } = await params;
   const form = await prisma.leadForm.findUnique({
     where: { slug },
-    select: { id: true, title: true, headline: true, questions: true, active: true },
+    select: { id: true, title: true, headline: true, questions: true, pixelId: true, active: true },
   });
   if (!form || !form.active) return NextResponse.json({ error: "Formulário não encontrado" }, { status: 404 });
   return NextResponse.json({ form });
