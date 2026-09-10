@@ -1514,10 +1514,19 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
   // métrica de venda de verdade (ver isTestNumber nas queries de vendas/funil/dashboards/etc).
   const isTestNumber = config.testPhoneNumbers.some(n => normalizePhoneBR(n) === contactNumber);
 
+  // Nome editado manualmente pelo atendente nunca pode ser sobrescrito pelo nome de exibição
+  // que a UazAPI manda em toda mensagem recebida — só preenche o nome automático a partir do
+  // WhatsApp quando a conversa ainda não tem nenhum (mesma regra já usada na importação de
+  // contatos: preenche só se estiver vazio, nunca sobrescreve).
+  const existingConversation = await prisma.conversation.findUnique({
+    where: { agentConfigId_contactNumber: { agentConfigId: config.id, contactNumber } },
+    select: { contactName: true },
+  });
+
   // Cliente respondeu — zera o contador de follow-up e marca prospect como RESPONDEU se aplicável
   const conversation = await prisma.conversation.upsert({
     where: { agentConfigId_contactNumber: { agentConfigId: config.id, contactNumber } },
-    update: { status: "ATIVO", followupCount: 0, isTestNumber, ...(contactName && { contactName }) },
+    update: { status: "ATIVO", followupCount: 0, isTestNumber, ...(contactName && !existingConversation?.contactName && { contactName }) },
     create: { agentConfigId: config.id, contactNumber, contactName, status: "ATIVO", isGroup: msg.isGroup ?? false, isTestNumber },
   });
   if (config.prospeccaoEnabled) {
