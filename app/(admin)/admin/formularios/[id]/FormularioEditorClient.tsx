@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Plus, Trash2, Save, Check, ExternalLink, Copy, Target } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Save, Check, ExternalLink, Copy, Target, ChevronDown } from "lucide-react";
 
 export type LeadFormQuestion = { key: string; label: string; type: "TEXTO" | "WHATSAPP" | "EMAIL" | "NUMERO" };
 type Submission = { id: string; nome: string | null; whatsapp: string | null; answers: Record<string, string>; inviteSentAt: string | null; createdAt: string };
@@ -25,6 +25,9 @@ export function FormularioEditorClient({
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const questionLabel = (key: string) => initialQuestions.find(q => q.key === key)?.label ?? key;
 
   function updateQuestion(i: number, patch: Partial<LeadFormQuestion>) {
     setQuestions(prev => prev.map((q, idx) => (idx === i ? { ...q, ...patch } : q)));
@@ -172,22 +175,48 @@ export function FormularioEditorClient({
           </div>
         ) : (
           <div className="space-y-2">
-            {submissions.map(s => (
-              <div key={s.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex items-center justify-between gap-4 flex-wrap">
-                <div className="min-w-0">
-                  <p className="font-medium truncate">{s.nome ?? "—"}</p>
-                  <p className="text-xs text-gray-500 font-mono">{s.whatsapp ?? "—"}</p>
-                </div>
-                <div className="flex items-center gap-3 text-xs text-gray-500 flex-shrink-0">
-                  <span>{new Date(s.createdAt).toLocaleString("pt-BR")}</span>
-                  {s.inviteSentAt ? (
-                    <span className="font-semibold px-2 py-0.5 rounded-full bg-green-900/40 text-green-300 border border-green-800/50">convite enviado</span>
-                  ) : (
-                    <span className="font-semibold px-2 py-0.5 rounded-full bg-gray-800 text-gray-500">sem convite</span>
+            {submissions.map(s => {
+              const isOpen = expandedId === s.id;
+              const answerEntries = Object.entries(s.answers ?? {});
+              return (
+                <div key={s.id} className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+                  <button
+                    onClick={() => setExpandedId(isOpen ? null : s.id)}
+                    className="w-full p-4 flex items-center justify-between gap-4 flex-wrap text-left hover:bg-gray-800/40"
+                  >
+                    <div className="min-w-0 flex items-center gap-2">
+                      <ChevronDown size={14} className={`text-gray-500 flex-shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{s.nome ?? "—"}</p>
+                        <p className="text-xs text-gray-500 font-mono">{s.whatsapp ?? "—"}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-gray-500 flex-shrink-0">
+                      <span>{new Date(s.createdAt).toLocaleString("pt-BR")}</span>
+                      {s.inviteSentAt ? (
+                        <span className="font-semibold px-2 py-0.5 rounded-full bg-green-900/40 text-green-300 border border-green-800/50">convite enviado</span>
+                      ) : (
+                        <span className="font-semibold px-2 py-0.5 rounded-full bg-gray-800 text-gray-500">sem convite</span>
+                      )}
+                    </div>
+                  </button>
+                  {isOpen && (
+                    <div className="border-t border-gray-800 p-4 space-y-3 bg-gray-950/40">
+                      {answerEntries.length === 0 ? (
+                        <p className="text-sm text-gray-500">Nenhuma resposta registrada.</p>
+                      ) : (
+                        answerEntries.map(([key, value]) => (
+                          <div key={key}>
+                            <p className="text-xs text-gray-500">{questionLabel(key)}</p>
+                            <p className="text-sm mt-0.5">{value || "—"}</p>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
