@@ -57,10 +57,14 @@ async function runFollowupJob() {
     const delays = config.followupDelaysMinutes as unknown as number[];
     if (!Array.isArray(delays) || delays.length === 0) continue;
 
+    // Dispara mesmo com humanTakeover:true quando o lead já tem vendedor responsável
+    // (assignedToId) — o vendedor pode esquecer de retomar contato, e é exatamente esse
+    // esquecimento que o follow-up automático cobre. Sem atendente atribuído E com a IA fora
+    // (humanTakeover:true), a conversa fica de fora — ninguém "dono" pra validar o disparo.
     const candidates = await prisma.conversation.findMany({
       where: {
         agentConfigId: config.id,
-        humanTakeover: false,
+        OR: [{ humanTakeover: false }, { assignedToId: { not: null } }],
         status: { not: "FINALIZADO" },
         followupCount: { lt: delays.length },
         isGroup: false, // IA nunca manda mensagem automática pra grupo
