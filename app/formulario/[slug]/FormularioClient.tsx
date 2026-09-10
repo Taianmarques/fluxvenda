@@ -7,6 +7,14 @@ import { ArrowUp, Check } from "lucide-react";
 
 export type LeadFormQuestion = { key: string; label: string; type: "TEXTO" | "WHATSAPP" | "EMAIL" | "NUMERO" };
 
+function BotAvatar({ avatarUrl }: { avatarUrl: string | null }) {
+  if (!avatarUrl) return null;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={avatarUrl} alt="" className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
+  );
+}
+
 type Bubble = { from: "bot" | "user"; text: string };
 
 const INPUT_MODE: Record<LeadFormQuestion["type"], string> = {
@@ -24,7 +32,9 @@ function trackPixel(event: string) {
   }
 }
 
-export function FormularioClient({ slug, headline, questions, pixelId }: { slug: string; headline: string; questions: LeadFormQuestion[]; pixelId: string | null }) {
+export function FormularioClient({ slug, headline, questions, pixelId, avatarUrl }: {
+  slug: string; headline: string; questions: LeadFormQuestion[]; pixelId: string | null; avatarUrl: string | null;
+}) {
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
   const [step, setStep] = useState(0); // índice da pergunta atual em `questions`
   const [showInput, setShowInput] = useState(false);
@@ -132,22 +142,30 @@ export function FormularioClient({ slug, headline, questions, pixelId }: { slug:
       </header>
 
       <main className="flex-1 max-w-2xl w-full mx-auto px-6 py-10 flex flex-col gap-4">
-        {bubbles.map((b, i) => (
-          <div
-            key={i}
-            className={`max-w-[85%] rounded-2xl px-5 py-3.5 text-[15px] leading-relaxed animate-in fade-in slide-in-from-bottom-2 duration-300 ${
-              b.from === "bot" ? "self-start bg-gray-100 text-gray-900" : "self-end bg-blue-600 text-white"
-            }`}
-          >
-            {b.text}
-          </div>
-        ))}
+        {bubbles.map((b, i) =>
+          b.from === "bot" ? (
+            <div key={i} className="self-start max-w-[85%] flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <BotAvatar avatarUrl={avatarUrl} />
+              <div className="rounded-2xl px-5 py-3.5 text-[15px] leading-relaxed bg-gray-100 text-gray-900">{b.text}</div>
+            </div>
+          ) : (
+            <div
+              key={i}
+              className="self-end max-w-[85%] rounded-2xl px-5 py-3.5 text-[15px] leading-relaxed bg-blue-600 text-white animate-in fade-in slide-in-from-bottom-2 duration-300"
+            >
+              {b.text}
+            </div>
+          )
+        )}
 
         {sending && !showInput && !done && (
-          <div className="self-start bg-gray-100 rounded-2xl px-5 py-3.5 flex items-center gap-1 animate-in fade-in duration-300">
-            {[0, 1, 2].map(i => (
-              <span key={i} className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: `${i * 120}ms` }} />
-            ))}
+          <div className="self-start flex items-center gap-2 animate-in fade-in duration-300">
+            <BotAvatar avatarUrl={avatarUrl} />
+            <div className="bg-gray-100 rounded-2xl px-5 py-3.5 flex items-center gap-1">
+              {[0, 1, 2].map(i => (
+                <span key={i} className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: `${i * 120}ms` }} />
+              ))}
+            </div>
           </div>
         )}
 
@@ -180,9 +198,14 @@ export function FormularioClient({ slug, headline, questions, pixelId }: { slug:
 
         {done && (
           <div className="mt-4 flex items-start gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
-              <Check size={16} className="text-white" />
-            </div>
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={avatarUrl} alt="" className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
+            ) : (
+              <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
+                <Check size={16} className="text-white" />
+              </div>
+            )}
             <p className="text-[15px] text-gray-700 leading-relaxed pt-1.5">
               Prontinho! Te chamamos agora no seu WhatsApp com o convite pra testar grátis por 7 dias
               (ou marcar uma demonstração, se preferir). Fica de olho por lá.

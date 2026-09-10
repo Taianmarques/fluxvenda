@@ -1915,6 +1915,7 @@ model LeadForm {
   headline  String   @db.Text // primeira mensagem do bot, antes da 1ª pergunta
   questions Json // [{ key, label, type: LeadFormFieldType }] — ordem = ordem de exibição
   pixelId   String? // Meta Pixel ID — dispara PageView ao abrir e Lead ao responder o WhatsApp
+  avatarUrl String?  @db.Text // foto (base64) ao lado das mensagens do bot — dá o ar de conversa com humano
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -19,6 +19,7 @@ export default async function AdminFormularioEditorPage({ params }: { params: Pr
       initialHeadline={form.headline}
       initialActive={form.active}
       initialPixelId={form.pixelId ?? ""}
+      initialAvatarUrl={form.avatarUrl}
       initialQuestions={form.questions as LeadFormQuestion[]}
       submissions={form.submissions.map(s => ({
         id: s.id,

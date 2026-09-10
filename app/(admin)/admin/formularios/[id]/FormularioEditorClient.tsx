@@ -2,30 +2,70 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Plus, Trash2, Save, Check, ExternalLink, Copy, Target, ChevronDown } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Save, Check, ExternalLink, Copy, Target, ChevronDown, ImagePlus, X } from "lucide-react";
 
 export type LeadFormQuestion = { key: string; label: string; type: "TEXTO" | "WHATSAPP" | "EMAIL" | "NUMERO" };
 type Submission = { id: string; nome: string | null; whatsapp: string | null; answers: Record<string, string>; inviteSentAt: string | null; createdAt: string };
 
 const TYPE_LABEL: Record<LeadFormQuestion["type"], string> = { TEXTO: "Texto", WHATSAPP: "WhatsApp", EMAIL: "E-mail", NUMERO: "Número" };
 
+// Redimensiona pro navegador antes de mandar pro servidor — a foto vira base64 salvo direto no
+// banco (mesmo padrão de Product.imagemBase64, não tem storage de blob nessa stack), então
+// comprimir aqui evita payload gigante numa selfie de celular direto da câmera.
+function resizeImageToBase64(file: File, maxSize = 200, quality = 0.85): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = document.createElement("img");
+    const reader = new FileReader();
+    reader.onload = () => {
+      img.onload = () => {
+        const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { reject(new Error("canvas indisponível")); return; }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = reject;
+      img.src = reader.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 export function FormularioEditorClient({
-  id, initialSlug, initialTitle, initialHeadline, initialActive, initialPixelId, initialQuestions, submissions,
+  id, initialSlug, initialTitle, initialHeadline, initialActive, initialPixelId, initialAvatarUrl, initialQuestions, submissions,
 }: {
   id: string; initialSlug: string; initialTitle: string; initialHeadline: string; initialActive: boolean;
-  initialPixelId: string; initialQuestions: LeadFormQuestion[]; submissions: Submission[];
+  initialPixelId: string; initialAvatarUrl: string | null; initialQuestions: LeadFormQuestion[]; submissions: Submission[];
 }) {
   const [slug, setSlug] = useState(initialSlug);
   const [title, setTitle] = useState(initialTitle);
   const [headline, setHeadline] = useState(initialHeadline);
   const [active, setActive] = useState(initialActive);
   const [pixelId, setPixelId] = useState(initialPixelId);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatarUrl);
   const [questions, setQuestions] = useState<LeadFormQuestion[]>(initialQuestions);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const dataUrl = await resizeImageToBase64(file);
+      setAvatarUrl(dataUrl);
+      setSaved(false);
+    } catch {
+      setError("Não deu pra processar essa imagem.");
+    }
+  }
 
   const questionLabel = (key: string) => initialQuestions.find(q => q.key === key)?.label ?? key;
 
@@ -51,7 +91,7 @@ export function FormularioEditorClient({
       const res = await fetch(`/api/admin/formularios/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug, title, headline, active, questions, pixelId: pixelId.trim() || null }),
+        body: JSON.stringify({ slug, title, headline, active, questions, pixelId: pixelId.trim() || null, avatarUrl }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Erro ao salvar."); return; }
@@ -110,6 +150,30 @@ export function FormularioEditorClient({
             rows={3}
             className="w-full mt-1 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
           />
+        </div>
+
+        <div>
+          <label className="text-xs text-gray-500 uppercase tracking-wide">Foto de quem "conversa" (opcional)</label>
+          <div className="flex items-center gap-3 mt-1.5">
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={avatarUrl} alt="" className="w-12 h-12 rounded-full object-cover border border-gray-800" />
+            ) : (
+              <div className="w-12 h-12 rounded-full bg-gray-950 border border-dashed border-gray-700 flex items-center justify-center text-gray-600">
+                <ImagePlus size={18} />
+              </div>
+            )}
+            <label className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-gray-700 text-gray-300 hover:border-blue-600 hover:text-blue-400 cursor-pointer">
+              {avatarUrl ? "Trocar foto" : "Enviar foto"}
+              <input type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
+            </label>
+            {avatarUrl && (
+              <button onClick={() => { setAvatarUrl(null); setSaved(false); }} className="p-1.5 rounded-lg hover:bg-gray-800 text-red-400" title="Remover">
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-gray-500 mt-1.5">Aparece ao lado de cada mensagem do bot na conversa — dá o ar de atendimento humano em vez de formulário.</p>
         </div>
 
         <div>

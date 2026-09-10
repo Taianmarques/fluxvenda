@@ -20,6 +20,7 @@ const updateSchema = z.object({
   headline: z.string().min(1).max(1000).optional(),
   questions: z.array(questionSchema).min(1).max(10).optional(),
   pixelId: z.string().max(40).nullable().optional(),
+  avatarUrl: z.string().max(8_000_000).nullable().optional(),
   active: z.boolean().optional(),
 });
 
