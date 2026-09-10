@@ -79,12 +79,17 @@ export async function POST(req: NextRequest) {
   // acima, que só dispara enquanto espera resposta do cliente).
   let stageFollowupChecked = 0;
   let stageFollowupSent = 0;
+  // Throttle: um backlog grande de oportunidades vencidas de uma vez (ex: várias movidas em
+  // lote pra uma etapa de nutrição) não pode virar uma rajada de mensagens no mesmo minuto —
+  // manda no máximo isso por execução do cron, o resto pega no próximo ciclo (5 em 5 min).
+  const MAX_STAGE_FOLLOWUPS_PER_RUN = 10;
 
   const stages = await prisma.pipelineStage.findMany({
     where: { pipeline: { agentConfig: { active: true, uazapiToken: { not: null } } } },
     include: { pipeline: { include: { agentConfig: true } } },
   });
 
+  stageLoop:
   for (const stage of stages) {
     const delays = stage.followupDelaysMinutes as unknown as number[];
     if (!Array.isArray(delays) || delays.length === 0) continue;
@@ -102,18 +107,27 @@ O lead está na etapa "${stage.name}" do funil "${stage.pipeline.name}". Siga es
       if (stageInstr) stageInstruction += `\n\nOrientações específicas da etapa "${stage.name}" (prioridade máxima):\n${stageInstr}`;
     }
 
+    // Etapa de nutrição/recuperação: precisa poder cutucar contato já ENCERRADO (é literalmente
+    // pra isso que existe — reengajar quem já foi tocado por atendente e esfriou) e não pode
+    // exigir humanTakeover:false, senão nunca dispara pra ninguém que já foi atendido por
+    // humano — que é o caso de praticamente todo lead parado. A proteção contra interromper
+    // troca ativa já vem do check de "última mensagem foi nossa" logo abaixo; reabrir a
+    // conversa (voltar pra Ativo) só acontece se o lead responder, no fluxo normal de mensagem
+    // recebida — nunca aqui, no envio do follow-up.
     const candidates = await prisma.opportunity.findMany({
       where: {
         stageId: stage.id,
         wonAt: null,
         lostAt: null,
         stageFollowupCount: { lt: delays.length },
-        conversation: { humanTakeover: false, status: { not: "FINALIZADO" }, isGroup: false }, // IA nunca manda mensagem automática pra grupo
+        conversation: { isGroup: false }, // IA nunca manda mensagem automática pra grupo
       },
       include: { conversation: { include: { messages: { where: { role: { not: "note" } }, orderBy: { createdAt: "desc" }, take: 20 } } } },
     });
 
     for (const opp of candidates) {
+      if (stageFollowupSent >= MAX_STAGE_FOLLOWUPS_PER_RUN) break stageLoop;
+
       const referenceTime = opp.stageFollowupCount === 0 ? opp.stageEnteredAt : (opp.lastStageFollowupAt ?? opp.stageEnteredAt);
       const delayMinutes = delays[opp.stageFollowupCount];
       const dueAt = new Date(referenceTime.getTime() + delayMinutes * 60000);
