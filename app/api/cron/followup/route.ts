@@ -14,13 +14,13 @@ function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Teto de mensagens automáticas de follow-up (conversa + etapa somadas) por execução do cron —
-// evita que um backlog grande vire uma rajada de envios de uma vez só. O resto do backlog
-// continua no próximo ciclo (5 em 5min).
-const MAX_FOLLOWUPS_PER_RUN = 10;
+// Teto de follow-ups de ETAPA do pipeline por execução do cron — só vale pra esse mecanismo
+// (backlog de oportunidades paradas, ex: várias movidas de uma vez pra uma etapa de nutrição).
+// O follow-up normal de conversa continua sem teto/espera, como sempre foi.
+const MAX_STAGE_FOLLOWUPS_PER_RUN = 10;
 
-// Evita duas execuções rodando ao mesmo tempo — com o espaçamento variado entre envios (até
-// 2min cada), uma execução pode demorar mais que o intervalo entre chamadas do scheduler
+// Evita duas execuções rodando ao mesmo tempo — com o espaçamento variado entre envios de etapa
+// (até 2min cada), uma execução pode demorar mais que o intervalo entre chamadas do scheduler
 // externo (5min); sem essa trava, duas execuções sobrepostas poderiam mandar follow-up
 // duplicado pro mesmo contato.
 let followupRunInProgress = false;
@@ -52,11 +52,7 @@ async function runFollowupJob() {
 
   let sent = 0;
   let checked = 0;
-  // Compartilhado com o follow-up de etapa logo abaixo — o teto e o espaçamento valem pro total
-  // de mensagens automáticas de follow-up desta execução, não por mecanismo separado.
-  let totalFollowupsSent = 0;
 
-  convoLoop:
   for (const config of configs) {
     const delays = config.followupDelaysMinutes as unknown as number[];
     if (!Array.isArray(delays) || delays.length === 0) continue;
@@ -73,8 +69,6 @@ async function runFollowupJob() {
     });
 
     for (const conversation of candidates) {
-      if (totalFollowupsSent >= MAX_FOLLOWUPS_PER_RUN) break convoLoop;
-
       // A 1ª tentativa conta a partir da última atividade da conversa; as seguintes contam
       // a partir do envio da tentativa anterior, permitindo intervalos diferentes entre elas.
       const referenceTime = conversation.followupCount === 0 ? conversation.updatedAt : (conversation.lastFollowupAt ?? conversation.updatedAt);
@@ -102,12 +96,8 @@ async function runFollowupJob() {
         where: { id: conversation.id },
         data: { followupCount: { increment: 1 }, lastFollowupAt: new Date() },
       });
-      // Espaça os envios com um intervalo variado — nunca manda dois follow-ups automáticos
-      // colados, pra não parecer disparo em massa pro WhatsApp/Meta. Só espera a partir do 2º.
-      if (totalFollowupsSent > 0) await sleep(Math.floor((45 + Math.random() * 75) * 1000)); // 45s–2min
       await sendWhatsAppTextAsTeam(config.uazapiToken, conversation.contactNumber, followup);
       sent++;
-      totalFollowupsSent++;
     }
   }
 
@@ -159,7 +149,7 @@ O lead está na etapa "${stage.name}" do funil "${stage.pipeline.name}". Siga es
     });
 
     for (const opp of candidates) {
-      if (totalFollowupsSent >= MAX_FOLLOWUPS_PER_RUN) break stageLoop;
+      if (stageFollowupSent >= MAX_STAGE_FOLLOWUPS_PER_RUN) break stageLoop;
 
       const referenceTime = opp.stageFollowupCount === 0 ? opp.stageEnteredAt : (opp.lastStageFollowupAt ?? opp.stageEnteredAt);
       const delayMinutes = delays[opp.stageFollowupCount];
@@ -188,11 +178,11 @@ O lead está na etapa "${stage.name}" do funil "${stage.pipeline.name}". Siga es
         where: { id: opp.id },
         data: { stageFollowupCount: { increment: 1 }, lastStageFollowupAt: new Date() },
       });
-      // Mesmo espaçamento variado do follow-up de conversa acima — soma no mesmo teto/contador.
-      if (totalFollowupsSent > 0) await sleep(Math.floor((45 + Math.random() * 75) * 1000)); // 45s–2min
+      // Espaça os envios com um intervalo variado — nunca manda dois follow-ups automáticos
+      // colados, pra não parecer disparo em massa pro WhatsApp/Meta. Só espera a partir do 2º.
+      if (stageFollowupSent > 0) await sleep(Math.floor((45 + Math.random() * 75) * 1000)); // 45s–2min
       await sendWhatsAppTextAsTeam(config.uazapiToken, conversation.contactNumber, followup);
       stageFollowupSent++;
-      totalFollowupsSent++;
     }
   }
 
