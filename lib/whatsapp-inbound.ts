@@ -233,6 +233,14 @@ function buildDataAtualContext(): string {
   return `\n\nHoje é ${dateStr} (${weekday}). Use isso pra calcular datas relativas ("segunda", "amanhã", etc.) antes de chamar agendar_demo_especialista — sempre com a data exata (AAAA-MM-DD) que veio de consultar_horarios_demo, nunca calculada de cabeça.`;
 }
 
+// Vale pra QUALQUER contato da equipe interna da FluxVenda, cadastrado ou não (lead vindo do
+// formulário de captação, por exemplo) — sem isso, sem o contexto de contatoPlataforma (que só
+// existe pra quem já tem conta), a IA não sabe que já tem o WhatsApp de quem fala com ela e
+// acaba pedindo telefone de novo antes de agendar, travando o fluxo.
+function buildDemoInstructionContext(): string {
+  return `\n\nAGENDAMENTO DE DEMONSTRAÇÃO: você já sabe o WhatsApp de quem está falando com você — é o número dessa própria conversa. NUNCA peça telefone pra agendar. Se o contato quiser agendar uma demonstração, chame consultar_horarios_demo direto pra ver os horários livres, sugira 2-3 opções, e só depois que ele confirmar uma delas chame agendar_demo_especialista com a data/hora exatas.`;
+}
+
 type ContatoPlataforma = {
   profile: { id: string; name: string; email: string; phone: string | null };
   team: { id: string; name: string; crmTrialEndsAt: Date | null; pago: boolean } | null;
@@ -313,9 +321,7 @@ function buildContatoPlataformaContext(contato: ContatoPlataforma): string {
 
   return `\n\nCONTATO JÁ CADASTRADO NA FLUXVENDA — NÃO peça nome, telefone ou nome da empresa de novo, já temos:
 Nome: ${contato.profile.name}
-Status: ${status}
-
-Se ele quiser agendar uma demonstração com especialista, chame consultar_horarios_demo pra ver os horários livres, sugira 2-3 opções, e depois de ele confirmar uma, chame agendar_demo_especialista com a data/hora exatas.`;
+Status: ${status}`;
 }
 
 // Lista as etapas do funil e ensina o agente a mover o lead conforme a conversa evolui.
@@ -1764,7 +1770,7 @@ O lead está na etapa "${currentOpp.stage.name}" do funil "${currentOpp.stage.pi
       + (config.pipelineAutoAvancar ? await buildPipelineContext(config.id, conversation.id) : "")
       + (departamentos.length > 0 ? buildDepartamentosContext(departamentos) : "")
       + (config.multiAgenteDepartamentos && departamentos.length > 1 ? buildAreasIAContext(departamentos) : "")
-      + (isFluxVendaInterno ? buildDataAtualContext() : "")
+      + (isFluxVendaInterno ? buildDataAtualContext() + buildDemoInstructionContext() : "")
       + (isProspect ? (await buildProspeccaoContext(config.id, contactNumber) ?? "") : "");
     const result = await runAgentWithTools(
       activeSystemPrompt + extraContext,
