@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Radio, Clock, Bot, Instagram, MessageCircle } from "lucide-react";
+import { Radio, Clock, Bot, Instagram, MessageCircle, ChevronLeft, ChevronRight } from "lucide-react";
 
 type Atendente = { id: string; name: string };
 
@@ -42,6 +42,39 @@ export function AoVivoClient({ agentId, atendentes }: { agentId: string; atenden
   const [loading, setLoading] = useState(true);
   const inFlightRef = useRef(false);
   const fingerprintRef = useRef("");
+
+  // Ordem de exibição das colunas dos atendentes, por preferência do gestor. Guardada no
+  // navegador (não no banco) — é uma preferência pessoal de visualização, não algo que precise
+  // sincronizar entre dispositivos ou gestores da mesma equipe.
+  const ordemStorageKey = `aovivo-ordem-${agentId}`;
+  const [ordem, setOrdem] = useState<string[]>(() => atendentes.map(a => a.id));
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(ordemStorageKey);
+      if (!stored) return;
+      const salvos: string[] = JSON.parse(stored);
+      const ids = salvos.filter(id => atendentes.some(a => a.id === id));
+      for (const a of atendentes) if (!ids.includes(a.id)) ids.push(a.id);
+      // localStorage só existe no navegador — não dá pra ler no useState inicial (rodaria no
+      // servidor também) sem quebrar a hidratação, então o ajuste de ordem acontece aqui.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setOrdem(ids);
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agentId]);
+
+  function moverColuna(id: string, direcao: -1 | 1) {
+    setOrdem(prev => {
+      const idx = prev.indexOf(id);
+      const novoIdx = idx + direcao;
+      if (idx < 0 || novoIdx < 0 || novoIdx >= prev.length) return prev;
+      const next = [...prev];
+      [next[idx], next[novoIdx]] = [next[novoIdx], next[idx]];
+      try { localStorage.setItem(ordemStorageKey, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }
 
   async function refresh(isPoll = false) {
     if (isPoll && inFlightRef.current) return;
@@ -91,10 +124,13 @@ export function AoVivoClient({ agentId, atendentes }: { agentId: string; atenden
   );
 
   const pendentes = ativas.filter(c => !c.assignedToId);
-  const porAtendente = atendentes.map(a => ({
-    atendente: a,
-    conversas: ativas.filter(c => c.assignedToId === a.id),
-  }));
+  const porAtendente = ordem
+    .map(id => atendentes.find(a => a.id === id))
+    .filter((a): a is Atendente => !!a)
+    .map(a => ({
+      atendente: a,
+      conversas: ativas.filter(c => c.assignedToId === a.id),
+    }));
 
   const totalNaoLidas = ativas.filter(naoLida).length;
 
@@ -134,7 +170,7 @@ export function AoVivoClient({ agentId, atendentes }: { agentId: string; atenden
     );
   }
 
-  function Coluna({ titulo, cor, conversas: convs, destaque }: { titulo: string; cor: string; conversas: Conversa[]; destaque?: boolean }) {
+  function Coluna({ titulo, cor, conversas: convs, destaque, onMoveLeft, onMoveRight }: { titulo: string; cor: string; conversas: Conversa[]; destaque?: boolean; onMoveLeft?: () => void; onMoveRight?: () => void }) {
     const unreadCount = convs.filter(naoLida).length;
     return (
       <div className={`w-72 flex-shrink-0 flex flex-col rounded-2xl border max-h-full ${destaque ? "border-red-800/60 bg-red-950/20" : "border-gray-800 bg-gray-900"}`}>
@@ -157,6 +193,28 @@ export function AoVivoClient({ agentId, atendentes }: { agentId: string; atenden
           <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${destaque ? "bg-red-900/50 text-red-300" : "bg-gray-800 text-gray-400"}`}>
             {convs.length}
           </span>
+          {(onMoveLeft || onMoveRight) && (
+            <div className="flex items-center gap-0.5 flex-shrink-0">
+              <button
+                type="button"
+                onClick={onMoveLeft}
+                disabled={!onMoveLeft}
+                title="Mover coluna pra esquerda"
+                className="p-0.5 rounded hover:bg-gray-800 disabled:opacity-20 disabled:cursor-not-allowed text-gray-400"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={onMoveRight}
+                disabled={!onMoveRight}
+                title="Mover coluna pra direita"
+                className="p-0.5 rounded hover:bg-gray-800 disabled:opacity-20 disabled:cursor-not-allowed text-gray-400"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          )}
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[100px]">
           {convs.length === 0 ? (
@@ -198,6 +256,8 @@ export function AoVivoClient({ agentId, atendentes }: { agentId: string; atenden
                 titulo={col.atendente.name}
                 cor={CORES[i % CORES.length]}
                 conversas={col.conversas}
+                onMoveLeft={i > 0 ? () => moverColuna(col.atendente.id, -1) : undefined}
+                onMoveRight={i < porAtendente.length - 1 ? () => moverColuna(col.atendente.id, 1) : undefined}
               />
             ))}
           </div>
