@@ -1231,22 +1231,10 @@ export function WhatsappInbox({
     }
   }
 
-  const statusCounts = {
-    ativos: conversations.filter(c => !c.isGroup && c.humanTakeover && c.status !== "FINALIZADO").length,
-    pendentes: conversations.filter(c => !c.isGroup && !c.humanTakeover && c.status !== "FINALIZADO").length,
-    finalizados: conversations.filter(c => !c.isGroup && c.status === "FINALIZADO").length,
-    grupos: conversations.filter(c => c.isGroup).length,
-  };
-
-  const statusFiltered = conversations.filter(c => {
-    if (statusFilter === "grupos") return c.isGroup;
-    if (c.isGroup) return false;
-    if (statusFilter === "ativos") return c.humanTakeover && c.status !== "FINALIZADO";
-    if (statusFilter === "pendentes") return !c.humanTakeover && c.status !== "FINALIZADO";
-    return c.status === "FINALIZADO";
-  });
-
-  const extraFiltered = statusFiltered.filter(c => {
+  // Filtros do painel (atendente, etapa, etc.) valem também pras contagens das abas — sem isso,
+  // o gestor filtrava por um atendente específico mas via os números de "Ativos"/"Pendentes"/etc.
+  // somando a equipe inteira, o que não bate com a lista que ele está de fato vendo.
+  function matchesExtraFilters(c: ConversationSummary) {
     if (filters.attendantId === "__none__" && c.assignedToId) return false;
     if (filters.attendantId && filters.attendantId !== "__none__" && c.assignedToId !== filters.attendantId) return false;
     if (filters.leadStatusId && c.leadStatusId !== filters.leadStatusId) return false;
@@ -1258,6 +1246,23 @@ export function WhatsappInbox({
       if (!(lastAt > readAt)) return false;
     }
     return true;
+  }
+
+  const extraFilteredAll = conversations.filter(matchesExtraFilters);
+
+  const statusCounts = {
+    ativos: extraFilteredAll.filter(c => !c.isGroup && c.humanTakeover && c.status !== "FINALIZADO").length,
+    pendentes: extraFilteredAll.filter(c => !c.isGroup && !c.humanTakeover && c.status !== "FINALIZADO").length,
+    finalizados: extraFilteredAll.filter(c => !c.isGroup && c.status === "FINALIZADO").length,
+    grupos: extraFilteredAll.filter(c => c.isGroup).length,
+  };
+
+  const extraFiltered = extraFilteredAll.filter(c => {
+    if (statusFilter === "grupos") return c.isGroup;
+    if (c.isGroup) return false;
+    if (statusFilter === "ativos") return c.humanTakeover && c.status !== "FINALIZADO";
+    if (statusFilter === "pendentes") return !c.humanTakeover && c.status !== "FINALIZADO";
+    return c.status === "FINALIZADO";
   });
 
   const filteredConversations = search.trim()
