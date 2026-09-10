@@ -23,6 +23,8 @@ const PUBLIC_ROUTES: RegExp[] = [
   /^\/api\/cron(\/.*)?$/,          // protegido por CRON_SECRET, não por sessão de usuário
   /^\/api\/instagram\/callback$/,  // callback do OAuth — valida via OAuthState, sem sessão
   /^\/loja(\/.*)?$/,               // catálogo público (PWA) — clientes finais, sem login
+  /^\/formulario(\/.*)?$/,         // formulário conversacional de captação de lead — sem login
+  /^\/api\/formularios(\/.*)?$/,   // GET do formulário + responder pergunta a pergunta — sem sessão
   /^\/agenda(\/.*)?$/,             // agenda do profissional (PWA) — acesso por token secreto
   /^\/agendar(\/.*)?$/,            // página pública de auto-agendamento (PWA)
   /^\/api\/agendar(\/.*)?$/,       // horários livres + criação de agendamento da página pública
