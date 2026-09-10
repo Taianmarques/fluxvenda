@@ -19,6 +19,12 @@ function sleep(ms: number) {
 // continua no próximo ciclo (5 em 5min).
 const MAX_FOLLOWUPS_PER_RUN = 10;
 
+// Evita duas execuções rodando ao mesmo tempo — com o espaçamento variado entre envios (até
+// 2min cada), uma execução pode demorar mais que o intervalo entre chamadas do scheduler
+// externo (5min); sem essa trava, duas execuções sobrepostas poderiam mandar follow-up
+// duplicado pro mesmo contato.
+let followupRunInProgress = false;
+
 // Disparado por um scheduler externo (crontab/cron-job.org) com:
 // Authorization: Bearer <CRON_SECRET>
 export async function POST(req: NextRequest) {
@@ -28,6 +34,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  if (followupRunInProgress) {
+    return NextResponse.json({ ok: true, skipped: "execução anterior ainda em andamento" });
+  }
+  followupRunInProgress = true;
+  try {
+    return await runFollowupJob();
+  } finally {
+    followupRunInProgress = false;
+  }
+}
+
+async function runFollowupJob() {
   const configs = await prisma.agentConfig.findMany({
     where: { active: true, followupEnabled: true, uazapiToken: { not: null } },
   });
@@ -86,7 +104,7 @@ export async function POST(req: NextRequest) {
       });
       // Espaça os envios com um intervalo variado — nunca manda dois follow-ups automáticos
       // colados, pra não parecer disparo em massa pro WhatsApp/Meta. Só espera a partir do 2º.
-      if (totalFollowupsSent > 0) await sleep(Math.floor((8 + Math.random() * 17) * 1000)); // 8–25s
+      if (totalFollowupsSent > 0) await sleep(Math.floor((45 + Math.random() * 75) * 1000)); // 45s–2min
       await sendWhatsAppTextAsTeam(config.uazapiToken, conversation.contactNumber, followup);
       sent++;
       totalFollowupsSent++;
@@ -171,7 +189,7 @@ O lead está na etapa "${stage.name}" do funil "${stage.pipeline.name}". Siga es
         data: { stageFollowupCount: { increment: 1 }, lastStageFollowupAt: new Date() },
       });
       // Mesmo espaçamento variado do follow-up de conversa acima — soma no mesmo teto/contador.
-      if (totalFollowupsSent > 0) await sleep(Math.floor((8 + Math.random() * 17) * 1000)); // 8–25s
+      if (totalFollowupsSent > 0) await sleep(Math.floor((45 + Math.random() * 75) * 1000)); // 45s–2min
       await sendWhatsAppTextAsTeam(config.uazapiToken, conversation.contactNumber, followup);
       stageFollowupSent++;
       totalFollowupsSent++;
