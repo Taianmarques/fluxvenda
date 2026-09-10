@@ -10,6 +10,15 @@ function hoursFromNow(n: number) {
   return d;
 }
 
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Teto de mensagens automáticas de follow-up (conversa + etapa somadas) por execução do cron —
+// evita que um backlog grande vire uma rajada de envios de uma vez só. O resto do backlog
+// continua no próximo ciclo (5 em 5min).
+const MAX_FOLLOWUPS_PER_RUN = 10;
+
 // Disparado por um scheduler externo (crontab/cron-job.org) com:
 // Authorization: Bearer <CRON_SECRET>
 export async function POST(req: NextRequest) {
@@ -25,7 +34,11 @@ export async function POST(req: NextRequest) {
 
   let sent = 0;
   let checked = 0;
+  // Compartilhado com o follow-up de etapa logo abaixo — o teto e o espaçamento valem pro total
+  // de mensagens automáticas de follow-up desta execução, não por mecanismo separado.
+  let totalFollowupsSent = 0;
 
+  convoLoop:
   for (const config of configs) {
     const delays = config.followupDelaysMinutes as unknown as number[];
     if (!Array.isArray(delays) || delays.length === 0) continue;
@@ -42,6 +55,8 @@ export async function POST(req: NextRequest) {
     });
 
     for (const conversation of candidates) {
+      if (totalFollowupsSent >= MAX_FOLLOWUPS_PER_RUN) break convoLoop;
+
       // A 1ª tentativa conta a partir da última atividade da conversa; as seguintes contam
       // a partir do envio da tentativa anterior, permitindo intervalos diferentes entre elas.
       const referenceTime = conversation.followupCount === 0 ? conversation.updatedAt : (conversation.lastFollowupAt ?? conversation.updatedAt);
@@ -69,8 +84,12 @@ export async function POST(req: NextRequest) {
         where: { id: conversation.id },
         data: { followupCount: { increment: 1 }, lastFollowupAt: new Date() },
       });
+      // Espaça os envios com um intervalo variado — nunca manda dois follow-ups automáticos
+      // colados, pra não parecer disparo em massa pro WhatsApp/Meta. Só espera a partir do 2º.
+      if (totalFollowupsSent > 0) await sleep(Math.floor((8 + Math.random() * 17) * 1000)); // 8–25s
       await sendWhatsAppTextAsTeam(config.uazapiToken, conversation.contactNumber, followup);
       sent++;
+      totalFollowupsSent++;
     }
   }
 
@@ -79,10 +98,6 @@ export async function POST(req: NextRequest) {
   // acima, que só dispara enquanto espera resposta do cliente).
   let stageFollowupChecked = 0;
   let stageFollowupSent = 0;
-  // Throttle: um backlog grande de oportunidades vencidas de uma vez (ex: várias movidas em
-  // lote pra uma etapa de nutrição) não pode virar uma rajada de mensagens no mesmo minuto —
-  // manda no máximo isso por execução do cron, o resto pega no próximo ciclo (5 em 5 min).
-  const MAX_STAGE_FOLLOWUPS_PER_RUN = 10;
 
   const stages = await prisma.pipelineStage.findMany({
     where: { pipeline: { agentConfig: { active: true, uazapiToken: { not: null } } } },
@@ -126,7 +141,7 @@ O lead está na etapa "${stage.name}" do funil "${stage.pipeline.name}". Siga es
     });
 
     for (const opp of candidates) {
-      if (stageFollowupSent >= MAX_STAGE_FOLLOWUPS_PER_RUN) break stageLoop;
+      if (totalFollowupsSent >= MAX_FOLLOWUPS_PER_RUN) break stageLoop;
 
       const referenceTime = opp.stageFollowupCount === 0 ? opp.stageEnteredAt : (opp.lastStageFollowupAt ?? opp.stageEnteredAt);
       const delayMinutes = delays[opp.stageFollowupCount];
@@ -155,8 +170,11 @@ O lead está na etapa "${stage.name}" do funil "${stage.pipeline.name}". Siga es
         where: { id: opp.id },
         data: { stageFollowupCount: { increment: 1 }, lastStageFollowupAt: new Date() },
       });
+      // Mesmo espaçamento variado do follow-up de conversa acima — soma no mesmo teto/contador.
+      if (totalFollowupsSent > 0) await sleep(Math.floor((8 + Math.random() * 17) * 1000)); // 8–25s
       await sendWhatsAppTextAsTeam(config.uazapiToken, conversation.contactNumber, followup);
       stageFollowupSent++;
+      totalFollowupsSent++;
     }
   }
 
