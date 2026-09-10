@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
-import { sendTrialInviteToLead } from "@/lib/lead-form-funnel";
+import { sendTrialInviteToLead, gerarProximaPergunta } from "@/lib/lead-form-funnel";
 
 type Question = { key: string; label: string; type: "TEXTO" | "WHATSAPP" | "EMAIL" | "NUMERO" };
 
@@ -52,5 +52,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     }
   }
 
-  return NextResponse.json({ submissionId: submission.id });
+  // A próxima pergunta é reescrita pela IA usando o que já foi respondido, pra soar como
+  // continuação da conversa em vez do texto fixo cadastrado no admin.
+  const currentIndex = questions.findIndex(q => q.key === key);
+  const next = questions[currentIndex + 1];
+  let nextMessage: string | null = null;
+  if (next) {
+    const respondidas = questions
+      .slice(0, currentIndex + 1)
+      .filter(q => answers[q.key] !== undefined)
+      .map(q => ({ pergunta: q.label, resposta: answers[q.key] }));
+    nextMessage = await gerarProximaPergunta({ headline: form.headline, respondidas, proximaPergunta: next.label });
+  }
+
+  return NextResponse.json({ submissionId: submission.id, nextMessage });
 }

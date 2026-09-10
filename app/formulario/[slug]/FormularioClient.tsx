@@ -54,6 +54,8 @@ export function FormularioClient({ slug, headline, questions }: { slug: string; 
     setValue("");
     setShowInput(false);
 
+    const next = step + 1;
+    let nextMessage: string | null = null;
     try {
       const res = await fetch(`/api/formularios/${slug}/responder`, {
         method: "POST",
@@ -62,23 +64,19 @@ export function FormularioClient({ slug, headline, questions }: { slug: string; 
       });
       const data = await res.json();
       if (data.submissionId) setSubmissionId(data.submissionId);
+      nextMessage = data.nextMessage ?? null;
     } catch {
       // segue o fluxo mesmo se o registro falhar — não trava o lead numa tela de erro
     }
 
-    const next = step + 1;
     if (next < questions.length) {
-      setTimeout(() => {
-        setBubbles(prev => [...prev, { from: "bot", text: questions[next].label }]);
-        setStep(next);
-        setTimeout(() => setShowInput(true), 250);
-        setSending(false);
-      }, 500);
+      setBubbles(prev => [...prev, { from: "bot", text: nextMessage || questions[next].label }]);
+      setStep(next);
+      setTimeout(() => setShowInput(true), 250);
+      setSending(false);
     } else {
-      setTimeout(() => {
-        setDone(true);
-        setSending(false);
-      }, 500);
+      setDone(true);
+      setSending(false);
     }
   }
 
@@ -112,6 +110,14 @@ export function FormularioClient({ slug, headline, questions }: { slug: string; 
             {b.text}
           </div>
         ))}
+
+        {sending && !showInput && !done && (
+          <div className="self-start bg-gray-100 rounded-2xl px-5 py-3.5 flex items-center gap-1 animate-in fade-in duration-300">
+            {[0, 1, 2].map(i => (
+              <span key={i} className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: `${i * 120}ms` }} />
+            ))}
+          </div>
+        )}
 
         {showInput && current && (
           <div className="mt-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
