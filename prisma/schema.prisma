@@ -1891,6 +1891,44 @@ model TrialFunnelSent {
   @@unique([teamId, stepId])
 }
 
+// ─── Formulário de captação (topo do funil) ──────────────────────────────────
+// Formulário conversacional (estilo Typeform), público, criado pelo super admin — usado como
+// isca de anúncio/link na bio pra captar lead antes de virar conta de verdade. Ao responder o
+// campo do tipo WHATSAPP, a pessoa já recebe o convite pra teste grátis/demonstração pelo
+// próprio WhatsApp da FluxVenda (ver lib/lead-form-funnel.ts) — não depende de cadastro.
+enum LeadFormFieldType {
+  TEXTO
+  WHATSAPP
+  EMAIL
+  NUMERO
+}
+
+model LeadForm {
+  id        String   @id @default(cuid())
+  slug      String   @unique // parte da URL pública: /formulario/{slug}
+  title     String // só uso interno, não aparece pro lead
+  headline  String   @db.Text // primeira mensagem do bot, antes da 1ª pergunta
+  questions Json // [{ key, label, type: LeadFormFieldType }] — ordem = ordem de exibição
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  submissions LeadFormSubmission[]
+}
+
+model LeadFormSubmission {
+  id           String    @id @default(cuid())
+  formId       String
+  form         LeadForm  @relation(fields: [formId], references: [id], onDelete: Cascade)
+  answers      Json      @default("{}") // { [questionKey]: valor }
+  nome         String?
+  whatsapp     String?
+  inviteSentAt DateTime? // quando o convite automático foi disparado (null = ainda não chegou no campo whatsapp)
+  createdAt    DateTime  @default(now())
+
+  @@index([formId])
+}
+
 // ─── Agente de Ligação (Twilio + ElevenLabs) ─────────────────────────────────
 
 enum PhoneCallStatus {
