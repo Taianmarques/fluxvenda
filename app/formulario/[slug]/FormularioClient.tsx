@@ -152,7 +152,8 @@ export function FormularioClient({ slug, headline, questions }: { slug: string; 
               <Check size={16} className="text-white" />
             </div>
             <p className="text-[15px] text-gray-700 leading-relaxed pt-1.5">
-              Prontinho! Fica de olho no seu WhatsApp — já te chamamos por lá.
+              Prontinho! Te chamamos agora no seu WhatsApp com o convite pra testar grátis por 7 dias
+              (ou marcar uma demonstração, se preferir). Fica de olho por lá.
             </p>
           </div>
         )}

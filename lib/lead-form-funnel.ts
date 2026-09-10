@@ -12,10 +12,13 @@ function normalizePhone(raw: string): string {
   return `55${digits}`;
 }
 
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3002";
+
 const CONVITE_TEMPLATE = (nome: string) =>
   `Oi, ${nome.split(" ")[0]}! Vi que você quer entender como aplicar IA no seu comercial. ` +
-  `A FluxVenda é um CRM com IA que atende, agenda e vende pelo seu WhatsApp — dá pra testar de graça ` +
-  `ou já marcar uma demonstração rápida com a gente. O que prefere?`;
+  `A FluxVenda é um CRM com IA que atende, agenda e vende pelo seu WhatsApp.\n\n` +
+  `Você pode testar grátis por 7 dias, sem cartão — é só se cadastrar aqui: ${APP_URL}/sign-up?product=crm\n\n` +
+  `Ou, se preferir, eu já te agendo uma demonstração rápida com a gente. O que prefere?`;
 
 // Reescreve a próxima pergunta usando o que a pessoa já respondeu, pra soar como uma conversa de
 // verdade em vez de um formulário engessado (ex: "Prazer, Taian! E qual seu WhatsApp?" em vez de
