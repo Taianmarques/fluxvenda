@@ -41,8 +41,13 @@ export default async function AdminDemonstracoesPage() {
                   className={`flex items-center justify-between gap-4 bg-gray-900 border rounded-2xl p-4 ${passada ? "border-gray-800 opacity-50" : "border-gray-800"}`}
                 >
                   <div className="min-w-0">
-                    <p className="font-semibold truncate">{b.team.name}</p>
-                    <p className="text-xs text-gray-500 truncate">{b.requestedBy.name} • {b.requestedBy.email}</p>
+                    <p className="font-semibold truncate">
+                      {b.team?.name ?? b.leadName ?? "Lead"}
+                      {!b.team && <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-900/40 text-amber-300 border border-amber-800/50 align-middle">sem conta</span>}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate">
+                      {b.requestedBy ? `${b.requestedBy.name} • ${b.requestedBy.email}` : (b.leadPhone ?? "—")}
+                    </p>
                   </div>
                   <div className="flex items-center gap-4 flex-shrink-0 text-right">
                     <div>

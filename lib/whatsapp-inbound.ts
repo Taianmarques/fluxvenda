@@ -942,10 +942,9 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
         return "Erro: informe data (AAAA-MM-DD) e hora (HH:MM) exatamente como apareceram em consultar_horarios_demo.";
       }
 
+      // Contato pode não ter conta ainda (lead vindo do formulário de captação) — nesse caso
+      // agenda mesmo assim, guardando nome/telefone em vez de team/profile (ver DemoBooking).
       const contato = await lookupContatoPlataforma(contactNumber);
-      if (!contato?.team) {
-        return "Erro: não encontrei uma equipe cadastrada pra esse contato, não é possível agendar automaticamente. Oriente a acessar o Hub (app.fluxvenda.com.br/crm/hub/inicio > Agendar uma demonstração) ou chame transferir_departamento.";
-      }
 
       const scheduledAt = new Date(`${data}T${hora}:00`);
       const [settings, busy] = await Promise.all([
@@ -957,10 +956,18 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
         return "Erro: esse horário não está mais disponível. Chame consultar_horarios_demo de novo pra ver os horários atuais e ofereça outra opção.";
       }
 
+      const nomeParaAgenda = contato?.profile.name ?? contactName ?? "Lead via formulário";
       await prisma.demoBooking.create({
-        data: { teamId: contato.team.id, requestedById: contato.profile.id, scheduledAt, durationMinutes: DEMO_SLOT_MINUTES },
+        data: contato?.team
+          ? { teamId: contato.team.id, requestedById: contato.profile.id, scheduledAt, durationMinutes: DEMO_SLOT_MINUTES }
+          : { leadName: nomeParaAgenda, leadPhone: contactNumber, scheduledAt, durationMinutes: DEMO_SLOT_MINUTES },
       });
-      sendDemoBookingNotification(contato.team.name, contato.profile.name, contato.profile.email, scheduledAt).catch(() => {});
+      sendDemoBookingNotification(
+        contato?.team?.name ?? "Lead (sem conta ainda)",
+        nomeParaAgenda,
+        contato?.profile.email ?? `WhatsApp ${contactNumber}`,
+        scheduledAt
+      ).catch(() => {});
 
       const dataFormatada = scheduledAt.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" });
       const horaFormatada = scheduledAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });

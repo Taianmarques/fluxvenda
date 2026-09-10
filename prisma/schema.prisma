@@ -1700,11 +1700,16 @@ model DemoBooking {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
 
-  teamId String
-  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  // Nulos quando quem agendou ainda não tem conta na FluxVenda (lead vindo do formulário de
+  // captação, por exemplo) — nesse caso usa leadName/leadPhone abaixo em vez da equipe/perfil.
+  teamId String?
+  team   Team?   @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
-  requestedById String
-  requestedBy   Profile @relation(fields: [requestedById], references: [id], onDelete: Cascade)
+  requestedById String?
+  requestedBy   Profile? @relation(fields: [requestedById], references: [id], onDelete: Cascade)
+
+  leadName  String?
+  leadPhone String?
 
   scheduledAt     DateTime
   durationMinutes Int      @default(40)
