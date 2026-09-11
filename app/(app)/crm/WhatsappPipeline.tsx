@@ -8,13 +8,13 @@ import {
 import { useDroppable, useDraggable } from "@dnd-kit/core";
 import { SortableContext, useSortable, arrayMove, horizontalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ThumbsUp, ThumbsDown, MessageCircle, Bot, X, ListChecks, MoreVertical, ArrowRightLeft, GitBranch, Pencil, Trash2, Clock, GripVertical } from "lucide-react";
+import { ThumbsUp, ThumbsDown, MessageCircle, Bot, BotOff, X, ListChecks, MoreVertical, ArrowRightLeft, GitBranch, Pencil, Trash2, Clock, GripVertical } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { ConversationPopup } from "./ConversationPopup";
 import { PipelineTaskPanel } from "./PipelineTaskPanel";
 import type { Attendant } from "./PipelineFiltersPanel";
 
-export type Stage = { id: string; name: string; color: string; order: number; agenteInstrucoes?: string; followupDelaysMinutes?: number[] };
+export type Stage = { id: string; name: string; color: string; order: number; agenteInstrucoes?: string; iaEnabled?: boolean; followupDelaysMinutes?: number[] };
 
 export type PipelineOption = { id: string; name: string; stages: { id: string; name: string }[] };
 
@@ -425,6 +425,11 @@ function Column({
   const [salvandoAgente, setSalvandoAgente] = useState(false);
   const temAgente = (stage.agenteInstrucoes ?? "").trim().length > 0;
 
+  // Liga/desliga a IA pra quem está nesta etapa — desligada, só atendente humano responde,
+  // mesmo que a conversa em si não esteja com humanTakeover
+  const [iaEnabled, setIaEnabled] = useState(stage.iaEnabled ?? true);
+  const iaDesativada = stage.iaEnabled === false;
+
   // Follow-up automático: dispara sozinho se o lead ficar parado demais nesta etapa
   const [followupRows, setFollowupRows] = useState<DelayRow[]>((stage.followupDelaysMinutes ?? []).map(minutesToRow));
   const temFollowup = (stage.followupDelaysMinutes ?? []).length > 0;
@@ -446,7 +451,7 @@ function Column({
       await fetch(`/api/ferramentas/whatsapp/etapas/${stage.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agenteInstrucoes: instrucoes.trim(), followupDelaysMinutes: followupRows.map(rowToMinutes) }),
+        body: JSON.stringify({ agenteInstrucoes: instrucoes.trim(), iaEnabled, followupDelaysMinutes: followupRows.map(rowToMinutes) }),
       });
       setShowAgente(false);
       onStagesChange();
@@ -506,14 +511,25 @@ function Column({
               onClick={() => {
                 setInstrucoes(stage.agenteInstrucoes ?? "");
                 setFollowupRows((stage.followupDelaysMinutes ?? []).map(minutesToRow));
+                setIaEnabled(stage.iaEnabled ?? true);
                 setShowAgente(s => !s);
               }}
-              title={temAgente || temFollowup ? "Agente da etapa configurado — clique para editar" : "Configurar agente responsável por esta etapa"}
+              title={
+                iaDesativada
+                  ? "IA desativada nesta etapa — clique para editar"
+                  : temAgente || temFollowup
+                    ? "Agente da etapa configurado — clique para editar"
+                    : "Configurar agente responsável por esta etapa"
+              }
               className={`flex-shrink-0 flex ${
-                temAgente || temFollowup ? "text-blue-400 hover:text-blue-300" : "md:hidden md:group-hover:flex text-gray-600 hover:text-gray-400"
+                iaDesativada
+                  ? "text-red-400 hover:text-red-300"
+                  : temAgente || temFollowup
+                    ? "text-blue-400 hover:text-blue-300"
+                    : "md:hidden md:group-hover:flex text-gray-600 hover:text-gray-400"
               }`}
             >
-              <Bot size={14} />
+              {iaDesativada ? <BotOff size={14} /> : <Bot size={14} />}
             </button>
             <button
               onClick={() => onDelete(stage.id)}
@@ -532,6 +548,23 @@ function Column({
               <p className="text-xs font-semibold flex items-center gap-1"><Bot size={11} /> Agente desta etapa</p>
               <button onClick={() => setShowAgente(false)} className="text-gray-500 hover:text-gray-300"><X size={12} /></button>
             </div>
+
+            <div
+              onClick={() => setIaEnabled(v => !v)}
+              className={`flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 cursor-pointer select-none ${dark ? "bg-gray-900" : "bg-gray-50"}`}
+            >
+              <span className="text-xs flex items-center gap-1.5">
+                {iaEnabled ? <Bot size={12} className="text-blue-400" /> : <BotOff size={12} className="text-red-400" />}
+                IA responde automaticamente nesta etapa
+              </span>
+              <span className={`relative w-8 h-4.5 flex-shrink-0 rounded-full transition-colors ${iaEnabled ? "bg-blue-600" : "bg-gray-600"}`}>
+                <span className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white transition-transform ${iaEnabled ? "translate-x-4" : "translate-x-0.5"}`} />
+              </span>
+            </div>
+            {!iaEnabled && (
+              <p className="text-[10px] text-red-400">Desativada: leads nesta etapa só serão atendidos por um humano, mesmo sem transferência manual.</p>
+            )}
+
             <textarea
               value={instrucoes}
               onChange={e => setInstrucoes(e.target.value)}

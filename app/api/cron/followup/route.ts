@@ -111,8 +111,11 @@ async function runFollowupJob() {
   let stageFollowupChecked = 0;
   let stageFollowupSent = 0;
 
+  // iaEnabled:false = gestor desligou a IA pra quem está nessa etapa (só humano) — o follow-up
+  // automático é gerado e enviado como a IA, então não faz sentido disparar aqui se a etapa
+  // não deixa a IA falar com esses leads de forma alguma.
   const stages = await prisma.pipelineStage.findMany({
-    where: { pipeline: { agentConfig: { active: true, uazapiToken: { not: null } } } },
+    where: { iaEnabled: true, pipeline: { agentConfig: { active: true, uazapiToken: { not: null } } } },
     include: { pipeline: { include: { agentConfig: true } } },
   });
 

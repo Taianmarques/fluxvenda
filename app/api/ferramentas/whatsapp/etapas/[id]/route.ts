@@ -9,6 +9,7 @@ const patchSchema = z.object({
   color: z.string().optional(),
   order: z.number().int().optional(),
   agenteInstrucoes: z.string().max(1500).optional(),
+  iaEnabled: z.boolean().optional(),
   followupDelaysMinutes: z.array(z.number().int().min(1).max(43200)).max(10).optional(),
 });
 

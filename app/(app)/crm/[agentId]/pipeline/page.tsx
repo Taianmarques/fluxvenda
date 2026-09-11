@@ -83,6 +83,7 @@ export default async function PipelinePage({ params }: { params: Promise<{ agent
         agenteInstrucoes: p.agenteInstrucoes,
         stages: p.stages.map(s => ({
           id: s.id, name: s.name, color: s.color, order: s.order, agenteInstrucoes: s.agenteInstrucoes,
+          iaEnabled: s.iaEnabled,
           followupDelaysMinutes: s.followupDelaysMinutes as unknown as number[],
         })),
       }))}

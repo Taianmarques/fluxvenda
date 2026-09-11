@@ -1566,15 +1566,24 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
     await assignNextAttendant(config.id, config.teamId, conversation.id);
   }
 
+  // Etapa atual do funil (se houver) — buscado aqui porque também entra no gate abaixo (uma
+  // etapa pode desligar a IA, ex: "Fechamento"/"Pós-venda" só com humano); reaproveitado mais
+  // adiante pra montar a instrução da IA por etapa, sem repetir a query.
+  const currentOpp = await prisma.opportunity.findFirst({
+    where: { conversationId: conversation.id, wonAt: null, stageId: { not: null } },
+    orderBy: { createdAt: "desc" },
+    include: { stage: { include: { pipeline: { select: { name: true, agenteInstrucoes: true } } } } },
+  });
+
   // Atendente humano assumiu essa conversa, ou um critério de "quem a IA atende" excluiu essa
-  // conversa (já tem vendedor / nível da carteira / número bloqueado) — apenas registra a
-  // mensagem, sem o agente responder. Em ambos os casos dispara web push pro atendente
-  // responsável (ou pra equipe toda, se a conversa ainda não tem dono) — ninguém deve ficar
-  // sem saber que chegou mensagem só porque a IA decidiu não responder.
+  // conversa (já tem vendedor / nível da carteira / número bloqueado / IA desligada na etapa
+  // atual) — apenas registra a mensagem, sem o agente responder. Em todos os casos dispara web
+  // push pro atendente responsável (ou pra equipe toda, se a conversa ainda não tem dono) —
+  // ninguém deve ficar sem saber que chegou mensagem só porque a IA decidiu não responder.
   // Modo sandbox (simulador de teste em Ferramentas > Treino): ignora as pausas/gates de
   // produção — o gestor testando o agente sempre quer ver a IA responder, independente do
   // agente estar pausado ou de "quem a IA atende" excluir aquele contato de mentira.
-  if (!opts?.sandbox && (conversation.humanTakeover || !shouldAiHandle(config, conversation))) {
+  if (!opts?.sandbox && (conversation.humanTakeover || !shouldAiHandle(config, conversation) || currentOpp?.stage?.iaEnabled === false)) {
     notifyHumanTakeoverMessage(config, conversation.id, conversation.assignedToId, conversation.contactName ?? contactNumber, text).catch(() => {});
     return;
   }
@@ -1702,13 +1711,9 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
     : "\n\nEmojis: NUNCA use emojis nas respostas. Mantenha o texto limpo, sem símbolos especiais.";
 
   // Agente do funil e da etapa: instruções que moldam a IA conforme onde o lead está.
-  // Pipeline vale para o funil inteiro; a etapa refina por cima.
+  // Pipeline vale para o funil inteiro; a etapa refina por cima. (currentOpp já foi buscado
+  // mais acima, no gate de "quem a IA atende" — reaproveitado aqui pra não repetir a query.)
   let stageInstruction = "";
-  const currentOpp = await prisma.opportunity.findFirst({
-    where: { conversationId: conversation.id, wonAt: null, stageId: { not: null } },
-    orderBy: { createdAt: "desc" },
-    include: { stage: { include: { pipeline: { select: { name: true, agenteInstrucoes: true } } } } },
-  });
   if (currentOpp?.stage) {
     const pipelineInstr = currentOpp.stage.pipeline.agenteInstrucoes?.trim();
     const stageInstr = currentOpp.stage.agenteInstrucoes?.trim();

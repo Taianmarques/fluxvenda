@@ -1397,6 +1397,11 @@ model PipelineStage {
   // enquanto o lead estiver nesta etapa do funil (prioridade sobre o prompt geral)
   agenteInstrucoes String @default("")
 
+  // false = a IA para de responder automaticamente pra quem está nesta etapa (mesmo
+  // tratamento de humanTakeover:true — só atendente humano segue a partir daqui). Não afeta
+  // o follow-up automático abaixo, que é um mecanismo à parte.
+  iaEnabled Boolean @default(true)
+
   // Follow-up automático por tempo parado na etapa (independe de quem mandou a última
   // mensagem — diferente do follow-up global do agente). [] = desativado nesta etapa.
   // Minutos por tentativa, ex: [1440, 2880] = 1ª após 24h parado, 2ª +48h depois.
