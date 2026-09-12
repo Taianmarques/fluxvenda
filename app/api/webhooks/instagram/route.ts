@@ -8,6 +8,7 @@ import { emitChatEvent } from "@/lib/realtime";
 import { verifyMetaHandshake, verifyMetaSignature } from "@/lib/meta-webhook";
 import { sendWhatsAppTextAsTeam } from "@/lib/whatsapp";
 import { extractBrazilianPhoneFromText } from "@/lib/phone-extract";
+import { buildConhecimentoContext, buildTreinoContext } from "@/lib/whatsapp-inbound";
 
 // GET: verificação de webhook pela Meta (hub challenge)
 export async function GET(req: NextRequest) {
@@ -373,7 +374,13 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
     content: m.content,
   }));
 
-  const result = await runAgent(config.systemPrompt + emojiInstruction + igColetaInstruction, history, text);
+  // Mesmo tratamento de contexto usado no WhatsApp — base de conhecimento e exemplos de
+  // treino (RAG por similaridade) valiam só pro WhatsApp antes; sem isso, o que o gestor
+  // cadastra nessas telas não tinha nenhum efeito nas respostas via Instagram.
+  const conhecimentoContext = await buildConhecimentoContext(config.id);
+  const treinoContext = await buildTreinoContext(config, text);
+
+  const result = await runAgent(config.systemPrompt + emojiInstruction + igColetaInstruction + conhecimentoContext + treinoContext, history, text);
 
   await prisma.message.create({ data: { conversationId: conversation.id, role: "assistant", content: result.reply } });
   emitChatEvent(config.id, conversation.id);
@@ -459,8 +466,11 @@ async function processComment(igBusinessAccountId: string, comment: {
     if (!config.systemPrompt || config.instagramAiPaused) return;
     if (await isOverQuota(config.teamId)) return;
 
+    const conhecimentoContext = await buildConhecimentoContext(config.id);
+    const treinoContext = await buildTreinoContext(config, text);
+
     const result = await runAgent(
-      config.systemPrompt,
+      config.systemPrompt + conhecimentoContext + treinoContext,
       [],
       `Alguém comentou no seu post: "${text}". Responda com uma mensagem direta e personalizada para continuar a conversa no privado.`
     );

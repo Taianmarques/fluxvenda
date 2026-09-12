@@ -130,7 +130,7 @@ Você também pode receber, no meio da conversa, um lembrete automático pergunt
 // Base de conhecimento do agente — injetada no system prompt de toda resposta (os três
 // caminhos: texto com tools, texto puro e imagem). Orçamento de caracteres evita inflar
 // o custo de token por mensagem; itens mais antigos têm prioridade (ordem de criação).
-async function buildConhecimentoContext(agentConfigId: string): Promise<string> {
+export async function buildConhecimentoContext(agentConfigId: string): Promise<string> {
   const itens = await prisma.conhecimentoItem.findMany({
     where: { agentConfigId, active: true },
     orderBy: { createdAt: "asc" },
@@ -156,7 +156,7 @@ async function buildConhecimentoContext(agentConfigId: string): Promise<string> 
 // atendimento simulado (tela Treino) mais parecidos com a mensagem atual do cliente — usado
 // como referência em vez de fine-tuning. Nunca trava a resposta se a chamada de embedding da
 // OpenAI falhar; nesse caso só entra sem exemplos.
-async function buildTreinoContext(config: AgentConfigFull, mensagemCliente: string): Promise<string> {
+export async function buildTreinoContext(config: AgentConfigFull, mensagemCliente: string): Promise<string> {
   if (!mensagemCliente.trim()) return "";
 
   const todos = await prisma.treinoExemplo.findMany({
