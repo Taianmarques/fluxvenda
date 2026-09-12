@@ -51,39 +51,60 @@ Responda APENAS com um JSON válido neste formato exato, sem markdown, sem comen
 
 // ─── Conversa de vitrine (catálogo + agendamento + Pix) ──────────────────────
 
+// O que a conta de exemplo deve demonstrar de verdade na conversa vitrine — escolhido pelo
+// admin na tela de criação (ver ContasExemploAdminClient.tsx). "foto" só faz sentido com
+// "produto" marcado junto (é a foto DO produto).
+export type ShowcaseToggles = { produto: boolean; foto: boolean; agendamento: boolean; pagamento: boolean };
+export const SHOWCASE_DEFAULTS: ShowcaseToggles = { produto: true, foto: true, agendamento: true, pagamento: true };
+
 type ShowcaseBeat = "texto" | "foto_produto" | "agendar" | "pix";
 type ShowcaseMensagem = { role: "user" | "assistant"; content: string; beat?: ShowcaseBeat };
 type ShowcaseDialogo = {
   contactName: string;
-  produto: { nome: string; preco: number };
+  produto: { nome: string; preco: number } | null;
   mensagens: ShowcaseMensagem[];
 };
 
-// Mesma ideia de generateDemoDialogue, mas roteirizada pra passar, nesta ordem, pelos três
-// momentos que a conta de exemplo precisa ILUSTRAR de verdade (não só descrever em texto):
-// a IA mostrando a foto de um produto, confirmando um agendamento e gerando um Pix. Os "beats"
-// marcam em qual mensagem do assistente cada coisa acontece — createShowcaseConversation usa
-// isso pra inserir a foto/Appointment/Order de verdade no lugar certo da conversa.
+// Mesma ideia de generateDemoDialogue, mas roteirizada pra passar, nesta ordem, pelos momentos
+// marcados em `toggles` que a conta de exemplo precisa ILUSTRAR de verdade (não só descrever em
+// texto): a IA mostrando a foto de um produto, confirmando um agendamento e/ou gerando um Pix.
+// Os "beats" marcam em qual mensagem do assistente cada coisa acontece — createShowcaseConversation
+// usa isso pra inserir a foto/Appointment/Order de verdade no lugar certo da conversa. Sem
+// nenhum toggle ativo não há o que mostrar, então retorna null (a conta fica só com as
+// conversas genéricas por etapa).
 async function generateShowcaseDialogue(params: {
-  teamName: string; segmento: string; subsegmento: string; valorMin: number; valorMax: number;
+  teamName: string; segmento: string; subsegmento: string; valorMin: number; valorMax: number; toggles: ShowcaseToggles;
 }): Promise<ShowcaseDialogo | null> {
-  const prompt = `Gere uma conversa simulada e realista de WhatsApp entre um lead e o atendente de IA de uma empresa do segmento "${params.segmento}" (subsegmento "${params.subsegmento}"), chamada "${params.teamName}", que vende pelo WhatsApp com catálogo de produtos e agendamento de horários.
+  const { produto, foto, agendamento, pagamento } = params.toggles;
+  if (!produto && !agendamento && !pagamento) return null;
 
-A conversa precisa mostrar, NESTA ORDEM, o lead: 1) perguntando sobre um produto/serviço específico e pedindo pra ver uma foto, 2) decidindo agendar um horário (visita, retirada ou atendimento) e recebendo a confirmação, 3) fechando a compra e recebendo um Pix pra pagar. Termine com o cliente confirmando que vai pagar.
+  const passos: string[] = [];
+  if (produto) passos.push(foto ? "perguntando sobre um produto/serviço específico e pedindo pra ver uma foto" : "perguntando sobre um produto/serviço específico e decidindo com base no que o atendente descreveu");
+  if (agendamento) passos.push("decidindo agendar um horário (visita, retirada ou atendimento) e recebendo a confirmação");
+  if (pagamento) passos.push("fechando a compra e recebendo um Pix pra pagar, confirmando ao final que vai pagar");
+  const passosTexto = passos.map((p, i) => `${i + 1}) ${p}`).join(", ");
 
-Escreva em português do Brasil, tom natural de WhatsApp, mensagens curtas. Entre 8 e 14 mensagens no total, alternando cliente e atendente, começando pelo cliente.
+  const beats = [
+    produto && foto ? `- "foto_produto": a mensagem em que ele avisa que vai mandar a foto (a foto é enviada automaticamente logo depois — não descreva a foto em texto, nem invente um link de imagem)` : null,
+    agendamento ? `- "agendar": a mensagem em que ele confirma um horário marcado` : null,
+    pagamento ? `- "pix": a mensagem em que ele confirma que gerou a cobrança (o código Pix é enviado automaticamente ANTES dessa mensagem, como uma mensagem separada — não escreva o código Pix você mesmo)` : null,
+  ].filter(Boolean).join("\n");
+
+  const prompt = `Gere uma conversa simulada e realista de WhatsApp entre um lead e o atendente de IA de uma empresa do segmento "${params.segmento}" (subsegmento "${params.subsegmento}"), chamada "${params.teamName}"${produto || pagamento ? ", que vende pelo WhatsApp" : ""}${agendamento ? " e agenda horários" : ""}.
+
+A conversa precisa mostrar, NESTA ORDEM, o lead: ${passosTexto}.
+
+Escreva em português do Brasil, tom natural de WhatsApp, mensagens curtas. Entre ${4 + passos.length * 2} e ${6 + passos.length * 3} mensagens no total, alternando cliente e atendente, começando pelo cliente.
+
+${produto || pagamento ? `Invente um produto ou serviço plausível pro segmento, com preço em reais entre ${params.valorMin} e ${params.valorMax}. O nome do produto deve ser curto (até uns 30 caracteres).` : ""}
 
 Marque cada mensagem do ASSISTENTE com um campo "beat":
-- "foto_produto": a mensagem em que ele avisa que vai mandar a foto (a foto é enviada automaticamente logo depois — não descreva a foto em texto, nem invente um link de imagem)
-- "agendar": a mensagem em que ele confirma um horário marcado
-- "pix": a mensagem em que ele confirma que gerou a cobrança (o código Pix é enviado automaticamente ANTES dessa mensagem, como uma mensagem separada — não escreva o código Pix você mesmo)
+${beats}
 - "texto": qualquer outra mensagem do assistente
 Mensagens do cliente (role "user") não precisam de "beat".
 
-Invente um produto ou serviço plausível pro segmento, com preço em reais entre ${params.valorMin} e ${params.valorMax}. O nome do produto deve ser curto (até uns 30 caracteres).
-
 Responda APENAS com um JSON válido neste formato exato, sem markdown, sem comentários:
-{"contactName": "Nome Fictício", "produto": {"nome": "...", "preco": 000.00}, "mensagens": [{"role": "user", "content": "..."}, {"role": "assistant", "beat": "texto", "content": "..."}]}`;
+{"contactName": "Nome Fictício"${produto || pagamento ? `, "produto": {"nome": "...", "preco": 000.00}` : ""}, "mensagens": [{"role": "user", "content": "..."}, {"role": "assistant", "beat": "texto", "content": "..."}]}`;
 
   const completion = await openai.chat.completions.create({
     model: MODEL,
@@ -99,17 +120,55 @@ Responda APENAS com um JSON válido neste formato exato, sem markdown, sem comen
           Boolean(m) && typeof m === "object" && "role" in (m as object) && "content" in (m as object)
         )
       : [];
-    if (mensagens.length === 0 || !parsed.produto?.nome) return null;
+    if (mensagens.length === 0) return null;
+    const precisaProduto = produto || pagamento;
+    if (precisaProduto && !parsed.produto?.nome) return null;
     return {
       contactName: typeof parsed.contactName === "string" ? parsed.contactName : "Cliente Demonstração",
-      produto: {
-        nome: String(parsed.produto.nome).slice(0, 60),
-        preco: Number(parsed.produto.preco) > 0 ? Number(parsed.produto.preco) : Math.round((params.valorMin + params.valorMax) / 2),
-      },
+      produto: precisaProduto
+        ? {
+            nome: String(parsed.produto.nome).slice(0, 60),
+            preco: Number(parsed.produto.preco) > 0 ? Number(parsed.produto.preco) : Math.round((params.valorMin + params.valorMax) / 2),
+          }
+        : null,
       mensagens,
     };
   } catch {
     return null;
+  }
+}
+
+// Conversa de exemplo pra uma situação específica descrita livremente pelo gestor (ex: "cliente
+// que manda mensagem às 3 da manhã") — mesmo formato de generateDemoDialogue, mas o cenário
+// substitui a etapa do funil como contexto. Não gera Opportunity/pipeline: é só pra mostrar como
+// a IA se comporta nessa situação, sem forçar a conversa a caber numa etapa de vendas.
+async function generateCenarioDialogue(params: { teamName: string; segmento: string; subsegmento: string; cenario: string }): Promise<DialogoSimulado> {
+  const prompt = `Gere uma conversa simulada e realista de WhatsApp entre um lead e o atendente de IA de uma empresa do segmento "${params.segmento}" (subsegmento "${params.subsegmento}"), chamada "${params.teamName}".
+
+A conversa deve retratar especificamente esta situação, descrita pelo gestor da empresa: "${params.cenario}". Monte uma conversa plausível pra esse cenário exato, mostrando como o atendente de IA lida com ela.
+
+Escreva em português do Brasil, tom natural de WhatsApp (mensagens curtas, sem formalidade excessiva, pode usar 1-2 emojis). Entre 4 e 8 mensagens no total, alternando cliente e atendente, começando pelo cliente.
+
+Responda APENAS com um JSON válido neste formato exato, sem markdown, sem comentários:
+{"contactName": "Nome Fictício", "messages": [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]}`;
+
+  const completion = await openai.chat.completions.create({
+    model: MODEL,
+    max_tokens: 900,
+    response_format: { type: "json_object" },
+    messages: [{ role: "user", content: prompt }],
+  });
+
+  try {
+    const parsed = JSON.parse(completion.choices[0]?.message?.content ?? "{}");
+    const messages = Array.isArray(parsed.messages)
+      ? parsed.messages.filter((m: unknown): m is { role: "user" | "assistant"; content: string } =>
+          Boolean(m) && typeof m === "object" && ("role" in (m as object)) && ("content" in (m as object))
+        )
+      : [];
+    return { contactName: typeof parsed.contactName === "string" ? parsed.contactName : "Lead Exemplo", messages };
+  } catch {
+    return { contactName: "Lead Exemplo", messages: [] };
   }
 }
 
@@ -301,22 +360,35 @@ async function createShowcaseConversation(params: {
   agentId: string;
   stages: { id: string; name: string }[];
   teamName: string; segmento: string; subsegmento: string; valorMin: number; valorMax: number;
+  toggles: ShowcaseToggles;
+  fotoProduto?: { base64: string; mimeType: string } | null; // foto real enviada pelo admin — sem ela, cai na placeholder gerada
   professionalId?: string | null; serviceId?: string | null;
 }): Promise<void> {
   const dialogo = await generateShowcaseDialogue(params);
   if (!dialogo) return;
 
-  const { base64: fotoBase64, mimeType: fotoMime } = await generateProductPlaceholderImage(dialogo.produto.nome);
-
-  const product = await prisma.product.create({
-    data: {
-      agentConfigId: params.agentId,
-      name: dialogo.produto.nome,
-      price: dialogo.produto.preco,
-      imagemBase64: fotoBase64,
-      imagemMimeType: fotoMime,
-    },
-  });
+  // "produto" no catálogo só é criado se o toggle "produto" estiver ligado — quando só
+  // "pagamento" está ligado, a cobrança usa o nome/preço do dialogo direto (sem virar item de
+  // catálogo, ver OrderItem abaixo, que aceita productId nulo).
+  let product: { id: string; name: string; price: number } | null = null;
+  let fotoBase64: string | null = null;
+  let fotoMime: string | null = null;
+  if (params.toggles.produto && dialogo.produto) {
+    if (params.toggles.foto) {
+      const foto = params.fotoProduto ?? await generateProductPlaceholderImage(dialogo.produto.nome);
+      fotoBase64 = foto.base64;
+      fotoMime = foto.mimeType;
+    }
+    product = await prisma.product.create({
+      data: {
+        agentConfigId: params.agentId,
+        name: dialogo.produto.nome,
+        price: dialogo.produto.preco,
+        imagemBase64: fotoBase64,
+        imagemMimeType: fotoMime,
+      },
+    });
+  }
 
   const contactNumber = fakePhoneNumber(Math.floor(Math.random() * 900000) + 900000);
   const conversation = await prisma.conversation.create({
@@ -328,7 +400,7 @@ async function createShowcaseConversation(params: {
 
   for (const m of dialogo.mensagens) {
     // O código Pix chega como mensagem separada ANTES da confirmação — mesma ordem do fluxo real
-    if (m.role === "assistant" && m.beat === "pix") {
+    if (m.role === "assistant" && m.beat === "pix" && dialogo.produto) {
       const pixPayload = buildFakePixPayload(dialogo.produto.preco);
       await prisma.message.create({
         data: { conversationId: conversation.id, role: "assistant", content: pixPayload, createdAt: nextTimestamp() },
@@ -342,7 +414,7 @@ async function createShowcaseConversation(params: {
         },
       });
       await prisma.orderItem.create({
-        data: { orderId: order.id, productId: product.id, name: product.name, unitPrice: product.price, quantity: 1 },
+        data: { orderId: order.id, productId: product?.id ?? null, name: dialogo.produto.nome, unitPrice: dialogo.produto.preco, quantity: 1 },
       });
     }
 
@@ -350,7 +422,7 @@ async function createShowcaseConversation(params: {
       data: { conversationId: conversation.id, role: m.role, content: m.content, createdAt: nextTimestamp() },
     });
 
-    if (m.role === "assistant" && m.beat === "foto_produto") {
+    if (m.role === "assistant" && m.beat === "foto_produto" && product && fotoBase64 && fotoMime) {
       await prisma.message.create({
         data: {
           conversationId: conversation.id, role: "assistant", content: product.name,
@@ -382,8 +454,34 @@ async function createShowcaseConversation(params: {
     await prisma.opportunity.create({
       data: {
         conversationId: conversation.id, stageId: fechadoStage.id,
-        title: dialogo.produto.nome, dealValue: dialogo.produto.preco, wonAt: new Date(),
+        title: dialogo.produto?.nome ?? "Atendimento",
+        dealValue: dialogo.produto?.preco ?? Math.round((params.valorMin + Math.random() * (params.valorMax - params.valorMin)) * 100) / 100,
+        wonAt: new Date(),
       },
+    });
+  }
+}
+
+// Cria uma conversa simples pra um cenário livre descrito pelo gestor (ex: "cliente que manda
+// mensagem às 3 da manhã") — sem Opportunity/pipeline, é só pra ilustrar o comportamento da IA
+// nessa situação (ver generateCenarioDialogue). Nunca derruba a criação da conta se falhar.
+async function createCenarioConversation(params: { agentId: string; teamName: string; segmento: string; subsegmento: string; cenario: string }): Promise<void> {
+  const dialogo = await generateCenarioDialogue(params);
+  if (dialogo.messages.length === 0) return;
+
+  const conversation = await prisma.conversation.create({
+    data: {
+      agentConfigId: params.agentId,
+      contactNumber: fakePhoneNumber(Math.floor(Math.random() * 900000) + 100000),
+      contactName: dialogo.contactName,
+    },
+  });
+
+  const baseTime = Date.now() - 30 * 60_000;
+  for (let i = 0; i < dialogo.messages.length; i++) {
+    const m = dialogo.messages[i];
+    await prisma.message.create({
+      data: { conversationId: conversation.id, role: m.role, content: m.content, createdAt: new Date(baseTime + i * 4 * 60_000) },
     });
   }
 }
@@ -392,9 +490,15 @@ export type DemoAccountOptions = {
   conversasPorEtapa: number; // quantas conversas/oportunidades simuladas por etapa do funil
   valorMin: number; // faixa de dealValue sorteado pra cada oportunidade (R$)
   valorMax: number;
+  showcase: ShowcaseToggles; // o que demonstrar na conversa vitrine — ver generateShowcaseDialogue
+  fotoProduto?: { base64: string; mimeType: string } | null; // foto real do produto, enviada pelo admin (opcional — sem ela, usa a placeholder gerada)
+  cenariosExtras?: string[]; // situações livres descritas pelo admin, cada uma vira uma conversa própria
 };
 
-export const DEMO_ACCOUNT_DEFAULTS: DemoAccountOptions = { conversasPorEtapa: 1, valorMin: 500, valorMax: 4500 };
+export const DEMO_ACCOUNT_DEFAULTS: DemoAccountOptions = {
+  conversasPorEtapa: 1, valorMin: 500, valorMax: 4500,
+  showcase: SHOWCASE_DEFAULTS, fotoProduto: null, cenariosExtras: [],
+};
 
 // Cria uma conta de exemplo completa: Profile (dono fictício) + Team (isDemo) + AgentConfig
 // (sem WhatsApp real conectado — token fixo só pra passar no gate de "canal conectado" das
@@ -404,7 +508,8 @@ export const DEMO_ACCOUNT_DEFAULTS: DemoAccountOptions = { conversasPorEtapa: 1,
 // enviando foto de produto, confirmando agendamento e gerando Pix (ver createShowcaseConversation).
 // Chamado por app/api/admin/contas-exemplo.
 export async function createDemoAccount(segmento: string, subsegmento: string, options: DemoAccountOptions = DEMO_ACCOUNT_DEFAULTS): Promise<{ teamId: string; agentId: string }> {
-  const { conversasPorEtapa, valorMin, valorMax } = options;
+  const { conversasPorEtapa, valorMin, valorMax, fotoProduto, cenariosExtras = [] } = options;
+  const toggles = options.showcase ?? SHOWCASE_DEFAULTS;
   const suffix = randomUUID().slice(0, 8);
   const teamName = `Exemplo — ${segmento} (${subsegmento})`;
 
@@ -440,11 +545,12 @@ export async function createDemoAccount(segmento: string, subsegmento: string, o
       // Token fixo (não conecta em nada de verdade) só pra "canal conectado" reconhecer a
       // conta como ativa nas telas do CRM — nenhum envio real é tentado sem interação humana.
       uazapiToken: `demo-${suffix}`,
-      // Comércio + agendamento ativos pra conversa "vitrine" (createShowcaseConversation) poder
-      // mostrar a IA enviando foto de produto, confirmando horário e gerando Pix de verdade.
-      commerceEnabled: true,
+      // Comércio + agendamento ligados conforme os toggles escolhidos na criação — só o
+      // necessário pra conversa "vitrine" (createShowcaseConversation) mostrar de verdade o que
+      // o admin marcou (foto de produto, agendamento, Pix).
+      commerceEnabled: toggles.produto || toggles.pagamento,
       pickupEnabled: true,
-      schedulingEnabled: true,
+      schedulingEnabled: toggles.agendamento,
       availability: [
         { dayOfWeek: 1, start: "09:00", end: "18:00" },
         { dayOfWeek: 2, start: "09:00", end: "18:00" },
@@ -507,7 +613,7 @@ export async function createDemoAccount(segmento: string, subsegmento: string, o
   // — senão a tela de Agenda fica praticamente vazia numa demonstração desses segmentos.
   let featuredProfessionalId: string | null = null;
   let featuredServiceId: string | null = null;
-  if (isSchedulingFocused(segmento, subsegmento)) {
+  if (toggles.agendamento && isSchedulingFocused(segmento, subsegmento)) {
     const featured = await seedFullAgenda({ agentId: agent.id, segmento, subsegmento });
     featuredProfessionalId = featured.professionalId;
     featuredServiceId = featured.serviceId;
@@ -515,8 +621,15 @@ export async function createDemoAccount(segmento: string, subsegmento: string, o
 
   await createShowcaseConversation({
     agentId: agent.id, stages, teamName, segmento, subsegmento, valorMin, valorMax,
+    toggles, fotoProduto,
     professionalId: featuredProfessionalId, serviceId: featuredServiceId,
   });
+
+  // Situações extras descritas livremente pelo admin (ex: "cliente que manda mensagem às 3 da
+  // manhã") — cada uma vira uma conversa própria, sem entrar no funil (ver createCenarioConversation).
+  for (const cenario of cenariosExtras.map(c => c.trim()).filter(Boolean).slice(0, 5)) {
+    await createCenarioConversation({ agentId: agent.id, teamName, segmento, subsegmento, cenario });
+  }
 
   return { teamId: team.id, agentId: agent.id };
 }

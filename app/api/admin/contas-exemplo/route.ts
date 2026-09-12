@@ -34,12 +34,23 @@ export async function GET() {
   });
 }
 
+const showcaseSchema = z.object({
+  produto: z.boolean().default(true),
+  foto: z.boolean().default(true),
+  agendamento: z.boolean().default(true),
+  pagamento: z.boolean().default(true),
+});
+
 const schema = z.object({
   segmento: z.enum(SEGMENTS),
   subsegmento: z.string().trim().min(1),
   conversasPorEtapa: z.number().int().min(1).max(5).default(1),
   valorMin: z.number().min(0).max(1_000_000).default(500),
   valorMax: z.number().min(0).max(1_000_000).default(4500),
+  showcase: showcaseSchema.default({}),
+  // Foto real do produto, opcional — sem ela, a conversa vitrine usa uma placeholder gerada
+  fotoProduto: z.object({ base64: z.string().min(1).max(8_000_000), mimeType: z.string().min(1).max(60) }).nullable().optional(),
+  cenariosExtras: z.array(z.string().trim().min(1).max(200)).max(5).default([]),
 }).refine(d => d.valorMax >= d.valorMin, { message: "Valor máximo deve ser maior ou igual ao mínimo", path: ["valorMax"] });
 
 // Cria uma conta de exemplo completa (equipe + agente + pipeline + conversas simuladas por
@@ -64,6 +75,9 @@ export async function POST(req: NextRequest) {
       conversasPorEtapa: body.data.conversasPorEtapa,
       valorMin: body.data.valorMin,
       valorMax: body.data.valorMax,
+      showcase: body.data.showcase,
+      fotoProduto: body.data.fotoProduto ?? null,
+      cenariosExtras: body.data.cenariosExtras,
     });
     return NextResponse.json({ teamId, agentId });
   } catch (err) {
