@@ -159,6 +159,138 @@ function fakePhoneNumber(seed: number): string {
   return `5511900${String(seed).padStart(6, "0")}`;
 }
 
+function pick<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+// Dia (seg-sex) a partir de hoje + offsetDays corridos — offset negativo pra história recente
+// (agendamentos já CONCLUIDO), positivo pra agenda futura. Simples: se cair em fim de semana,
+// empurra pra segunda — suficiente pra popular uma agenda de demonstração plausível.
+function businessDayWithOffset(offsetDays: number): Date {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  if (d.getDay() === 6) d.setDate(d.getDate() + 2);
+  if (d.getDay() === 0) d.setDate(d.getDate() + 1);
+  return d;
+}
+
+const FAKE_CONTACT_NAMES = [
+  "Ana Souza", "Bruno Lima", "Carla Mendes", "Diego Alves", "Elaine Costa", "Fábio Rocha",
+  "Gabriela Dias", "Henrique Nunes", "Isabela Ramos", "João Pedro Silva", "Karina Farias",
+  "Lucas Teixeira", "Marina Castro", "Nathan Oliveira", "Paula Barros", "Rafael Gomes",
+  "Sabrina Martins", "Thiago Carvalho", "Vanessa Pires", "Wesley Santos",
+];
+
+// ─── Agenda cheia pra segmentos que giram em torno de horário marcado ────────
+
+// Subsegmentos (dentro de segmentos que também têm modelos não-agendados, como "Serviços" e
+// "Automotivo e Veículos") cujo negócio é, na prática, sempre por agendamento — clínica,
+// barbearia/salão/estética entram em "Saúde / Bem-estar", oficina/funilaria em Automotivo.
+const SCHEDULING_SUBSEGMENTS = new Set([
+  "Saúde / Bem-estar",
+  "Oficina Mecânica", "Funilaria e Pintura", "Estética Automotiva",
+]);
+
+// "Saúde" como segmento inteiro é sempre por agendamento (consulta, exame, sessão); os demais
+// segmentos só entram por subsegmento específico (ver SCHEDULING_SUBSEGMENTS acima).
+function isSchedulingFocused(segmento: string, subsegmento: string): boolean {
+  return segmento === "Saúde" || SCHEDULING_SUBSEGMENTS.has(subsegmento);
+}
+
+type AgendaEquipe = { profissionais: string[]; servicos: { nome: string; duracaoMinutos: number }[] };
+
+const AGENDA_EQUIPE_FALLBACK: AgendaEquipe = {
+  profissionais: ["Atendente 1", "Atendente 2"],
+  servicos: [{ nome: "Atendimento", duracaoMinutos: 30 }],
+};
+
+// Nomes de profissionais e serviços plausíveis pro segmento — só usado quando
+// isSchedulingFocused, pra popular Professional/Service antes de gerar a agenda. Nunca trava a
+// criação da conta: qualquer falha da IA cai no fallback genérico acima.
+async function generateAgendaEquipe(params: { segmento: string; subsegmento: string }): Promise<AgendaEquipe> {
+  const prompt = `Para uma empresa do segmento "${params.segmento}" (subsegmento "${params.subsegmento}") que atende por agendamento de horário (ex: clínica, barbearia, salão, oficina), gere nomes plausíveis de 2 profissionais que atendem e de 3 a 5 serviços que essa empresa oferece, com a duração típica em minutos de cada serviço.
+
+Responda APENAS com um JSON válido neste formato exato, sem markdown, sem comentários:
+{"profissionais": ["Nome 1", "Nome 2"], "servicos": [{"nome": "...", "duracaoMinutos": 30}]}`;
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: MODEL, max_tokens: 400, response_format: { type: "json_object" },
+      messages: [{ role: "user", content: prompt }],
+    });
+    const parsed = JSON.parse(completion.choices[0]?.message?.content ?? "{}");
+
+    const profissionais = Array.isArray(parsed.profissionais) && parsed.profissionais.length > 0
+      ? parsed.profissionais.map(String).slice(0, 4)
+      : AGENDA_EQUIPE_FALLBACK.profissionais;
+
+    const servicosBrutos = Array.isArray(parsed.servicos)
+      ? parsed.servicos.filter((s: unknown): s is { nome: string; duracaoMinutos?: number } =>
+          Boolean(s) && typeof s === "object" && "nome" in (s as object)
+        )
+      : [];
+    const servicos = servicosBrutos.length > 0
+      ? servicosBrutos.map((s: { nome: string; duracaoMinutos?: number }) => ({
+          nome: String(s.nome),
+          duracaoMinutos: Number(s.duracaoMinutos) > 0 ? Number(s.duracaoMinutos) : 30,
+        }))
+      : AGENDA_EQUIPE_FALLBACK.servicos;
+
+    return { profissionais, servicos };
+  } catch {
+    return AGENDA_EQUIPE_FALLBACK;
+  }
+}
+
+// Cadastra profissionais/serviços e preenche a Agenda com um punhado de compromissos espalhados
+// entre passado recente (CONCLUIDO) e próximos dias (CONFIRMADO) — só chamado pra segmentos
+// onde agendamento é o núcleo do negócio (isSchedulingFocused), pra a tela de Agenda não
+// aparecer praticamente vazia numa demonstração desses segmentos. Retorna um profissional e
+// serviço "em destaque" pra createShowcaseConversation usar no agendamento da conversa vitrine,
+// em vez do modo genérico de agenda única.
+async function seedFullAgenda(params: { agentId: string; segmento: string; subsegmento: string }): Promise<{ professionalId: string | null; serviceId: string | null }> {
+  const equipe = await generateAgendaEquipe(params);
+  const availability = [1, 2, 3, 4, 5].map(dayOfWeek => ({ dayOfWeek, start: "09:00", end: "18:00" }));
+
+  const professionals = await Promise.all(
+    equipe.profissionais.map(nome => prisma.professional.create({ data: { agentConfigId: params.agentId, name: nome, availability } }))
+  );
+  const services = await Promise.all(
+    equipe.servicos.map(s => prisma.service.create({ data: { agentConfigId: params.agentId, name: s.nome, durationMinutes: s.duracaoMinutos } }))
+  );
+
+  const usedSlots = new Set<string>();
+  const totalAppointments = 12 + Math.floor(Math.random() * 5); // 12-16
+  for (let i = 0; i < totalAppointments; i++) {
+    const scheduledAt = businessDayWithOffset(Math.floor(Math.random() * 13) - 3); // -3 a +9 dias
+    scheduledAt.setHours(9 + Math.floor(Math.random() * 9), Math.random() < 0.5 ? 0 : 30, 0, 0);
+
+    const professional = pick(professionals);
+    const slotKey = `${professional.id}-${scheduledAt.getTime()}`;
+    if (usedSlots.has(slotKey)) continue; // colisão de horário — só pula, não é crítico bater N exato
+    usedSlots.add(slotKey);
+
+    const service = pick(services);
+    const isPast = scheduledAt.getTime() < Date.now();
+    const status = Math.random() < 0.1 ? "CANCELADO" : isPast ? "CONCLUIDO" : "CONFIRMADO";
+
+    await prisma.appointment.create({
+      data: {
+        agentConfigId: params.agentId,
+        professionalId: professional.id,
+        serviceId: service.id,
+        contactName: pick(FAKE_CONTACT_NAMES),
+        contactNumber: fakePhoneNumber(Math.floor(Math.random() * 900000) + 100000),
+        scheduledAt,
+        durationMinutes: service.durationMinutes,
+        status,
+      },
+    });
+  }
+
+  return { professionalId: professionals[0]?.id ?? null, serviceId: services[0]?.id ?? null };
+}
+
 // Cria a conversa "vitrine" da conta de exemplo: um produto real no catálogo (com foto), e uma
 // conversa que passa pelos três comportamentos que a demonstração comercial precisa mostrar
 // funcionando de verdade — não só em texto: a IA manda a foto do produto (Message com
@@ -169,6 +301,7 @@ async function createShowcaseConversation(params: {
   agentId: string;
   stages: { id: string; name: string }[];
   teamName: string; segmento: string; subsegmento: string; valorMin: number; valorMax: number;
+  professionalId?: string | null; serviceId?: string | null;
 }): Promise<void> {
   const dialogo = await generateShowcaseDialogue(params);
   if (!dialogo) return;
@@ -228,11 +361,17 @@ async function createShowcaseConversation(params: {
     }
 
     if (m.role === "assistant" && m.beat === "agendar") {
+      // Quando o segmento é focado em agendamento (ver isSchedulingFocused), usa o profissional
+      // e serviço já cadastrados por seedFullAgenda — senão cai no modo agenda única do agente.
+      const service = params.serviceId
+        ? await prisma.service.findUnique({ where: { id: params.serviceId }, select: { durationMinutes: true } })
+        : null;
       await prisma.appointment.create({
         data: {
           agentConfigId: params.agentId, conversationId: conversation.id,
+          professionalId: params.professionalId ?? null, serviceId: params.serviceId ?? null,
           contactName: dialogo.contactName, contactNumber,
-          scheduledAt: nextBusinessDayAt(15), durationMinutes: 30, status: "CONFIRMADO",
+          scheduledAt: nextBusinessDayAt(15), durationMinutes: service?.durationMinutes ?? 30, status: "CONFIRMADO",
         },
       });
     }
@@ -363,7 +502,21 @@ export async function createDemoAccount(segmento: string, subsegmento: string, o
     }
   }
 
-  await createShowcaseConversation({ agentId: agent.id, stages, teamName, segmento, subsegmento, valorMin, valorMax });
+  // Segmentos onde o negócio inteiro gira em torno de horário marcado (clínica, barbearia,
+  // oficina...) ganham profissionais/serviços cadastrados e uma agenda com vários compromissos
+  // — senão a tela de Agenda fica praticamente vazia numa demonstração desses segmentos.
+  let featuredProfessionalId: string | null = null;
+  let featuredServiceId: string | null = null;
+  if (isSchedulingFocused(segmento, subsegmento)) {
+    const featured = await seedFullAgenda({ agentId: agent.id, segmento, subsegmento });
+    featuredProfessionalId = featured.professionalId;
+    featuredServiceId = featured.serviceId;
+  }
+
+  await createShowcaseConversation({
+    agentId: agent.id, stages, teamName, segmento, subsegmento, valorMin, valorMax,
+    professionalId: featuredProfessionalId, serviceId: featuredServiceId,
+  });
 
   return { teamId: team.id, agentId: agent.id };
 }
