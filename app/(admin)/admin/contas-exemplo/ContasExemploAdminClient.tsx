@@ -74,6 +74,7 @@ export function ContasExemploAdminClient({ initialContas }: { initialContas: Con
         <h1 className="text-2xl font-bold flex items-center gap-2"><FlaskConical size={24} className="text-blue-400" /> Contas de exemplo</h1>
         <p className="text-gray-400 text-sm mt-1">
           Gera uma equipe fictícia com pipeline padrão e uma conversa simulada por etapa do funil (escritas por IA, pro segmento escolhido) — útil pra demonstração comercial sem depender de dados de cliente real.
+          Também cria uma conversa de vitrine com catálogo e agendamento ativos, mostrando a IA enviando foto de produto, confirmando um horário e gerando um Pix.
           Leva alguns segundos pra gerar; nenhuma mensagem sai de verdade (a conta não tem WhatsApp conectado).
         </p>
       </div>
