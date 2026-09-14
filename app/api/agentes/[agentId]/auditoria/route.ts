@@ -14,7 +14,18 @@ const schema = z.object({
   // do funil/pipeline (gargalos, negociações travadas, conversão, ciclo de venda) — dado
   // quantitativo do Opportunity, não depende de ler transcrição de conversa.
   tipo: z.enum(["atendimento", "comercial"]).default("atendimento"),
+  // Pedido livre do gestor pra guiar a análise (ex: "veja se pedem o fechamento", "confira se
+  // seguem o script") — soma às notas/seções fixas, não substitui.
+  foco: z.string().trim().max(500).optional(),
 });
+
+// Quando o gestor descreve o que quer ver, isso vira uma seção extra e obrigatória no
+// relatório — sem essa instrução explícita, o modelo tende a diluir o pedido genericamente
+// pelas seções fixas em vez de responder diretamente a ele.
+function focoInstruction(foco: string | undefined, numeroSecao: number): string {
+  if (!foco?.trim()) return "";
+  return `\n\nADICIONAL — O GESTOR PEDIU FOCO ESPECÍFICO NESTA ANÁLISE: "${foco.trim()}"\nDedique uma seção extra numerada (${numeroSecao}. FOCO SOLICITADO) respondendo diretamente a esse pedido, com exemplos concretos dos dados/conversas quando possível. As seções acima continuam obrigatórias.`;
+}
 
 const AUDITOR_PROMPT = `Você é um auditor sênior de qualidade de atendimento e vendas por WhatsApp.
 Receberá estatísticas e trechos reais de conversas de um período. Produza um relatório de auditoria em português com:
@@ -56,9 +67,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
 
   const inicio = new Date(body.data.inicio);
   const fim = new Date(body.data.fim);
-  const { atendenteId, tipo } = body.data;
+  const { atendenteId, tipo, foco } = body.data;
 
-  if (tipo === "comercial") return auditoriaComercial(config, agentId, atendenteId, inicio, fim);
+  if (tipo === "comercial") return auditoriaComercial(config, agentId, atendenteId, inicio, fim, foco);
 
   // Conversas com atividade no período (do atendente, se filtrado)
   const conversas = await prisma.conversation.findMany({
@@ -148,7 +159,7 @@ AMOSTRA DE CONVERSAS (${conversas.length} mais recentes do período):
 
 ${transcricoes}`.slice(0, 60_000);
 
-  const result = await runAgent(AUDITOR_PROMPT, [], contexto);
+  const result = await runAgent(AUDITOR_PROMPT + focoInstruction(foco, 7), [], contexto);
   logTokenUsage({ teamId: config.teamId, provider: "openai", model: "gpt-4o-mini", feature: "auditoria", ...result.usage });
 
   return NextResponse.json({ relatorio: result.reply, stats });
@@ -165,6 +176,7 @@ async function auditoriaComercial(
   atendenteId: string | null,
   inicio: Date,
   fim: Date,
+  foco: string | undefined,
 ) {
   const filtroAtendente = atendenteId ? { conversation: { assignedToId: atendenteId } } : {};
 
@@ -241,7 +253,7 @@ RESULTADO DO PERÍODO: ${entradas.length} negociações novas | ${ganhas.length}
 NEGOCIAÇÕES MAIS TRAVADAS (abertas há mais tempo na etapa atual):
 ${maisTravadas.map(t => `- ${t.nome} — etapa "${t.etapa}", parada há ${t.diasParado} dias, R$ ${t.valor.toFixed(2)}`).join("\n") || "nenhuma"}`;
 
-  const result = await runAgent(COMERCIAL_PROMPT, [], contexto);
+  const result = await runAgent(COMERCIAL_PROMPT + focoInstruction(foco, 6), [], contexto);
   logTokenUsage({ teamId: config.teamId, provider: "openai", model: "gpt-4o-mini", feature: "auditoria", ...result.usage });
 
   return NextResponse.json({ relatorio: result.reply, stats });

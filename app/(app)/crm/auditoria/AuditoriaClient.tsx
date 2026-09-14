@@ -68,6 +68,7 @@ export function AuditoriaClient({ agentId, atendentes }: { agentId: string; aten
   const [periodo, setPeriodo] = useState<Periodo>("7d");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
+  const [foco, setFoco] = useState("");
 
   const [gerando, setGerando] = useState(false);
   const [relatorio, setRelatorio] = useState("");
@@ -97,6 +98,7 @@ export function AuditoriaClient({ agentId, atendentes }: { agentId: string; aten
           atendenteId: atendenteId || null,
           inicio: inicio.toISOString(),
           fim: fim.toISOString(),
+          foco: foco.trim() || undefined,
         }),
       });
       const data = await res.json();
@@ -186,6 +188,22 @@ export function AuditoriaClient({ agentId, atendentes }: { agentId: string; aten
               <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 text-sm text-white" />
             </div>
           )}
+
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">O que você quer que a IA analise? (opcional)</label>
+            <textarea
+              value={foco}
+              onChange={e => setFoco(e.target.value)}
+              rows={2}
+              maxLength={500}
+              placeholder={
+                tipo === "comercial"
+                  ? 'Ex: "foca na etapa de Negociação" ou "quero saber se o valor médio das travadas justifica priorizar elas"'
+                  : 'Ex: "veja se os vendedores estão pedindo o fechamento" ou "confira se a IA está seguindo o script certo"'
+              }
+              className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:border-gray-600"
+            />
+          </div>
 
           <button
             onClick={handleGerar}
