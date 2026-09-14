@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { ClipboardCheck, Sparkles, X, MessageCircle, Send, Trophy, DoorClosed } from "lucide-react";
+import { ClipboardCheck, Sparkles, X, MessageCircle, Send, Trophy, DoorClosed, TrendingUp, TrendingDown, Timer, Layers } from "lucide-react";
 
 type Atendente = { id: string; name: string };
-type Stats = {
+
+type StatsAtendimento = {
   conversas: number;
   mensagensEnviadas: number;
   encerradas: number;
@@ -13,7 +14,23 @@ type Stats = {
   motivos: { motivo: string; qtd: number }[];
 };
 
+type StatsComercial = {
+  porEtapa: { pipeline: string; etapa: string; quantidade: number; diasParadoMedio: number; diasParadoMax: number }[];
+  entradas: number;
+  ganhas: number; valorGanho: number;
+  perdidas: number; valorPerdido: number;
+  cicloMedioDias: number | null;
+  taxaConversao: number | null;
+  maisTravadas: { nome: string; etapa: string; diasParado: number; valor: number }[];
+};
+
+type Tipo = "atendimento" | "comercial";
 type Periodo = "7d" | "15d" | "30d" | "mes_atual" | "mes_anterior" | "custom";
+
+const TIPOS: { key: Tipo; label: string; desc: string }[] = [
+  { key: "atendimento", label: "Qualidade do atendimento", desc: "Analisa trechos reais de conversas: tom, agilidade, condução comercial." },
+  { key: "comercial", label: "Processo comercial (funil)", desc: "Analisa o pipeline: onde as negociações travam, conversão e ciclo de venda." },
+];
 
 const PERIODOS: { key: Periodo; label: string }[] = [
   { key: "7d", label: "7 dias" },
@@ -46,6 +63,7 @@ function rangeFor(p: Periodo, customStart: string, customEnd: string): { inicio:
 }
 
 export function AuditoriaClient({ agentId, atendentes }: { agentId: string; atendentes: Atendente[] }) {
+  const [tipo, setTipo] = useState<Tipo>("atendimento");
   const [atendenteId, setAtendenteId] = useState<string>("");
   const [periodo, setPeriodo] = useState<Periodo>("7d");
   const [customStart, setCustomStart] = useState("");
@@ -53,20 +71,29 @@ export function AuditoriaClient({ agentId, atendentes }: { agentId: string; aten
 
   const [gerando, setGerando] = useState(false);
   const [relatorio, setRelatorio] = useState("");
-  const [stats, setStats] = useState<Stats | null>(null);
+  const [tipoRelatorio, setTipoRelatorio] = useState<Tipo>("atendimento");
+  const [statsAtendimento, setStatsAtendimento] = useState<StatsAtendimento | null>(null);
+  const [statsComercial, setStatsComercial] = useState<StatsComercial | null>(null);
   const [error, setError] = useState("");
+
+  function trocarTipo(novo: Tipo) {
+    setTipo(novo);
+    setError("");
+  }
 
   async function handleGerar() {
     setGerando(true);
     setError("");
     setRelatorio("");
-    setStats(null);
+    setStatsAtendimento(null);
+    setStatsComercial(null);
     try {
       const { inicio, fim } = rangeFor(periodo, customStart, customEnd);
       const res = await fetch(`/api/agentes/${agentId}/auditoria`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          tipo,
           atendenteId: atendenteId || null,
           inicio: inicio.toISOString(),
           fim: fim.toISOString(),
@@ -75,9 +102,11 @@ export function AuditoriaClient({ agentId, atendentes }: { agentId: string; aten
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Erro ao gerar auditoria.");
       setRelatorio(data.relatorio);
-      setStats(data.stats);
-    } catch (e: any) {
-      setError(e.message);
+      setTipoRelatorio(tipo);
+      if (tipo === "comercial") setStatsComercial(data.stats);
+      else setStatsAtendimento(data.stats);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erro ao gerar auditoria.");
     } finally {
       setGerando(false);
     }
@@ -91,11 +120,30 @@ export function AuditoriaClient({ agentId, atendentes }: { agentId: string; aten
         <div>
           <p className="text-gray-400 text-sm">Gestão</p>
           <h1 className="text-2xl md:text-3xl font-bold mt-1 flex items-center gap-2">
-            <ClipboardCheck size={26} className="text-blue-400" /> Auditoria de conversas
+            <ClipboardCheck size={26} className="text-blue-400" /> Auditoria
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            A IA analisa as conversas reais do período e devolve notas, pontos fortes, melhorias e conversas que merecem sua atenção.
+            {tipo === "comercial"
+              ? "A IA analisa o funil de vendas (pipeline) e devolve gargalos, negociações travadas e recomendações pra destravar o processo."
+              : "A IA analisa as conversas reais do período e devolve notas, pontos fortes, melhorias e conversas que merecem sua atenção."}
           </p>
+        </div>
+
+        {/* Tipo de auditoria */}
+        <div className="flex gap-2">
+          {TIPOS.map(t => (
+            <button
+              key={t.key}
+              onClick={() => trocarTipo(t.key)}
+              title={t.desc}
+              className={`flex-1 text-left rounded-2xl border px-4 py-3 transition-colors ${
+                tipo === t.key ? "bg-purple-900/30 border-purple-700" : "bg-gray-900 border-gray-800 hover:border-gray-700"
+              }`}
+            >
+              <p className={`text-sm font-semibold ${tipo === t.key ? "text-purple-300" : "text-gray-300"}`}>{t.label}</p>
+              <p className="text-[11px] text-gray-500 mt-0.5">{t.desc}</p>
+            </button>
+          ))}
         </div>
 
         {/* Filtros */}
@@ -145,7 +193,7 @@ export function AuditoriaClient({ agentId, atendentes }: { agentId: string; aten
             className="flex items-center gap-2 bg-purple-700 hover:bg-purple-600 disabled:opacity-60 rounded-xl px-5 py-2.5 text-sm font-medium"
           >
             <Sparkles size={15} />
-            {gerando ? "Analisando conversas..." : "Gerar auditoria"}
+            {gerando ? "Analisando..." : "Gerar auditoria"}
           </button>
         </div>
 
@@ -156,47 +204,99 @@ export function AuditoriaClient({ agentId, atendentes }: { agentId: string; aten
           </div>
         )}
 
-        {/* Estatísticas do período */}
-        {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {[
-              { label: "Conversas ativas", value: String(stats.conversas), icon: MessageCircle },
-              { label: "Mensagens enviadas", value: String(stats.mensagensEnviadas), icon: Send },
-              { label: "Vendas ganhas", value: `${stats.vendasGanhas}${stats.valorGanho > 0 ? ` · ${brl(stats.valorGanho)}` : ""}`, icon: Trophy },
-              { label: "Encerradas", value: String(stats.encerradas), icon: DoorClosed },
-            ].map(card => (
-              <div key={card.label} className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
-                <card.icon size={15} className="text-blue-400 mb-1.5" />
-                <p className="text-lg font-bold truncate">{card.value}</p>
-                <p className="text-[10px] text-gray-500">{card.label}</p>
+        {/* Estatísticas — qualidade do atendimento */}
+        {statsAtendimento && (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { label: "Conversas ativas", value: String(statsAtendimento.conversas), icon: MessageCircle },
+                { label: "Mensagens enviadas", value: String(statsAtendimento.mensagensEnviadas), icon: Send },
+                { label: "Vendas ganhas", value: `${statsAtendimento.vendasGanhas}${statsAtendimento.valorGanho > 0 ? ` · ${brl(statsAtendimento.valorGanho)}` : ""}`, icon: Trophy },
+                { label: "Encerradas", value: String(statsAtendimento.encerradas), icon: DoorClosed },
+              ].map(card => (
+                <div key={card.label} className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
+                  <card.icon size={15} className="text-blue-400 mb-1.5" />
+                  <p className="text-lg font-bold truncate">{card.value}</p>
+                  <p className="text-[10px] text-gray-500">{card.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {statsAtendimento.motivos.length > 0 && (
+              <div className="flex gap-1.5 flex-wrap">
+                {statsAtendimento.motivos.map(m => (
+                  <span key={m.motivo} className="text-[11px] px-2.5 py-1 rounded-full bg-gray-900 border border-gray-800 text-gray-400">
+                    {m.motivo}: <span className="font-bold text-gray-200">{m.qtd}</span>
+                  </span>
+                ))}
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
 
-        {stats && stats.motivos.length > 0 && (
-          <div className="flex gap-1.5 flex-wrap">
-            {stats.motivos.map(m => (
-              <span key={m.motivo} className="text-[11px] px-2.5 py-1 rounded-full bg-gray-900 border border-gray-800 text-gray-400">
-                {m.motivo}: <span className="font-bold text-gray-200">{m.qtd}</span>
-              </span>
-            ))}
-          </div>
+        {/* Estatísticas — processo comercial (funil) */}
+        {statsComercial && (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { label: "Negociações novas", value: String(statsComercial.entradas), icon: Layers },
+                { label: "Ganhas", value: `${statsComercial.ganhas}${statsComercial.valorGanho > 0 ? ` · ${brl(statsComercial.valorGanho)}` : ""}`, icon: TrendingUp },
+                { label: "Perdidas", value: `${statsComercial.perdidas}${statsComercial.valorPerdido > 0 ? ` · ${brl(statsComercial.valorPerdido)}` : ""}`, icon: TrendingDown },
+                { label: "Ciclo médio até ganhar", value: statsComercial.cicloMedioDias !== null ? `${statsComercial.cicloMedioDias}d` : "—", icon: Timer },
+              ].map(card => (
+                <div key={card.label} className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
+                  <card.icon size={15} className="text-blue-400 mb-1.5" />
+                  <p className="text-lg font-bold truncate">{card.value}</p>
+                  <p className="text-[10px] text-gray-500">{card.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {statsComercial.taxaConversao !== null && (
+              <p className="text-xs text-gray-400">Taxa de conversão do período: <span className="font-bold text-gray-200">{statsComercial.taxaConversao}%</span> (ganhas / ganhas+perdidas)</p>
+            )}
+
+            {statsComercial.porEtapa.length > 0 && (
+              <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-2">
+                <p className="text-xs font-semibold text-gray-400">Negociações abertas agora, por etapa</p>
+                {statsComercial.porEtapa.map(e => (
+                  <div key={`${e.pipeline}-${e.etapa}`} className="flex items-center justify-between text-xs gap-2">
+                    <span className="text-gray-300 truncate">{e.pipeline} → {e.etapa}</span>
+                    <span className="text-gray-500 flex-shrink-0">{e.quantidade} parada(s) · média {e.diasParadoMedio}d · pior {e.diasParadoMax}d</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {statsComercial.maisTravadas.length > 0 && (
+              <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-2">
+                <p className="text-xs font-semibold text-gray-400">Negociações mais travadas</p>
+                {statsComercial.maisTravadas.map((t, i) => (
+                  <div key={i} className="flex items-center justify-between text-xs gap-2">
+                    <span className="text-gray-300 truncate">{t.nome} — {t.etapa}</span>
+                    <span className="text-gray-500 flex-shrink-0">{t.diasParado}d parada · {brl(t.valor)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
 
         {/* Relatório */}
         {relatorio && (
           <div className="bg-purple-950/30 border border-purple-800/40 rounded-2xl p-5">
             <p className="text-sm font-semibold text-purple-300 flex items-center gap-1.5 mb-3">
-              <ClipboardCheck size={14} /> Auditoria — {atendenteNome}
+              <ClipboardCheck size={14} /> {tipoRelatorio === "comercial" ? "Auditoria do funil" : "Auditoria"} — {atendenteNome}
             </p>
             <p className="text-sm text-gray-200 whitespace-pre-wrap leading-relaxed">{relatorio}</p>
           </div>
         )}
 
         <p className="text-xs text-gray-600">
-          A auditoria usa uma amostra das conversas mais recentes do período (até 10, com até 40 mensagens cada) e as
-          estatísticas completas. Só o gestor tem acesso a esta página.
+          {tipo === "comercial"
+            ? "A auditoria do funil usa o estado atual de todas as negociações abertas (etapa e tempo parado) e o resultado consolidado do período (ganhas/perdidas/ciclo). Sem histórico de etapas passadas, a conversão é medida pelo resultado final, não etapa a etapa."
+            : "A auditoria usa uma amostra das conversas mais recentes do período (até 10, com até 40 mensagens cada) e as estatísticas completas."}
+          {" "}Só o gestor tem acesso a esta página.
         </p>
       </div>
     </div>

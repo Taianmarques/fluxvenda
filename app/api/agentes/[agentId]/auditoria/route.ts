@@ -10,6 +10,10 @@ const schema = z.object({
   atendenteId: z.string().nullable(), // null = todas as conversas (com ou sem dono)
   inicio: z.string().datetime(),
   fim: z.string().datetime(),
+  // "atendimento" (default) = qualidade das conversas, como sempre foi. "comercial" = saúde
+  // do funil/pipeline (gargalos, negociações travadas, conversão, ciclo de venda) — dado
+  // quantitativo do Opportunity, não depende de ler transcrição de conversa.
+  tipo: z.enum(["atendimento", "comercial"]).default("atendimento"),
 });
 
 const AUDITOR_PROMPT = `Você é um auditor sênior de qualidade de atendimento e vendas por WhatsApp.
@@ -23,6 +27,17 @@ Receberá estatísticas e trechos reais de conversas de um período. Produza um 
 6. CONVERSAS QUE MERECEM ATENÇÃO do gestor (cite o nome/número do cliente e o porquê em uma frase — ex: cliente esfriou sem follow-up, reclamação sem resposta, oportunidade de venda perdida)
 
 Seja direto, específico e justo — elogie o que foi bem feito e aponte o que custou vendas. Máximo ~400 palavras.`;
+
+const COMERCIAL_PROMPT = `Você é um consultor sênior de processos comerciais e funil de vendas B2B.
+Receberá dados quantitativos do funil de vendas (pipeline) de uma empresa: quantas negociações estão paradas em cada etapa e há quanto tempo, taxa de conversão do período, ciclo médio de fechamento e as negociações mais travadas. Produza uma análise em português com:
+
+1. RESUMO EXECUTIVO DO FUNIL (2-3 frases sobre a saúde geral do processo comercial)
+2. GARGALOS IDENTIFICADOS (em que etapa(s) o funil está entupindo, com base nos números — cite quantidade e tempo parado)
+3. SAÚDE DO PROCESSO — notas de 0 a 10: Fluidez do funil (sem acúmulo parado) | Velocidade de fechamento | Taxa de conversão do período
+4. NEGOCIAÇÕES QUE MERECEM ATENÇÃO AGORA (cite as mais travadas da lista, com valor e tempo parado, e por que isso é urgente)
+5. RECOMENDAÇÕES PRÁTICAS pra destravar o funil (ex: revisar critério de uma etapa, ativar follow-up automático nela, redistribuir carteira)
+
+Baseie-se SOMENTE nos números fornecidos — nunca invente uma etapa, valor ou negociação que não esteja nos dados. Se os dados forem insuficientes pra alguma seção, diga isso brevemente em vez de inventar. Seja direto e específico. Máximo ~350 palavras.`;
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {
   const { userId } = await auth();
@@ -41,7 +56,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
 
   const inicio = new Date(body.data.inicio);
   const fim = new Date(body.data.fim);
-  const { atendenteId } = body.data;
+  const { atendenteId, tipo } = body.data;
+
+  if (tipo === "comercial") return auditoriaComercial(config, agentId, atendenteId, inicio, fim);
 
   // Conversas com atividade no período (do atendente, se filtrado)
   const conversas = await prisma.conversation.findMany({
@@ -132,6 +149,99 @@ AMOSTRA DE CONVERSAS (${conversas.length} mais recentes do período):
 ${transcricoes}`.slice(0, 60_000);
 
   const result = await runAgent(AUDITOR_PROMPT, [], contexto);
+  logTokenUsage({ teamId: config.teamId, provider: "openai", model: "gpt-4o-mini", feature: "auditoria", ...result.usage });
+
+  return NextResponse.json({ relatorio: result.reply, stats });
+}
+
+// Análise do FUNIL/pipeline, não da conversa — dado quantitativo do Opportunity. O schema só
+// guarda a etapa ATUAL de cada negociação (stageId + stageEnteredAt), sem histórico de por
+// quais etapas ela já passou, então "conversão etapa a etapa" real não é calculável; o que dá
+// pra medir com o que existe é: onde as negociações abertas estão paradas agora, há quanto
+// tempo, e o resultado (ganhas/perdidas/ciclo) do período — o suficiente pra apontar gargalo.
+async function auditoriaComercial(
+  config: NonNullable<Awaited<ReturnType<typeof getAgentConfigAsManager>>>,
+  agentId: string,
+  atendenteId: string | null,
+  inicio: Date,
+  fim: Date,
+) {
+  const filtroAtendente = atendenteId ? { conversation: { assignedToId: atendenteId } } : {};
+
+  const [pipelines, abertas, doPeriodo] = await Promise.all([
+    prisma.pipeline.findMany({
+      where: { agentConfigId: agentId },
+      orderBy: { order: "asc" },
+      include: { stages: { orderBy: { order: "asc" } } },
+    }),
+    // Snapshot atual — não é filtrado por período, é "onde as coisas estão paradas agora"
+    prisma.opportunity.findMany({
+      where: { wonAt: null, lostAt: null, stage: { pipeline: { agentConfigId: agentId } }, ...filtroAtendente },
+      include: { stage: true, conversation: { select: { contactName: true, contactNumber: true } } },
+    }),
+    prisma.opportunity.findMany({
+      where: {
+        stage: { pipeline: { agentConfigId: agentId } },
+        ...filtroAtendente,
+        OR: [{ createdAt: { gte: inicio, lte: fim } }, { wonAt: { gte: inicio, lte: fim } }, { lostAt: { gte: inicio, lte: fim } }],
+      },
+      select: { createdAt: true, wonAt: true, lostAt: true, dealValue: true },
+    }),
+  ]);
+
+  if (pipelines.length === 0 || (abertas.length === 0 && doPeriodo.length === 0)) {
+    return NextResponse.json({ error: "Nenhum funil configurado ou nenhuma negociação registrada pra esse filtro." }, { status: 404 });
+  }
+
+  const diasParado = (op: { stageEnteredAt: Date }) => (Date.now() - op.stageEnteredAt.getTime()) / 86_400_000;
+
+  const porEtapa = pipelines.flatMap(p => p.stages.map(s => {
+    const nesta = abertas.filter(o => o.stageId === s.id);
+    const dias = nesta.map(diasParado);
+    return {
+      pipeline: p.name,
+      etapa: s.name,
+      quantidade: nesta.length,
+      diasParadoMedio: dias.length ? Math.round(dias.reduce((a, b) => a + b, 0) / dias.length) : 0,
+      diasParadoMax: dias.length ? Math.round(Math.max(...dias)) : 0,
+    };
+  })).filter(e => e.quantidade > 0);
+
+  const ganhas = doPeriodo.filter(o => o.wonAt && o.wonAt >= inicio && o.wonAt <= fim);
+  const perdidas = doPeriodo.filter(o => o.lostAt && o.lostAt >= inicio && o.lostAt <= fim);
+  const entradas = doPeriodo.filter(o => o.createdAt >= inicio && o.createdAt <= fim);
+  const valorGanho = ganhas.reduce((s, o) => s + o.dealValue, 0);
+  const valorPerdido = perdidas.reduce((s, o) => s + o.dealValue, 0);
+  const ciclosDias = ganhas.filter(o => o.wonAt).map(o => (o.wonAt!.getTime() - o.createdAt.getTime()) / 86_400_000);
+  const cicloMedioDias = ciclosDias.length ? Math.round(ciclosDias.reduce((a, b) => a + b, 0) / ciclosDias.length) : null;
+  const taxaConversao = ganhas.length + perdidas.length > 0 ? Math.round((ganhas.length / (ganhas.length + perdidas.length)) * 100) : null;
+
+  const maisTravadas = abertas
+    .map(o => ({ nome: o.conversation.contactName || o.conversation.contactNumber, etapa: o.stage!.name, diasParado: Math.round(diasParado(o)), valor: o.dealValue }))
+    .sort((a, b) => b.diasParado - a.diasParado)
+    .slice(0, 8);
+
+  const stats = {
+    porEtapa,
+    entradas: entradas.length,
+    ganhas: ganhas.length, valorGanho,
+    perdidas: perdidas.length, valorPerdido,
+    cicloMedioDias, taxaConversao,
+    maisTravadas,
+  };
+
+  const contexto = `PERÍODO: ${inicio.toLocaleDateString("pt-BR")} a ${fim.toLocaleDateString("pt-BR")}
+FILTRO: ${atendenteId ? "negociações de um atendente específico" : "todas as negociações"}
+
+NEGOCIAÇÕES ABERTAS AGORA, POR ETAPA (funil/pipeline → etapa: quantidade parada | dias parado em média | dias parado no pior caso):
+${porEtapa.map(e => `- ${e.pipeline} → ${e.etapa}: ${e.quantidade} parada(s) | média ${e.diasParadoMedio}d | pior caso ${e.diasParadoMax}d`).join("\n") || "nenhuma negociação aberta"}
+
+RESULTADO DO PERÍODO: ${entradas.length} negociações novas | ${ganhas.length} ganhas (R$ ${valorGanho.toFixed(2)}) | ${perdidas.length} perdidas (R$ ${valorPerdido.toFixed(2)}) | taxa de conversão ${taxaConversao ?? "sem dado suficiente"}% | ciclo médio até ganhar: ${cicloMedioDias ?? "sem dado suficiente"} dias
+
+NEGOCIAÇÕES MAIS TRAVADAS (abertas há mais tempo na etapa atual):
+${maisTravadas.map(t => `- ${t.nome} — etapa "${t.etapa}", parada há ${t.diasParado} dias, R$ ${t.valor.toFixed(2)}`).join("\n") || "nenhuma"}`;
+
+  const result = await runAgent(COMERCIAL_PROMPT, [], contexto);
   logTokenUsage({ teamId: config.teamId, provider: "openai", model: "gpt-4o-mini", feature: "auditoria", ...result.usage });
 
   return NextResponse.json({ relatorio: result.reply, stats });
