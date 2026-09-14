@@ -1049,6 +1049,7 @@ export function WhatsappAgentClient({
             <input type="checkbox" checked={iaIgnoraAtribuidos} onChange={e => setIaIgnoraAtribuidos(e.target.checked)} className="w-4 h-4" />
             <span className="text-sm">Não responder conversas que já têm um vendedor atribuído</span>
           </label>
+          <p className="text-xs text-gray-500 -mt-2">Não vale pro vendedor definido em &quot;SDR padrão&quot; abaixo — os pendentes dele a IA continua respondendo normalmente; só os que ele (ou outro humano) já assumiu de verdade ficam de fora.</p>
 
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" checked={transferirAoPedirFoto} onChange={e => setTransferirAoPedirFoto(e.target.checked)} className="w-4 h-4" />
@@ -1057,7 +1058,7 @@ export function WhatsappAgentClient({
           <p className="text-xs text-gray-500 -mt-2">A IA não consegue enviar mídia — em vez de tentar contornar, ela já passa a conversa pra um humano assim que perceber o pedido.</p>
 
           <div>
-            <label className="text-sm text-gray-400 block mb-1.5">Vendedor que recebe os leads transferidos pela IA</label>
+            <label className="text-sm text-gray-400 block mb-1.5">SDR padrão (vendedor humano)</label>
             <select
               value={iaLeadAttendantId}
               onChange={e => setIaLeadAttendantId(e.target.value)}
@@ -1066,7 +1067,7 @@ export function WhatsappAgentClient({
               <option value="">Sem preferência (segue a distribuição padrão)</option>
               {attendants.map(a => <option key={a.id} value={a.id}>{a.name}{a.isManager ? " (gestor)" : ""}</option>)}
             </select>
-            <p className="text-xs text-gray-500 mt-1">Vale só pra conversas ainda sem atendente — quando a IA transfere (SDR, pedido de foto, perfil excluído), esse vendedor é definido automaticamente. Não rouba conversas que já têm alguém.</p>
+            <p className="text-xs text-gray-500 mt-1">Todo contato novo já nasce vinculado a esse vendedor, mesmo pendente — a IA continua atendendo normalmente até ele (ou outro humano) assumir de verdade a conversa. Também é quem recebe os leads que a IA transfere (SDR, pedido de foto, perfil excluído) quando a conversa ainda não tem dono. Não rouba conversas que já têm alguém.</p>
           </div>
 
           <div>

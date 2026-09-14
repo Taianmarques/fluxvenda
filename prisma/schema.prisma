@@ -656,7 +656,10 @@ model AgentConfig {
   // quando vazio/desligado. Mensagem sempre é salva independente do resultado (escuta ativa):
   // se algum critério excluir a conversa, ela só não gera resposta automática, mas o histórico
   // continua completo pro atendente (ou a própria IA, se reativada depois) ter contexto.
-  iaIgnoraAtribuidos       Boolean @default(false) // true = não responde conversa que já tem vendedor
+  // true = não responde conversa que já tem vendedor — EXCETO quando esse vendedor é o
+  // iaLeadAttendantId (abaixo), já que ele agora é o dono padrão de todo lead novo desde a
+  // 1ª mensagem; sem essa exceção a IA nunca responderia ninguém (ver shouldAiHandle).
+  iaIgnoraAtribuidos       Boolean @default(false)
   iaNiveisCarteiraExcluidos Json   @default("[]")  // ["A","B","C","INATIVO","PERDIDO"] — nível manual/importado, não o calculado automático
   iaNumerosBloqueados       Json   @default("[]")  // números (só dígitos) que a IA nunca responde
   iaPerfisExcluidos         Json   @default("[]")  // ["MARCENEIRO","ARQUITETO","EMPRESA","CONSUMIDOR_FINAL"] — só some efeito com sdrMateriaisEnabled, verificado assim que registrar_perfil_lead roda
@@ -665,9 +668,13 @@ model AgentConfig {
   // enviar) — expõe a tool transferir_atendente_foto só quando ativo.
   transferirAoPedirFoto Boolean @default(false)
 
-  // Vendedor que recebe os leads que a IA transfere (SDR, transferirAoPedirFoto, exclusão por
-  // perfil) — quando definido, sobrepõe o "não força atribuição" padrão só pra esses handoffs
-  // originados pela IA. Null = mantém o comportamento padrão (respeita leadDistributionMode).
+  // Vendedor/SDR padrão: quando definido, TODO contato novo já nasce atribuído a ele (desde a
+  // 1ª mensagem, não só nos handoffs da IA) — a IA continua respondendo normalmente enquanto a
+  // conversa estiver pendente (humanTakeover:false); só para quando esse vendedor (ou qualquer
+  // outro humano) assumir de verdade. Também é quem recebe os leads que a IA transfere (SDR,
+  // transferirAoPedirFoto, exclusão por perfil) quando a conversa ainda não tem dono — nesses
+  // casos o handoff já vem com humanTakeover:true junto. Null = mantém o comportamento padrão
+  // (respeita leadDistributionMode, conversas nascem sem dono).
   iaLeadAttendantId String?
 
   // Id de um modelo fine-tunado da OpenAI (ex: "ft:gpt-4o-mini-2024-07-18:org::abc123") pra usar

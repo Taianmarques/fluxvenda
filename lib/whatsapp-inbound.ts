@@ -1472,7 +1472,12 @@ function shouldAiHandle(config: AgentConfigFull, conversation: { assignedToId: s
   // Uma resposta roteirizada de vendas soltada no meio de uma conversa com várias pessoas
   // seria um erro sério, então esse critério não é configurável por agente.
   if (conversation.isGroup) return false;
-  if (config.iaIgnoraAtribuidos && conversation.assignedToId) return false;
+  // iaLeadAttendantId (SDR padrão) não conta como "já tem vendedor" aqui — ele é o dono de
+  // todo lead novo desde a 1ª mensagem (ver processIncomingMessage), então excluí-lo faria a
+  // IA nunca responder ninguém. Só um dono DIFERENTE dele (carteira, rodízio, atribuição
+  // manual) segue desligando a IA — humanTakeover é quem realmente pausa a IA no lead do SDR.
+  const donoDiferenteDoSdr = conversation.assignedToId && conversation.assignedToId !== config.iaLeadAttendantId;
+  if (config.iaIgnoraAtribuidos && donoDiferenteDoSdr) return false;
 
   const numerosBloqueados = Array.isArray(config.iaNumerosBloqueados) ? config.iaNumerosBloqueados as string[] : [];
   if (numerosBloqueados.includes(conversation.contactNumber)) return false;
@@ -1527,7 +1532,13 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
   const conversation = await prisma.conversation.upsert({
     where: { agentConfigId_contactNumber: { agentConfigId: config.id, contactNumber } },
     update: { status: "ATIVO", followupCount: 0, isTestNumber, ...(contactName && !existingConversation?.contactName && { contactName }) },
-    create: { agentConfigId: config.id, contactNumber, contactName, status: "ATIVO", isGroup: msg.isGroup ?? false, isTestNumber },
+    create: {
+      agentConfigId: config.id, contactNumber, contactName, status: "ATIVO", isGroup: msg.isGroup ?? false, isTestNumber,
+      // Contato novo já nasce vinculado ao SDR padrão (iaLeadAttendantId), se configurado —
+      // continua "pendente" (humanTakeover:false) até alguém assumir de verdade, então a IA
+      // segue respondendo normalmente (ver carve-out em shouldAiHandle).
+      ...(config.iaLeadAttendantId && !msg.isGroup && { assignedToId: config.iaLeadAttendantId }),
+    },
   });
   if (config.prospeccaoEnabled) {
     await prisma.prospect.updateMany({
@@ -1560,9 +1571,11 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
   });
   emitChatEvent(config.id, conversation.id); // push em tempo real pro CRM
 
-  // Conversa nova + rodízio ativo: já nasce atribuída a um atendente, em ordem
+  // Conversa nova + rodízio ativo: já nasce atribuída a um atendente, em ordem — só entra se o
+  // SDR padrão acima não tiver reclamado a conversa primeiro (os dois mecanismos são
+  // alternativos, não faz sentido rodízio roubar de quem acabou de nascer com dono fixo).
   const isNewConversation = conversation.createdAt.getTime() === conversation.updatedAt.getTime();
-  if (isNewConversation && config.leadDistributionMode === "RODIZIO") {
+  if (isNewConversation && config.leadDistributionMode === "RODIZIO" && !conversation.assignedToId) {
     await assignNextAttendant(config.id, config.teamId, conversation.id);
   }
 
