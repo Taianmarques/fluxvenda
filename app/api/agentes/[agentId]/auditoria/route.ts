@@ -28,16 +28,20 @@ function focoInstruction(foco: string | undefined, numeroSecao: number): string 
 }
 
 const AUDITOR_PROMPT = `Você é um auditor sênior de qualidade de atendimento e vendas por WhatsApp.
-Receberá estatísticas e trechos reais de conversas de um período. Produza um relatório de auditoria em português com:
+Receberá estatísticas e trechos reais de conversas de um período — incluindo negociações que estão travadas há tempo, marcadas explicitamente no texto. Produza um relatório de auditoria em português com:
 
 1. RESUMO EXECUTIVO (2-3 frases sobre a qualidade geral)
 2. NOTAS de 0 a 10: Cordialidade e tom | Agilidade aparente | Condução comercial (avanço para venda) | Clareza das respostas
 3. PONTOS FORTES (bullets curtos, com exemplos citando o cliente quando possível)
 4. PONTOS DE MELHORIA (bullets curtos e específicos)
 5. SUGESTÕES PRÁTICAS (o que fazer diferente já na próxima conversa)
-6. CONVERSAS QUE MERECEM ATENÇÃO do gestor (cite o nome/número do cliente e o porquê em uma frase — ex: cliente esfriou sem follow-up, reclamação sem resposta, oportunidade de venda perdida)
+6. DIAGNÓSTICO DAS CONVERSAS QUE MERECEM ATENÇÃO do gestor (até 5 — priorize as marcadas como travadas, mas inclua qualquer outra que mereça atenção). Pra cada uma, traga em bullets:
+   - Cliente: nome/número
+   - Perfil do cliente: o que dá pra inferir da conversa (o que ele busca, nível de urgência, objeções levantadas, sinais de interesse ou desinteresse) — nunca invente algo que não apareça no texto
+   - O que está travando: diagnóstico ESPECÍFICO e concreto, citando trecho real quando possível — diga se a trava é do vendedor (demorou a responder, não tratou a objeção, não fez a pergunta certa pra avançar, sumiu sem follow-up) ou do cliente (esperando desconto, comparando com concorrente, ainda decidindo, sem orçamento) — nunca uma resposta genérica tipo "falta de follow-up" sem dizer o que exatamente faltou
+   - Próximo passo recomendado
 
-Seja direto, específico e justo — elogie o que foi bem feito e aponte o que custou vendas. Máximo ~400 palavras.`;
+Seja direto, específico e justo — elogie o que foi bem feito e aponte o que custou vendas. Máximo ~550 palavras.`;
 
 const COMERCIAL_PROMPT = `Você é um consultor sênior de processos comerciais e funil de vendas B2B.
 Receberá dados quantitativos do funil de vendas (pipeline) de uma empresa: quantas negociações estão paradas em cada etapa e há quanto tempo, taxa de conversão do período, ciclo médio de fechamento e as negociações mais travadas. Produza uma análise em português com:
@@ -95,6 +99,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
     return NextResponse.json({ error: "Nenhuma conversa com atividade nesse período para esse filtro." }, { status: 404 });
   }
 
+  // Amostra por atividade recente tende a mostrar conversas fluindo bem — pra diagnosticar
+  // trava de verdade (pedido do gestor), soma as negociações abertas há mais tempo na etapa
+  // atual, sem filtro de período (o ponto aqui não é "o que rolou no período", é "por que isso
+  // não anda"). Exclui quem já entrou na amostra acima pra não duplicar transcrição.
+  const travadas = await prisma.opportunity.findMany({
+    where: {
+      wonAt: null,
+      lostAt: null,
+      stage: { pipeline: { agentConfigId: agentId } },
+      ...(atendenteId ? { conversation: { assignedToId: atendenteId } } : {}),
+      conversationId: { notIn: conversas.map(c => c.id) },
+    },
+    orderBy: { stageEnteredAt: "asc" },
+    take: 5,
+    include: {
+      stage: { select: { name: true } },
+      conversation: {
+        include: { messages: { where: { role: { not: "note" } }, orderBy: { createdAt: "desc" }, take: 40, include: { sender: { select: { name: true } } } } },
+      },
+    },
+  });
+
   // ── Estatísticas do período ──────────────────────────────────────────────
   const [totalConversas, mensagensHumanas, encerradas] = await Promise.all([
     prisma.conversation.count({
@@ -142,20 +168,32 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
   };
 
   // ── Transcrições para o auditor ──────────────────────────────────────────
-  const transcricoes = conversas.map(c => {
-    const linhas = c.messages.map(m => {
+  function linhasDe(msgs: { role: string; content: string; sender: { name: string | null } | null }[]) {
+    return msgs.map(m => {
       const quem = m.role === "user" ? "CLIENTE" : m.role === "human" ? `ATENDENTE${m.sender?.name ? ` ${m.sender.name}` : ""}` : m.role === "note" ? "NOTA INTERNA" : "IA";
       return `[${quem}] ${m.content.slice(0, 300)}`;
     }).join("\n");
-    return `--- Conversa com ${c.contactName || c.contactNumber} (status: ${c.status}${c.motivoEncerramento ? `, encerrada: ${c.motivoEncerramento}` : ""}) ---\n${linhas}`;
+  }
+
+  const transcricoesRecentes = conversas.map(c =>
+    `--- Conversa com ${c.contactName || c.contactNumber} (status: ${c.status}${c.motivoEncerramento ? `, encerrada: ${c.motivoEncerramento}` : ""}) ---\n${linhasDe(c.messages)}`
+  ).join("\n\n");
+
+  const transcricoesTravadas = travadas.map(o => {
+    const c = o.conversation;
+    const diasParado = Math.round((Date.now() - o.stageEnteredAt.getTime()) / 86_400_000);
+    const msgsCronologicas = c.messages.slice().reverse();
+    return `--- [NEGOCIAÇÃO TRAVADA HÁ ${diasParado} DIAS na etapa "${o.stage!.name}", valor R$ ${o.dealValue.toFixed(2)}] Conversa com ${c.contactName || c.contactNumber} ---\n${linhasDe(msgsCronologicas)}`;
   }).join("\n\n");
+
+  const transcricoes = [transcricoesRecentes, transcricoesTravadas].filter(Boolean).join("\n\n");
 
   const contexto = `PERÍODO: ${inicio.toLocaleDateString("pt-BR")} a ${fim.toLocaleDateString("pt-BR")}
 FILTRO: ${atendenteId ? "conversas de um atendente específico" : "todas as conversas"}
 ESTATÍSTICAS: ${stats.conversas} conversas ativas | ${stats.mensagensEnviadas} mensagens enviadas pelo atendente | ${stats.encerradas} encerradas | ${stats.vendasGanhas} vendas ganhas (R$ ${valorGanho.toFixed(2)})
 MOTIVOS DE ENCERRAMENTO: ${stats.motivos.map(m => `${m.motivo}: ${m.qtd}`).join(", ") || "nenhum"}
 
-AMOSTRA DE CONVERSAS (${conversas.length} mais recentes do período):
+AMOSTRA DE CONVERSAS (${conversas.length} mais recentes do período${travadas.length > 0 ? ` + ${travadas.length} negociações travadas há mais tempo, marcadas explicitamente abaixo` : ""}):
 
 ${transcricoes}`.slice(0, 60_000);
 
