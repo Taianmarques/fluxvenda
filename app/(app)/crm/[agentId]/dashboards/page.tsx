@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
   LayoutDashboard, Wallet, Trophy, UserPlus, MessageCircle,
-  Headset, Bot, UserCheck, Users2, ListTodo, Filter, KanbanSquare, Goal,
+  Headset, Bot, UserCheck, Users2, ListTodo, Filter, KanbanSquare, Goal, Megaphone,
 } from "lucide-react";
 import { getAgentConfigWithRole } from "@/lib/team";
 import { CrmPageGate } from "@/app/(app)/crm/CrmPageGate";
@@ -53,14 +53,14 @@ async function DashboardsPageContent({ params }: { params: Promise<{ agentId: st
   const [conversations, leadStatuses, opportunities, pendingTasks, team] = await Promise.all([
     prisma.conversation.findMany({
       where: { agentConfigId: config.id, isSandbox: false, isTestNumber: false, isGroup: false },
-      select: { id: true, createdAt: true, status: true, humanTakeover: true, followupCount: true, leadStatusId: true, assignedToId: true },
+      select: { id: true, createdAt: true, status: true, humanTakeover: true, followupCount: true, leadStatusId: true, assignedToId: true, origemAnuncio: true },
     }),
     prisma.leadStatus.findMany({ where: { agentConfigId: config.id }, orderBy: { order: "asc" } }),
     prisma.opportunity.findMany({
       where: { conversation: { agentConfigId: config.id, isSandbox: false, isTestNumber: false, isGroup: false } },
       select: {
         id: true, dealValue: true, wonAt: true, lostAt: true, stageFollowupCount: true, createdAt: true,
-        conversation: { select: { assignedToId: true } },
+        conversation: { select: { assignedToId: true, origemAnuncio: true } },
       },
     }),
     prisma.opportunityTask.findMany({
@@ -171,6 +171,32 @@ async function DashboardsPageContent({ params }: { params: Promise<{ agentId: st
   const lost30dTotal = lost30d.reduce((s, o) => s + o.dealValue, 0);
   const ticketMedio = wonAll.length > 0 ? wonAll.reduce((s, o) => s + o.dealValue, 0) / wonAll.length : 0;
   const ganhoPerdaMax = Math.max(1, won30d.length, lost30d.length);
+
+  // Origem de anúncio: capturada da 1ª mensagem via tag "#codigo" num link wa.me (ver
+  // detectarOrigemAnuncio em lib/whatsapp-inbound.ts). Painel só aparece se algum lead já
+  // chegou com origem marcada — a maioria dos agentes nunca usa isso.
+  const origemLeadsMap = new Map<string, number>();
+  for (const c of conversations) {
+    if (c.origemAnuncio) origemLeadsMap.set(c.origemAnuncio, (origemLeadsMap.get(c.origemAnuncio) ?? 0) + 1);
+  }
+  const origemVendasMap = new Map<string, { count: number; total: number }>();
+  for (const o of wonAll) {
+    const origem = o.conversation.origemAnuncio;
+    if (!origem) continue;
+    const entry = origemVendasMap.get(origem) ?? { count: 0, total: 0 };
+    entry.count += 1;
+    entry.total += o.dealValue;
+    origemVendasMap.set(origem, entry);
+  }
+  const porOrigem = Array.from(new Set([...origemLeadsMap.keys(), ...origemVendasMap.keys()]))
+    .map(tag => ({
+      tag,
+      leads: origemLeadsMap.get(tag) ?? 0,
+      vendas: origemVendasMap.get(tag)?.count ?? 0,
+      total: origemVendasMap.get(tag)?.total ?? 0,
+    }))
+    .sort((a, b) => b.total - a.total || b.leads - a.leads);
+  const porOrigemMaxTotal = Math.max(1, ...porOrigem.map(o => o.total));
 
   return (
     <div className="h-full overflow-y-auto bg-gray-950 text-white p-6">
@@ -399,6 +425,29 @@ async function DashboardsPageContent({ params }: { params: Promise<{ agentId: st
             </div>
           </div>
         </div>
+
+        {/* Origem de anúncio — só aparece se algum lead já chegou com tag rastreada */}
+        {porOrigem.length > 0 && (
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-4">
+            <p className="font-semibold flex items-center gap-2"><Megaphone size={17} className="text-purple-400" /> Vendas por origem de anúncio</p>
+            <div className="space-y-2">
+              {porOrigem.map(o => (
+                <div key={o.tag} className="flex items-center gap-3">
+                  <p className="w-28 text-xs text-gray-300 truncate flex-shrink-0">#{o.tag}</p>
+                  <div className="flex-1 h-6 bg-gray-950 rounded-lg overflow-hidden">
+                    <div
+                      className="h-full rounded-lg bg-purple-600/50 flex items-center px-2"
+                      style={{ width: `${Math.max(8, (o.total / porOrigemMaxTotal) * 100)}%` }}
+                    >
+                      <span className="text-[10px] font-bold">{formatBRL(o.total)}</span>
+                    </div>
+                  </div>
+                  <span className="w-32 text-[11px] text-gray-500 flex-shrink-0 text-right">{o.leads} lead{o.leads === 1 ? "" : "s"} · {o.vendas} venda{o.vendas === 1 ? "" : "s"}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -143,6 +143,7 @@ async function WhatsappInboxPageContent({
         isGroup: c.isGroup,
         groupVisibleToIds: c.groupVisibleToIds,
         isTestNumber: c.isTestNumber,
+        origemAnuncio: c.origemAnuncio,
       }))}
     />
   );

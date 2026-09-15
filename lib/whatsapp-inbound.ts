@@ -1502,6 +1502,15 @@ function resolveHandoffAssignee(config: AgentConfigFull, currentAssignedToId: st
 
 const SESSION_WINDOW_MS = 24 * 60 * 60 * 1000;
 
+// Rastreio de anúncio sem precisar de link oficial da Meta (que só manda esse dado pela Cloud
+// API): o gestor cria o link do anúncio como wa.me/<numero>?text=<mensagem>%20%23codigo, com uma
+// tag "#codigo-da-campanha" no texto pré-preenchido. Se o lead mandar sem editar (ou editar e
+// manter a tag), a 1ª mensagem chega com essa tag e a gente registra a origem na conversa.
+function detectarOrigemAnuncio(text: string): string | null {
+  const match = text.match(/#([a-zA-Z0-9_-]{2,40})/);
+  return match ? match[1].toLowerCase() : null;
+}
+
 export async function processIncomingMessage(config: AgentConfigFull, msg: IncomingMessage, adapter: ChannelAdapter, opts?: { enforceSessionWindow?: boolean; sandbox?: boolean }): Promise<void> {
   const { text, caption, contactName, mediaUrl, mediaType, imageUrl } = msg;
 
@@ -1538,6 +1547,7 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
       // continua "pendente" (humanTakeover:false) até alguém assumir de verdade, então a IA
       // segue respondendo normalmente (ver carve-out em shouldAiHandle).
       ...(config.iaLeadAttendantId && !msg.isGroup && { assignedToId: config.iaLeadAttendantId }),
+      origemAnuncio: msg.isGroup ? null : detectarOrigemAnuncio(text),
     },
   });
   if (config.prospeccaoEnabled) {

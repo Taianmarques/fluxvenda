@@ -1544,6 +1544,12 @@ model Conversation {
   // gatilho pra não reprocessar a cada mensagem nova (só a 1ª detecção dispara o contato)
   extractedWhatsappNumber String?
 
+  // Origem de anúncio: capturada da 1ª mensagem quando o lead vem de um link wa.me com texto
+  // pré-preenchido contendo uma tag "#codigo-da-campanha" (ver detectarOrigemAnuncio em
+  // lib/whatsapp-inbound.ts). Null = não veio de um link de anúncio rastreado, ou não detectou
+  // tag. Nunca reavaliado depois da 1ª mensagem — a origem é sempre a de quando o lead chegou.
+  origemAnuncio String?
+
   messages          Message[]
   appointments      Appointment[]
   opportunities     Opportunity[]

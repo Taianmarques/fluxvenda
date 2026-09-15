@@ -4,7 +4,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import {
   MessageCircle, Search, X, Lock, Unlock, Bot, User, UserPlus, Users, Eye,
   FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Sun, Moon, Smile, Zap, StickyNote, ArrowRightLeft, HandCoins, CalendarClock, ListFilter, Instagram, ArrowLeft,
-  Reply, Forward, ChevronDown, Package, ImageOff, Pin, Download, Maximize2, ListChecks, KanbanSquare, UserCheck, LogOut,
+  Reply, Forward, ChevronDown, Package, ImageOff, Pin, Download, Maximize2, ListChecks, KanbanSquare, UserCheck, LogOut, Megaphone,
 } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { EmojiPicker } from "./EmojiPicker";
@@ -33,6 +33,7 @@ type ConversationSummary = {
   isGroup: boolean;
   groupVisibleToIds: string[];
   isTestNumber: boolean;
+  origemAnuncio: string | null;
 };
 
 type Attendant = { id: string; name: string; isManager: boolean };
@@ -160,6 +161,7 @@ type ConversationDetail = {
   isGroup: boolean;
   groupVisibleToIds: string[];
   isTestNumber: boolean;
+  origemAnuncio: string | null;
 };
 
 type ChatTheme = "dark" | "light";
@@ -549,6 +551,7 @@ export function WhatsappInbox({
           isGroup: Boolean(c.isGroup),
           groupVisibleToIds: c.groupVisibleToIds ?? [],
           isTestNumber: Boolean(c.isTestNumber),
+          origemAnuncio: c.origemAnuncio ?? null,
         }));
         // Só re-renderiza a lista se algo realmente mudou
         const fp = JSON.stringify(next.map((c: any) => [
@@ -1497,6 +1500,14 @@ export function WhatsappInbox({
                       <div className="flex items-center justify-between gap-2">
                         <p className="font-medium truncate">{c.contactName || c.contactNumber}</p>
                         <div className="flex items-center gap-1 flex-shrink-0">
+                          {c.origemAnuncio && (
+                            <span
+                              title={`Veio do anúncio "${c.origemAnuncio}"`}
+                              className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-purple-900/40 text-purple-300 border border-purple-700/50"
+                            >
+                              <Megaphone size={9} /> {c.origemAnuncio}
+                            </span>
+                          )}
                           {c.isTestNumber && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-900/40 text-amber-300 border border-amber-700/50">teste</span>
                           )}
@@ -1602,6 +1613,14 @@ export function WhatsappInbox({
                         ? <Instagram size={14} className="text-pink-400 flex-shrink-0" />
                         : <WhatsAppIcon size={14} />}
                       {detail.contactName || (isIgContact(detail.contactNumber) ? "Instagram DM" : detail.contactNumber)}
+                      {detail.origemAnuncio && (
+                        <span
+                          title={`Veio do anúncio "${detail.origemAnuncio}"`}
+                          className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-purple-900/40 text-purple-300 border border-purple-700/50 flex-shrink-0"
+                        >
+                          <Megaphone size={9} /> {detail.origemAnuncio}
+                        </span>
+                      )}
                       {detail.isTestNumber && (
                         <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-900/40 text-amber-300 border border-amber-700/50 flex-shrink-0">teste</span>
                       )}
