@@ -2,6 +2,12 @@ const UAZAPI_URL = process.env.UAZAPI_URL ?? "";
 const UAZAPI_TOKEN = process.env.UAZAPI_TOKEN ?? "";
 const UAZAPI_ADMIN_TOKEN = process.env.UAZAPI_ADMIN_TOKEN ?? "";
 
+// Sem isso, uma instabilidade na UazAPI (ex: incidente de datacenter deles) trava CADA chamada
+// por 10s (timeout padrão de conexão do fetch) antes de falhar — com várias mensagens chegando
+// ao mesmo tempo, essas esperas se acumulam e deixam o CRM inteiro lento, não só o envio.
+// Reduzido pra falhar mais rápido; segue dando folga de sobra pro tempo normal de resposta.
+const UAZAPI_TIMEOUT_MS = 6000;
+
 // Grupo (isGroup) não é número de telefone — usa o id do grupo direto, com o sufixo "@g.us"
 // (mesma convenção que a UazAPI já usa pra chatId em getChatProfilePicture abaixo). Formatar
 // como telefone brasileiro (dígitos + prefixo 55) corromperia o id do grupo.
@@ -23,6 +29,7 @@ async function sendText(url: string, token: string, phone: string, text: string,
       token,
     },
     body: JSON.stringify({ number, text, ...(replyId && { replyid: replyId }) }),
+    signal: AbortSignal.timeout(UAZAPI_TIMEOUT_MS),
   });
 
   if (!res.ok) {
@@ -79,6 +86,7 @@ export async function sendMediaAsTeam(
       ...(options?.fileName && { docName: options.fileName }),
       ...(options?.replyId && { replyid: options.replyId }),
     }),
+    signal: AbortSignal.timeout(UAZAPI_TIMEOUT_MS),
   });
 
   if (!res.ok) {
@@ -114,6 +122,7 @@ export async function connectInstance(token: string): Promise<UazapiInstanceStat
     method: "POST",
     headers: { "Content-Type": "application/json", token },
     body: JSON.stringify({}),
+    signal: AbortSignal.timeout(UAZAPI_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`Erro ao conectar instância: ${res.status}`);
   return parseInstanceStatus(await res.json());
@@ -124,6 +133,7 @@ export async function getInstanceStatus(token: string): Promise<UazapiInstanceSt
   const res = await fetch(`${UAZAPI_URL}/instance/status`, {
     method: "GET",
     headers: { token },
+    signal: AbortSignal.timeout(UAZAPI_TIMEOUT_MS),
   });
   if (!res.ok) return { connected: false, qrcode: null, paircode: null, profileName: null, ownerNumber: null };
   const data = await res.json().catch(() => ({}));
@@ -138,6 +148,7 @@ export async function downloadMessageMedia(token: string, messageId: string): Pr
     method: "POST",
     headers: { "Content-Type": "application/json", token },
     body: JSON.stringify({ id: messageId }),
+    signal: AbortSignal.timeout(UAZAPI_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`Erro ao baixar mídia: ${res.status}`);
   return res.json();
@@ -150,6 +161,7 @@ export async function deleteMessageOnWhatsApp(token: string, messageId: string):
     method: "POST",
     headers: { "Content-Type": "application/json", token },
     body: JSON.stringify({ id: messageId }),
+    signal: AbortSignal.timeout(UAZAPI_TIMEOUT_MS),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
@@ -166,6 +178,7 @@ export async function editMessageOnWhatsApp(token: string, messageId: string, te
     method: "POST",
     headers: { "Content-Type": "application/json", token },
     body: JSON.stringify({ id: messageId, text }),
+    signal: AbortSignal.timeout(UAZAPI_TIMEOUT_MS),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
@@ -184,6 +197,7 @@ export async function getChatProfilePicture(token: string, chatId: string): Prom
       method: "POST",
       headers: { "Content-Type": "application/json", token },
       body: JSON.stringify({ wa_chatid: chatId }),
+      signal: AbortSignal.timeout(UAZAPI_TIMEOUT_MS),
     });
     if (!res.ok) return null;
     const data = await res.json().catch(() => null);
@@ -200,6 +214,7 @@ export async function disconnectInstance(token: string): Promise<void> {
     method: "POST",
     headers: { "Content-Type": "application/json", token },
     body: JSON.stringify({}),
+    signal: AbortSignal.timeout(UAZAPI_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`Erro ao desconectar instância: ${res.status}`);
 }
@@ -209,6 +224,7 @@ export async function deleteInstance(token: string): Promise<void> {
   const res = await fetch(`${UAZAPI_URL}/instance`, {
     method: "DELETE",
     headers: { token },
+    signal: AbortSignal.timeout(UAZAPI_TIMEOUT_MS),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
@@ -224,6 +240,7 @@ export async function createInstance(name: string): Promise<{ token: string; nam
     method: "POST",
     headers: { "Content-Type": "application/json", admintoken: UAZAPI_ADMIN_TOKEN },
     body: JSON.stringify({ name }),
+    signal: AbortSignal.timeout(UAZAPI_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`Erro ao criar instância: ${res.status}`);
   const data = await res.json();
@@ -245,6 +262,7 @@ export async function registerAgentWebhook(token: string, webhookUrl: string): P
       addUrlEvents: false,
       addUrlTypesMessages: false,
     }),
+    signal: AbortSignal.timeout(UAZAPI_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`Erro ao registrar webhook: ${res.status}`);
 }
