@@ -33,6 +33,8 @@ export function OpportunitiesPanel({
   const [movePipelineId, setMovePipelineId] = useState("");
   const [moveStageId, setMoveStageId] = useState("");
   const [moving, setMoving] = useState(false);
+  const [editingValueId, setEditingValueId] = useState<string | null>(null);
+  const [valueInput, setValueInput] = useState("");
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -76,6 +78,23 @@ export function OpportunitiesPanel({
     const res = await fetch(`/api/ferramentas/whatsapp/conversas/${conversationId}/oportunidades/${oppId}/ganho`, { method: "POST" });
     const data = await res.json();
     if (!res.ok) { alert(data.error ?? "Não foi possível marcar como ganho."); return; }
+    onChange();
+  }
+
+  function startEditingValue(o: Opportunity) {
+    setEditingValueId(o.id);
+    setValueInput(String(o.dealValue));
+  }
+
+  async function commitValue(oppId: string, currentValue: number) {
+    setEditingValueId(null);
+    const parsed = Number(valueInput.replace(",", "."));
+    if (!Number.isFinite(parsed) || parsed <= 0 || parsed === currentValue) return;
+    await fetch(`/api/ferramentas/whatsapp/conversas/${conversationId}/oportunidades/${oppId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dealValue: parsed }),
+    });
     onChange();
   }
 
@@ -162,9 +181,25 @@ export function OpportunitiesPanel({
               <div className="group flex items-center gap-1">
                 <div className="flex-1 min-w-0">
                   <p className={`text-xs font-medium truncate ${dark ? "text-gray-200" : "text-gray-800"}`}>{o.title || "Negociação"}</p>
-                  <p className={`text-xs font-semibold ${o.wonAt ? "text-green-500" : dark ? "text-gray-400" : "text-gray-500"}`}>
-                    {formatBRL(o.dealValue)}{o.wonAt && " — ganho"}
-                  </p>
+                  {editingValueId === o.id ? (
+                    <input
+                      autoFocus
+                      value={valueInput}
+                      onChange={e => setValueInput(e.target.value)}
+                      onBlur={() => commitValue(o.id, o.dealValue)}
+                      onKeyDown={e => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
+                      placeholder="0,00"
+                      className={`w-24 text-xs font-semibold rounded px-1.5 py-0.5 border focus:outline-none ${dark ? "bg-gray-950 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+                    />
+                  ) : (
+                    <p
+                      className={`text-xs font-semibold ${o.wonAt ? "text-green-500" : `${dark ? "text-gray-400" : "text-gray-500"} cursor-text hover:underline`}`}
+                      onClick={() => { if (!o.wonAt) startEditingValue(o); }}
+                      title={o.wonAt ? undefined : "Clique para editar o valor"}
+                    >
+                      {formatBRL(o.dealValue)}{o.wonAt && " — ganho"}
+                    </p>
+                  )}
                 </div>
                 {!o.wonAt && pipelines.length > 1 && (
                   <button
