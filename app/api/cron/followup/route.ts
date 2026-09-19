@@ -4,6 +4,7 @@ import { generateFollowupMessage } from "@/lib/agent-engine";
 import { sendWhatsAppTextAsTeam } from "@/lib/whatsapp";
 import { logTokenUsage } from "@/lib/token-usage";
 import { dentroHorarioEnvio } from "@/lib/sending-hours";
+import { normalizeStageFollowup } from "@/lib/pipeline";
 
 function hoursFromNow(n: number) {
   const d = new Date();
@@ -98,8 +99,8 @@ export async function POST(req: NextRequest) {
   });
 
   for (const stage of stages) {
-    const delays = stage.followupDelaysMinutes as unknown as number[];
-    if (!Array.isArray(delays) || delays.length === 0) continue;
+    const delays = normalizeStageFollowup(stage.followupDelaysMinutes);
+    if (delays.length === 0) continue;
 
     const config = stage.pipeline.agentConfig;
     if (!config.systemPrompt || !config.uazapiToken) continue;
@@ -128,8 +129,8 @@ O lead está na etapa "${stage.name}" do funil "${stage.pipeline.name}". Siga es
 
     for (const opp of candidates) {
       const referenceTime = opp.stageFollowupCount === 0 ? opp.stageEnteredAt : (opp.lastStageFollowupAt ?? opp.stageEnteredAt);
-      const delayMinutes = delays[opp.stageFollowupCount];
-      const dueAt = new Date(referenceTime.getTime() + delayMinutes * 60000);
+      const attempt = delays[opp.stageFollowupCount];
+      const dueAt = new Date(referenceTime.getTime() + attempt.minutos * 60000);
       if (dueAt > new Date()) continue;
 
       stageFollowupChecked++;
@@ -145,7 +146,7 @@ O lead está na etapa "${stage.name}" do funil "${stage.pipeline.name}". Siga es
         .reverse()
         .map(m => ({ role: m.role === "user" ? ("user" as const) : ("assistant" as const), content: m.content }));
 
-      const { reply: followup, usage } = await generateFollowupMessage(config.systemPrompt + stageInstruction, history, opp.stageFollowupCount + 1);
+      const { reply: followup, usage } = await generateFollowupMessage(config.systemPrompt + stageInstruction, history, opp.stageFollowupCount + 1, attempt.objetivo);
       if (!followup) continue;
       logTokenUsage({ teamId: config.teamId, provider: "openai", model: "gpt-4o-mini", feature: "followup", ...usage });
 
@@ -160,6 +161,10 @@ O lead está na etapa "${stage.name}" do funil "${stage.pipeline.name}". Siga es
         where: { id: opp.id },
         data: { stageFollowupCount: { increment: 1 }, lastStageFollowupAt: new Date() },
       });
+      // Marca como "aguardando" — em nutrição automática, não precisa de atenção do atendente
+      // agora. Volta pra ATIVO sozinha assim que o cliente responder (ver upsert no webhook do
+      // WhatsApp, que sempre seta status: "ATIVO" em qualquer mensagem recebida).
+      await prisma.conversation.update({ where: { id: conversation.id }, data: { status: "AGUARDANDO" } });
       stageFollowupSent++;
     }
   }

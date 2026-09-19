@@ -9,7 +9,12 @@ const patchSchema = z.object({
   color: z.string().optional(),
   order: z.number().int().optional(),
   agenteInstrucoes: z.string().max(1500).optional(),
-  followupDelaysMinutes: z.array(z.number().int().min(1).max(43200)).max(10).optional(),
+  // Cada tentativa: quanto tempo esperar (minutos) + objetivo opcional dessa nutrição específica
+  // (ver lib/pipeline.ts normalizeStageFollowup — lê tanto esse formato quanto o antigo, número puro).
+  followupDelaysMinutes: z.array(z.object({
+    minutos: z.number().int().min(1).max(43200),
+    objetivo: z.string().trim().max(300).optional(),
+  })).max(10).optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

@@ -1,5 +1,29 @@
 import { prisma } from "@/lib/prisma";
 
+// Uma tentativa de follow-up de etapa: quanto tempo esperar parado na etapa + (opcional) o que
+// essa tentativa específica deve comunicar (ex: "reforçar um benefício", "oferecer condição
+// especial") — sem objetivo, cai no texto genérico de retomada (ver generateFollowupMessage).
+export type StageFollowupAttempt = { minutos: number; objetivo?: string };
+
+// PipelineStage.followupDelaysMinutes é Json e já foi salvo no formato antigo (array de números,
+// em minutos) antes do campo "objetivo" existir — normaliza os dois formatos pra não precisar
+// migrar dados já salvos.
+export function normalizeStageFollowup(raw: unknown): StageFollowupAttempt[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item): StageFollowupAttempt | null => {
+      if (typeof item === "number") return Number.isFinite(item) && item > 0 ? { minutos: item } : null;
+      if (item && typeof item === "object" && "minutos" in item) {
+        const obj = item as { minutos: unknown; objetivo?: unknown };
+        const minutos = Number(obj.minutos);
+        if (!Number.isFinite(minutos) || minutos <= 0) return null;
+        return { minutos, objetivo: typeof obj.objetivo === "string" && obj.objetivo.trim() ? obj.objetivo.trim() : undefined };
+      }
+      return null;
+    })
+    .filter((x): x is StageFollowupAttempt => x !== null);
+}
+
 export const DEFAULT_STAGES = [
   { name: "Novo Lead", color: "#3b82f6" },
   { name: "Em Atendimento", color: "#eab308" },

@@ -692,11 +692,16 @@ export async function runAgentWithTools(
 export async function generateFollowupMessage(
   systemPrompt: string,
   history: { role: "user" | "assistant"; content: string }[],
-  attemptNumber: number
+  attemptNumber: number,
+  objetivo?: string
 ): Promise<{ reply: string; usage: AgentUsage }> {
-  const instruction = attemptNumber >= 2
-    ? "O cliente já não respondeu a um follow-up anterior. Mande uma última mensagem curta e educada, sem ser insistente, dando a entender que essa é a última tentativa de contato."
-    : "O cliente não responde há um tempo. Mande uma mensagem curta e natural retomando a conversa, sem ser insistente, baseada no que foi discutido.";
+  // Objetivo específico da tentativa (configurado na etapa do pipeline) tem prioridade sobre o
+  // texto genérico — deixa a nutrição diferente por tentativa em vez de sempre "retomando o assunto".
+  const instruction = objetivo?.trim()
+    ? `O cliente não responde há um tempo. Mande uma mensagem curta e natural retomando a conversa, com este objetivo específico: ${objetivo.trim()}`
+    : attemptNumber >= 2
+      ? "O cliente já não respondeu a um follow-up anterior. Mande uma última mensagem curta e educada, sem ser insistente, dando a entender que essa é a última tentativa de contato."
+      : "O cliente não responde há um tempo. Mande uma mensagem curta e natural retomando a conversa, sem ser insistente, baseada no que foi discutido.";
 
   const completion = await openai.chat.completions.create({
     model: MODEL,

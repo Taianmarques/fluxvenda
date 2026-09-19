@@ -22,7 +22,7 @@ type InitialConfig = {
 } | null;
 
 export type DelayUnit = "horas" | "minutos";
-export type DelayRow = { value: number; unit: DelayUnit };
+export type DelayRow = { value: number; unit: DelayUnit; objetivo?: string };
 
 export function minutesToRow(minutes: number): DelayRow {
   return minutes % 60 === 0 ? { value: minutes / 60, unit: "horas" } : { value: minutes, unit: "minutos" };
@@ -38,36 +38,51 @@ export function formatDelay(minutes: number): string {
 }
 
 export function FollowupDelaysEditor({
-  followupDelays, onAdd, onRemove, onUpdate,
+  followupDelays, onAdd, onRemove, onUpdate, withObjetivo,
 }: {
   followupDelays: DelayRow[];
   onAdd: () => void;
   onRemove: (i: number) => void;
   onUpdate: (i: number, row: Partial<DelayRow>) => void;
+  // Mostra um campo de texto por tentativa pra dar um objetivo específico de nutrição (ex:
+  // "reforçar um benefício", "oferecer condição especial") em vez do texto genérico de retomada —
+  // usado no follow-up por etapa do pipeline, não no follow-up geral do agente.
+  withObjetivo?: boolean;
 }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <label className="text-sm text-gray-400 block">Tentativas (cada uma pode esperar um tempo diferente)</label>
       {followupDelays.map((row, i) => (
-        <div key={i} className="flex items-center gap-2">
-          <span className="text-xs text-gray-500 w-20 flex-shrink-0">
-            {i === 0 ? "1ª tentativa" : `${i + 1}ª, +`}
-          </span>
-          <input
-            type="number" min={1} max={row.unit === "horas" ? 720 : 1440} value={row.value}
-            onChange={e => onUpdate(i, { value: Math.max(1, Number(e.target.value)) })}
-            className="w-24 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
-          />
-          <select
-            value={row.unit} onChange={e => onUpdate(i, { unit: e.target.value as DelayUnit })}
-            className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
-          >
-            <option value="horas">horas</option>
-            <option value="minutos">minutos</option>
-          </select>
-          <span className="text-xs text-gray-500">sem resposta</span>
-          {followupDelays.length > 1 && (
-            <button onClick={() => onRemove(i)} className="text-xs text-red-400 hover:text-red-300 ml-auto">Remover</button>
+        <div key={i} className={withObjetivo ? "bg-gray-950/50 border border-gray-800 rounded-xl p-3 space-y-2" : ""}>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 w-20 flex-shrink-0">
+              {i === 0 ? "1ª tentativa" : `${i + 1}ª, +`}
+            </span>
+            <input
+              type="number" min={1} max={row.unit === "horas" ? 720 : 1440} value={row.value}
+              onChange={e => onUpdate(i, { value: Math.max(1, Number(e.target.value)) })}
+              className="w-24 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+            />
+            <select
+              value={row.unit} onChange={e => onUpdate(i, { unit: e.target.value as DelayUnit })}
+              className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+            >
+              <option value="horas">horas</option>
+              <option value="minutos">minutos</option>
+            </select>
+            <span className="text-xs text-gray-500">sem resposta</span>
+            {followupDelays.length > 1 && (
+              <button onClick={() => onRemove(i)} className="text-xs text-red-400 hover:text-red-300 ml-auto">Remover</button>
+            )}
+          </div>
+          {withObjetivo && (
+            <input
+              value={row.objetivo ?? ""}
+              onChange={e => onUpdate(i, { objetivo: e.target.value })}
+              placeholder="O que essa mensagem deve comunicar (opcional — em branco usa um texto genérico de retomada)"
+              maxLength={300}
+              className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-600"
+            />
           )}
         </div>
       ))}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { KanbanSquare } from "lucide-react";
 import { getAgentConfigWithRole } from "@/lib/team";
 import { podeVerNaoAtribuidos } from "@/lib/crm-access";
+import { normalizeStageFollowup } from "@/lib/pipeline";
 import { PipelineBoardLoader as PipelineBoard } from "../../pipeline/PipelineBoardLoader";
 
 export default async function PipelinePage({ params }: { params: Promise<{ agentId: string }> }) {
@@ -86,7 +87,7 @@ export default async function PipelinePage({ params }: { params: Promise<{ agent
         agenteInstrucoes: p.agenteInstrucoes,
         stages: p.stages.map(s => ({
           id: s.id, name: s.name, color: s.color, order: s.order, agenteInstrucoes: s.agenteInstrucoes,
-          followupDelaysMinutes: s.followupDelaysMinutes as unknown as number[],
+          followupDelaysMinutes: normalizeStageFollowup(s.followupDelaysMinutes),
         })),
       }))}
       initialLeadStatuses={leadStatuses.map(s => ({ id: s.id, name: s.name, color: s.color, order: s.order }))}

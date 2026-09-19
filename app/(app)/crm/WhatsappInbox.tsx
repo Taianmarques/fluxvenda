@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   MessageCircle, Search, X, Lock, Unlock, Bot, User, UserPlus, UserCheck, Users, Eye,
-  FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Smile, Zap, StickyNote, ArrowRightLeft, HandCoins, CalendarClock, ListFilter, ListChecks, Instagram, ArrowLeft,
+  FileText, Video, Trash2, Check, Paperclip, PenLine, Mic, Smile, Zap, StickyNote, ArrowRightLeft, HandCoins, CalendarClock, Clock, ListFilter, ListChecks, Instagram, ArrowLeft,
   Reply, Forward, ChevronDown, Package, ImageOff, Pin, Maximize2, Download,
 } from "lucide-react";
 import { useCrmTheme } from "./CrmThemeContext";
@@ -348,7 +348,7 @@ export function WhatsappInbox({
 }) {
   const { theme } = useCrmTheme();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"ativos" | "pendentes" | "finalizados" | "grupos">("ativos");
+  const [statusFilter, setStatusFilter] = useState<"ativos" | "pendentes" | "aguardando" | "finalizados" | "grupos">("ativos");
   // Seleção múltipla + ações em lote — só faz sentido nas abas Ativos/Pendentes; os checkboxes
   // só aparecem depois de ativar o modo seleção (ícone perto de Filtros), pra não poluir a
   // lista por padrão
@@ -1139,8 +1139,9 @@ export function WhatsappInbox({
   }
 
   const statusCounts = {
-    ativos: conversations.filter(c => !c.isGroup && c.humanTakeover && c.status !== "FINALIZADO").length,
-    pendentes: conversations.filter(c => !c.isGroup && !c.humanTakeover && c.status !== "FINALIZADO").length,
+    ativos: conversations.filter(c => !c.isGroup && c.humanTakeover && c.status !== "FINALIZADO" && c.status !== "AGUARDANDO").length,
+    pendentes: conversations.filter(c => !c.isGroup && !c.humanTakeover && c.status !== "FINALIZADO" && c.status !== "AGUARDANDO").length,
+    aguardando: conversations.filter(c => !c.isGroup && c.status === "AGUARDANDO").length,
     finalizados: conversations.filter(c => !c.isGroup && c.status === "FINALIZADO").length,
     grupos: conversations.filter(c => c.isGroup).length,
   };
@@ -1148,8 +1149,9 @@ export function WhatsappInbox({
   const statusFiltered = conversations.filter(c => {
     if (statusFilter === "grupos") return c.isGroup;
     if (c.isGroup) return false;
-    if (statusFilter === "ativos") return c.humanTakeover && c.status !== "FINALIZADO";
-    if (statusFilter === "pendentes") return !c.humanTakeover && c.status !== "FINALIZADO";
+    if (statusFilter === "aguardando") return c.status === "AGUARDANDO";
+    if (statusFilter === "ativos") return c.humanTakeover && c.status !== "FINALIZADO" && c.status !== "AGUARDANDO";
+    if (statusFilter === "pendentes") return !c.humanTakeover && c.status !== "FINALIZADO" && c.status !== "AGUARDANDO";
     return c.status === "FINALIZADO";
   });
 
@@ -1208,10 +1210,11 @@ export function WhatsappInbox({
                   ["ativos", "Ativos"],
                   ["pendentes", "Pendentes"],
                   ["grupos", "Grupos"],
+                  ["aguardando", "Em nutrição automática — aguardando resposta do lead"],
                   ["finalizados", "Finalizados"],
                 ] as const).map(([key, label]) => {
-                  // Finalizados minimizada (só o ícone) — abre espaço pra Grupos não vazar da linha
-                  const iconOnly = key === "finalizados";
+                  // Finalizados e Aguardando minimizadas (só o ícone) — abre espaço pra Grupos não vazar da linha
+                  const iconOnly = key === "finalizados" || key === "aguardando";
                   return (
                     <button
                       key={key}
@@ -1223,7 +1226,9 @@ export function WhatsappInbox({
                           : `border-transparent ${t.toggleBar} ${t.toggleInactive}`
                       }`}
                     >
-                      {iconOnly ? <Check size={13} /> : <>{label} <span className="opacity-70">{statusCounts[key]}</span></>}
+                      {key === "finalizados" && <Check size={13} />}
+                      {key === "aguardando" && <Clock size={13} />}
+                      {!iconOnly && <>{label} <span className="opacity-70">{statusCounts[key]}</span></>}
                     </button>
                   );
                 })}
@@ -1375,6 +1380,9 @@ export function WhatsappInbox({
                         <div className="flex items-center gap-1 flex-shrink-0">
                           {c.status === "FINALIZADO" && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-700/50 text-gray-300 border border-gray-600">encerrado</span>
+                          )}
+                          {c.status === "AGUARDANDO" && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-900/40 text-blue-300 border border-blue-800/50">nutrição</span>
                           )}
                           <button
                             onClick={e => handleTogglePin(c.id, c.pinned, e)}
