@@ -24,6 +24,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ agen
       keywords: string[];
       replyMessage: string;
       funnelId: string | null;
+      mediaId?: string | null;
+      mediaThumbnailUrl?: string | null;
+      mediaPermalink?: string | null;
       order: number;
       active: boolean;
     }>;
@@ -44,6 +47,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ agen
             keywords: Array.isArray(f.keywords) ? f.keywords.map(String) : [],
             replyMessage: f.replyMessage ?? "",
             funnelId: f.funnelId ?? null,
+            mediaId: f.mediaId ?? null,
+            mediaThumbnailUrl: f.mediaThumbnailUrl ?? null,
+            mediaPermalink: f.mediaPermalink ?? null,
             order: f.order ?? i,
             active: f.active !== false,
           })),

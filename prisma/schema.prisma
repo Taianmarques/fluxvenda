@@ -2019,6 +2019,13 @@ model InstagramCommentFlow {
   order        Int      @default(0)
   active       Boolean  @default(true)
 
+  // Escopa a condição a UM post/reel específico — null = vale pra qualquer post da conta
+  // (comportamento anterior). Thumbnail/permalink são um snapshot do momento da escolha, só
+  // pra exibir na lista de condições sem re-consultar a API do Instagram toda hora.
+  mediaId           String?
+  mediaThumbnailUrl String? @db.Text
+  mediaPermalink    String?
+
   // Quando definido, dispara o funil em vez de enviar replyMessage
   funnelId String?
   funnel   InstagramFunnel? @relation(fields: [funnelId], references: [id], onDelete: SetNull)

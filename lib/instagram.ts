@@ -62,6 +62,34 @@ export async function getInstagramUserProfile(accessToken: string, igsid: string
   return { name: data.name ?? null, username: data.username ?? null };
 }
 
+// Posts/reels recentes da conta conectada — usado pelo seletor "escopar condição a um post"
+// nas Condições de comentário (ver app/api/instagram/media/[agentId]/route.ts).
+export type InstagramMediaItem = {
+  id: string;
+  caption: string | null;
+  mediaType: string;
+  thumbnailUrl: string | null;
+  permalink: string;
+  timestamp: string;
+};
+
+export async function getRecentInstagramMedia(accessToken: string, limit = 25): Promise<InstagramMediaItem[]> {
+  const fields = "id,caption,media_type,media_url,thumbnail_url,permalink,timestamp";
+  const res = await fetch(`${IG_GRAPH}/me/media?fields=${fields}&limit=${limit}&access_token=${accessToken}`);
+  const data = await res.json();
+  if (!res.ok || data.error) throw new Error(data.error?.message ?? "Falha ao buscar posts do Instagram");
+  type RawMedia = { id: string; caption?: string; media_type: string; media_url?: string; thumbnail_url?: string; permalink: string; timestamp: string };
+  return ((data.data ?? []) as RawMedia[]).map((m) => ({
+    id: m.id,
+    caption: m.caption ?? null,
+    mediaType: m.media_type,
+    // Vídeo/reel só tem capa em thumbnail_url; imagem usa o próprio media_url como capa
+    thumbnailUrl: m.thumbnail_url ?? m.media_url ?? null,
+    permalink: m.permalink,
+    timestamp: m.timestamp,
+  }));
+}
+
 // ─── Webhook ──────────────────────────────────────────────────────────────────
 
 export async function subscribeInstagramWebhook(igUserId: string, accessToken: string): Promise<void> {

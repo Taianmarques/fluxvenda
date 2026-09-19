@@ -35,7 +35,10 @@ async function CondicoesPageContent({
     prisma.instagramCommentFlow.findMany({
       where: { agentConfigId: agentId },
       orderBy: { order: "asc" },
-      select: { id: true, name: true, keywords: true, replyMessage: true, funnelId: true, order: true, active: true },
+      select: {
+        id: true, name: true, keywords: true, replyMessage: true, funnelId: true, order: true, active: true,
+        mediaId: true, mediaThumbnailUrl: true, mediaPermalink: true,
+      },
     }),
     prisma.instagramFunnel.findMany({
       where: { agentConfigId: agentId },

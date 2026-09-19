@@ -4,7 +4,7 @@ import { useState } from "react";
 import {
   GitBranch, Plus, X, ChevronUp, ChevronDown, GripVertical,
   Trash2, ToggleLeft, ToggleRight, Instagram, MessageSquare,
-  Clock, HelpCircle, Zap,
+  Clock, HelpCircle, Zap, Image as ImageIcon, Loader2,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -15,9 +15,14 @@ type CommentFlow = {
   keywords: string[];
   replyMessage: string;
   funnelId: string | null;
+  mediaId: string | null;
+  mediaThumbnailUrl: string | null;
+  mediaPermalink: string | null;
   order: number;
   active: boolean;
 };
+
+type MediaItem = { id: string; caption: string | null; thumbnailUrl: string | null; permalink: string };
 
 type Branch = { keywords: string[]; label: string; funnelId: string | null };
 
@@ -413,19 +418,32 @@ function FunnelBuilder({ funnel, allFunnels, onUpdate, onDelete }: {
 // ─── Flow card (conditions tab) ───────────────────────────────────────────────
 
 function FlowCard({
-  flow, index, total, funnels,
+  flow, index, total, funnels, mediaLibrary, loadingMedia, onRequestMedia,
   onUpdate, onDelete, onMoveUp, onMoveDown,
 }: {
   flow: CommentFlow;
   index: number;
   total: number;
   funnels: Funnel[];
+  mediaLibrary: MediaItem[] | null;
+  loadingMedia: boolean;
+  onRequestMedia: () => void;
   onUpdate: (patch: Partial<CommentFlow>) => void;
   onDelete: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
 }) {
   const [kwInput, setKwInput] = useState("");
+  const [showPicker, setShowPicker] = useState(false);
+
+  function openPicker() {
+    setShowPicker(true);
+    onRequestMedia();
+  }
+  function pickMedia(m: MediaItem) {
+    onUpdate({ mediaId: m.id, mediaThumbnailUrl: m.thumbnailUrl, mediaPermalink: m.permalink });
+    setShowPicker(false);
+  }
 
   function addKw() {
     const kw = kwInput.trim().toLowerCase();
@@ -488,6 +506,72 @@ function FlowCard({
             />
             <button onClick={addKw} className="text-xs text-purple-400 border border-purple-800/50 rounded-lg px-3 py-1.5">+ Add</button>
           </div>
+        </div>
+
+        {/* Post específico */}
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium text-gray-400">
+            Post
+            <span className="text-gray-600 font-normal ml-1.5">(opcional — só vale nesse post)</span>
+          </p>
+          {flow.mediaId ? (
+            <div className="flex items-center gap-2 bg-gray-800 border border-gray-700 rounded-lg px-2.5 py-1.5">
+              {flow.mediaThumbnailUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={flow.mediaThumbnailUrl} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0" />
+              ) : (
+                <div className="w-8 h-8 rounded bg-gray-900 flex items-center justify-center flex-shrink-0"><ImageIcon size={13} className="text-gray-600" /></div>
+              )}
+              {flow.mediaPermalink && (
+                <a href={flow.mediaPermalink} target="_blank" rel="noreferrer" className="text-xs text-purple-400 hover:underline truncate flex-1 min-w-0">
+                  Ver post
+                </a>
+              )}
+              <button onClick={openPicker} className="text-xs text-gray-400 hover:text-gray-200 flex-shrink-0">Trocar</button>
+              <button onClick={() => onUpdate({ mediaId: null, mediaThumbnailUrl: null, mediaPermalink: null })} className="text-gray-600 hover:text-red-400 flex-shrink-0"><X size={12} /></button>
+            </div>
+          ) : (
+            <button
+              onClick={openPicker}
+              className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-purple-300 border border-dashed border-gray-700 hover:border-purple-700 rounded-lg px-3 py-1.5 transition-colors"
+            >
+              <ImageIcon size={13} /> Escolher post — sem isso, vale pra qualquer post
+            </button>
+          )}
+
+          {showPicker && (
+            <div className="border border-gray-800 rounded-lg p-2 bg-gray-950/60 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-gray-500">Posts recentes</p>
+                <button onClick={() => setShowPicker(false)} className="text-gray-600 hover:text-gray-300"><X size={12} /></button>
+              </div>
+              {loadingMedia && (
+                <p className="text-xs text-gray-500 flex items-center gap-1.5 py-2"><Loader2 size={12} className="animate-spin" /> Carregando posts...</p>
+              )}
+              {!loadingMedia && mediaLibrary?.length === 0 && (
+                <p className="text-xs text-gray-500 py-2">Nenhum post encontrado.</p>
+              )}
+              {!loadingMedia && mediaLibrary && mediaLibrary.length > 0 && (
+                <div className="grid grid-cols-5 gap-1.5 max-h-48 overflow-y-auto">
+                  {mediaLibrary.map((m) => (
+                    <button
+                      key={m.id}
+                      onClick={() => pickMedia(m)}
+                      title={m.caption ?? undefined}
+                      className="aspect-square rounded overflow-hidden border border-gray-800 hover:border-purple-500 transition-colors"
+                    >
+                      {m.thumbnailUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={m.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full bg-gray-900 flex items-center justify-center"><ImageIcon size={14} className="text-gray-700" /></div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Ação */}
@@ -561,6 +645,24 @@ export function CondicoesClient({ agentId, igConnected, igUsername, igCommentAut
 
   const [error, setError] = useState("");
 
+  // ── Posts recentes (pro seletor "escopar a um post") — buscado uma vez, sob demanda,
+  // compartilhado por todos os cards de condição ──
+  const [mediaLibrary, setMediaLibrary] = useState<MediaItem[] | null>(null);
+  const [loadingMedia, setLoadingMedia] = useState(false);
+  async function ensureMediaLoaded() {
+    if (mediaLibrary !== null || loadingMedia) return;
+    setLoadingMedia(true);
+    try {
+      const res = await fetch(`/api/instagram/media/${agentId}`);
+      const data = await res.json();
+      setMediaLibrary(res.ok ? (data.media ?? []) : []);
+    } catch {
+      setMediaLibrary([]);
+    } finally {
+      setLoadingMedia(false);
+    }
+  }
+
   // ── Flow helpers ──
   function updateFlow(id: string, patch: Partial<CommentFlow>) {
     setFlows((prev) => prev.map((f) => f.id === id ? { ...f, ...patch } : f));
@@ -572,7 +674,10 @@ export function CondicoesClient({ agentId, igConnected, igUsername, igCommentAut
     setFlows(next.map((f, i) => ({ ...f, order: i })));
   }
   function addFlow() {
-    setFlows((prev) => [...prev, { id: newFlowId(), name: `Condição ${prev.length + 1}`, keywords: [], replyMessage: "", funnelId: null, order: prev.length, active: true }]);
+    setFlows((prev) => [...prev, {
+      id: newFlowId(), name: `Condição ${prev.length + 1}`, keywords: [], replyMessage: "", funnelId: null,
+      mediaId: null, mediaThumbnailUrl: null, mediaPermalink: null, order: prev.length, active: true,
+    }]);
   }
 
   // ── Funnel helpers ──
@@ -691,6 +796,7 @@ export function CondicoesClient({ agentId, igConnected, igUsername, igCommentAut
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Como funciona</p>
               <ol className="text-xs text-gray-500 space-y-0.5 list-decimal list-inside">
                 <li>Alguém comenta num post → sistema verifica condições na ordem</li>
+                <li>Se a condição tem um post escolhido, ela só vale nesse post</li>
                 <li>Primeira que bater: envia mensagem direta ou inicia um funil</li>
                 <li>Se nenhuma bater: usa o fallback abaixo</li>
               </ol>
@@ -705,6 +811,9 @@ export function CondicoesClient({ agentId, igConnected, igUsername, igCommentAut
                 index={i}
                 total={flows.length}
                 funnels={funnels}
+                mediaLibrary={mediaLibrary}
+                loadingMedia={loadingMedia}
+                onRequestMedia={ensureMediaLoaded}
                 onUpdate={(patch) => updateFlow(flow.id, patch)}
                 onDelete={() => setFlows((prev) => prev.filter((f) => f.id !== flow.id))}
                 onMoveUp={() => moveFlow(i, i - 1)}

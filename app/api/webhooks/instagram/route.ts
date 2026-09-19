@@ -425,7 +425,7 @@ async function processComment(igBusinessAccountId: string, comment: {
       igCommentFlows: {
         where: { active: true },
         orderBy: { order: "asc" },
-        select: { keywords: true, replyMessage: true, funnelId: true },
+        select: { keywords: true, replyMessage: true, funnelId: true, mediaId: true },
       },
     },
   });
@@ -434,9 +434,13 @@ async function processComment(igBusinessAccountId: string, comment: {
     return;
   }
 
-  // Procura o primeiro fluxo ativo cujas keywords batem com o comentário
+  // Procura o primeiro fluxo ativo cujo post (se escopado) e palavras-chave batem com o
+  // comentário — condições escopadas a um post específico (mediaId) só valem nesse post; o
+  // gestor deve colocá-las antes das genéricas na lista se quiser que tenham prioridade.
+  const postId = comment.media?.id;
   const lowerText = text.toLowerCase();
   const matchedFlow = config.igCommentFlows.find((flow) => {
+    if (flow.mediaId && flow.mediaId !== postId) return false;
     if (flow.keywords.length === 0) return true; // catch-all
     return flow.keywords.some((kw) => lowerText.includes(kw.toLowerCase()));
   });
