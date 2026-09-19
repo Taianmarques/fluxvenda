@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Plus, Trash2, Save, Check, ExternalLink, Copy, Target, ChevronDown, ImagePlus, X } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Save, Check, ExternalLink, Copy, Target, ChevronDown, ImagePlus, X, Send, Search, Loader2 } from "lucide-react";
 
 export type LeadFormQuestion = { key: string; label: string; type: "TEXTO" | "WHATSAPP" | "EMAIL" | "NUMERO" };
 type Submission = { id: string; nome: string | null; whatsapp: string | null; answers: Record<string, string>; inviteSentAt: string | null; createdAt: string };
+type AgentOption = { id: string; nome: string; teamName: string; temWhatsapp: boolean };
 
 const TYPE_LABEL: Record<LeadFormQuestion["type"], string> = { TEXTO: "Texto", WHATSAPP: "WhatsApp", EMAIL: "E-mail", NUMERO: "Número" };
 
@@ -36,10 +37,13 @@ function resizeImageToBase64(file: File, maxSize = 200, quality = 0.85): Promise
 }
 
 export function FormularioEditorClient({
-  id, initialSlug, initialTitle, initialHeadline, initialActive, initialPixelId, initialAvatarUrl, initialQuestions, submissions,
+  id, initialSlug, initialTitle, initialHeadline, initialActive, initialPixelId, initialAvatarUrl,
+  initialAgentConfigId, initialAgentLabel, initialInviteMessage, initialQuestions, submissions,
 }: {
   id: string; initialSlug: string; initialTitle: string; initialHeadline: string; initialActive: boolean;
-  initialPixelId: string; initialAvatarUrl: string | null; initialQuestions: LeadFormQuestion[]; submissions: Submission[];
+  initialPixelId: string; initialAvatarUrl: string | null;
+  initialAgentConfigId: string | null; initialAgentLabel: string | null; initialInviteMessage: string;
+  initialQuestions: LeadFormQuestion[]; submissions: Submission[];
 }) {
   const [slug, setSlug] = useState(initialSlug);
   const [title, setTitle] = useState(initialTitle);
@@ -53,6 +57,40 @@ export function FormularioEditorClient({
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // Roteamento do lead: pra qual agente mandar o convite, e com qual mensagem de abertura
+  const [agentConfigId, setAgentConfigId] = useState<string | null>(initialAgentConfigId);
+  const [agentLabel, setAgentLabel] = useState<string | null>(initialAgentLabel);
+  const [inviteMessage, setInviteMessage] = useState(initialInviteMessage);
+  const [showAgentPicker, setShowAgentPicker] = useState(false);
+  const [agentQuery, setAgentQuery] = useState("");
+  const [agentOptions, setAgentOptions] = useState<AgentOption[] | null>(null);
+  const [loadingAgents, setLoadingAgents] = useState(false);
+
+  async function searchAgents(q: string) {
+    setLoadingAgents(true);
+    try {
+      const res = await fetch(`/api/admin/agentes?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      setAgentOptions(res.ok ? (data.agents ?? []) : []);
+    } catch {
+      setAgentOptions([]);
+    } finally {
+      setLoadingAgents(false);
+    }
+  }
+
+  function openAgentPicker() {
+    setShowAgentPicker(true);
+    if (agentOptions === null) searchAgents("");
+  }
+
+  function pickAgent(a: AgentOption) {
+    setAgentConfigId(a.id);
+    setAgentLabel(`${a.nome} — ${a.teamName}`);
+    setShowAgentPicker(false);
+    setSaved(false);
+  }
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -91,7 +129,10 @@ export function FormularioEditorClient({
       const res = await fetch(`/api/admin/formularios/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug, title, headline, active, questions, pixelId: pixelId.trim() || null, avatarUrl }),
+        body: JSON.stringify({
+          slug, title, headline, active, questions, pixelId: pixelId.trim() || null, avatarUrl,
+          agentConfigId, inviteMessage: inviteMessage.trim() || null,
+        }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Erro ao salvar."); return; }
@@ -153,7 +194,7 @@ export function FormularioEditorClient({
         </div>
 
         <div>
-          <label className="text-xs text-gray-500 uppercase tracking-wide">Foto de quem "conversa" (opcional)</label>
+          <label className="text-xs text-gray-500 uppercase tracking-wide">Foto de quem &quot;conversa&quot; (opcional)</label>
           <div className="flex items-center gap-3 mt-1.5">
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -189,6 +230,81 @@ export function FormularioEditorClient({
             Cola aqui o ID do pixel (Gerenciador de Eventos do Meta). Dispara <span className="font-mono">PageView</span> ao abrir,{" "}
             <span className="font-mono">Lead</span> quando responde o WhatsApp e <span className="font-mono">CompleteRegistration</span> ao terminar o formulário.
           </p>
+        </div>
+
+        <div className="border border-gray-800 rounded-xl p-4 space-y-3">
+          <div>
+            <label className="text-xs text-gray-500 uppercase tracking-wide flex items-center gap-1.5"><Send size={12} /> Pra qual agente mandar o lead</label>
+            <p className="text-xs text-gray-500 mt-1">
+              Quem responder o WhatsApp cai no atendimento normal desse agente (system prompt, pipeline, follow-ups próprios) — é isso que muda o &quot;funil&quot; de cada formulário.
+            </p>
+          </div>
+
+          {agentConfigId && agentLabel ? (
+            <div className="flex items-center gap-2 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2">
+              <span className="text-sm flex-1 min-w-0 truncate">{agentLabel}</span>
+              <button type="button" onClick={openAgentPicker} className="text-xs text-blue-400 hover:text-blue-300 flex-shrink-0">Trocar</button>
+              <button
+                type="button"
+                onClick={() => { setAgentConfigId(null); setAgentLabel(null); setSaved(false); }}
+                className="text-xs text-gray-500 hover:text-gray-300 flex-shrink-0"
+              >
+                Usar padrão FluxVenda
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={openAgentPicker}
+              className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-blue-400 border border-dashed border-gray-700 hover:border-blue-700 rounded-xl px-3 py-2 transition-colors"
+            >
+              <Search size={13} /> Padrão (agente interno FluxVenda) — clique pra escolher outro
+            </button>
+          )}
+
+          {showAgentPicker && (
+            <div className="border border-gray-800 rounded-xl p-3 bg-gray-950/60 space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  autoFocus
+                  value={agentQuery}
+                  onChange={e => { setAgentQuery(e.target.value); searchAgents(e.target.value); }}
+                  placeholder="Buscar por nome do agente ou empresa..."
+                  className="flex-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-blue-600"
+                />
+                <button type="button" onClick={() => setShowAgentPicker(false)} className="text-gray-500 hover:text-gray-300 flex-shrink-0"><X size={14} /></button>
+              </div>
+              {loadingAgents && <p className="text-xs text-gray-500 flex items-center gap-1.5 py-2"><Loader2 size={12} className="animate-spin" /> Buscando...</p>}
+              {!loadingAgents && agentOptions?.length === 0 && <p className="text-xs text-gray-500 py-2">Nenhum agente encontrado.</p>}
+              {!loadingAgents && agentOptions && agentOptions.length > 0 && (
+                <div className="max-h-56 overflow-y-auto space-y-1">
+                  {agentOptions.map(a => (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => pickAgent(a)}
+                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-800 flex items-center justify-between gap-2"
+                    >
+                      <span className="text-sm truncate">{a.nome} <span className="text-gray-500">— {a.teamName}</span></span>
+                      {!a.temWhatsapp && <span className="text-[10px] text-amber-400 flex-shrink-0">sem WhatsApp</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div>
+            <label className="text-xs text-gray-500 uppercase tracking-wide">Mensagem de abertura no WhatsApp (opcional)</label>
+            <textarea
+              value={inviteMessage}
+              onChange={e => { setInviteMessage(e.target.value); setSaved(false); }}
+              rows={3}
+              maxLength={1000}
+              placeholder="Deixe vazio pra usar o convite padrão de teste grátis da FluxVenda. Use {{nome}} pra interpolar o primeiro nome do lead."
+              className="w-full mt-1 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+            />
+          </div>
         </div>
 
         <div className="space-y-2">

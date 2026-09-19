@@ -941,6 +941,7 @@ model AgentConfig {
   campanhas            Campanha[]
   motivosPerda         MotivoPerda[]
   treinoExemplos       TreinoExemplo[]
+  leadForms            LeadForm[]
 
   @@index([teamId])
 }
@@ -1925,6 +1926,17 @@ model LeadForm {
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Pra quem o lead é roteado ao responder o WhatsApp — null = agente interno multi-setor da
+  // FluxVenda (comportamento padrão/antigo, ver lib/lead-form-funnel.ts). Formulários diferentes
+  // podem apontar pra agentes diferentes (times/campanhas diferentes); a partir daí quem
+  // responder cai no atendimento normal daquele agente (system prompt, pipeline, follow-ups).
+  agentConfigId String?
+  agentConfig   AgentConfig? @relation(fields: [agentConfigId], references: [id], onDelete: SetNull)
+
+  // Mensagem de abertura enviada assim que o WhatsApp é respondido — {{nome}} é interpolado.
+  // Vazio = usa o texto padrão fixo de convite pro teste grátis da FluxVenda.
+  inviteMessage String? @db.Text
 
   submissions LeadFormSubmission[]
 }

@@ -22,6 +22,9 @@ const updateSchema = z.object({
   pixelId: z.string().max(40).nullable().optional(),
   avatarUrl: z.string().max(8_000_000).nullable().optional(),
   active: z.boolean().optional(),
+  // null = agente interno multi-setor da FluxVenda (padrão antigo)
+  agentConfigId: z.string().nullable().optional(),
+  inviteMessage: z.string().max(1000).nullable().optional(),
 });
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -52,6 +55,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (body.data.slug) {
     const clash = await prisma.leadForm.findFirst({ where: { slug: body.data.slug, NOT: { id } } });
     if (clash) return NextResponse.json({ error: "Já existe um formulário com esse link" }, { status: 400 });
+  }
+
+  if (body.data.agentConfigId) {
+    const agent = await prisma.agentConfig.findUnique({ where: { id: body.data.agentConfigId }, select: { id: true } });
+    if (!agent) return NextResponse.json({ error: "Agente de destino inválido" }, { status: 400 });
   }
 
   const form = await prisma.leadForm.update({ where: { id }, data: body.data });

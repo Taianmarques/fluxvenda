@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
-import { sendTrialInviteToLead, gerarProximaPergunta } from "@/lib/lead-form-funnel";
+import { sendFormInviteToLead, gerarProximaPergunta } from "@/lib/lead-form-funnel";
 
 type Question = { key: string; label: string; type: "TEXTO" | "WHATSAPP" | "EMAIL" | "NUMERO" };
 
@@ -46,7 +46,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
 
   if (question.type === "WHATSAPP" && !submission.inviteSentAt) {
     const nome = submission.nome || answers.nome || "tudo bem";
-    const sent = await sendTrialInviteToLead(nome, value).catch(() => false);
+    const sent = await sendFormInviteToLead({
+      nome, whatsappRaw: value, agentConfigId: form.agentConfigId, inviteMessage: form.inviteMessage,
+    }).catch(() => false);
     if (sent) {
       await prisma.leadFormSubmission.update({ where: { id: submission.id }, data: { inviteSentAt: new Date() } });
     }

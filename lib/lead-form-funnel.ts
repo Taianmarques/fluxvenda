@@ -62,19 +62,29 @@ export async function gerarProximaPergunta(params: {
   }
 }
 
-// Dispara o convite de teste grátis/demonstração assim que o lead preenche o campo de WhatsApp
-// no formulário público — pelo mesmo número/agente multi-setor que a FluxVenda já usa
-// internamente (ver lib/internal-agent.ts), então quem responder cai direto na mesma IA que já
-// sabe agendar demonstração (AGENDAR_DEMO_TOOLS em lib/agent-engine.ts).
-export async function sendTrialInviteToLead(nome: string, whatsappRaw: string): Promise<boolean> {
-  const contactNumber = normalizePhone(whatsappRaw);
+// Dispara a mensagem de abertura assim que o lead preenche o campo de WhatsApp no formulário
+// público — pro agente escolhido no formulário (LeadForm.agentConfigId), ou pelo agente interno
+// multi-setor que a FluxVenda usa pro seu próprio funil de trial (ver lib/internal-agent.ts)
+// quando o formulário não escolheu nenhum. Dali em diante, quem responder cai no atendimento
+// normal daquele agente — system prompt, pipeline e follow-ups próprios são o "funil" de cada
+// formulário, não algo reimplementado aqui.
+export async function sendFormInviteToLead(params: {
+  nome: string;
+  whatsappRaw: string;
+  agentConfigId: string | null;
+  inviteMessage: string | null;
+}): Promise<boolean> {
+  const { nome, inviteMessage } = params;
+  const contactNumber = normalizePhone(params.whatsappRaw);
 
-  const agentConfig = await prisma.agentConfig.findFirst({
-    where: { teamId: FLUXVENDA_TEAM_ID, multiAgenteDepartamentos: true },
-    select: { id: true, uazapiToken: true },
-  });
+  const agentConfig = params.agentConfigId
+    ? await prisma.agentConfig.findUnique({ where: { id: params.agentConfigId }, select: { id: true, uazapiToken: true } })
+    : await prisma.agentConfig.findFirst({
+        where: { teamId: FLUXVENDA_TEAM_ID, multiAgenteDepartamentos: true },
+        select: { id: true, uazapiToken: true },
+      });
   if (!agentConfig?.uazapiToken) {
-    console.error("[lead-form-funnel] AgentConfig interno da FluxVenda não encontrado ou sem token");
+    console.error("[lead-form-funnel] agente de destino não encontrado ou sem WhatsApp conectado", params.agentConfigId);
     return false;
   }
 
@@ -84,7 +94,9 @@ export async function sendTrialInviteToLead(nome: string, whatsappRaw: string): 
     create: { agentConfigId: agentConfig.id, contactNumber, contactName: nome },
   });
 
-  const texto = CONVITE_TEMPLATE(nome);
+  const texto = inviteMessage?.trim()
+    ? inviteMessage.replace(/\{\{\s*nome\s*\}\}/gi, nome.split(" ")[0])
+    : CONVITE_TEMPLATE(nome);
   const waMessageId = await sendWhatsAppTextAsTeam(agentConfig.uazapiToken, contactNumber, texto);
   if (!waMessageId) return false;
 

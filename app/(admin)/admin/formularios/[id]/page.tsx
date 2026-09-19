@@ -7,7 +7,10 @@ export default async function AdminFormularioEditorPage({ params }: { params: Pr
   const { id } = await params;
   const form = await prisma.leadForm.findUnique({
     where: { id },
-    include: { submissions: { orderBy: { createdAt: "desc" }, take: 200 } },
+    include: {
+      submissions: { orderBy: { createdAt: "desc" }, take: 200 },
+      agentConfig: { select: { id: true, nome: true, team: { select: { name: true } } } },
+    },
   });
   if (!form) notFound();
 
@@ -20,6 +23,9 @@ export default async function AdminFormularioEditorPage({ params }: { params: Pr
       initialActive={form.active}
       initialPixelId={form.pixelId ?? ""}
       initialAvatarUrl={form.avatarUrl}
+      initialAgentConfigId={form.agentConfigId}
+      initialAgentLabel={form.agentConfig ? `${form.agentConfig.nome} — ${form.agentConfig.team.name}` : null}
+      initialInviteMessage={form.inviteMessage ?? ""}
       initialQuestions={form.questions as LeadFormQuestion[]}
       submissions={form.submissions.map(s => ({
         id: s.id,
