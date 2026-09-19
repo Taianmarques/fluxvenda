@@ -30,9 +30,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
   const { motivoPerdaId } = body.data;
 
+  let motivoNome: string | null = null;
   if (motivoPerdaId) {
     const motivo = await prisma.motivoPerda.findFirst({ where: { id: motivoPerdaId, agentConfigId: config.id } });
     if (!motivo) return NextResponse.json({ error: "Motivo de perda inválido" }, { status: 400 });
+    motivoNome = motivo.nome;
   }
 
   const opportunity = await prisma.opportunity.findFirst({
@@ -58,6 +60,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       ...(lostStage && { stageId: lostStage.id, stageEnteredAt: new Date() }),
     },
   });
+
+  // Encerra a conversa automaticamente com o mesmo motivo, reaproveitando o motivo de perda em
+  // vez de o atendente preencher separado — só quando não sobra nenhuma outra negociação em
+  // aberto nessa conversa (um contato pode ter várias oportunidades ao mesmo tempo) e ela ainda
+  // não estava encerrada por outro motivo.
+  if (conversation.status !== "FINALIZADO") {
+    const outraEmAberto = await prisma.opportunity.count({
+      where: { conversationId: id, id: { not: oppId }, wonAt: null, lostAt: null },
+    });
+    if (outraEmAberto === 0) {
+      const motivoEncerramento = motivoNome ?? "Negociação perdida";
+      await prisma.conversation.update({
+        where: { id },
+        data: { status: "FINALIZADO", motivoEncerramento, encerradaEm: new Date() },
+      });
+      await prisma.message.create({
+        data: { conversationId: id, role: "note", content: `Atendimento encerrado automaticamente — motivo: ${motivoEncerramento}.` },
+      });
+    }
+  }
 
   return NextResponse.json({ opportunity: updated });
 }
