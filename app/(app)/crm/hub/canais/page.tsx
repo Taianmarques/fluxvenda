@@ -25,17 +25,10 @@ async function CanaisPageContent() {
 
   const agentIds = result.configs.map((c) => c.id);
 
-  const [igConnections, igFlows] = await Promise.all([
-    prisma.instagramConnection.findMany({
-      where: { agentConfigId: { in: agentIds } },
-      select: { agentConfigId: true, instagramUsername: true, instagramBusinessAccountId: true },
-    }),
-    prisma.instagramCommentFlow.findMany({
-      where: { agentConfigId: { in: agentIds } },
-      orderBy: { order: "asc" },
-      select: { id: true, agentConfigId: true, name: true, keywords: true, replyMessage: true, order: true, active: true },
-    }),
-  ]);
+  const igConnections = await prisma.instagramConnection.findMany({
+    where: { agentConfigId: { in: agentIds } },
+    select: { agentConfigId: true, instagramUsername: true, instagramBusinessAccountId: true },
+  });
 
   const igByAgent: Record<string, { username: string; businessAccountId: string }> = {};
   for (const ig of igConnections) {
@@ -43,12 +36,6 @@ async function CanaisPageContent() {
       username: ig.instagramUsername,
       businessAccountId: ig.instagramBusinessAccountId,
     };
-  }
-
-  const flowsByAgent: Record<string, typeof igFlows> = {};
-  for (const f of igFlows) {
-    if (!flowsByAgent[f.agentConfigId]) flowsByAgent[f.agentConfigId] = [];
-    flowsByAgent[f.agentConfigId].push(f);
   }
 
   const channels = result.configs.map((c) => ({
@@ -62,11 +49,6 @@ async function CanaisPageContent() {
     learningMode: c.learningMode,
     learningModeTestNumbers: c.learningModeTestNumbers,
     uazapiToken: c.uazapiToken,
-    igCommentAutoDm: c.igCommentAutoDm,
-    igCommentDmMessage: c.igCommentDmMessage,
-    igColetaWhatsappEnabled: c.igColetaWhatsappEnabled,
-    igColetaWhatsappInstrucoes: c.igColetaWhatsappInstrucoes,
-    igCommentFlows: flowsByAgent[c.id] ?? [],
     instagram: igByAgent[c.id] ?? null,
   }));
 

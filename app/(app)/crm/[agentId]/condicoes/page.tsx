@@ -54,6 +54,8 @@ async function CondicoesPageContent({
       igUsername={igConnection?.instagramUsername ?? null}
       igCommentAutoDm={config.igCommentAutoDm}
       igCommentDmMessage={config.igCommentDmMessage}
+      igColetaWhatsappEnabled={config.igColetaWhatsappEnabled}
+      igColetaWhatsappInstrucoes={config.igColetaWhatsappInstrucoes}
       initialFlows={flows}
       initialFunnels={funnels.map((f) => ({
         id: f.id,

@@ -50,6 +50,8 @@ type Props = {
   igUsername: string | null;
   igCommentAutoDm: boolean;
   igCommentDmMessage: string | null;
+  igColetaWhatsappEnabled: boolean;
+  igColetaWhatsappInstrucoes: string;
   initialFlows: CommentFlow[];
   initialFunnels: Funnel[];
 };
@@ -628,12 +630,17 @@ function FlowCard({
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export function CondicoesClient({ agentId, igConnected, igUsername, igCommentAutoDm, igCommentDmMessage, initialFlows, initialFunnels }: Props) {
+export function CondicoesClient({
+  agentId, igConnected, igUsername, igCommentAutoDm, igCommentDmMessage,
+  igColetaWhatsappEnabled, igColetaWhatsappInstrucoes, initialFlows, initialFunnels,
+}: Props) {
   const [tab, setTab] = useState<"condicoes" | "funis">("condicoes");
 
   // ── Conditions state ──
   const [autoDm, setAutoDm] = useState(igCommentAutoDm);
   const [fallback, setFallback] = useState(igCommentDmMessage ?? "");
+  const [coletaWhatsapp, setColetaWhatsapp] = useState(igColetaWhatsappEnabled);
+  const [coletaWhatsappInstrucoes, setColetaWhatsappInstrucoes] = useState(igColetaWhatsappInstrucoes);
   const [flows, setFlows] = useState<CommentFlow[]>(initialFlows);
   const [savingFlows, setSavingFlows] = useState(false);
   const [savedFlows, setSavedFlows] = useState(false);
@@ -691,7 +698,11 @@ export function CondicoesClient({ agentId, igConnected, igUsername, igCommentAut
       const res = await fetch(`/api/instagram/comment-flows/${agentId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ igCommentAutoDm: autoDm, igCommentDmMessage: fallback.trim() || null, flows: flows.map((f, i) => ({ ...f, order: i })) }),
+        body: JSON.stringify({
+          igCommentAutoDm: autoDm, igCommentDmMessage: fallback.trim() || null,
+          igColetaWhatsappEnabled: coletaWhatsapp, igColetaWhatsappInstrucoes: coletaWhatsappInstrucoes.trim(),
+          flows: flows.map((f, i) => ({ ...f, order: i })),
+        }),
       });
       if (!res.ok) throw new Error();
       setSavedFlows(true); setTimeout(() => setSavedFlows(false), 2500);
@@ -841,6 +852,36 @@ export function CondicoesClient({ agentId, igConnected, igUsername, igCommentAut
                 placeholder="Deixe vazio para o agente de IA responder..."
                 className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-gray-500 resize-none"
               />
+            </div>
+
+            <div className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium">Coletar WhatsApp na DM</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    A IA passa a ter como objetivo pedir o WhatsApp do lead pra continuar o atendimento por lá. Quando o número aparecer na conversa, ela reage com naturalidade (em vez de recusar) e o sistema inicia automaticamente uma conversa de WhatsApp.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setColetaWhatsapp((v) => !v)}
+                  className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${coletaWhatsapp ? "bg-purple-600" : "bg-gray-700"}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${coletaWhatsapp ? "translate-x-5" : "translate-x-0"}`} />
+                </button>
+              </div>
+              {coletaWhatsapp && (
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-gray-400">Como e quando pedir o número (opcional)</p>
+                  <textarea
+                    value={coletaWhatsappInstrucoes}
+                    onChange={(e) => setColetaWhatsappInstrucoes(e.target.value)}
+                    rows={2}
+                    maxLength={1000}
+                    placeholder="Ex: só peça depois de entender o que o cliente procura, nunca logo na primeira mensagem; se ele perguntar preço, peça o WhatsApp antes de responder..."
+                    className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-gray-500 resize-none"
+                  />
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-between">
