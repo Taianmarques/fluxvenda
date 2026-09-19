@@ -16,6 +16,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ age
     whatsappAiPaused: config.whatsappAiPaused,
     instagramAiPaused: config.instagramAiPaused,
     learningMode: config.learningMode,
+    learningModeTestNumbers: config.learningModeTestNumbers,
   });
 }
 
@@ -23,6 +24,8 @@ const schema = z.object({
   whatsappAiPaused: z.boolean().optional(),
   instagramAiPaused: z.boolean().optional(),
   learningMode: z.boolean().optional(),
+  // Só dígitos, mesmo formato de Conversation.contactNumber (ver getInstagramUserProfile/UazAPI)
+  learningModeTestNumbers: z.array(z.string().regex(/^\d{8,15}$/)).max(5).optional(),
 });
 
 // Pausa só a resposta automática da IA num canal — mensagens continuam chegando e sendo
@@ -47,5 +50,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
     whatsappAiPaused: updated.whatsappAiPaused,
     instagramAiPaused: updated.instagramAiPaused,
     learningMode: updated.learningMode,
+    learningModeTestNumbers: updated.learningModeTestNumbers,
   });
 }

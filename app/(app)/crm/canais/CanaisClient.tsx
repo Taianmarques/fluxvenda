@@ -39,6 +39,7 @@ type Channel = {
   whatsappAiPaused: boolean;
   instagramAiPaused: boolean;
   learningMode: boolean;
+  learningModeTestNumbers: string[];
   uazapiToken: string | null;
   whatsapp: WhatsAppStatus | null;
   instagram: InstagramStatus;
@@ -210,6 +211,10 @@ export function CanaisClient({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Campo de texto pra adicionar um número de teste do modo aprendizado (keyed by channelId)
+  const [testNumberInputs, setTestNumberInputs] = useState<Record<string, string>>({});
+  const [testNumberError, setTestNumberError] = useState<Record<string, string>>({});
 
   // Painel de fluxos aberto
   const [openFlowsId, setOpenFlowsId] = useState<string | null>(null);
@@ -463,6 +468,37 @@ export function CanaisClient({
     } finally { setLoadingId(null); }
   }
 
+  // Números liberados pra testar a IA de verdade pelo WhatsApp enquanto ainda em modo
+  // aprendizado (ver AgentConfig.learningModeTestNumbers / lib/whatsapp-inbound.ts) — só esses
+  // números recebem resposta automática antes do gestor clicar em "Ativar IA".
+  async function salvarTestNumbers(channelId: string, numbers: string[]) {
+    setChannels((prev) => prev.map((c) => (c.id === channelId ? { ...c, learningModeTestNumbers: numbers } : c)));
+    await fetch(`/api/agentes/${channelId}/pausar-ia`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ learningModeTestNumbers: numbers }),
+    });
+  }
+
+  function handleAddTestNumber(ch: Channel) {
+    const raw = (testNumberInputs[ch.id] ?? "").replace(/\D/g, "");
+    setTestNumberError((prev) => ({ ...prev, [ch.id]: "" }));
+    if (raw.length < 8 || raw.length > 15) {
+      setTestNumberError((prev) => ({ ...prev, [ch.id]: "Número inválido — use o WhatsApp completo com DDI e DDD, só números." }));
+      return;
+    }
+    if (ch.learningModeTestNumbers.includes(raw)) {
+      setTestNumberInputs((prev) => ({ ...prev, [ch.id]: "" }));
+      return;
+    }
+    setTestNumberInputs((prev) => ({ ...prev, [ch.id]: "" }));
+    salvarTestNumbers(ch.id, [...ch.learningModeTestNumbers, raw]);
+  }
+
+  function handleRemoveTestNumber(ch: Channel, numero: string) {
+    salvarTestNumbers(ch.id, ch.learningModeTestNumbers.filter((n) => n !== numero));
+  }
+
   async function handleCreate(connect: "whatsapp" | "instagram" | "none") {
     if (!newName.trim()) return;
     setLoadingId("new");
@@ -675,25 +711,66 @@ export function CanaisClient({
 
                 {/* Modo aprendizado: estado inicial, IA não responde em nenhum canal ainda */}
                 {ch.learningMode && (
-                  <div className="px-5 py-3 flex items-center justify-between gap-3 flex-wrap bg-blue-950/30 border-b border-blue-900/40">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <GraduationCap size={15} className="text-blue-400 flex-shrink-0" />
-                      <div className="min-w-0">
-                        <p className={`text-sm font-medium ${theme === "dark" ? "text-blue-300" : "text-blue-700"}`}>Modo aprendizado</p>
-                        <p className="text-xs text-gray-400">
-                          As conversas chegam e são salvas normalmente, mas a IA ainda não responde em nenhum canal.
-                        </p>
+                  <div className="px-5 py-3 flex flex-col gap-3 bg-blue-950/30 border-b border-blue-900/40">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <GraduationCap size={15} className="text-blue-400 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <p className={`text-sm font-medium ${theme === "dark" ? "text-blue-300" : "text-blue-700"}`}>Modo aprendizado</p>
+                          <p className="text-xs text-gray-400">
+                            As conversas chegam e são salvas normalmente, mas a IA ainda não responde em nenhum canal.
+                          </p>
+                        </div>
                       </div>
+                      {isManager && (
+                        <button
+                          onClick={() => handleAtivarIA(ch.id)}
+                          disabled={loadingId === ch.id + ":ativarIA"}
+                          className="flex items-center gap-1.5 text-xs text-blue-300 hover:text-white border border-blue-700 hover:border-blue-500 bg-blue-900/30 hover:bg-blue-900/60 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50 flex-shrink-0"
+                        >
+                          <Rocket size={12} />
+                          {loadingId === ch.id + ":ativarIA" ? "..." : "Ativar IA"}
+                        </button>
+                      )}
                     </div>
+
                     {isManager && (
-                      <button
-                        onClick={() => handleAtivarIA(ch.id)}
-                        disabled={loadingId === ch.id + ":ativarIA"}
-                        className="flex items-center gap-1.5 text-xs text-blue-300 hover:text-white border border-blue-700 hover:border-blue-500 bg-blue-900/30 hover:bg-blue-900/60 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50 flex-shrink-0"
-                      >
-                        <Rocket size={12} />
-                        {loadingId === ch.id + ":ativarIA" ? "..." : "Ativar IA"}
-                      </button>
+                      <div className="pl-[26px] space-y-1.5">
+                        <p className="text-xs text-gray-400">
+                          Números de WhatsApp liberados pra testar — só eles recebem resposta de verdade da IA antes de ativar pra todo mundo:
+                        </p>
+                        {ch.learningModeTestNumbers.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {ch.learningModeTestNumbers.map((numero) => (
+                              <span key={numero} className="flex items-center gap-1.5 text-xs font-mono bg-blue-900/30 border border-blue-800/50 text-blue-200 rounded-full pl-2.5 pr-1.5 py-1">
+                                +{numero}
+                                <button onClick={() => handleRemoveTestNumber(ch, numero)} title="Remover" className="text-blue-400 hover:text-white">
+                                  <X size={11} />
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2">
+                          <input
+                            value={testNumberInputs[ch.id] ?? ""}
+                            onChange={(e) => setTestNumberInputs((prev) => ({ ...prev, [ch.id]: e.target.value }))}
+                            onKeyDown={(e) => e.key === "Enter" && handleAddTestNumber(ch)}
+                            placeholder="Ex: 5511999999999"
+                            disabled={ch.learningModeTestNumbers.length >= 5}
+                            className="flex-1 min-w-0 bg-blue-950/40 border border-blue-800/50 rounded-lg px-2.5 py-1.5 text-xs font-mono placeholder:text-gray-600 focus:outline-none focus:border-blue-500 disabled:opacity-50"
+                          />
+                          <button
+                            onClick={() => handleAddTestNumber(ch)}
+                            disabled={ch.learningModeTestNumbers.length >= 5}
+                            className="flex-shrink-0 text-xs text-blue-300 hover:text-white border border-blue-700 hover:border-blue-500 rounded-lg px-3 py-1.5 disabled:opacity-50"
+                          >
+                            Adicionar
+                          </button>
+                        </div>
+                        {testNumberError[ch.id] && <p className="text-xs text-red-400">{testNumberError[ch.id]}</p>}
+                        {ch.learningModeTestNumbers.length >= 5 && <p className="text-xs text-gray-500">Limite de 5 números.</p>}
+                      </div>
                     )}
                   </div>
                 )}

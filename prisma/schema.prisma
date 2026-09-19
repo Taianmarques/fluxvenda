@@ -707,6 +707,12 @@ model AgentConfig {
   // responde em nenhum canal, até o gestor clicar em "Ativar IA" (vê/valida antes de ir ao ar).
   learningMode Boolean @default(false)
 
+  // Números liberados pra testar a IA de verdade pelo WhatsApp enquanto ainda em modo
+  // aprendizado (whatsappAiPaused=true) — só esses números recebem resposta automática antes de
+  // "Ativar IA", só dígitos (mesmo formato de Conversation.contactNumber). Sem efeito fora do
+  // modo aprendizado (com a IA já ativa, todo mundo recebe resposta normalmente).
+  learningModeTestNumbers String[] @default([])
+
   uazapiInstance String?
   uazapiToken    String?
 
