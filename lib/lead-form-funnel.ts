@@ -6,7 +6,7 @@ import { openai, MODEL } from "@/lib/openai";
 // Normaliza o número digitado no formulário público pro formato que a UazAPI espera (com DDI
 // 55). Aceita com ou sem "55", com ou sem o 9º dígito — só garante o prefixo, não corrige o
 // resto (o lead pode ter digitado errado; a IA que vai continuar a conversa lida com isso).
-function normalizePhone(raw: string): string {
+export function normalizePhone(raw: string): string {
   const digits = raw.replace(/\D/g, "");
   if (digits.startsWith("55") && digits.length >= 12) return digits;
   return `55${digits}`;
@@ -19,6 +19,43 @@ const CONVITE_TEMPLATE = (nome: string) =>
   `A FluxVenda é um CRM com IA que atende, agenda e vende pelo seu WhatsApp.\n\n` +
   `Você pode testar grátis por 7 dias, sem cartão — é só se cadastrar aqui: ${APP_URL}/sign-up?product=crm\n\n` +
   `Ou, se preferir, eu já te agendo uma demonstração rápida com a gente. O que prefere?`;
+
+function interpolateNome(texto: string, nome: string): string {
+  return texto.replace(/\{\{\s*nome\s*\}\}/gi, nome.split(" ")[0]);
+}
+
+// Resolve o agente de destino de um formulário: o escolhido em LeadForm.agentConfigId, ou o
+// agente interno multi-setor da FluxVenda (ver lib/internal-agent.ts) quando o formulário não
+// escolheu nenhum — mesmo fallback usado pro convite e pra sequência de follow-up (ver
+// app/api/cron/followup/route.ts), pra garantir que os dois sempre mandam pelo mesmo número.
+export async function resolveFormAgent(agentConfigId: string | null): Promise<{ id: string; uazapiToken: string } | null> {
+  const agentConfig = agentConfigId
+    ? await prisma.agentConfig.findUnique({ where: { id: agentConfigId }, select: { id: true, uazapiToken: true } })
+    : await prisma.agentConfig.findFirst({
+        where: { teamId: FLUXVENDA_TEAM_ID, multiAgenteDepartamentos: true },
+        select: { id: true, uazapiToken: true },
+      });
+  if (!agentConfig?.uazapiToken) return null;
+  return { id: agentConfig.id, uazapiToken: agentConfig.uazapiToken };
+}
+
+export type FormFunnelStep = { minutos: number; mensagem: string };
+
+// LeadForm.funnelSteps é Json — normaliza pra um formato seguro, descartando entradas inválidas
+// em vez de derrubar o cron por causa de um valor salvo errado.
+export function normalizeFormFunnelSteps(raw: unknown): FormFunnelStep[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item): FormFunnelStep | null => {
+      if (!item || typeof item !== "object") return null;
+      const obj = item as { minutos?: unknown; mensagem?: unknown };
+      const minutos = Number(obj.minutos);
+      const mensagem = typeof obj.mensagem === "string" ? obj.mensagem.trim() : "";
+      if (!Number.isFinite(minutos) || minutos <= 0 || !mensagem) return null;
+      return { minutos, mensagem };
+    })
+    .filter((x): x is FormFunnelStep => x !== null);
+}
 
 // Reescreve a próxima pergunta usando o que a pessoa já respondeu, pra soar como uma conversa de
 // verdade em vez de um formulário engessado (ex: "Prazer, Taian! E qual seu WhatsApp?" em vez de
@@ -77,13 +114,8 @@ export async function sendFormInviteToLead(params: {
   const { nome, inviteMessage } = params;
   const contactNumber = normalizePhone(params.whatsappRaw);
 
-  const agentConfig = params.agentConfigId
-    ? await prisma.agentConfig.findUnique({ where: { id: params.agentConfigId }, select: { id: true, uazapiToken: true } })
-    : await prisma.agentConfig.findFirst({
-        where: { teamId: FLUXVENDA_TEAM_ID, multiAgenteDepartamentos: true },
-        select: { id: true, uazapiToken: true },
-      });
-  if (!agentConfig?.uazapiToken) {
+  const agentConfig = await resolveFormAgent(params.agentConfigId);
+  if (!agentConfig) {
     console.error("[lead-form-funnel] agente de destino não encontrado ou sem WhatsApp conectado", params.agentConfigId);
     return false;
   }
@@ -94,9 +126,7 @@ export async function sendFormInviteToLead(params: {
     create: { agentConfigId: agentConfig.id, contactNumber, contactName: nome },
   });
 
-  const texto = inviteMessage?.trim()
-    ? inviteMessage.replace(/\{\{\s*nome\s*\}\}/gi, nome.split(" ")[0])
-    : CONVITE_TEMPLATE(nome);
+  const texto = inviteMessage?.trim() ? interpolateNome(inviteMessage, nome) : CONVITE_TEMPLATE(nome);
   const waMessageId = await sendWhatsAppTextAsTeam(agentConfig.uazapiToken, contactNumber, texto);
   if (!waMessageId) return false;
 

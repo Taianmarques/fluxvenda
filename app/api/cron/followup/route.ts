@@ -5,6 +5,8 @@ import { sendWhatsAppTextAsTeam } from "@/lib/whatsapp";
 import { logTokenUsage } from "@/lib/token-usage";
 import { dentroHorarioEnvio } from "@/lib/sending-hours";
 import { normalizeStageFollowup } from "@/lib/pipeline";
+import { normalizeFormFunnelSteps, normalizePhone } from "@/lib/lead-form-funnel";
+import { FLUXVENDA_TEAM_ID } from "@/lib/internal-agent";
 
 function hoursFromNow(n: number) {
   const d = new Date();
@@ -209,6 +211,64 @@ O lead está na etapa "${stage.name}" do funil "${stage.pipeline.name}". Siga es
     }
   }
 
+  // Funil de formulário: sequência de mensagens configurada em LeadForm.funnelSteps, disparada
+  // depois do convite inicial (LeadFormSubmission.inviteSentAt) pro mesmo agente/conversa. Pausa
+  // sozinha se o lead já respondeu (mesma regra "só manda se a última mensagem foi nossa" dos
+  // outros follow-ups) — dali em diante quem responde cai no atendimento normal do agente.
+  let formFunnelChecked = 0;
+  let formFunnelSent = 0;
+
+  const dueFormSubmissions = await prisma.leadFormSubmission.findMany({
+    where: { inviteSentAt: { not: null }, whatsapp: { not: null } },
+    include: { form: { select: { agentConfigId: true, funnelSteps: true } } },
+  });
+
+  for (const submission of dueFormSubmissions) {
+    const steps = normalizeFormFunnelSteps(submission.form.funnelSteps);
+    if (submission.funnelStepsSent >= steps.length) continue;
+
+    const referenceTime = submission.funnelStepsSent === 0 ? submission.inviteSentAt! : (submission.lastFunnelStepAt ?? submission.inviteSentAt!);
+    const step = steps[submission.funnelStepsSent];
+    const dueAt = new Date(referenceTime.getTime() + step.minutos * 60000);
+    if (dueAt > new Date()) continue;
+
+    formFunnelChecked++;
+
+    const config = submission.form.agentConfigId
+      ? await prisma.agentConfig.findUnique({ where: { id: submission.form.agentConfigId } })
+      : await prisma.agentConfig.findFirst({ where: { teamId: FLUXVENDA_TEAM_ID, multiAgenteDepartamentos: true } });
+    if (!config?.uazapiToken || !config.active) continue;
+    if (!dentroHorarioEnvio(config.horarioEnvioInicio, config.horarioEnvioFim)) continue;
+
+    const contactNumber = normalizePhone(submission.whatsapp!);
+    const conversation = await prisma.conversation.findUnique({
+      where: { agentConfigId_contactNumber: { agentConfigId: config.id, contactNumber } },
+    });
+    if (!conversation || conversation.humanTakeover || conversation.status === "FINALIZADO") continue;
+
+    const lastMessage = await prisma.message.findFirst({
+      where: { conversationId: conversation.id, role: { not: "note" } },
+      orderBy: { createdAt: "desc" },
+    });
+    if (!lastMessage || lastMessage.role === "user") continue;
+
+    const nome = submission.nome || "tudo bem";
+    const texto = step.mensagem.replace(/\{\{\s*nome\s*\}\}/gi, nome.split(" ")[0]);
+
+    const sentId = await sendWhatsAppTextAsTeam(config.uazapiToken, contactNumber, texto);
+    if (!sentId) {
+      console.error(`[cron/followup] falha ao enviar passo do funil de formulário — submissão ${submission.id} — tenta de novo na próxima execução`);
+      continue;
+    }
+
+    await prisma.message.create({ data: { conversationId: conversation.id, role: "assistant", content: texto, waMessageId: sentId } });
+    await prisma.leadFormSubmission.update({
+      where: { id: submission.id },
+      data: { funnelStepsSent: { increment: 1 }, lastFunnelStepAt: new Date() },
+    });
+    formFunnelSent++;
+  }
+
   // Envios agendados: mensagens de texto que um atendente programou pra sair numa hora futura
   let scheduledChecked = 0;
   let scheduledSent = 0;
@@ -253,6 +313,6 @@ O lead está na etapa "${stage.name}" do funil "${stage.pipeline.name}". Siga es
 
   return NextResponse.json({
     ok: true, checked, sent, stageFollowupChecked, stageFollowupSent,
-    remindersChecked, remindersSent, scheduledChecked, scheduledSent,
+    remindersChecked, remindersSent, formFunnelChecked, formFunnelSent, scheduledChecked, scheduledSent,
   });
 }

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { normalizeFormFunnelSteps } from "@/lib/lead-form-funnel";
 import { FormularioEditorClient, type LeadFormQuestion } from "./FormularioEditorClient";
 
 // Auth já garantida pelo AdminLayout (só ADMIN chega até aqui)
@@ -26,6 +27,7 @@ export default async function AdminFormularioEditorPage({ params }: { params: Pr
       initialAgentConfigId={form.agentConfigId}
       initialAgentLabel={form.agentConfig ? `${form.agentConfig.nome} — ${form.agentConfig.team.name}` : null}
       initialInviteMessage={form.inviteMessage ?? ""}
+      initialFunnelSteps={normalizeFormFunnelSteps(form.funnelSteps)}
       initialQuestions={form.questions as LeadFormQuestion[]}
       submissions={form.submissions.map(s => ({
         id: s.id,

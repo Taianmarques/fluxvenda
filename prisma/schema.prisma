@@ -1938,6 +1938,14 @@ model LeadForm {
   // Vazio = usa o texto padrão fixo de convite pro teste grátis da FluxVenda.
   inviteMessage String? @db.Text
 
+  // Sequência de mensagens automáticas disparadas depois do convite — mesmo estilo do funil do
+  // teste grátis (ver lib/trial-funnel-shared.ts), mas configurável por formulário em vez de fixo
+  // no código: [{ minutos: number, mensagem: string }], "minutos" contado a partir do envio do
+  // convite (LeadFormSubmission.inviteSentAt). Processado pelo mesmo cron dos outros follow-ups
+  // (app/api/cron/followup/route.ts) — pausa sozinho se o lead responder (mesma regra de "só
+  // manda se a última mensagem foi nossa" usada em todo follow-up automático do sistema).
+  funnelSteps Json @default("[]")
+
   submissions LeadFormSubmission[]
 }
 
@@ -1950,6 +1958,10 @@ model LeadFormSubmission {
   whatsapp     String?
   inviteSentAt DateTime? // quando o convite automático foi disparado (null = ainda não chegou no campo whatsapp)
   createdAt    DateTime  @default(now())
+
+  // Progresso na sequência de LeadForm.funnelSteps — mesmo padrão de Conversation.followupCount
+  funnelStepsSent  Int       @default(0)
+  lastFunnelStepAt DateTime?
 
   @@index([formId])
 }

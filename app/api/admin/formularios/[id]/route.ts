@@ -25,6 +25,10 @@ const updateSchema = z.object({
   // null = agente interno multi-setor da FluxVenda (padrão antigo)
   agentConfigId: z.string().nullable().optional(),
   inviteMessage: z.string().max(1000).nullable().optional(),
+  funnelSteps: z.array(z.object({
+    minutos: z.number().int().min(1).max(43200),
+    mensagem: z.string().trim().min(1).max(1000),
+  })).max(15).optional(),
 });
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

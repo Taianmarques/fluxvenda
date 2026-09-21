@@ -5,10 +5,24 @@ import Link from "next/link";
 import { ArrowLeft, Plus, Trash2, Save, Check, ExternalLink, Copy, Target, ChevronDown, ImagePlus, X, Send, Search, Loader2 } from "lucide-react";
 
 export type LeadFormQuestion = { key: string; label: string; type: "TEXTO" | "WHATSAPP" | "EMAIL" | "NUMERO" };
+export type FunnelStep = { minutos: number; mensagem: string };
 type Submission = { id: string; nome: string | null; whatsapp: string | null; answers: Record<string, string>; inviteSentAt: string | null; createdAt: string };
 type AgentOption = { id: string; nome: string; teamName: string; temWhatsapp: boolean };
 
 const TYPE_LABEL: Record<LeadFormQuestion["type"], string> = { TEXTO: "Texto", WHATSAPP: "WhatsApp", EMAIL: "E-mail", NUMERO: "Número" };
+
+// Editor de tempo (valor + unidade) pra cada passo do funil — mesmo padrão já usado no follow-up
+// de etapa do pipeline (WhatsappPipeline.tsx), convertido pra/de minutos ao salvar.
+type DelayUnit = "horas" | "dias";
+type StepRow = { value: number; unit: DelayUnit; mensagem: string };
+function stepToRow(s: FunnelStep): StepRow {
+  return s.minutos % 1440 === 0
+    ? { value: s.minutos / 1440, unit: "dias", mensagem: s.mensagem }
+    : { value: Math.round(s.minutos / 60), unit: "horas", mensagem: s.mensagem };
+}
+function rowToStep(r: StepRow): FunnelStep {
+  return { minutos: r.unit === "dias" ? r.value * 1440 : r.value * 60, mensagem: r.mensagem };
+}
 
 // Redimensiona pro navegador antes de mandar pro servidor — a foto vira base64 salvo direto no
 // banco (mesmo padrão de Product.imagemBase64, não tem storage de blob nessa stack), então
@@ -38,11 +52,12 @@ function resizeImageToBase64(file: File, maxSize = 200, quality = 0.85): Promise
 
 export function FormularioEditorClient({
   id, initialSlug, initialTitle, initialHeadline, initialActive, initialPixelId, initialAvatarUrl,
-  initialAgentConfigId, initialAgentLabel, initialInviteMessage, initialQuestions, submissions,
+  initialAgentConfigId, initialAgentLabel, initialInviteMessage, initialFunnelSteps, initialQuestions, submissions,
 }: {
   id: string; initialSlug: string; initialTitle: string; initialHeadline: string; initialActive: boolean;
   initialPixelId: string; initialAvatarUrl: string | null;
   initialAgentConfigId: string | null; initialAgentLabel: string | null; initialInviteMessage: string;
+  initialFunnelSteps: FunnelStep[];
   initialQuestions: LeadFormQuestion[]; submissions: Submission[];
 }) {
   const [slug, setSlug] = useState(initialSlug);
@@ -92,6 +107,24 @@ export function FormularioEditorClient({
     setSaved(false);
   }
 
+  // Funil após o convite: sequência de mensagens automáticas, mesmo estilo do funil do teste
+  // grátis — mas editável por formulário (tempo + texto de cada passo, ver lib/lead-form-funnel.ts)
+  const [funnelRows, setFunnelRows] = useState<StepRow[]>(initialFunnelSteps.map(stepToRow));
+
+  function addFunnelStep() {
+    const last = funnelRows[funnelRows.length - 1];
+    setFunnelRows(prev => [...prev, { value: last ? last.value : 1, unit: last ? last.unit : "dias", mensagem: "" }]);
+    setSaved(false);
+  }
+  function updateFunnelStep(i: number, patch: Partial<StepRow>) {
+    setFunnelRows(prev => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+    setSaved(false);
+  }
+  function removeFunnelStep(i: number) {
+    setFunnelRows(prev => prev.filter((_, idx) => idx !== i));
+    setSaved(false);
+  }
+
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -132,6 +165,7 @@ export function FormularioEditorClient({
         body: JSON.stringify({
           slug, title, headline, active, questions, pixelId: pixelId.trim() || null, avatarUrl,
           agentConfigId, inviteMessage: inviteMessage.trim() || null,
+          funnelSteps: funnelRows.filter(r => r.mensagem.trim()).map(rowToStep),
         }),
       });
       const data = await res.json();
@@ -305,6 +339,50 @@ export function FormularioEditorClient({
               className="w-full mt-1 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
             />
           </div>
+        </div>
+
+        <div className="border border-gray-800 rounded-xl p-4 space-y-3">
+          <div>
+            <label className="text-xs text-gray-500 uppercase tracking-wide">Funil após o convite (opcional)</label>
+            <p className="text-xs text-gray-500 mt-1">
+              Sequência de mensagens disparadas automaticamente depois do convite, mesmo estilo do funil do teste grátis — mas só desse formulário. Pausa sozinha se o lead responder.
+            </p>
+          </div>
+
+          {funnelRows.map((row, i) => (
+            <div key={i} className="bg-gray-950/60 border border-gray-800 rounded-xl p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500 w-24 flex-shrink-0">{i === 0 ? "1º passo, +" : `${i + 1}º passo, +`}</span>
+                <input
+                  type="number" min={1} value={row.value}
+                  onChange={e => updateFunnelStep(i, { value: Math.max(1, Number(e.target.value)) })}
+                  className="w-20 bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-blue-600"
+                />
+                <select
+                  value={row.unit}
+                  onChange={e => updateFunnelStep(i, { unit: e.target.value as DelayUnit })}
+                  className="bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-blue-600"
+                >
+                  <option value="horas">horas</option>
+                  <option value="dias">dias</option>
+                </select>
+                <span className="text-xs text-gray-500">após o convite</span>
+                <button type="button" onClick={() => removeFunnelStep(i)} className="ml-auto p-1.5 rounded-lg hover:bg-gray-800 text-red-400 flex-shrink-0"><Trash2 size={13} /></button>
+              </div>
+              <textarea
+                value={row.mensagem}
+                onChange={e => updateFunnelStep(i, { mensagem: e.target.value })}
+                rows={2}
+                maxLength={1000}
+                placeholder="Texto da mensagem — use {{nome}} pra interpolar o primeiro nome do lead."
+                className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+              />
+            </div>
+          ))}
+
+          <button type="button" onClick={addFunnelStep} className="flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300">
+            <Plus size={14} /> Adicionar passo
+          </button>
         </div>
 
         <div className="space-y-2">
