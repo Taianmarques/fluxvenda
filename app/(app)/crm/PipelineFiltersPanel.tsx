@@ -7,7 +7,7 @@ import type { Stage, PipelineOpportunity } from "./WhatsappPipeline";
 export type Attendant = { id: string; name: string; isManager: boolean };
 
 export type PipelineFilters = {
-  attendantId: string | null; // null = todos, "__none__" = sem atendente
+  attendantIds: string[]; // vazio = todos; pode incluir "__none__" junto com ids reais
   leadStatusId: string | null; // null = todos
   search: string;
   stageIds: string[]; // vazio = todas as etapas
@@ -19,7 +19,7 @@ export type PipelineFilters = {
 };
 
 export const EMPTY_PIPELINE_FILTERS: PipelineFilters = {
-  attendantId: null,
+  attendantIds: [],
   leadStatusId: null,
   search: "",
   stageIds: [],
@@ -32,7 +32,7 @@ export const EMPTY_PIPELINE_FILTERS: PipelineFilters = {
 
 export function hasActivePipelineFilters(f: PipelineFilters): boolean {
   return (
-    f.attendantId !== null ||
+    f.attendantIds.length > 0 ||
     f.leadStatusId !== null ||
     f.search.trim() !== "" ||
     f.stageIds.length > 0 ||
@@ -53,8 +53,10 @@ export function applyPipelineFilters(opportunities: PipelineOpportunity[], f: Pi
   const end = f.endDate ? new Date(`${f.endDate}T23:59:59`) : null;
 
   return opportunities.filter(o => {
-    if (f.attendantId === "__none__" && o.assignedToId) return false;
-    if (f.attendantId && f.attendantId !== "__none__" && o.assignedToId !== f.attendantId) return false;
+    if (f.attendantIds.length > 0) {
+      const matches = f.attendantIds.some(id => id === "__none__" ? !o.assignedToId : o.assignedToId === id);
+      if (!matches) return false;
+    }
     if (f.leadStatusId && o.leadStatusId !== f.leadStatusId) return false;
     if (q) {
       const matches =
@@ -108,6 +110,15 @@ export function PipelineFiltersPanel({
     });
   }
 
+  function toggleAttendant(id: string) {
+    onChange({
+      ...filters,
+      attendantIds: filters.attendantIds.includes(id)
+        ? filters.attendantIds.filter(x => x !== id)
+        : [...filters.attendantIds, id],
+    });
+  }
+
   return (
     <div
       ref={ref}
@@ -124,16 +135,19 @@ export function PipelineFiltersPanel({
       </div>
 
       <div>
-        <p className={labelClass}>Atendente</p>
-        <select
-          value={filters.attendantId ?? ""}
-          onChange={e => onChange({ ...filters, attendantId: e.target.value || null })}
-          className={`mt-1 ${inputClass}`}
-        >
-          <option value="">Todos</option>
-          <option value="__none__">Sem atendente</option>
-          {attendants.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-        </select>
+        <p className={labelClass}>Atendente {filters.attendantIds.length > 0 && `(${filters.attendantIds.length})`}</p>
+        <div className={`space-y-1 mt-1 max-h-32 overflow-y-auto rounded-lg border p-2 ${dark ? "border-gray-700" : "border-gray-300"}`}>
+          <label className={checkboxRowClass}>
+            <input type="checkbox" checked={filters.attendantIds.includes("__none__")} onChange={() => toggleAttendant("__none__")} />
+            Sem atendente
+          </label>
+          {attendants.map(a => (
+            <label key={a.id} className={checkboxRowClass}>
+              <input type="checkbox" checked={filters.attendantIds.includes(a.id)} onChange={() => toggleAttendant(a.id)} />
+              {a.name}
+            </label>
+          ))}
+        </div>
       </div>
 
       <div>
