@@ -1317,9 +1317,19 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
       const fotos = product.images.length > 0
         ? product.images
         : [{ imagemBase64: product.imagemBase64, imagemMimeType: product.imagemMimeType ?? "image/jpeg" }];
+
+      // Legenda com as informações do produto — antes ia só o nome, sem preço nem descrição
+      const precoLinha = product.precoPromocional != null && product.precoPromocional < product.price
+        ? `De R$ ${product.price.toFixed(2)} por R$ ${product.precoPromocional.toFixed(2)}`
+        : `R$ ${product.price.toFixed(2)}`;
+      const legenda = [product.name, precoLinha, product.description.trim()].filter(Boolean).join("\n");
+
       try {
+        // Legenda vai como mensagem de texto separada, não no campo "caption" da mídia — a
+        // UazAPI às vezes aceita o caption na requisição mas não entrega ele no WhatsApp do
+        // cliente (só a foto chega), então garantimos a entrega mandando como texto normal.
         for (const foto of fotos) {
-          await adapter.sendMedia(contactNumber, "image", foto.imagemBase64, { caption: product.name });
+          await adapter.sendMedia(contactNumber, "image", foto.imagemBase64);
           // A foto enviada pela ferramenta não passava pelo histórico — o atendente revisando a
           // conversa no CRM não via nem a imagem nem a legenda que o cliente recebeu de verdade.
           await prisma.message.create({
@@ -1329,8 +1339,10 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
             },
           });
         }
+        await adapter.sendText(contactNumber, legenda);
+        await prisma.message.create({ data: { conversationId, role: "assistant", content: legenda } });
         emitChatEvent(agentConfigId, conversationId);
-        return `${fotos.length > 1 ? `${fotos.length} fotos` : "Foto"} de "${product.name}" enviada(s).`;
+        return `${fotos.length > 1 ? `${fotos.length} fotos` : "Foto"} de "${product.name}" enviada(s), com legenda em seguida.`;
       } catch (err) {
         console.error("[whatsapp-inbound] erro ao enviar foto do produto:", err);
         return "Não foi possível enviar a foto agora.";

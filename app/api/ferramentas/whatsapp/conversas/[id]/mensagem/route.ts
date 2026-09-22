@@ -80,6 +80,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   let mediaUrl: string | null = null;
   let mediaType: string | null = null;
   let content = body.data.content ?? "";
+  const captionText = content; // preserva o texto original digitado — `content` vira o placeholder da mídia mais abaixo
 
   // Mensagem citada — guard de conversa impede citar mensagem de outro chat. Sem waMessageId
   // (mensagens antigas), a citação sai só no CRM: envia sem replyid, mas grava replyToId.
@@ -88,6 +89,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     : null;
   const replyId = replyTarget?.waMessageId ?? undefined;
   let waMessageId: string | null = null;
+  let captionWaMessageId: string | null = null; // legenda enviada como texto separado, quando há mídia + texto
 
   if (isInstagram) {
     if (!content) return NextResponse.json({ error: "Instagram DM só suporta texto" }, { status: 400 });
@@ -109,8 +111,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       const { base64, type, fileName } = body.data.media;
       let sent;
       try {
+        // Legenda NÃO vai no campo "caption" da mídia — a UazAPI às vezes aceita na requisição
+        // mas não entrega ela no WhatsApp do cliente (só a foto chega). Manda como mensagem de
+        // texto separada logo abaixo, pra garantir a entrega mesmo quando o caption é ignorado.
         sent = await sendMediaAsTeam(config.uazapiToken, conversation.contactNumber, type, base64, {
-          caption: body.data.content ? `${signaturePrefix}${body.data.content}` : (signaturePrefix || undefined),
           fileName,
           replyId,
           isGroup: conversation.isGroup,
@@ -129,7 +133,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         console.error("[mensagem] erro ao obter url da mídia enviada:", err);
       }
 
-      if (!content) content = fileName ? `[${type}] ${fileName}` : `[${type}]`;
+      if (captionText.trim()) {
+        captionWaMessageId = await sendWhatsAppTextAsTeam(config.uazapiToken, conversation.contactNumber, `${signaturePrefix}${captionText}`, undefined, conversation.isGroup);
+        if (!captionWaMessageId) console.error("[mensagem] falha ao enviar legenda como texto separado — a foto já foi enviada");
+      }
+      content = fileName ? `[${type}] ${fileName}` : `[${type}]`;
     } else {
       waMessageId = await sendWhatsAppTextAsTeam(config.uazapiToken, conversation.contactNumber, `${signaturePrefix}${content}`, replyId, conversation.isGroup);
     }
@@ -138,11 +146,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const message = await prisma.message.create({
     data: { conversationId: id, role: "human", content, mediaUrl, mediaType, senderId: userId, waMessageId, replyToId: replyTarget?.id ?? null },
   });
+  // A legenda vira uma segunda mensagem no histórico, refletindo exatamente o que o cliente
+  // recebeu de verdade (duas mensagens), em vez de fingir que foi uma única com caption.
+  if (captionWaMessageId) {
+    await prisma.message.create({
+      data: { conversationId: id, role: "human", content: captionText, senderId: userId, waMessageId: captionWaMessageId },
+    });
+  }
   emitChatEvent(conversation.agentConfigId, id); // outros atendentes veem na hora
 
   // Automação por mensagem rápida: se o texto enviado é o conteúdo de uma resposta rápida
   // vinculada a uma automação ativa, move o lead para a etapa configurada (sem IA)
-  runQuickReplyAutomation(conversation.agentConfigId, id, content).catch(err =>
+  runQuickReplyAutomation(conversation.agentConfigId, id, captionText).catch(err =>
     console.warn("[automacao] quick reply:", err?.message ?? err)
   );
 
