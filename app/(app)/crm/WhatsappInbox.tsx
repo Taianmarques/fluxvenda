@@ -87,13 +87,14 @@ type CatalogProduct = {
   id: string; name: string; price: number; precoPromocional: number | null; active: boolean;
   imagemBase64: string | null; imagemMimeType: string | null;
   marca: string | null; modelo: string | null; anoFabricacao: number | null; anoModelo: number | null;
-  km: number | null; cor: string | null; cambio: string | null; combustivel: string | null; condicaoVeiculo: string | null;
+  km: number | null; cor: string | null; cambio: string | null; combustivel: string | null; carroceria: string | null; condicaoVeiculo: string | null;
   tipoNegocio: string | null; tipoImovel: string | null; areaM2: number | null; quartos: number | null;
   banheiros: number | null; vagasGaragem: number | null; bairro: string | null; cidade: string | null;
 };
 
 const CAMBIO_LABEL: Record<string, string> = { MANUAL: "Manual", AUTOMATICO: "Automático" };
 const COMBUSTIVEL_LABEL: Record<string, string> = { FLEX: "Flex", GASOLINA: "Gasolina", ETANOL: "Etanol", DIESEL: "Diesel", ELETRICO: "Elétrico", HIBRIDO: "Híbrido", GNV: "GNV" };
+const CARROCERIA_LABEL: Record<string, string> = { HATCH: "Hatch", SEDA: "Sedã", SUV: "SUV", PICAPE: "Picape", MINIVAN: "Minivan", COUPE: "Cupê", CONVERSIVEL: "Conversível", PERUA: "Perua", UTILITARIO: "Utilitário/Van" };
 const CONDICAO_LABEL: Record<string, string> = { NOVO: "Novo", SEMINOVO: "Seminovo", USADO: "Usado" };
 const TIPO_NEGOCIO_LABEL: Record<string, string> = { VENDA: "Venda", ALUGUEL: "Aluguel" };
 const TIPO_IMOVEL_LABEL: Record<string, string> = { CASA: "Casa", APARTAMENTO: "Apartamento", COMERCIAL: "Comercial", TERRENO: "Terreno" };
@@ -103,6 +104,7 @@ const TIPO_IMOVEL_LABEL: Record<string, string> = { CASA: "Casa", APARTAMENTO: "
 function productSpecsLine(p: CatalogProduct): string {
   if (p.marca || p.modelo || p.anoFabricacao || p.anoModelo || p.km != null || p.condicaoVeiculo) {
     return [
+      p.carroceria ? CARROCERIA_LABEL[p.carroceria] ?? p.carroceria : "",
       (p.anoFabricacao || p.anoModelo) ? `${p.anoFabricacao ?? "?"}/${p.anoModelo ?? "?"}` : "",
       p.km != null ? `${p.km.toLocaleString("pt-BR")} km` : "",
       p.cor ?? "",

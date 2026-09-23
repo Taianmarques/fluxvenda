@@ -37,6 +37,7 @@ const schema = z.object({
   cor: z.string().max(50).nullable().optional(),
   cambio: z.enum(["MANUAL", "AUTOMATICO"]).nullable().optional(),
   combustivel: z.enum(["FLEX", "GASOLINA", "ETANOL", "DIESEL", "ELETRICO", "HIBRIDO", "GNV"]).nullable().optional(),
+  carroceria: z.enum(["HATCH", "SEDA", "SUV", "PICAPE", "MINIVAN", "COUPE", "CONVERSIVEL", "PERUA", "UTILITARIO"]).nullable().optional(),
   placa: z.string().max(20).nullable().optional(),
   condicaoVeiculo: z.enum(["NOVO", "SEMINOVO", "USADO"]).nullable().optional(),
   // Imóveis
@@ -79,6 +80,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
       cor: body.data.cor ?? null,
       cambio: body.data.cambio ?? null,
       combustivel: body.data.combustivel ?? null,
+      carroceria: body.data.carroceria ?? null,
       placa: body.data.placa ?? null,
       condicaoVeiculo: body.data.condicaoVeiculo ?? null,
       tipoNegocio: body.data.tipoNegocio ?? null,

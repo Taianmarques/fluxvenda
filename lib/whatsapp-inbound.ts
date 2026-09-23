@@ -361,6 +361,23 @@ function buildPosVendaContext(reviewLink: string): string {
 
 const CAMBIO_LABEL: Record<string, string> = { MANUAL: "Manual", AUTOMATICO: "Automático" };
 const COMBUSTIVEL_LABEL: Record<string, string> = { FLEX: "Flex", GASOLINA: "Gasolina", ETANOL: "Etanol", DIESEL: "Diesel", ELETRICO: "Elétrico", HIBRIDO: "Híbrido", GNV: "GNV" };
+const CARROCERIA_LABEL: Record<string, string> = { HATCH: "Hatch", SEDA: "Sedã", SUV: "SUV", PICAPE: "Picape", MINIVAN: "Minivan", COUPE: "Cupê", CONVERSIVEL: "Conversível", PERUA: "Perua", UTILITARIO: "Utilitário/Van" };
+// Termos que o cliente usa → valor do enum Carroceria (busca por categoria no consultar_produtos)
+const CARROCERIA_SINONIMOS: [RegExp, ("HATCH" | "SEDA" | "SUV" | "PICAPE" | "MINIVAN" | "COUPE" | "CONVERSIVEL" | "PERUA" | "UTILITARIO")[]][] = [
+  [/\bsuv\b|utilitario esportivo|crossover/, ["SUV"]],
+  [/pick.?up|picape|pickup|caminhonete|cabine/, ["PICAPE"]],
+  [/sed[aã]|\bsedan\b/, ["SEDA"]],
+  [/hatch/, ["HATCH"]],
+  [/minivan|monovolume/, ["MINIVAN"]],
+  [/cupe|coupe/, ["COUPE"]],
+  [/conversivel|cabrio/, ["CONVERSIVEL"]],
+  [/perua|station|wagon/, ["PERUA"]],
+  [/\bvan\b|furgao|utilitario/, ["UTILITARIO"]],
+];
+function carroceriasDaBusca(busca: string) {
+  const t = busca.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  return CARROCERIA_SINONIMOS.filter(([re]) => re.test(t)).flatMap(([, v]) => v);
+}
 const CONDICAO_VEICULO_LABEL: Record<string, string> = { NOVO: "Novo", SEMINOVO: "Seminovo", USADO: "Usado" };
 const TIPO_NEGOCIO_LABEL: Record<string, string> = { VENDA: "Venda", ALUGUEL: "Aluguel" };
 const TIPO_IMOVEL_LABEL: Record<string, string> = { CASA: "Casa", APARTAMENTO: "Apartamento", COMERCIAL: "Comercial", TERRENO: "Terreno" };
@@ -768,11 +785,13 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
 
     if (name === "consultar_produtos") {
       const busca = typeof args?.busca === "string" && args.busca.trim() ? args.busca.trim() : undefined;
+      const carrocerias = busca ? carroceriasDaBusca(busca) : [];
       let products = await prisma.product.findMany({
         where: {
           agentConfigId, active: true,
           ...(busca ? {
             OR: [
+              ...(carrocerias.length ? [{ carroceria: { in: carrocerias } }] : []),
               { name: { contains: busca, mode: "insensitive" } },
               { description: { contains: busca, mode: "insensitive" } },
               { marca: { contains: busca, mode: "insensitive" } },
@@ -808,6 +827,7 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
             : `R$ ${p.price.toFixed(2)}`;
           if (config.catalogType === "VEICULOS") {
             const attrs = [
+              p.carroceria ? CARROCERIA_LABEL[p.carroceria] ?? p.carroceria : "",
               (p.anoFabricacao || p.anoModelo) ? `${p.anoFabricacao ?? "?"}/${p.anoModelo ?? "?"}` : "",
               p.km != null ? `${p.km} km` : "",
               p.cor ?? "",

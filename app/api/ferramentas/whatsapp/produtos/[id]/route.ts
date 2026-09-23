@@ -23,6 +23,7 @@ const patchSchema = z.object({
   cor: z.string().max(50).nullable().optional(),
   cambio: z.enum(["MANUAL", "AUTOMATICO"]).nullable().optional(),
   combustivel: z.enum(["FLEX", "GASOLINA", "ETANOL", "DIESEL", "ELETRICO", "HIBRIDO", "GNV"]).nullable().optional(),
+  carroceria: z.enum(["HATCH", "SEDA", "SUV", "PICAPE", "MINIVAN", "COUPE", "CONVERSIVEL", "PERUA", "UTILITARIO"]).nullable().optional(),
   placa: z.string().max(20).nullable().optional(),
   condicaoVeiculo: z.enum(["NOVO", "SEMINOVO", "USADO"]).nullable().optional(),
   // Imóveis

@@ -32,7 +32,7 @@ type Product = {
   id: string; name: string; description: string; category?: string; price: number; precoPromocional?: number | null;
   stock: number | null; active: boolean; imagemBase64?: string | null; imagemMimeType?: string | null;
   marca?: string | null; modelo?: string | null; anoFabricacao?: number | null; anoModelo?: number | null; km?: number | null;
-  cor?: string | null; cambio?: string | null; combustivel?: string | null; placa?: string | null; condicaoVeiculo?: string | null;
+  cor?: string | null; cambio?: string | null; combustivel?: string | null; carroceria?: string | null; placa?: string | null; condicaoVeiculo?: string | null;
   tipoNegocio?: string | null; tipoImovel?: string | null; areaM2?: number | null; quartos?: number | null;
   banheiros?: number | null; vagasGaragem?: number | null; bairro?: string | null; cidade?: string | null;
 };
@@ -40,14 +40,14 @@ type Product = {
 // Campos específicos de Veículos/Imóveis — sempre string no form (parseados/convertidos ao enviar)
 type ExtraFields = {
   marca: string; modelo: string; anoFabricacao: string; anoModelo: string; km: string; cor: string;
-  cambio: string; combustivel: string; placa: string; condicaoVeiculo: string;
+  cambio: string; combustivel: string; carroceria: string; placa: string; condicaoVeiculo: string;
   tipoNegocio: string; tipoImovel: string; areaM2: string; quartos: string; banheiros: string; vagasGaragem: string;
   bairro: string; cidade: string;
 };
 
 const EMPTY_EXTRA: ExtraFields = {
   marca: "", modelo: "", anoFabricacao: "", anoModelo: "", km: "", cor: "",
-  cambio: "", combustivel: "", placa: "", condicaoVeiculo: "",
+  cambio: "", combustivel: "", carroceria: "", placa: "", condicaoVeiculo: "",
   tipoNegocio: "", tipoImovel: "", areaM2: "", quartos: "", banheiros: "", vagasGaragem: "",
   bairro: "", cidade: "",
 };
@@ -56,7 +56,7 @@ function extraFromProduct(p: Product): ExtraFields {
   return {
     marca: p.marca ?? "", modelo: p.modelo ?? "", anoFabricacao: p.anoFabricacao != null ? String(p.anoFabricacao) : "",
     anoModelo: p.anoModelo != null ? String(p.anoModelo) : "", km: p.km != null ? String(p.km) : "", cor: p.cor ?? "",
-    cambio: p.cambio ?? "", combustivel: p.combustivel ?? "", placa: p.placa ?? "", condicaoVeiculo: p.condicaoVeiculo ?? "",
+    cambio: p.cambio ?? "", combustivel: p.combustivel ?? "", carroceria: p.carroceria ?? "", placa: p.placa ?? "", condicaoVeiculo: p.condicaoVeiculo ?? "",
     tipoNegocio: p.tipoNegocio ?? "", tipoImovel: p.tipoImovel ?? "", areaM2: p.areaM2 != null ? String(p.areaM2) : "",
     quartos: p.quartos != null ? String(p.quartos) : "", banheiros: p.banheiros != null ? String(p.banheiros) : "",
     vagasGaragem: p.vagasGaragem != null ? String(p.vagasGaragem) : "", bairro: p.bairro ?? "", cidade: p.cidade ?? "",
@@ -72,21 +72,21 @@ function extraToPayload(extra: ExtraFields, catalogType: CatalogType) {
   if (catalogType === "VEICULOS") {
     return {
       marca: str(extra.marca), modelo: str(extra.modelo), anoFabricacao: int(extra.anoFabricacao), anoModelo: int(extra.anoModelo),
-      km: int(extra.km), cor: str(extra.cor), cambio: str(extra.cambio), combustivel: str(extra.combustivel),
+      km: int(extra.km), cor: str(extra.cor), cambio: str(extra.cambio), combustivel: str(extra.combustivel), carroceria: str(extra.carroceria),
       placa: str(extra.placa), condicaoVeiculo: str(extra.condicaoVeiculo),
       tipoNegocio: null, tipoImovel: null, areaM2: null, quartos: null, banheiros: null, vagasGaragem: null, bairro: null, cidade: null,
     };
   }
   if (catalogType === "IMOVEIS") {
     return {
-      marca: null, modelo: null, anoFabricacao: null, anoModelo: null, km: null, cor: null, cambio: null, combustivel: null,
+      marca: null, modelo: null, anoFabricacao: null, anoModelo: null, km: null, cor: null, cambio: null, combustivel: null, carroceria: null,
       placa: null, condicaoVeiculo: null,
       tipoNegocio: str(extra.tipoNegocio), tipoImovel: str(extra.tipoImovel), areaM2: float(extra.areaM2), quartos: int(extra.quartos),
       banheiros: int(extra.banheiros), vagasGaragem: int(extra.vagasGaragem), bairro: str(extra.bairro), cidade: str(extra.cidade),
     };
   }
   return {
-    marca: null, modelo: null, anoFabricacao: null, anoModelo: null, km: null, cor: null, cambio: null, combustivel: null,
+    marca: null, modelo: null, anoFabricacao: null, anoModelo: null, km: null, cor: null, cambio: null, combustivel: null, carroceria: null,
     placa: null, condicaoVeiculo: null, tipoNegocio: null, tipoImovel: null, areaM2: null, quartos: null, banheiros: null,
     vagasGaragem: null, bairro: null, cidade: null,
   };
@@ -94,6 +94,7 @@ function extraToPayload(extra: ExtraFields, catalogType: CatalogType) {
 
 const CAMBIO_LABEL: Record<string, string> = { MANUAL: "Manual", AUTOMATICO: "Automático" };
 const COMBUSTIVEL_LABEL: Record<string, string> = { FLEX: "Flex", GASOLINA: "Gasolina", ETANOL: "Etanol", DIESEL: "Diesel", ELETRICO: "Elétrico", HIBRIDO: "Híbrido", GNV: "GNV" };
+const CARROCERIA_LABEL: Record<string, string> = { HATCH: "Hatch", SEDA: "Sedã", SUV: "SUV", PICAPE: "Picape", MINIVAN: "Minivan", COUPE: "Cupê", CONVERSIVEL: "Conversível", PERUA: "Perua", UTILITARIO: "Utilitário/Van" };
 const CONDICAO_LABEL: Record<string, string> = { NOVO: "Novo", SEMINOVO: "Seminovo", USADO: "Usado" };
 const TIPO_NEGOCIO_LABEL: Record<string, string> = { VENDA: "Venda", ALUGUEL: "Aluguel" };
 const TIPO_IMOVEL_LABEL: Record<string, string> = { CASA: "Casa", APARTAMENTO: "Apartamento", COMERCIAL: "Comercial", TERRENO: "Terreno" };
@@ -102,6 +103,7 @@ function productSummaryLine(p: Product, catalogType: CatalogType): string {
   if (catalogType === "VEICULOS") {
     const parts = [
       [p.marca, p.modelo].filter(Boolean).join(" "),
+      p.carroceria ? CARROCERIA_LABEL[p.carroceria] ?? p.carroceria : "",
       (p.anoFabricacao || p.anoModelo) ? `${p.anoFabricacao ?? "?"}/${p.anoModelo ?? "?"}` : "",
       p.km != null ? `${p.km.toLocaleString("pt-BR")} km` : "",
       p.cor ?? "",
@@ -145,6 +147,10 @@ function ProductTypeFields({ catalogType, values, onChange }: { catalogType: Cat
         <select value={values.combustivel} onChange={e => onChange({ combustivel: e.target.value })} className={inputCls}>
           <option value="">Combustível</option>
           {Object.entries(COMBUSTIVEL_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
+        <select value={values.carroceria} onChange={e => onChange({ carroceria: e.target.value })} className={inputCls}>
+          <option value="">Categoria (SUV, picape, sedã...)</option>
+          {Object.entries(CARROCERIA_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
         <select value={values.condicaoVeiculo} onChange={e => onChange({ condicaoVeiculo: e.target.value })} className={inputCls}>
           <option value="">Condição</option>

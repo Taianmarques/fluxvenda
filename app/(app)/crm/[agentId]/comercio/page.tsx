@@ -96,7 +96,7 @@ async function ComercioPageContent({ params }: { params: Promise<{ agentId: stri
         id: p.id, name: p.name, description: p.description, category: p.category, price: p.price, precoPromocional: p.precoPromocional,
         stock: p.stock, active: p.active, imagemBase64: p.imagemBase64, imagemMimeType: p.imagemMimeType,
         marca: p.marca, modelo: p.modelo, anoFabricacao: p.anoFabricacao, anoModelo: p.anoModelo, km: p.km, cor: p.cor,
-        cambio: p.cambio, combustivel: p.combustivel, placa: p.placa, condicaoVeiculo: p.condicaoVeiculo,
+        cambio: p.cambio, combustivel: p.combustivel, carroceria: p.carroceria, placa: p.placa, condicaoVeiculo: p.condicaoVeiculo,
         tipoNegocio: p.tipoNegocio, tipoImovel: p.tipoImovel, areaM2: p.areaM2, quartos: p.quartos, banheiros: p.banheiros,
         vagasGaragem: p.vagasGaragem, bairro: p.bairro, cidade: p.cidade,
       }))}

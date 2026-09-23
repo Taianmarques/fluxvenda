@@ -1214,6 +1214,7 @@ model Product {
   cor             String?
   cambio          Cambio?
   combustivel     Combustivel?
+  carroceria      Carroceria? // categoria (SUV, picape, sedã...) — a IA usa pra responder "tem SUV?"
   placa           String? // uso interno — nunca exposto na loja pública nem enviado pra IA/cliente
   condicaoVeiculo CondicaoVeiculo?
 
@@ -1266,6 +1267,18 @@ enum Combustivel {
   ELETRICO
   HIBRIDO
   GNV
+}
+
+enum Carroceria {
+  HATCH
+  SEDA
+  SUV
+  PICAPE
+  MINIVAN
+  COUPE
+  CONVERSIVEL
+  PERUA
+  UTILITARIO
 }
 
 enum CondicaoVeiculo {
