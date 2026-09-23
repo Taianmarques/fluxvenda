@@ -23,6 +23,7 @@ import { generateEmbedding, cosineSimilarity } from "@/lib/embeddings";
 import { getDemoSlotDays, isDemoSlotAvailable, DEMO_SLOT_MINUTES, DEFAULT_DEMO_TIMES } from "@/lib/demo-scheduling";
 import { sendDemoBookingNotification } from "@/lib/email";
 import { FLUXVENDA_TEAM_ID } from "@/lib/internal-agent";
+import { phoneInList } from "@/lib/phone-match";
 
 type AgentConfigFull = NonNullable<Awaited<ReturnType<typeof prisma.agentConfig.findFirst>>>;
 
@@ -1580,7 +1581,7 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
   // pra teste (ver AgentConfig.learningModeTestNumbers) continuam recebendo resposta de verdade
   // enquanto a IA está pausada (modo aprendizado ou pausa manual), pro gestor conversar com a
   // IA pelo WhatsApp sem ligar pra todo mundo.
-  if (config.whatsappAiPaused && !config.learningModeTestNumbers.includes(contactNumber)) return;
+  if (config.whatsappAiPaused && !phoneInList(config.learningModeTestNumbers, contactNumber)) return;
   // Agente ainda não configurado (sem systemPrompt) — conectar o canal não exige configurar
   // o agente primeiro (ver checklist de início do CRM). A conversa aparece normal na caixa
   // de entrada pro atendente responder na mão; só a IA não tem o que usar pra responder.
