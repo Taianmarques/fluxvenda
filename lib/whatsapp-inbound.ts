@@ -374,6 +374,35 @@ const CARROCERIA_SINONIMOS: [RegExp, ("HATCH" | "SEDA" | "SUV" | "PICAPE" | "MIN
   [/perua|station|wagon/, ["PERUA"]],
   [/\bvan\b|furgao|utilitario/, ["UTILITARIO"]],
 ];
+// Distância de edição com transposição (kicks ↔ kikcs = 1) — tolera erro de digitação no cadastro ou na pergunta
+function distanciaEdicao(a: string, b: string): number {
+  const d: number[][] = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 0; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const custo = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + custo);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+    }
+  }
+  return d[a.length][b.length];
+}
+
+// Palavra da busca "bate" com o texto se aparece nele, ou se alguma palavra do texto é quase igual
+// (1 erro em palavras de 4-6 letras, 2 em palavras maiores). Números (ano, motor) só batem exatos.
+function palavraBate(token: string, hay: string, palavras: string[]): boolean {
+  if (hay.includes(token)) return true;
+  if (/\d/.test(token) || token.length < 4) return false;
+  const tolerancia = token.length >= 7 ? 2 : 1;
+  // candidatas: cada palavra e pares de palavras vizinhas juntas ("t-croos" → "tcroos")
+  const candidatas = [...palavras, ...palavras.slice(1).map((w, i) => palavras[i] + w)];
+  return candidatas.some(w => {
+    if (w.length < 3 || /\d/.test(w)) return false;
+    if (Math.abs(w.length - token.length) <= tolerancia && distanciaEdicao(token, w) <= tolerancia) return true;
+    // erro de digitação no começo de uma palavra maior ("kick" ↔ "kikcs")
+    return w.length > token.length && distanciaEdicao(token, w.slice(0, token.length)) <= 1;
+  });
+}
 function carroceriasDaBusca(busca: string) {
   const t = busca.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   return CARROCERIA_SINONIMOS.filter(([re]) => re.test(t)).flatMap(([, v]) => v);
@@ -808,8 +837,9 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
             p.cambio ? CAMBIO_LABEL[p.cambio] : "",
             p.combustivel ? COMBUSTIVEL_LABEL[p.combustivel] : "",
           ].filter(Boolean).join(" "));
+          const palavras = hay.split(/[^a-z0-9]+/).filter(Boolean);
           const hits = tokens.filter(t =>
-            hay.includes(t) || (p.carroceria != null && carroceriasDaBusca(t).includes(p.carroceria)),
+            palavraBate(t, hay, palavras) || (p.carroceria != null && carroceriasDaBusca(t).includes(p.carroceria)),
           ).length;
           return { p, hits };
         });
