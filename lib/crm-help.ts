@@ -231,6 +231,7 @@ export const CRM_HELP: Partial<Record<CrmPageKey, HelpArticle>> = {
     blocks: [
       { text: "É por aqui que se conecta o número de WhatsApp (via QR code) e a conta de Instagram que o agente vai usar pra atender. Sem um canal conectado, a IA não recebe nem envia mensagem nenhuma." },
       { heading: "Modo aprendizado", text: "Antes de ativar a IA de vez, dá pra deixar o canal em \"Modo aprendizado\": as conversas chegam e ficam salvas normalmente, mas a IA ainda não responde em nenhum canal — bom pra revisar o Conhecimento cadastrado antes de colocar o agente pra atender de verdade. \"Ativar IA\" liga o atendimento automático quando estiver pronto." },
+      { heading: "Números de teste", text: "Com a IA do WhatsApp pausada (modo aprendizado ou botão \"Pausar IA\"), dá pra liberar até 5 números de WhatsApp pra testar: só eles recebem resposta de verdade da IA, todos os outros contatos seguem sem resposta automática. O campo aparece em Canais, logo abaixo do WhatsApp, sempre que a IA estiver pausada." },
       { heading: "Ações por canal", bullets: [
         "WhatsApp: Pausar (para o atendimento temporariamente sem desconectar), Reconectar (gera um novo QR code) e Pausar IA (só a IA para, atendentes continuam podendo responder)",
         "Instagram DM: \"Conectar Instagram\" inicia a autenticação com a conta comercial",

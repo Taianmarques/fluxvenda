@@ -462,45 +462,6 @@ export function CanaisClient({
                         </button>
                       )}
                     </div>
-
-                    {isManager && (
-                      <div className="pl-[26px] space-y-1.5">
-                        <p className="text-xs text-gray-400">
-                          Números de WhatsApp liberados pra testar — só eles recebem resposta de verdade da IA antes de ativar pra todo mundo:
-                        </p>
-                        {ch.learningModeTestNumbers.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5">
-                            {ch.learningModeTestNumbers.map((numero) => (
-                              <span key={numero} className="flex items-center gap-1.5 text-xs font-mono bg-blue-900/30 border border-blue-800/50 text-blue-200 rounded-full pl-2.5 pr-1.5 py-1">
-                                +{numero}
-                                <button onClick={() => handleRemoveTestNumber(ch, numero)} title="Remover" className="text-blue-400 hover:text-white">
-                                  <X size={11} />
-                                </button>
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        <div className="flex items-center gap-2">
-                          <input
-                            value={testNumberInputs[ch.id] ?? ""}
-                            onChange={(e) => setTestNumberInputs((prev) => ({ ...prev, [ch.id]: e.target.value }))}
-                            onKeyDown={(e) => e.key === "Enter" && handleAddTestNumber(ch)}
-                            placeholder="Ex: 5511999999999"
-                            disabled={ch.learningModeTestNumbers.length >= 5}
-                            className="flex-1 min-w-0 bg-blue-950/40 border border-blue-800/50 rounded-lg px-2.5 py-1.5 text-xs font-mono placeholder:text-gray-600 focus:outline-none focus:border-blue-500 disabled:opacity-50"
-                          />
-                          <button
-                            onClick={() => handleAddTestNumber(ch)}
-                            disabled={ch.learningModeTestNumbers.length >= 5}
-                            className="flex-shrink-0 text-xs text-blue-300 hover:text-white border border-blue-700 hover:border-blue-500 rounded-lg px-3 py-1.5 disabled:opacity-50"
-                          >
-                            Adicionar
-                          </button>
-                        </div>
-                        {testNumberError[ch.id] && <p className="text-xs text-red-400">{testNumberError[ch.id]}</p>}
-                        {ch.learningModeTestNumbers.length >= 5 && <p className="text-xs text-gray-500">Limite de 5 números.</p>}
-                      </div>
-                    )}
                   </div>
                 )}
 
@@ -567,6 +528,47 @@ export function CanaisClient({
                     </div>
                   )}
                 </div>
+
+                {/* Números de teste: com a IA do WhatsApp pausada (modo aprendizado ou pausa manual),
+                    só esses números continuam recebendo resposta de verdade da IA */}
+                {isManager && ch.whatsappAiPaused && (
+                  <div className="px-5 py-3 space-y-1.5 bg-amber-950/10 border-b border-gray-800/40">
+                    <p className="text-xs text-gray-400">
+                      <span className="text-amber-300 font-medium">IA pausada.</span> Números de WhatsApp liberados pra testar — só eles recebem resposta de verdade da IA enquanto ela estiver pausada:
+                    </p>
+                    {ch.learningModeTestNumbers.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {ch.learningModeTestNumbers.map((numero) => (
+                          <span key={numero} className="flex items-center gap-1.5 text-xs font-mono bg-amber-900/20 border border-amber-800/50 text-amber-200 rounded-full pl-2.5 pr-1.5 py-1">
+                            +{numero}
+                            <button onClick={() => handleRemoveTestNumber(ch, numero)} title="Remover" className="text-amber-400 hover:text-white">
+                              <X size={11} />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <input
+                        value={testNumberInputs[ch.id] ?? ""}
+                        onChange={(e) => setTestNumberInputs((prev) => ({ ...prev, [ch.id]: e.target.value }))}
+                        onKeyDown={(e) => e.key === "Enter" && handleAddTestNumber(ch)}
+                        placeholder="Ex: 5511999999999"
+                        disabled={ch.learningModeTestNumbers.length >= 5}
+                        className="flex-1 min-w-0 bg-gray-950/60 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs font-mono placeholder:text-gray-600 focus:outline-none focus:border-amber-600 disabled:opacity-50"
+                      />
+                      <button
+                        onClick={() => handleAddTestNumber(ch)}
+                        disabled={ch.learningModeTestNumbers.length >= 5}
+                        className="flex-shrink-0 text-xs text-amber-300 hover:text-white border border-amber-700 hover:border-amber-500 rounded-lg px-3 py-1.5 disabled:opacity-50"
+                      >
+                        Adicionar
+                      </button>
+                    </div>
+                    {testNumberError[ch.id] && <p className="text-xs text-red-400">{testNumberError[ch.id]}</p>}
+                    {ch.learningModeTestNumbers.length >= 5 && <p className="text-xs text-gray-500">Limite de 5 números.</p>}
+                  </div>
+                )}
 
                 {/* Instagram */}
                 <div className="px-5 py-3 flex items-center justify-between gap-3 flex-wrap">

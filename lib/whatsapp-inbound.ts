@@ -1577,8 +1577,9 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
   if (conversation.isGroup) return;
   // Canal pausado só pra IA (independente de "active", que desliga o canal inteiro) — a
   // mensagem já foi salva acima, só não gera resposta automática. Exceção: números liberados
-  // pra teste em modo aprendizado (ver AgentConfig.learningModeTestNumbers) continuam recebendo
-  // resposta de verdade, pro gestor conversar com a IA pelo WhatsApp antes de "Ativar IA".
+  // pra teste (ver AgentConfig.learningModeTestNumbers) continuam recebendo resposta de verdade
+  // enquanto a IA está pausada (modo aprendizado ou pausa manual), pro gestor conversar com a
+  // IA pelo WhatsApp sem ligar pra todo mundo.
   if (config.whatsappAiPaused && !config.learningModeTestNumbers.includes(contactNumber)) return;
   // Agente ainda não configurado (sem systemPrompt) — conectar o canal não exige configurar
   // o agente primeiro (ver checklist de início do CRM). A conversa aparece normal na caixa
