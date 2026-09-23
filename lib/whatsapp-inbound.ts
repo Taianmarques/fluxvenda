@@ -785,38 +785,44 @@ function makeExecuteTool(agentConfigId: string, conversationId: string, contactN
 
     if (name === "consultar_produtos") {
       const busca = typeof args?.busca === "string" && args.busca.trim() ? args.busca.trim() : undefined;
-      const carrocerias = busca ? carroceriasDaBusca(busca) : [];
-      let products = await prisma.product.findMany({
-        where: {
-          agentConfigId, active: true,
-          ...(busca ? {
-            OR: [
-              ...(carrocerias.length ? [{ carroceria: { in: carrocerias } }] : []),
-              { name: { contains: busca, mode: "insensitive" } },
-              { description: { contains: busca, mode: "insensitive" } },
-              { marca: { contains: busca, mode: "insensitive" } },
-              { modelo: { contains: busca, mode: "insensitive" } },
-              { cor: { contains: busca, mode: "insensitive" } },
-              { category: { contains: busca, mode: "insensitive" } },
-            ],
-          } : {}),
-        },
+      // Busca por palavras (sem acento, sem exigir a frase inteira): "Onix branco 2020" acha o Onix
+      // branco mesmo que nenhum campo contenha essa frase. Carroceria (SUV, picape...) entra por sinônimo.
+      const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const STOP = new Set(["de", "do", "da", "dos", "das", "um", "uma", "o", "a", "os", "as", "e", "com", "para", "pra", "tem", "voces", "algum", "alguma", "ai", "no", "na", "em", "que", "quero", "queria", "carro", "carros", "veiculo", "veiculos"]);
+      const tokens = busca ? norm(busca).split(/[^a-z0-9]+/).filter(t => t.length >= 2 && !STOP.has(t)) : [];
+
+      const todos = await prisma.product.findMany({
+        where: { agentConfigId, active: true },
         orderBy: { createdAt: "asc" },
+        take: 300,
       });
 
-      // Termos como "SUV", "picape", "sedã" ou "econômico" não são campo do cadastro — a busca por
-      // texto não acha nada mesmo com o item no estoque. Nesse caso devolve o catálogo completo
-      // e deixa a IA classificar pelos modelos, em vez de responder que não tem.
+      let products = todos;
       let semCorrespondenciaDireta = false;
-      if (products.length === 0 && busca) {
-        products = await prisma.product.findMany({
-          where: { agentConfigId, active: true },
-          orderBy: { createdAt: "asc" },
-          take: 60,
+      if (tokens.length > 0) {
+        const scored = todos.map(p => {
+          const hay = norm([
+            p.name, p.description, p.marca, p.modelo, p.cor, p.category,
+            p.anoFabricacao, p.anoModelo,
+            p.carroceria ? CARROCERIA_LABEL[p.carroceria] : "",
+            p.cambio ? CAMBIO_LABEL[p.cambio] : "",
+            p.combustivel ? COMBUSTIVEL_LABEL[p.combustivel] : "",
+          ].filter(Boolean).join(" "));
+          const hits = tokens.filter(t =>
+            hay.includes(t) || (p.carroceria != null && carroceriasDaBusca(t).includes(p.carroceria)),
+          ).length;
+          return { p, hits };
         });
-        semCorrespondenciaDireta = products.length > 0;
-      }
-      if (products.length === 0) return "Nenhum produto encontrado no catálogo.";
+        const melhor = Math.max(...scored.map(s => s.hits));
+        if (melhor === 0) {
+          // Nada bate (ex: "econômico", "bom pra família"): devolve o catálogo pra IA classificar pelos modelos
+          semCorrespondenciaDireta = todos.length > 0;
+          products = todos.slice(0, 60);
+        } else {
+          // Se algum item bate com todas as palavras, mostra só eles; senão os mais próximos primeiro
+          products = (melhor === tokens.length ? scored.filter(s => s.hits === melhor) : scored.filter(s => s.hits > 0).sort((a, b) => b.hits - a.hits)).map(s => s.p);
+        }
+      }      if (products.length === 0) return "Nenhum produto encontrado no catálogo.";
       const aviso = semCorrespondenciaDireta
         ? `Nenhum item tem "${busca}" no nome, modelo ou descrição — pode ser uma categoria/característica que não é campo do cadastro (ex: SUV, picape, sedã, hatch). Segue o catálogo completo: identifique pelos modelos quais se encaixam no que o cliente pediu e ofereça só esses; se nenhum se encaixar, diga que no momento não tem.\n\n`
         : "";
