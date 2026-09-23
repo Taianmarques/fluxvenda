@@ -246,7 +246,7 @@ export const COMMERCE_TOOLS = [
       description: "Lista os produtos disponíveis no catálogo dessa empresa, com preço e estoque. Use SEMPRE antes de informar preço ou disponibilidade — nunca invente produto ou valor fora dessa lista.",
       parameters: {
         type: "object",
-        properties: { busca: { type: "string", description: "Termo opcional pra filtrar produtos pelo nome" } },
+        properties: { busca: { type: "string", description: "Termo opcional pra filtrar por nome, marca, modelo, cor ou descrição. Categorias como SUV, picape, sedã ou hatch NÃO são campo do cadastro: pra pedidos assim, chame SEM busca (ou com o termo — se nada bater, o catálogo completo volta) e identifique você mesmo pelos modelos quais itens se encaixam." } },
         required: [],
       },
     },
