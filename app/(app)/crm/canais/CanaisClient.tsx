@@ -5,7 +5,7 @@ import { useCrmTheme } from "../CrmThemeContext";
 import {
   Wifi, Pause, Play, Plus, RefreshCw, X,
   CheckCircle2, Smartphone, Instagram, Link2Off,
-  Trash2, BotOff, Bot, GraduationCap, Rocket,
+  Trash2, BotOff, Bot, GraduationCap, Rocket, RotateCcw,
 } from "lucide-react";
 
 type WhatsAppStatus = {
@@ -231,6 +231,30 @@ export function CanaisClient({
     }
     setTestNumberInputs((prev) => ({ ...prev, [ch.id]: "" }));
     salvarTestNumbers(ch.id, [...ch.learningModeTestNumbers, raw]);
+  }
+
+  // Apaga a conversa do número de teste (histórico, follow-ups, transferência pra humano) pra o
+  // próximo teste começar do zero — ver app/api/agentes/[agentId]/numeros-teste/reiniciar
+  async function handleRestartTestNumber(ch: Channel, numero: string) {
+    if (!confirm(`Reiniciar o atendimento de +${numero}? A conversa desse número (mensagens e oportunidade) será apagada e o próximo teste começa do zero.`)) return;
+    const key = ch.id + ":reiniciar:" + numero;
+    setLoadingId(key);
+    setTestNumberError((prev) => ({ ...prev, [ch.id]: "" }));
+    try {
+      const res = await fetch(`/api/agentes/${ch.id}/numeros-teste/reiniciar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ numero }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setTestNumberError((prev) => ({ ...prev, [ch.id]: data.error ?? "Não foi possível reiniciar o atendimento." }));
+      }
+    } catch {
+      setTestNumberError((prev) => ({ ...prev, [ch.id]: "Falha na conexão." }));
+    } finally {
+      setLoadingId(null);
+    }
   }
 
   function handleRemoveTestNumber(ch: Channel, numero: string) {
@@ -541,6 +565,14 @@ export function CanaisClient({
                         {ch.learningModeTestNumbers.map((numero) => (
                           <span key={numero} className="flex items-center gap-1.5 text-xs font-mono bg-amber-900/20 border border-amber-800/50 text-amber-200 rounded-full pl-2.5 pr-1.5 py-1">
                             +{numero}
+                            <button
+                              onClick={() => handleRestartTestNumber(ch, numero)}
+                              disabled={loadingId === ch.id + ":reiniciar:" + numero}
+                              title="Reiniciar atendimento — apaga a conversa desse número pra começar um teste do zero"
+                              className="text-amber-400 hover:text-white disabled:opacity-50"
+                            >
+                              <RotateCcw size={11} className={loadingId === ch.id + ":reiniciar:" + numero ? "animate-spin" : ""} />
+                            </button>
                             <button onClick={() => handleRemoveTestNumber(ch, numero)} title="Remover" className="text-amber-400 hover:text-white">
                               <X size={11} />
                             </button>
