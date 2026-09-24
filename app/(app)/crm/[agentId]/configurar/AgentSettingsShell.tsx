@@ -97,6 +97,13 @@ export function AgentSettingsShell({
   instagramAiPaused: boolean;
 }) {
   const [section, setSection] = useState<Section>("agente");
+  // Seções já abertas continuam montadas (só escondidas): desmontar descartava o que foi salvo, e ao voltar
+  // o painel reiniciava com os valores antigos que o servidor mandou quando a página abriu.
+  const [visited, setVisited] = useState<Section[]>(["agente"]);
+  function abrirSecao(key: Section) {
+    setSection(key);
+    setVisited(v => (v.includes(key) ? v : [...v, key]));
+  }
   const [instrucoesOpen, setInstrucoesOpen] = useState(false);
   const [telefoniaOpen, setTelefoniaOpen] = useState(false);
 
@@ -135,7 +142,7 @@ export function AgentSettingsShell({
             return (
               <button
                 key={s.key}
-                onClick={() => setSection(s.key)}
+                onClick={() => abrirSecao(s.key)}
                 className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors flex-shrink-0 md:flex-shrink ${
                   isActive ? "bg-blue-500/10 text-blue-400" : "text-gray-400 hover:text-gray-200 hover:bg-gray-800/60"
                 }`}
@@ -153,8 +160,8 @@ export function AgentSettingsShell({
 
       {/* Conteúdo */}
       <div className="flex-1 min-w-0 w-full space-y-6">
-        {section === "agente" && (
-          <div className="space-y-6">
+        {visited.includes("agente") && (
+          <div className={`space-y-6 ${section === "agente" ? "" : "hidden"}`}>
             <SectionHeader title="O Agente" desc={`Agente de atendimento conectado ${connectedLabel} da sua empresa.`} />
 
             <Link
@@ -180,8 +187,8 @@ export function AgentSettingsShell({
           </div>
         )}
 
-        {section === "basico" && (
-          <div className="space-y-6">
+        {visited.includes("basico") && (
+          <div className={`space-y-6 ${section === "basico" ? "" : "hidden"}`}>
             <SectionHeader title="Configurações básicas" desc="Delay das respostas, modo somente leitura e assinatura do agente." />
             <ConfiguracoesBasicasPanel
               agentId={agentId}
@@ -211,8 +218,8 @@ export function AgentSettingsShell({
           </div>
         )}
 
-        {section === "personalidade" && (
-          <div className="space-y-6">
+        {visited.includes("personalidade") && (
+          <div className={`space-y-6 ${section === "personalidade" ? "" : "hidden"}`}>
             <SectionHeader title="Personalidade" desc="Nome, tom de voz e uso de emojis nas respostas do agente." />
             <PersonalidadePanel
               agentId={agentId}
@@ -242,8 +249,8 @@ export function AgentSettingsShell({
           </div>
         )}
 
-        {section === "sobre-empresa" && (
-          <div className="space-y-4">
+        {visited.includes("sobre-empresa") && (
+          <div className={`space-y-4 ${section === "sobre-empresa" ? "" : "hidden"}`}>
             <SectionHeader title="Sobre a empresa" desc="O que o agente sabe sobre o seu negócio para responder sem inventar." />
             <SobreEmpresaPanel
               agentId={agentId}
@@ -254,8 +261,8 @@ export function AgentSettingsShell({
           </div>
         )}
 
-        {section === "comercial" && (
-          <div className="space-y-4">
+        {visited.includes("comercial") && (
+          <div className={`space-y-4 ${section === "comercial" ? "" : "hidden"}`}>
             <SectionHeader title="Configuração comercial" desc="Serviços, preços, objeções comuns e horário de atendimento." />
             <ConfiguracaoComercialPanel
               agentId={agentId}
@@ -268,8 +275,8 @@ export function AgentSettingsShell({
           </div>
         )}
 
-        {section === "followup" && (
-          <div className="space-y-4">
+        {visited.includes("followup") && (
+          <div className={`space-y-4 ${section === "followup" ? "" : "hidden"}`}>
             <SectionHeader title="Follow-up" desc="Retomada automática quando o contato não responde." />
             <FollowupPanel
               agentId={agentId}
@@ -281,8 +288,8 @@ export function AgentSettingsShell({
           </div>
         )}
 
-        {section === "distribuicao" && (
-          <div className="space-y-4">
+        {visited.includes("distribuicao") && (
+          <div className={`space-y-4 ${section === "distribuicao" ? "" : "hidden"}`}>
             <SectionHeader title="Distribuição" desc="Como as conversas são atribuídas aos atendentes da equipe." />
             <DistribuicaoClient
               agentId={agentId}
@@ -296,15 +303,15 @@ export function AgentSettingsShell({
           </div>
         )}
 
-        {section === "multiagente" && (
-          <div className="space-y-4">
+        {visited.includes("multiagente") && (
+          <div className={`space-y-4 ${section === "multiagente" ? "" : "hidden"}`}>
             <SectionHeader title="Multi-agente" desc="Um único número, vários especialistas — a IA assume a persona do setor certo conforme a conversa." />
             <MultiAgentePanel agentId={agentId} initialEnabled={whatsappAgentConfig.multiAgenteDepartamentos} />
           </div>
         )}
 
-        {section === "conhecimento" && (
-          <div className="space-y-4">
+        {visited.includes("conhecimento") && (
+          <div className={`space-y-4 ${section === "conhecimento" ? "" : "hidden"}`}>
             <SectionHeader title="Conhecimento" desc="Documentos e páginas que o agente consulta para responder sem inventar." />
             <Link
               href={`/crm/${agentId}/conhecimento`}
@@ -319,8 +326,8 @@ export function AgentSettingsShell({
           </div>
         )}
 
-        {section === "treino" && (
-          <div className="space-y-4">
+        {visited.includes("treino") && (
+          <div className={`space-y-4 ${section === "treino" ? "" : "hidden"}`}>
             <SectionHeader title="Treino" desc="Exemplos de atendimento simulado que a IA usa como referência em conversas parecidas." />
             <Link
               href={`/crm/${agentId}/treino`}
@@ -335,8 +342,8 @@ export function AgentSettingsShell({
           </div>
         )}
 
-        {section === "analytics" && (
-          <div className="space-y-4">
+        {visited.includes("analytics") && (
+          <div className={`space-y-4 ${section === "analytics" ? "" : "hidden"}`}>
             <SectionHeader title="Analytics" desc="Volume de conversas do agente." />
             <div className="grid grid-cols-3 gap-4">
               {stats.map(m => (

@@ -48,6 +48,7 @@ export function DistribuicaoClient({
   const [attendants, setAttendants] = useState<Attendant[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState(false);
 
   function adicionarCondicao() {
     const texto = novaCondicao.trim();
@@ -74,13 +75,17 @@ export function DistribuicaoClient({
   async function save(patch: Record<string, unknown>) {
     setSaving(true);
     setSaved(false);
+    setSaveError(false);
     try {
-      await fetch(`/api/agentes/${agentId}/distribuicao`, {
+      const res = await fetch(`/api/agentes/${agentId}/distribuicao`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(patch),
       });
-      setSaved(true);
+      if (res.ok) setSaved(true);
+      else setSaveError(true);
+    } catch {
+      setSaveError(true);
     } finally {
       setSaving(false);
     }
@@ -90,7 +95,7 @@ export function DistribuicaoClient({
     <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-5">
       <div className="flex items-center justify-between">
         <p className="font-semibold flex items-center gap-2"><Users size={16} /> Distribuição de leads entre atendentes</p>
-        {saving ? <span className="text-xs text-gray-500">Salvando...</span> : saved ? <span className="text-xs text-green-400">Salvo</span> : null}
+        {saving ? <span className="text-xs text-gray-500">Salvando...</span> : saved ? <span className="text-xs text-green-400">Salvo</span> : saveError ? <span className="text-xs text-red-400">Não foi possível salvar (só o gestor altera)</span> : null}
       </div>
 
       <div className="grid sm:grid-cols-2 gap-2">
