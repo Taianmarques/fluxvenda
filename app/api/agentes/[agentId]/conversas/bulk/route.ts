@@ -5,7 +5,7 @@ import { getAgentConfigWithRole } from "@/lib/team";
 import { z } from "zod";
 
 const schema = z.object({
-  conversationIds: z.array(z.string()).min(1).max(500),
+  conversationIds: z.array(z.string()).min(1).max(5000), // "Selecionar todas" numa fila grande (ex: 1500 pendentes) precisa caber num único pedido
   acao: z.enum(["aceitar", "mover_etapa", "encerrar"]),
   stageId: z.string().optional(),   // mover_etapa
   motivo: z.string().trim().min(1).max(150).optional(), // encerrar
@@ -55,7 +55,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
     if (!d.motivo) return NextResponse.json({ error: "Motivo obrigatório" }, { status: 400 });
     await prisma.conversation.updateMany({
       where: { id: { in: conversas.map(c => c.id) } },
-      data: { status: "FINALIZADO", motivoEncerramento: d.motivo },
+      data: { status: "FINALIZADO", motivoEncerramento: d.motivo, encerradaEm: new Date() },
     });
     // Sem dono antes de encerrar: fica com quem encerrou, senão continuaria visível pra
     // qualquer atendente mesmo já finalizada (ver conversas/route.ts — só some da lista de
