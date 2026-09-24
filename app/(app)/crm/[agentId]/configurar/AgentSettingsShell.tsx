@@ -137,7 +137,7 @@ export function AgentSettingsShell({
                 key={s.key}
                 onClick={() => setSection(s.key)}
                 className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors flex-shrink-0 md:flex-shrink ${
-                  isActive ? "bg-blue-500/10 text-blue-400" : "text-gray-400 hover:text-white hover:bg-white/5"
+                  isActive ? "bg-blue-500/10 text-blue-400" : "text-gray-400 hover:text-gray-200 hover:bg-gray-800/60"
                 }`}
               >
                 <span className="flex items-center gap-2.5 whitespace-nowrap">
