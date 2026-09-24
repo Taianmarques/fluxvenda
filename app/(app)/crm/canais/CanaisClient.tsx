@@ -479,7 +479,7 @@ export function CanaisClient({
                         <button
                           onClick={() => handleAtivarIA(ch.id)}
                           disabled={loadingId === ch.id + ":ativarIA"}
-                          className="flex items-center gap-1.5 text-xs text-blue-300 hover:text-white border border-blue-700 hover:border-blue-500 bg-blue-900/30 hover:bg-blue-900/60 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50 flex-shrink-0"
+                          className="flex items-center gap-1.5 text-xs text-blue-300 hover:text-blue-300 border border-blue-700 hover:border-blue-500 bg-blue-900/30 hover:bg-blue-900/60 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50 flex-shrink-0"
                         >
                           <Rocket size={12} />
                           {loadingId === ch.id + ":ativarIA" ? "..." : "Ativar IA"}
@@ -513,7 +513,7 @@ export function CanaisClient({
                         <button
                           onClick={() => handlePause(ch.id)}
                           disabled={loadingId === ch.id + ":pause"}
-                          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white border border-gray-700 hover:border-gray-500 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
+                          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-200 border border-gray-700 hover:border-gray-500 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
                         >
                           <Pause size={12} />
                           {loadingId === ch.id + ":pause" ? "..." : "Pausar"}
@@ -543,7 +543,7 @@ export function CanaisClient({
                         className={`flex items-center gap-1.5 text-xs border rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50 ${
                           ch.whatsappAiPaused
                             ? "text-amber-300 border-amber-700 bg-amber-900/20"
-                            : "text-gray-400 hover:text-white border-gray-700 hover:border-gray-500"
+                            : "text-gray-400 hover:text-gray-200 border-gray-700 hover:border-gray-500"
                         }`}
                       >
                         {ch.whatsappAiPaused ? <BotOff size={12} /> : <Bot size={12} />}
@@ -563,17 +563,17 @@ export function CanaisClient({
                     {ch.learningModeTestNumbers.length > 0 && (
                       <div className="flex flex-wrap gap-1.5">
                         {ch.learningModeTestNumbers.map((numero) => (
-                          <span key={numero} className="flex items-center gap-1.5 text-xs font-mono bg-amber-900/20 border border-amber-800/50 text-amber-200 rounded-full pl-2.5 pr-1.5 py-1">
+                          <span key={numero} className="flex items-center gap-1.5 text-xs font-mono bg-amber-900/20 border border-amber-800/50 text-amber-300 rounded-full pl-2.5 pr-1.5 py-1">
                             +{numero}
                             <button
                               onClick={() => handleRestartTestNumber(ch, numero)}
                               disabled={loadingId === ch.id + ":reiniciar:" + numero}
                               title="Reiniciar atendimento — apaga a conversa desse número pra começar um teste do zero"
-                              className="text-amber-400 hover:text-white disabled:opacity-50"
+                              className="text-amber-300 hover:text-gray-200 disabled:opacity-50"
                             >
                               <RotateCcw size={11} className={loadingId === ch.id + ":reiniciar:" + numero ? "animate-spin" : ""} />
                             </button>
-                            <button onClick={() => handleRemoveTestNumber(ch, numero)} title="Remover" className="text-amber-400 hover:text-white">
+                            <button onClick={() => handleRemoveTestNumber(ch, numero)} title="Remover" className="text-amber-300 hover:text-gray-200">
                               <X size={11} />
                             </button>
                           </span>
@@ -592,7 +592,7 @@ export function CanaisClient({
                       <button
                         onClick={() => handleAddTestNumber(ch)}
                         disabled={ch.learningModeTestNumbers.length >= 5}
-                        className="flex-shrink-0 text-xs text-amber-300 hover:text-white border border-amber-700 hover:border-amber-500 rounded-lg px-3 py-1.5 disabled:opacity-50"
+                        className="flex-shrink-0 text-xs text-amber-300 hover:bg-amber-900/30 border border-amber-700 hover:border-amber-500 rounded-lg px-3 py-1.5 disabled:opacity-50"
                       >
                         Adicionar
                       </button>
@@ -631,7 +631,7 @@ export function CanaisClient({
                         <>
                           <a
                             href={`/crm/${ch.id}/condicoes`}
-                            className="flex items-center gap-1.5 text-xs border rounded-lg px-3 py-1.5 transition-colors text-gray-400 hover:text-white border-gray-700 hover:border-gray-500"
+                            className="flex items-center gap-1.5 text-xs border rounded-lg px-3 py-1.5 transition-colors text-gray-400 hover:text-gray-200 border-gray-700 hover:border-gray-500"
                           >
                             Condições
                           </a>
@@ -642,7 +642,7 @@ export function CanaisClient({
                             className={`flex items-center gap-1.5 text-xs border rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50 ${
                               ch.instagramAiPaused
                                 ? "text-amber-300 border-amber-700 bg-amber-900/20"
-                                : "text-gray-400 hover:text-white border-gray-700 hover:border-gray-500"
+                                : "text-gray-400 hover:text-gray-200 border-gray-700 hover:border-gray-500"
                             }`}
                           >
                             {ch.instagramAiPaused ? <BotOff size={12} /> : <Bot size={12} />}
@@ -721,7 +721,7 @@ export function CanaisClient({
       {connectingId && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-sm space-y-4 relative">
-            <button onClick={closeModal} className="absolute top-4 right-4 text-gray-500 hover:text-white">
+            <button onClick={closeModal} className="absolute top-4 right-4 text-gray-500 hover:text-gray-200">
               <X size={18} />
             </button>
             <div>
