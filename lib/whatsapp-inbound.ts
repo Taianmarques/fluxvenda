@@ -1689,7 +1689,10 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
   // - sustentado: 12+ respostas em 10 minutos (com debounce de 8s cada troca leva 15-30s,
   //   então duas IAs nunca passam de ~4/min — mas mantêm o ritmo SEM PARAR, coisa que
   //   humano não faz; 12 em 10min só acontece em ping-pong automatizado)
-  const [burstReplies, sustainedReplies] = await Promise.all([
+  // Números de teste (AgentConfig.learningModeTestNumbers) ficam de fora: é o próprio gestor
+  // testando, não duas IAs em loop — disparar várias mensagens rápidas ali é uso normal.
+  const isTestNumber = phoneInList(config.learningModeTestNumbers, contactNumber);
+  const [burstReplies, sustainedReplies] = isTestNumber ? [0, 0] : await Promise.all([
     prisma.message.count({
       where: { conversationId: conversation.id, role: "assistant", createdAt: { gte: new Date(Date.now() - 60_000) } },
     }),
@@ -1697,7 +1700,7 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
       where: { conversationId: conversation.id, role: "assistant", createdAt: { gte: new Date(Date.now() - 10 * 60_000) } },
     }),
   ]);
-  if (burstReplies >= 5 || sustainedReplies >= 12) {
+  if (!isTestNumber && (burstReplies >= 5 || sustainedReplies >= 12)) {
     await prisma.conversation.update({
       where: { id: conversation.id },
       data: { humanTakeover: true, status: "ATIVO" },
