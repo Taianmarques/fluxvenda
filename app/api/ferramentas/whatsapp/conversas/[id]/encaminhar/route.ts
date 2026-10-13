@@ -5,6 +5,7 @@ import { userBelongsToAgentConfig } from "@/lib/team";
 import { sendWhatsAppTextAsTeam, sendMediaAsTeam, type MediaType } from "@/lib/whatsapp";
 import { emitChatEvent } from "@/lib/realtime";
 import { z } from "zod";
+import { loadMediaBuffer } from "@/lib/media-store";
 
 const schema = z.object({
   messageId: z.string(),
@@ -46,9 +47,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   let mediaBase64: string | null = null;
   if (message.mediaUrl && message.mediaType) {
     try {
-      const res = await fetch(message.mediaUrl);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const buffer = await res.arrayBuffer();
+      const buffer = await loadMediaBuffer(message.mediaUrl);
       if (buffer.byteLength > MAX_MEDIA_BYTES) {
         return NextResponse.json({ error: "Mídia grande demais pra encaminhar (máx. 10MB)" }, { status: 413 });
       }

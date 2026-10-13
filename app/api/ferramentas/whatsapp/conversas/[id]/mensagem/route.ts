@@ -6,6 +6,7 @@ import { sendWhatsAppTextAsTeam, sendMediaAsTeam, downloadMessageMedia } from "@
 import { sendInstagramDM } from "@/lib/instagram";
 import { emitChatEvent } from "@/lib/realtime";
 import { z } from "zod";
+import { persistRemoteMedia } from "@/lib/media-store";
 
 async function runQuickReplyAutomation(agentConfigId: string, conversationId: string, content: string | undefined) {
   const texto = content?.trim();
@@ -127,7 +128,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
       try {
         const media = await downloadMessageMedia(config.uazapiToken, sent.messageid);
-        mediaUrl = media.fileURL;
+        mediaUrl = await persistRemoteMedia(media.fileURL, media.mimetype);
         mediaType = type;
       } catch (err) {
         console.error("[mensagem] erro ao obter url da mídia enviada:", err);

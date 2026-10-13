@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { transcribeAudio } from "@/lib/agent-engine";
 import { sendWhatsAppTextAsTeam, sendMediaAsTeam, downloadMessageMedia } from "@/lib/whatsapp";
+import { persistRemoteMedia } from "@/lib/media-store";
 import { processIncomingMessage, type ChannelAdapter } from "@/lib/whatsapp-inbound";
 
 function mediaMimetype(message: any): string | null {
@@ -67,7 +68,7 @@ export async function POST(req: NextRequest) {
     try {
       const media = await downloadMessageMedia(config.uazapiToken, message.id || message.messageid);
       text = await transcribeAudio(media.fileURL, media.mimetype);
-      mediaUrl = media.fileURL;
+      mediaUrl = await persistRemoteMedia(media.fileURL, media.mimetype);
       mediaType = "audio";
     } catch (err) {
       console.error("[whatsapp-webhook] erro ao transcrever áudio:", err);
@@ -76,7 +77,7 @@ export async function POST(req: NextRequest) {
     try {
       const media = await downloadMessageMedia(config.uazapiToken, message.id || message.messageid);
       imageUrl = media.fileURL;
-      mediaUrl = media.fileURL;
+      mediaUrl = await persistRemoteMedia(media.fileURL, media.mimetype);
       mediaType = "image";
       text = caption ? `[Imagem] ${caption}` : "[Imagem enviada pelo cliente]";
     } catch (err) {
@@ -85,7 +86,7 @@ export async function POST(req: NextRequest) {
   } else if (mimetype?.startsWith("video/")) {
     try {
       const media = await downloadMessageMedia(config.uazapiToken, message.id || message.messageid);
-      mediaUrl = media.fileURL;
+      mediaUrl = await persistRemoteMedia(media.fileURL, media.mimetype);
       mediaType = "video";
       text = caption ? `[Vídeo] ${caption}` : "[Vídeo enviado pelo cliente]";
     } catch (err) {
@@ -95,7 +96,7 @@ export async function POST(req: NextRequest) {
     // Qualquer outro mimetype (PDF, planilha, etc.) vira documento
     try {
       const media = await downloadMessageMedia(config.uazapiToken, message.id || message.messageid);
-      mediaUrl = media.fileURL;
+      mediaUrl = await persistRemoteMedia(media.fileURL, media.mimetype);
       mediaType = "document";
       const fileName = mediaFileName(message);
       text = caption ? `[Documento] ${caption}` : `[Documento enviado pelo cliente${fileName ? `: ${fileName}` : ""}]`;
