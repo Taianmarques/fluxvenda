@@ -12,6 +12,7 @@ export default async function FormularioPublicoPage({ params }: { params: Promis
     select: {
       headline: true, questions: true, pixelId: true, avatarUrl: true, active: true, agentOwned: true, doneMessage: true,
       accentColor: true, coverUrl: true, ctaLabel: true, ctaUrl: true, waNumber: true, waButtonText: true, consentText: true,
+      conversionUrl: true, conversionEvent: true,
     },
   });
   if (!form || !form.active) notFound();
@@ -32,6 +33,7 @@ export default async function FormularioPublicoPage({ params }: { params: Promis
       waNumber={form.waNumber}
       waButtonText={form.waButtonText}
       consentText={form.consentText?.trim() || null}
+      conversionUrl={form.conversionUrl}
     />
   );
 }

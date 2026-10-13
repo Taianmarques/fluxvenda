@@ -1980,6 +1980,11 @@ model LeadForm {
 
   // Plano B: botão "falar no WhatsApp" (wa.me) na tela final — aparece sempre que waNumber existe,
   // e é o único caminho do lead quando o envio automático do convite falha. Só dígitos com DDI.
+  // Página de conversão em site externo: o lead é levado pra lá ao concluir (com utm/fbclid) e o dono
+  // cola nela o pixel disparando conversionEvent. null = sem redirecionamento.
+  conversionUrl   String?
+  conversionEvent String?
+
   waNumber     String?
   waButtonText String?
 

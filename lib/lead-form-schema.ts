@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { QUESTION_TYPES, MAX_OPCOES_ESCOLHA, isHttpUrl, isValidHexColor } from "@/lib/lead-form-shared";
+import { QUESTION_TYPES, MAX_OPCOES_ESCOLHA, isHttpUrl, isValidHexColor, isConversionEvent } from "@/lib/lead-form-shared";
 
 // Validação compartilhada dos campos do formulário (editor do super admin e do CRM)
 
@@ -26,5 +26,7 @@ export const extrasShape = {
     z.string().regex(/^\d{10,13}$/, "WhatsApp do botão inválido — use DDD + número").nullable().optional(),
   ),
   waButtonText: z.preprocess(emptyToNull, z.string().trim().max(40).nullable().optional()),
+  conversionUrl: z.preprocess(emptyToNull, z.string().trim().max(500).refine(isHttpUrl, "A página de conversão precisa começar com http:// ou https://").nullable().optional()),
+  conversionEvent: z.preprocess(emptyToNull, z.string().refine(isConversionEvent, "Evento do pixel inválido").nullable().optional()),
   consentText: z.preprocess(emptyToNull, z.string().trim().max(500).nullable().optional()),
 };

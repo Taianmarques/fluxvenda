@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Script from "next/script";
 import { ArrowUp, Check, ExternalLink, MessageCircle } from "lucide-react";
-import { buildWaLink, DEFAULT_ACCENT, type LeadFormQuestion, type LeadFormUtm } from "@/lib/lead-form-shared";
+import { buildWaLink, withTrackingParams, DEFAULT_ACCENT, type LeadFormQuestion, type LeadFormUtm } from "@/lib/lead-form-shared";
 
 export type { LeadFormQuestion };
 
@@ -54,11 +54,12 @@ function readUtm(): LeadFormUtm {
 
 export function FormularioClient({
   slug, headline, questions, pixelId, avatarUrl, doneMessage, agentOwned, accentColor, coverUrl,
-  ctaLabel, ctaUrl, waNumber, waButtonText, consentText,
+  ctaLabel, ctaUrl, waNumber, waButtonText, consentText, conversionUrl,
 }: {
   slug: string; headline: string; questions: LeadFormQuestion[]; pixelId: string | null; avatarUrl: string | null;
   doneMessage: string | null; agentOwned: boolean; accentColor: string | null; coverUrl: string | null;
   ctaLabel: string | null; ctaUrl: string | null; waNumber: string | null; waButtonText: string | null; consentText: string | null;
+  conversionUrl: string | null;
 }) {
   const accent = accentColor || DEFAULT_ACCENT;
   const [bubbles, setBubbles] = useState<Bubble[]>([{ from: "bot", text: headline }]);
@@ -106,6 +107,15 @@ export function FormularioClient({
   useEffect(() => {
     if (showInput && current?.type !== "ESCOLHA") inputRef.current?.focus();
   }, [showInput, current]);
+
+  // Página de conversão em outro site: leva o lead pra lá (com fbclid/utm) logo depois do pixel do
+  // formulário disparar. O botão cobre quem tem a navegação automática bloqueada.
+  const conversionHref = conversionUrl ? withTrackingParams(conversionUrl, typeof window === "undefined" ? "" : window.location.search) : null;
+  useEffect(() => {
+    if (!done || !conversionHref) return;
+    const t = setTimeout(() => { window.location.href = conversionHref; }, 2500);
+    return () => clearTimeout(t);
+  }, [done, conversionHref]);
 
   const needsConsent = current?.type === "WHATSAPP" && Boolean(consentText);
 
@@ -319,6 +329,19 @@ export function FormularioClient({
                     : doneMessage ?? DEFAULT_DONE}
               </p>
             </div>
+
+            {conversionHref && (
+              <div className="pl-12">
+                <a
+                  href={conversionHref}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-[15px] font-semibold text-white"
+                  style={{ backgroundColor: accent }}
+                >
+                  Continuar <ExternalLink size={15} />
+                </a>
+                <p className="text-xs text-gray-400 mt-2">Te levando para a próxima página...</p>
+              </div>
+            )}
 
             {(ctaUrl || waLink) && (
               <div className="flex flex-col sm:flex-row gap-2 pl-12">

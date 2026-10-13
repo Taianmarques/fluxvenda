@@ -203,6 +203,7 @@ export function FormularioEditorClient({
           inviteMessage: inviteMessage.trim() || null, doneMessage: doneMessage.trim() || null,
           accentColor: extras.accentColor, coverUrl: extras.coverUrl, ctaLabel: extras.ctaLabel, ctaUrl: extras.ctaUrl,
           waNumber: extras.waNumber, waButtonText: extras.waButtonText, consentText: extras.consentText,
+          conversionUrl: extras.conversionUrl, conversionEvent: extras.conversionEvent,
           funnelSteps: funnelRows.filter(r => r.mensagem.trim()).map(rowToStep),
         }),
       });
@@ -304,7 +305,7 @@ export function FormularioEditorClient({
           </p>
         </div>
 
-        <ExtrasPanel value={extras} onChange={updateExtras} isCrm={isCrm} crmOptions={crmOptions} onError={setError} />
+        <ExtrasPanel value={extras} onChange={updateExtras} isCrm={isCrm} crmOptions={crmOptions} onError={setError} pixelId={pixelId} />
 
         <TrackingLinks slug={slug} />
 

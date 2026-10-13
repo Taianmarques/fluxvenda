@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, ImagePlus, X, Palette, Gift, MessageCircle, ShieldCheck, Tags, BarChart3, Link2 } from "lucide-react";
+import { Check, Copy, ImagePlus, X, Palette, Gift, MessageCircle, ShieldCheck, Tags, BarChart3, Link2, Target } from "lucide-react";
 import type { FormStats } from "@/lib/lead-form-stats";
-import { DEFAULT_ACCENT } from "@/lib/lead-form-shared";
+import { DEFAULT_ACCENT, CONVERSION_EVENTS, buildPixelSnippet } from "@/lib/lead-form-shared";
 
 // Seções extras do editor de formulário (aparência, entrega da isca, plano B no WhatsApp,
 // consentimento, organização no CRM, links de rastreio e desempenho) — separadas de
@@ -16,6 +16,8 @@ export type FormExtras = {
   ctaUrl: string;
   waNumber: string;
   waButtonText: string;
+  conversionUrl: string;
+  conversionEvent: string;
   consentText: string;
   etiquetaId: string | null;
   pipelineStageId: string | null;
@@ -68,14 +70,24 @@ function Box({ icon, title, hint, children }: { icon: React.ReactNode; title: st
 }
 
 export function ExtrasPanel({
-  value, onChange, isCrm, crmOptions, onError,
+  value, onChange, isCrm, crmOptions, onError, pixelId,
 }: {
   value: FormExtras;
   onChange: (patch: Partial<FormExtras>) => void;
   isCrm: boolean;
   crmOptions?: CrmFormOptions;
   onError: (msg: string) => void;
+  pixelId: string;
 }) {
+  const [snippetCopied, setSnippetCopied] = useState(false);
+  const snippet = buildPixelSnippet(pixelId.trim() || "SEU_PIXEL_ID", value.conversionEvent);
+  function copySnippet() {
+    navigator.clipboard.writeText(snippet).then(() => {
+      setSnippetCopied(true);
+      setTimeout(() => setSnippetCopied(false), 1500);
+    });
+  }
+
   async function handleCover(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -140,6 +152,38 @@ export function ExtrasPanel({
             <input value={value.ctaUrl} onChange={e => onChange({ ctaUrl: e.target.value })} maxLength={500} placeholder="https://..." className={`${inputCls} font-mono`} />
           </div>
         </div>
+      </Box>
+
+      <Box
+        icon={<Target size={12} />} title="Página de conversão (site externo)"
+        hint="O pixel só enxerga páginas onde está instalado. Informe a página do seu site onde a conversão acontece: o lead é levado pra lá ao concluir (com fbclid e utm) e, com o código abaixo colado nela, o Meta registra a conversão."
+      >
+        <div className="grid sm:grid-cols-[2fr_1fr] gap-2">
+          <div>
+            <label className="text-xs text-gray-500">Página (https://...)</label>
+            <input value={value.conversionUrl} onChange={e => onChange({ conversionUrl: e.target.value })} maxLength={500} placeholder="https://meusite.com.br/obrigado" className={`${inputCls} font-mono`} />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500">Evento do pixel</label>
+            <select value={value.conversionEvent} onChange={e => onChange({ conversionEvent: e.target.value })} className={inputCls}>
+              {CONVERSION_EVENTS.map(ev => <option key={ev.value} value={ev.value}>{ev.label}</option>)}
+            </select>
+          </div>
+        </div>
+        {value.conversionUrl.trim() && (
+          <div className="space-y-2">
+            {!pixelId.trim() && (
+              <p className="text-xs text-yellow-400">Preencha o ID do Pixel do formulário (campo acima) — o código abaixo usa ele.</p>
+            )}
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-gray-500">Cole no &lt;head&gt; da página acima:</p>
+              <button type="button" onClick={copySnippet} className="flex items-center gap-1.5 text-xs px-3 py-1 rounded-lg border border-gray-700 text-gray-300 hover:border-blue-600 hover:text-blue-400">
+                {snippetCopied ? <Check size={12} className="text-green-400" /> : <Copy size={12} />} Copiar código
+              </button>
+            </div>
+            <pre className="bg-gray-950 border border-gray-800 rounded-xl p-3 text-[11px] font-mono text-gray-400 overflow-x-auto max-h-48">{snippet}</pre>
+          </div>
+        )}
       </Box>
 
       <Box
