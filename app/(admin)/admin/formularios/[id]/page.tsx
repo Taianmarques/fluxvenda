@@ -27,6 +27,7 @@ export default async function AdminFormularioEditorPage({ params }: { params: Pr
       initialAgentConfigId={form.agentConfigId}
       initialAgentLabel={form.agentConfig ? `${form.agentConfig.nome} — ${form.agentConfig.team.name}` : null}
       initialInviteMessage={form.inviteMessage ?? ""}
+      initialDoneMessage={form.doneMessage ?? ""}
       initialFunnelSteps={normalizeFormFunnelSteps(form.funnelSteps)}
       initialQuestions={form.questions as LeadFormQuestion[]}
       submissions={form.submissions.map(s => ({

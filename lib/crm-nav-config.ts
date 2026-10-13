@@ -1,7 +1,7 @@
 import {
   MessageCircle, KanbanSquare, Calendar, Wallet, ShoppingCart, Landmark, Target,
   Wifi, GitBranch, Briefcase, Zap, UserPlus, ClipboardCheck, Radio, User, SunMoon, UserCog,
-  Megaphone, Phone, Coins, BookUser, BookOpen, LayoutDashboard, Goal, MessageSquareText, ThumbsDown, GraduationCap, type LucideIcon,
+  Megaphone, Phone, FileText, Coins, BookUser, BookOpen, LayoutDashboard, Goal, MessageSquareText, ThumbsDown, GraduationCap, type LucideIcon,
 } from "lucide-react";
 
 // Fonte única das páginas do CRM — usada pelo CrmSidebar (menu), CrmPageGate (bloqueio
@@ -15,7 +15,7 @@ export type CrmPageKey =
   | "mensagens" | "aovivo"
   | "dashboards"
   | "pipeline" | "agenda" | "vendas" | "comercio" | "meudesempenho"
-  | "campanhas" | "ligacoes" | "prospeccao"
+  | "campanhas" | "ligacoes" | "prospeccao" | "formularios"
   | "cobranca" | "carteira" | "contatos"
   | "automacao" | "condicoes"
   | "canais" | "equipe" | "auditoria" | "creditos" | "conhecimento" | "treino" | "metas" | "mensagensrapidas" | "motivosperda" | "aparencia" | "perfil";
@@ -60,6 +60,7 @@ export const CRM_CATEGORIES: CrmCategoryDef[] = [
     { key: "campanhas", label: "Campanhas", suffix: "/campanhas", icon: Megaphone, managerOnly: true },
     { key: "ligacoes", label: "Ligações", suffix: "/ligacoes", icon: Phone },
     { key: "prospeccao", label: "Prospecção", suffix: "/prospeccao", icon: Target },
+    { key: "formularios", label: "Formulários", suffix: "/formularios", icon: FileText, managerOnly: true },
   ] },
   { key: "gestao", label: "Gestão", variant: "flyout", pages: [
     { key: "cobranca", label: "Cobranças", suffix: "/cobranca", icon: Landmark },

@@ -20,6 +20,11 @@ const CONVITE_TEMPLATE = (nome: string) =>
   `Você pode testar grátis por 7 dias, sem cartão — é só se cadastrar aqui: ${APP_URL}/sign-up?product=crm\n\n` +
   `Ou, se preferir, eu já te agendo uma demonstração rápida com a gente. O que prefere?`;
 
+// Padrão dos formulários criados por gestores no CRM (LeadForm.agentOwned) — sem nada sobre o
+// teste grátis da FluxVenda, que só faz sentido nos formulários do super admin.
+const CONVITE_NEUTRO_TEMPLATE = (nome: string) =>
+  `Oi, ${nome.split(" ")[0]}! Recebemos o seu cadastro por aqui. Como posso te ajudar?`;
+
 function interpolateNome(texto: string, nome: string): string {
   return texto.replace(/\{\{\s*nome\s*\}\}/gi, nome.split(" ")[0]);
 }
@@ -110,8 +115,9 @@ export async function sendFormInviteToLead(params: {
   whatsappRaw: string;
   agentConfigId: string | null;
   inviteMessage: string | null;
+  agentOwned?: boolean;
 }): Promise<boolean> {
-  const { nome, inviteMessage } = params;
+  const { nome, inviteMessage, agentOwned } = params;
   const contactNumber = normalizePhone(params.whatsappRaw);
 
   const agentConfig = await resolveFormAgent(params.agentConfigId);
@@ -126,7 +132,9 @@ export async function sendFormInviteToLead(params: {
     create: { agentConfigId: agentConfig.id, contactNumber, contactName: nome },
   });
 
-  const texto = inviteMessage?.trim() ? interpolateNome(inviteMessage, nome) : CONVITE_TEMPLATE(nome);
+  const texto = inviteMessage?.trim()
+    ? interpolateNome(inviteMessage, nome)
+    : agentOwned ? CONVITE_NEUTRO_TEMPLATE(nome) : CONVITE_TEMPLATE(nome);
   const waMessageId = await sendWhatsAppTextAsTeam(agentConfig.uazapiToken, contactNumber, texto);
   if (!waMessageId) return false;
 

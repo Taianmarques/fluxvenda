@@ -52,12 +52,18 @@ function resizeImageToBase64(file: File, maxSize = 200, quality = 0.85): Promise
 
 export function FormularioEditorClient({
   id, initialSlug, initialTitle, initialHeadline, initialActive, initialPixelId, initialAvatarUrl,
-  initialAgentConfigId, initialAgentLabel, initialInviteMessage, initialFunnelSteps, initialQuestions, submissions,
+  initialAgentConfigId, initialAgentLabel, initialInviteMessage, initialDoneMessage, initialFunnelSteps, initialQuestions, submissions,
+  crmAgentId, whatsappOk = true,
 }: {
   id: string; initialSlug: string; initialTitle: string; initialHeadline: string; initialActive: boolean;
   initialPixelId: string; initialAvatarUrl: string | null;
-  initialAgentConfigId: string | null; initialAgentLabel: string | null; initialInviteMessage: string;
+  initialAgentConfigId: string | null; initialAgentLabel: string | null; initialInviteMessage: string; initialDoneMessage: string;
   initialFunnelSteps: FunnelStep[];
+  // Definido quando o editor roda dentro do CRM (gestor editando o formulário do próprio agente):
+  // troca a API, esconde a escolha de agente (é sempre o dele) e usa os textos padrão neutros.
+  crmAgentId?: string;
+  // false = o agente não tem WhatsApp via UazAPI conectado (único provedor que o formulário usa)
+  whatsappOk?: boolean;
   initialQuestions: LeadFormQuestion[]; submissions: Submission[];
 }) {
   const [slug, setSlug] = useState(initialSlug);
@@ -77,6 +83,10 @@ export function FormularioEditorClient({
   const [agentConfigId, setAgentConfigId] = useState<string | null>(initialAgentConfigId);
   const [agentLabel, setAgentLabel] = useState<string | null>(initialAgentLabel);
   const [inviteMessage, setInviteMessage] = useState(initialInviteMessage);
+  const [doneMessage, setDoneMessage] = useState(initialDoneMessage);
+  const isCrm = Boolean(crmAgentId);
+  const apiUrl = isCrm ? `/api/agentes/${crmAgentId}/formularios/${id}` : `/api/admin/formularios/${id}`;
+  const backHref = isCrm ? `/crm/${crmAgentId}/formularios` : "/admin/formularios";
   const [showAgentPicker, setShowAgentPicker] = useState(false);
   const [agentQuery, setAgentQuery] = useState("");
   const [agentOptions, setAgentOptions] = useState<AgentOption[] | null>(null);
@@ -146,7 +156,11 @@ export function FormularioEditorClient({
   }
 
   function addQuestion() {
-    setQuestions(prev => [...prev, { key: `campo${prev.length + 1}`, label: "", type: "TEXTO" }]);
+    setQuestions(prev => {
+      let n = prev.length + 1;
+      while (prev.some(q => q.key === `campo${n}`)) n++;
+      return [...prev, { key: `campo${n}`, label: "", type: "TEXTO" }];
+    });
     setSaved(false);
   }
 
@@ -159,12 +173,12 @@ export function FormularioEditorClient({
     setError(null);
     setSaving(true);
     try {
-      const res = await fetch(`/api/admin/formularios/${id}`, {
+      const res = await fetch(apiUrl, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           slug, title, headline, active, questions, pixelId: pixelId.trim() || null, avatarUrl,
-          agentConfigId, inviteMessage: inviteMessage.trim() || null,
+          ...(isCrm ? {} : { agentConfigId }), inviteMessage: inviteMessage.trim() || null, doneMessage: doneMessage.trim() || null,
           funnelSteps: funnelRows.filter(r => r.mensagem.trim()).map(rowToStep),
         }),
       });
@@ -185,7 +199,7 @@ export function FormularioEditorClient({
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
-      <Link href="/admin/formularios" className="text-sm text-gray-500 hover:text-gray-300 flex items-center gap-1.5">
+      <Link href={backHref} className="text-sm text-gray-500 hover:text-gray-300 flex items-center gap-1.5">
         <ArrowLeft size={14} /> Formulários
       </Link>
 
@@ -267,6 +281,20 @@ export function FormularioEditorClient({
         </div>
 
         <div className="border border-gray-800 rounded-xl p-4 space-y-3">
+          {isCrm && (
+            <div>
+              <label className="text-xs text-gray-500 uppercase tracking-wide flex items-center gap-1.5"><Send size={12} /> Primeira mensagem no WhatsApp</label>
+              <p className="text-xs text-gray-500 mt-1">
+                Assim que o lead responde a pergunta de WhatsApp, o agente manda a primeira mensagem. Quem responder cai na caixa de Mensagens e a IA atende normalmente.
+              </p>
+              {!whatsappOk && (
+                <p className="text-xs text-amber-400 mt-2">
+                  Esse agente não tem um WhatsApp conectado via UazAPI — o formulário guarda as respostas, mas não consegue mandar a mensagem. Conecte o número em Canais.
+                </p>
+              )}
+            </div>
+          )}
+          {!isCrm && (<>
           <div>
             <label className="text-xs text-gray-500 uppercase tracking-wide flex items-center gap-1.5"><Send size={12} /> Pra qual agente mandar o lead</label>
             <p className="text-xs text-gray-500 mt-1">
@@ -327,6 +355,7 @@ export function FormularioEditorClient({
               )}
             </div>
           )}
+          </>)}
 
           <div>
             <label className="text-xs text-gray-500 uppercase tracking-wide">Mensagem de abertura no WhatsApp (opcional)</label>
@@ -335,9 +364,26 @@ export function FormularioEditorClient({
               onChange={e => { setInviteMessage(e.target.value); setSaved(false); }}
               rows={3}
               maxLength={1000}
-              placeholder="Deixe vazio pra usar o convite padrão de teste grátis da FluxVenda. Use {{nome}} pra interpolar o primeiro nome do lead."
+              placeholder={isCrm
+                ? "Deixe vazio pra usar uma saudação simples (\"Oi, {{nome}}! Recebemos o seu cadastro...\"). Use {{nome}} pra interpolar o primeiro nome do lead."
+                : "Deixe vazio pra usar o convite padrão de teste grátis da FluxVenda. Use {{nome}} pra interpolar o primeiro nome do lead."}
               className="w-full mt-1 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
             />
+          </div>
+
+          <div>
+            <label className="text-xs text-gray-500 uppercase tracking-wide">Mensagem final na tela (opcional)</label>
+            <textarea
+              value={doneMessage}
+              onChange={e => { setDoneMessage(e.target.value); setSaved(false); }}
+              rows={2}
+              maxLength={1000}
+              placeholder={isCrm
+                ? "Deixe vazio pra usar: \"Prontinho! Recebemos seus dados e já te chamamos no seu WhatsApp.\""
+                : "Deixe vazio pra usar o texto padrão do teste grátis da FluxVenda."}
+              className="w-full mt-1 bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+            />
+            <p className="text-xs text-gray-500 mt-1">Aparece pro lead quando ele termina de responder o formulário.</p>
           </div>
         </div>
 

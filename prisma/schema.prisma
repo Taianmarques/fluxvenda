@@ -1959,6 +1959,15 @@ model LeadForm {
   // manda se a última mensagem foi nossa" usada em todo follow-up automático do sistema).
   funnelSteps Json @default("[]")
 
+  // true = criado por um gestor no CRM (Marketing > Formulários) pro próprio agente — fica
+  // restrito a esse agente (agentConfigId nunca é null) e não aparece/edita no painel do super
+  // admin como formulário da FluxVenda. Também troca os textos padrão (convite e tela final),
+  // que pros formulários da FluxVenda falam do teste grátis.
+  agentOwned Boolean @default(false)
+
+  // Texto mostrado ao lead quando termina o formulário — null = texto padrão (ver FormularioClient)
+  doneMessage String? @db.Text
+
   submissions LeadFormSubmission[]
 }
 

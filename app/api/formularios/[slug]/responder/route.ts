@@ -47,8 +47,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   if (question.type === "WHATSAPP" && !submission.inviteSentAt) {
     const nome = submission.nome || answers.nome || "tudo bem";
     const sent = await sendFormInviteToLead({
-      nome, whatsappRaw: value, agentConfigId: form.agentConfigId, inviteMessage: form.inviteMessage,
-    }).catch(() => false);
+      nome, whatsappRaw: value, agentConfigId: form.agentConfigId, inviteMessage: form.inviteMessage, agentOwned: form.agentOwned,
+    }).catch((err) => { console.error("[formularios] falha ao enviar convite:", err); return false; });
     if (sent) {
       await prisma.leadFormSubmission.update({ where: { id: submission.id }, data: { inviteSentAt: new Date() } });
     }

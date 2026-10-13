@@ -32,8 +32,8 @@ function trackPixel(event: string) {
   }
 }
 
-export function FormularioClient({ slug, headline, questions, pixelId, avatarUrl }: {
-  slug: string; headline: string; questions: LeadFormQuestion[]; pixelId: string | null; avatarUrl: string | null;
+export function FormularioClient({ slug, headline, questions, pixelId, avatarUrl, doneMessage }: {
+  slug: string; headline: string; questions: LeadFormQuestion[]; pixelId: string | null; avatarUrl: string | null; doneMessage: string | null;
 }) {
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
   const [step, setStep] = useState(0); // índice da pergunta atual em `questions`
@@ -206,9 +206,8 @@ export function FormularioClient({ slug, headline, questions, pixelId, avatarUrl
                 <Check size={16} className="text-white" />
               </div>
             )}
-            <p className="text-[15px] text-gray-700 leading-relaxed pt-1.5">
-              Prontinho! Te chamamos agora no seu WhatsApp com o convite pra testar grátis por 7 dias
-              (ou marcar uma demonstração, se preferir). Fica de olho por lá.
+            <p className="text-[15px] text-gray-700 leading-relaxed pt-1.5 whitespace-pre-line">
+              {doneMessage ?? "Prontinho! Te chamamos agora no seu WhatsApp com o convite pra testar grátis por 7 dias (ou marcar uma demonstração, se preferir). Fica de olho por lá."}
             </p>
           </div>
         )}

@@ -29,6 +29,7 @@ export async function GET() {
   }
 
   const forms = await prisma.leadForm.findMany({
+    where: { agentOwned: false },
     orderBy: { createdAt: "desc" },
     include: { _count: { select: { submissions: true } } },
   });

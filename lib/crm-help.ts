@@ -278,6 +278,14 @@ export const CRM_HELP: Partial<Record<CrmPageKey, HelpArticle>> = {
     ],
   },
 
+  formularios: {
+    summary: "Formulários de captação de leads, com link público, que já puxam a conversa no WhatsApp.",
+    blocks: [
+      { text: "Só para gestores. Crie um formulário em formato de conversa (nome, WhatsApp e o que mais quiser perguntar), copie o link e use em anúncio, bio do Instagram ou site. Assim que o lead preenche o WhatsApp, o agente já manda a primeira mensagem — a partir daí a conversa cai na caixa de Mensagens e a IA atende normalmente." },
+      { text: "Dá pra personalizar a mensagem de abertura no WhatsApp (use {{nome}} pro primeiro nome do lead), a mensagem final da tela, a foto de quem \"conversa\", o Pixel do Facebook e um funil de mensagens automáticas depois do primeiro contato — que pausa sozinho se o lead responder. O envio usa o WhatsApp conectado em Canais (UazAPI) e respeita o horário de envio do agente." },
+    ],
+  },
+
   motivosperda: {
     summary: "Lista de motivos usados ao marcar um negócio como perdido.",
     screenshot: "/ajuda/motivosperda.png",
