@@ -11,6 +11,7 @@ export type LeadFormQuestion = {
   options?: string[]; // só ESCOLHA: alternativas mostradas como botões
   // Só ESCOLHA em modo quiz: opção → key do resultado que ela pontua (opção sem entrada não pontua)
   optionResults?: Record<string, string>;
+  imageUrl?: string; // imagem ilustrativa mostrada junto da pergunta (/api/formularios/imagem/...)
 };
 
 // Quiz de perfil: cada resultado tem o que mostrar na tela final e o que fazer com o lead

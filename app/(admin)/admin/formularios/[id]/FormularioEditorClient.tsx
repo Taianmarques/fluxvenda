@@ -193,6 +193,28 @@ export function FormularioEditorClient({
     setSaved(false);
   }
 
+  // Imagem ilustrativa da pergunta: reduz no navegador e guarda no servidor (não no banco)
+  const [uploadingImage, setUploadingImage] = useState<number | null>(null);
+  async function handleQuestionImage(i: number, e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploadingImage(i);
+    try {
+      const dataUrl = await resizeImageToBase64(file, 1000, 0.82);
+      const res = await fetch("/api/midia/formulario", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dataUrl }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || typeof data.url !== "string") { setError(data.error ?? "Não foi possível enviar a imagem."); return; }
+      updateQuestion(i, { imageUrl: data.url });
+    } catch {
+      setError("Não deu pra processar essa imagem.");
+    } finally {
+      setUploadingImage(null);
+    }
+  }
+
   function addQuestion() {
     setQuestions(prev => {
       let n = prev.length + 1;
@@ -510,10 +532,29 @@ export function FormularioEditorClient({
               >
                 {Object.entries(TYPE_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
+              <label
+                className={`p-2 rounded-lg hover:bg-gray-800 flex-shrink-0 cursor-pointer ${q.imageUrl ? "text-blue-400" : "text-gray-400"}`}
+                title={q.imageUrl ? "Trocar imagem da pergunta" : "Adicionar imagem à pergunta"}
+              >
+                {uploadingImage === i ? <Loader2 size={14} className="animate-spin" /> : <ImagePlus size={14} />}
+                <input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => handleQuestionImage(i, e)} className="hidden" />
+              </label>
               <button onClick={() => removeQuestion(i)} className="p-2 rounded-lg hover:bg-gray-800 text-red-400 flex-shrink-0">
                 <Trash2 size={14} />
               </button>
             </div>
+            {q.imageUrl && (
+              <div className="pl-7 flex items-start gap-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={q.imageUrl} alt="" className="h-20 rounded-lg object-cover border border-gray-800" />
+                <button
+                  type="button" onClick={() => updateQuestion(i, { imageUrl: undefined })}
+                  className="p-1.5 rounded-lg hover:bg-gray-800 text-red-400" title="Remover imagem"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            )}
             {q.type === "ESCOLHA" && (
               <div className="pl-7">
                 <textarea

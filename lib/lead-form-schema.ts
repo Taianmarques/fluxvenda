@@ -9,6 +9,8 @@ export const questionSchema = z.object({
   type: z.enum(QUESTION_TYPES),
   options: z.array(z.string().trim().min(1).max(60)).max(MAX_OPCOES_ESCOLHA).optional(),
   optionResults: z.record(z.string().max(60), z.string().min(1).max(40)).optional(),
+  // Só imagens enviadas pelo próprio editor — nunca um link externo qualquer
+  imageUrl: z.string().regex(/^\/api\/formularios\/imagem\/[0-9a-f-]{36}\.(jpg|png|webp)$/i, "Imagem da pergunta inválida").optional(),
 }).refine(q => q.type !== "ESCOLHA" || (q.options?.length ?? 0) >= 2, "Pergunta de escolha precisa de pelo menos 2 opções");
 
 export const questionsSchema = z.array(questionSchema).min(1).max(10)

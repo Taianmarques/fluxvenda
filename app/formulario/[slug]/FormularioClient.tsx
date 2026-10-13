@@ -16,7 +16,7 @@ function BotAvatar({ avatarUrl }: { avatarUrl: string | null }) {
   );
 }
 
-type Bubble = { from: "bot" | "user"; text: string };
+type Bubble = { from: "bot" | "user"; text: string; image?: string };
 
 const INPUT_MODE: Record<LeadFormQuestion["type"], string> = {
   TEXTO: "text",
@@ -94,7 +94,7 @@ export function FormularioClient({
     } catch { /* sessionStorage indisponível (modo privado) — só não conta a visita */ }
 
     const t1 = setTimeout(() => {
-      setBubbles(prev => [...prev, { from: "bot", text: questions[0]?.label ?? "" }]);
+      setBubbles(prev => [...prev, { from: "bot", text: questions[0]?.label ?? "", image: questions[0]?.imageUrl }]);
       setTimeout(() => setShowInput(true), 250);
     }, 900);
     return () => clearTimeout(t1);
@@ -168,7 +168,7 @@ export function FormularioClient({
     }
 
     if (next < questions.length) {
-      setBubbles(prev => [...prev, { from: "bot", text: nextMessage || questions[next].label }]);
+      setBubbles(prev => [...prev, { from: "bot", text: nextMessage || questions[next].label, image: questions[next].imageUrl }]);
       setStep(next);
       setTimeout(() => setShowInput(true), 250);
       setSending(false);
@@ -237,9 +237,15 @@ export function FormularioClient({
       <main className="flex-1 max-w-2xl w-full mx-auto px-6 py-10 flex flex-col gap-4">
         {bubbles.map((b, i) =>
           b.from === "bot" ? (
-            <div key={i} className="self-start max-w-[85%] flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div key={i} className="self-start max-w-[85%] flex items-end gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
               <BotAvatar avatarUrl={avatarUrl} />
-              <div className="rounded-2xl px-5 py-3.5 text-[15px] leading-relaxed bg-gray-100 text-gray-900">{b.text}</div>
+              <div className="flex flex-col gap-2">
+                {b.image && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={b.image} alt="" className="rounded-2xl max-w-full sm:max-w-sm max-h-72 object-cover" />
+                )}
+                <div className="rounded-2xl px-5 py-3.5 text-[15px] leading-relaxed bg-gray-100 text-gray-900">{b.text}</div>
+              </div>
             </div>
           ) : (
             <div

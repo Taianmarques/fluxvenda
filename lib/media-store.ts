@@ -56,3 +56,20 @@ export async function loadMediaBuffer(mediaUrl: string): Promise<ArrayBuffer> {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.arrayBuffer();
 }
+
+// Imagens ilustrativas dos formulários públicos — pasta separada das mídias das conversas, porque
+// estas são servidas SEM login (/api/formularios/imagem/...) e as das conversas não.
+export const FORM_IMAGE_DIR = path.join(MEDIA_DIR, "formularios");
+export const FORM_IMAGE_URL_RE = /^\/api\/formularios\/imagem\/([0-9a-f-]{36}\.(?:jpg|png|webp))$/i;
+const FORM_IMAGE_MAX_BYTES = 3 * 1024 * 1024;
+
+export async function saveFormImage(dataUrl: string): Promise<string> {
+  const m = dataUrl.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
+  if (!m) throw new Error("Formato de imagem não suportado (use JPG, PNG ou WebP).");
+  const buf = Buffer.from(m[2], "base64");
+  if (buf.length > FORM_IMAGE_MAX_BYTES) throw new Error("Imagem grande demais (máx. 3MB).");
+  const name = `${randomUUID()}.${EXT_BY_MIME[m[1]]}`;
+  await mkdir(FORM_IMAGE_DIR, { recursive: true });
+  await writeFile(path.join(FORM_IMAGE_DIR, name), buf);
+  return `/api/formularios/imagem/${name}`;
+}
