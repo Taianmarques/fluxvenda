@@ -164,6 +164,57 @@ export async function sendFormInviteToLead(params: {
   return { ok: true };
 }
 
+// Quiz com o WhatsApp pedido no início: a abertura já saiu, então quando o lead termina o quiz
+// manda o resultado como mensagem seguinte (se o resultado tiver mensagem), anota na conversa e
+// aplica a etiqueta/etapa do resultado — a etapa move a oportunidade aberta que o formulário criou.
+export async function sendQuizResultToLead(p: {
+  whatsappRaw: string; agentConfigId: string | null; nome: string;
+  mensagem: string; resultado: string; ctaUrl: string | null;
+  etiquetaId: string | null; pipelineStageId: string | null;
+}): Promise<void> {
+  const agentConfig = await resolveFormAgent(p.agentConfigId);
+  if (!agentConfig) return;
+  const conversation = await findConversationByPhone(agentConfig.id, normalizePhone(p.whatsappRaw));
+  if (!conversation) return;
+
+  if (p.mensagem.trim()) {
+    const texto = interpolateTexto(p.mensagem, { nome: p.nome, link: p.ctaUrl, resultado: p.resultado });
+    const sent = await sendWhatsAppTextAsTeamDetailed(agentConfig.uazapiToken, conversation.contactNumber, texto);
+    if (sent.id) {
+      await prisma.message.create({ data: { conversationId: conversation.id, role: "assistant", content: texto, waMessageId: sent.id } });
+    } else {
+      console.error("[lead-form-funnel] resultado do quiz não saiu:", sent.error);
+    }
+  }
+
+  await prisma.message.create({
+    data: { conversationId: conversation.id, role: "note", content: `Resultado do quiz: ${p.resultado}.` },
+  });
+
+  if (p.etiquetaId) {
+    const etiqueta = await prisma.etiqueta.findFirst({ where: { id: p.etiquetaId, agentConfigId: agentConfig.id }, select: { id: true } });
+    if (etiqueta) {
+      await prisma.conversation.update({ where: { id: conversation.id }, data: { etiquetas: { connect: { id: etiqueta.id } } } });
+    }
+  }
+
+  if (p.pipelineStageId) {
+    const stage = await prisma.pipelineStage.findFirst({
+      where: { id: p.pipelineStageId, pipeline: { agentConfigId: agentConfig.id } }, select: { id: true },
+    });
+    if (stage) {
+      const aberta = await prisma.opportunity.findFirst({
+        where: { conversationId: conversation.id, wonAt: null, lostAt: null }, select: { id: true, stageId: true },
+      });
+      if (!aberta) {
+        await prisma.opportunity.create({ data: { conversationId: conversation.id, dealValue: 0, title: null, stageId: stage.id } });
+      } else if (aberta.stageId !== stage.id) {
+        await prisma.opportunity.update({ where: { id: aberta.id }, data: { stageId: stage.id, stageEnteredAt: new Date() } });
+      }
+    }
+  }
+}
+
 // Deixa o lead do formulário pronto no CRM: nota com a origem pro atendente, etiqueta da
 // campanha e oportunidade na etapa escolhida. Etiqueta/etapa só valem se forem do mesmo agente
 // (nunca confia só no id salvo no formulário). Não duplica oportunidade se já houver uma aberta.

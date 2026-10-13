@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
-import { sendFormInviteToLead, gerarProximaPergunta } from "@/lib/lead-form-funnel";
-import { isPlausibleBrPhone, normalizeQuizResults, computeQuizResult, type LeadFormQuestion, type LeadFormUtm } from "@/lib/lead-form-shared";
+import { sendFormInviteToLead, sendQuizResultToLead, gerarProximaPergunta } from "@/lib/lead-form-funnel";
+import { isPlausibleBrPhone, normalizeQuizResults, computeQuizResult, isQuizScoring, type LeadFormQuestion, type LeadFormUtm } from "@/lib/lead-form-shared";
 
 const utmField = z.string().trim().max(120).optional();
 
@@ -69,16 +69,29 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     data: { answers, ...extra },
   });
 
-  // Quiz: o resultado fecha na pergunta de WhatsApp (a 1ª mensagem já sai com ele — o editor
-  // garante que as perguntas que pontuam vêm antes) ou na última pergunta, se não houver WhatsApp.
+  // Quiz: o resultado fecha quando não sobra pergunta que pontua. Se o WhatsApp veio ANTES do quiz
+  // (pra garantir o contato logo no início), a 1ª mensagem sai na hora sem resultado e, ao
+  // terminar, o resultado vai numa 2ª mensagem. Se veio DEPOIS, a 1ª mensagem já sai com ele.
   const quizResults = normalizeQuizResults(form.quizResults);
   const currentIndex = questions.findIndex(q => q.key === key);
   const isLast = currentIndex === questions.length - 1;
-  const quiz = quizResults.length > 0 && (question.type === "WHATSAPP" || isLast)
+  const quizFechado = isLast || !questions.slice(currentIndex + 1).some(isQuizScoring);
+  const prevQuizResult = submission.quizResult;
+  const quiz = quizResults.length > 0 && quizFechado && (question.type === "WHATSAPP" || isLast)
     ? computeQuizResult(questions, quizResults, answers)
     : null;
-  if (quiz && submission.quizResult !== quiz.key) {
+  if (quiz && prevQuizResult !== quiz.key) {
     submission = await prisma.leadFormSubmission.update({ where: { id: submission.id }, data: { quizResult: quiz.key } });
+  }
+  // WhatsApp já respondido antes e a mensagem de abertura já saiu: o resultado vai como mensagem
+  // seguinte (uma vez só — reenvio do mesmo passo não repete)
+  if (quiz && question.type !== "WHATSAPP" && !prevQuizResult && submission.inviteSentAt && submission.whatsapp) {
+    await sendQuizResultToLead({
+      whatsappRaw: submission.whatsapp, agentConfigId: form.agentConfigId,
+      nome: submission.nome || answers.nome || "tudo bem",
+      mensagem: quiz.mensagem, resultado: quiz.titulo, ctaUrl: form.ctaUrl,
+      etiquetaId: quiz.etiquetaId, pipelineStageId: quiz.pipelineStageId,
+    }).catch(err => console.error("[formularios] falha ao enviar resultado do quiz:", err));
   }
 
   let inviteSent: boolean | undefined;

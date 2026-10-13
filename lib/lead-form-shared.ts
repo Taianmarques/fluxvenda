@@ -59,18 +59,18 @@ export function computeQuizResult(
   return melhor;
 }
 
-// O resultado precisa estar fechado quando a 1ª mensagem sai — então toda pergunta que pontua
-// tem que vir antes da pergunta de WhatsApp. Devolve o motivo quando a ordem não serve.
+export function isQuizScoring(q: LeadFormQuestion): boolean {
+  return q.type === "ESCOLHA" && Object.keys(q.optionResults ?? {}).length > 0;
+}
+
+// Configuração mínima do quiz. A pergunta de WhatsApp pode vir em qualquer posição: antes das
+// perguntas do quiz, a 1ª mensagem sai na hora e o resultado vai numa 2ª mensagem ao terminar;
+// depois delas, a 1ª mensagem já sai com o resultado.
 export function quizOrderError(questions: LeadFormQuestion[], results: QuizResult[]): string | null {
   if (results.length === 0) return null;
   if (results.length < 2) return "O quiz precisa de pelo menos 2 resultados.";
   if (results.some(r => !r.titulo.trim())) return "Todo resultado do quiz precisa de um título.";
-  const pontuam = questions.filter(q => q.type === "ESCOLHA" && Object.keys(q.optionResults ?? {}).length > 0);
-  if (pontuam.length === 0) return "No quiz, ligue as opções de pelo menos uma pergunta de escolha a um resultado.";
-  const wa = questions.findIndex(q => q.type === "WHATSAPP");
-  if (wa >= 0 && questions.findIndex((q, i) => i > wa && pontuam.includes(q)) >= 0) {
-    return "No quiz, a pergunta de WhatsApp precisa vir depois das perguntas que definem o resultado (a mensagem sai com o resultado).";
-  }
+  if (!questions.some(isQuizScoring)) return "No quiz, ligue as opções de pelo menos uma pergunta de escolha a um resultado.";
   return null;
 }
 

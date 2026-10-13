@@ -70,7 +70,7 @@ export function QuizPanel({
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-500">1ª mensagem no WhatsApp (vazio = a do formulário)</label>
+                <label className="text-xs text-gray-500">Mensagem do resultado no WhatsApp (opcional)</label>
                 <textarea
                   value={r.mensagem} onChange={e => update(i, { mensagem: e.target.value })} rows={2} maxLength={1000}
                   placeholder="Oi, {{nome}}! Seu perfil deu {{resultado}}..." className={inputCls}
@@ -112,8 +112,9 @@ export function QuizPanel({
             </button>
           )}
           <p className="text-xs text-gray-500">
-            Depois, em cada pergunta de escolha abaixo, diga para qual resultado cada opção conta. A pergunta de WhatsApp precisa vir
-            depois delas. Use <span className="font-mono">{"{{resultado}}"}</span> nas mensagens para citar o resultado.
+            Depois, em cada pergunta de escolha abaixo, diga para qual resultado cada opção conta. Recomendado: peça nome e WhatsApp
+            no início — a 1ª mensagem sai na hora (você não perde o contato) e, ao terminar o quiz, o lead recebe a mensagem do
+            resultado. Use <span className="font-mono">{"{{resultado}}"}</span> nas mensagens para citar o resultado.
           </p>
         </>
       )}
