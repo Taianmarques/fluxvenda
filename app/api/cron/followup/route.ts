@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateFollowupMessage } from "@/lib/agent-engine";
-import { sendWhatsAppTextAsTeam } from "@/lib/whatsapp";
+import { sendWhatsAppTextAsTeam, sendWhatsAppTextAsTeamDetailed, getInstanceStatus } from "@/lib/whatsapp";
 import { logTokenUsage } from "@/lib/token-usage";
 import { dentroHorarioEnvio } from "@/lib/sending-hours";
 import { normalizeStageFollowup } from "@/lib/pipeline";
 import { normalizeFormFunnelSteps, normalizePhone } from "@/lib/lead-form-funnel";
 import { interpolateTexto } from "@/lib/lead-form-shared";
 import { FLUXVENDA_TEAM_ID } from "@/lib/internal-agent";
+
+// Erro permanente da UazAPI: o número não tem WhatsApp. Tentar de novo nunca resolve — o follow-up
+// daquela conversa é encerrado em vez de falhar (e gastar IA gerando mensagem) a cada execução.
+function numeroForaDoWhatsapp(error: string | undefined): boolean {
+  return Boolean(error && /not on whatsapp/i.test(error));
+}
 
 function hoursFromNow(n: number) {
   const d = new Date();
@@ -31,8 +37,23 @@ export async function POST(req: NextRequest) {
   let sent = 0;
   let checked = 0;
 
+  // Canal desconectado (sessão caiu, QR expirou): nenhuma mensagem sai até reconectar, então nem
+  // adianta gerar a resposta com IA nem tentar enviar — pula o canal inteiro nesta execução e
+  // volta a tentar na próxima. Uma consulta de status por canal por execução.
+  const conexaoCache = new Map<string, boolean>();
+  async function canalConectado(token: string, agentId: string): Promise<boolean> {
+    let ok = conexaoCache.get(token);
+    if (ok === undefined) {
+      ok = await getInstanceStatus(token).then(s => s.connected).catch(() => true); // sem resposta do status: segue como antes
+      conexaoCache.set(token, ok);
+      if (!ok) console.warn(`[cron/followup] canal do agente ${agentId} desconectado — envios automáticos pulados até reconectar`);
+    }
+    return ok;
+  }
+
   for (const config of configs) {
     if (!dentroHorarioEnvio(config.horarioEnvioInicio, config.horarioEnvioFim)) continue;
+    if (!(await canalConectado(config.uazapiToken!, config.id))) continue;
 
     const delays = config.followupDelaysMinutes as unknown as number[];
     if (!Array.isArray(delays) || delays.length === 0) continue;
@@ -75,9 +96,16 @@ export async function POST(req: NextRequest) {
       // retorna null) — confirmando o envio antes de tocar no banco, uma falha simplesmente
       // deixa o followupCount como está, e o mesmo candidato volta a ser elegível na próxima
       // execução, em vez de a mensagem "existir" no CRM sem nunca ter saído de verdade.
-      const sentId = await sendWhatsAppTextAsTeam(config.uazapiToken, conversation.contactNumber, followup);
+      const envio = await sendWhatsAppTextAsTeamDetailed(config.uazapiToken, conversation.contactNumber, followup);
+      const sentId = envio.id;
       if (!sentId) {
-        console.error(`[cron/followup] falha ao enviar follow-up da conversa ${conversation.id} — tenta de novo na próxima execução`);
+        if (numeroForaDoWhatsapp(envio.error)) {
+          await prisma.conversation.update({ where: { id: conversation.id }, data: { followupCount: delays.length } });
+          await prisma.message.create({ data: { conversationId: conversation.id, role: "note", content: "Follow-up automático cancelado: esse número não está no WhatsApp." } });
+          console.warn(`[cron/followup] conversa ${conversation.id}: número fora do WhatsApp — follow-up encerrado`);
+        } else {
+          console.error(`[cron/followup] falha ao enviar follow-up da conversa ${conversation.id} — tenta de novo na próxima execução`);
+        }
         continue;
       }
 
@@ -108,6 +136,7 @@ export async function POST(req: NextRequest) {
     const config = stage.pipeline.agentConfig;
     if (!config.systemPrompt || !config.uazapiToken) continue;
     if (!dentroHorarioEnvio(config.horarioEnvioInicio, config.horarioEnvioFim)) continue;
+    if (!(await canalConectado(config.uazapiToken, config.id))) continue;
 
     const pipelineInstr = stage.pipeline.agenteInstrucoes?.trim();
     const stageInstr = stage.agenteInstrucoes?.trim();
@@ -153,9 +182,16 @@ O lead está na etapa "${stage.name}" do funil "${stage.pipeline.name}". Siga es
       if (!followup) continue;
       logTokenUsage({ teamId: config.teamId, provider: "openai", model: "gpt-4o-mini", feature: "followup", ...usage });
 
-      const sentId = await sendWhatsAppTextAsTeam(config.uazapiToken, conversation.contactNumber, followup);
+      const envio = await sendWhatsAppTextAsTeamDetailed(config.uazapiToken, conversation.contactNumber, followup);
+      const sentId = envio.id;
       if (!sentId) {
-        console.error(`[cron/followup] falha ao enviar follow-up de etapa da oportunidade ${opp.id} — tenta de novo na próxima execução`);
+        if (numeroForaDoWhatsapp(envio.error)) {
+          await prisma.opportunity.update({ where: { id: opp.id }, data: { stageFollowupCount: delays.length } });
+          await prisma.message.create({ data: { conversationId: conversation.id, role: "note", content: "Nutrição da etapa cancelada: esse número não está no WhatsApp." } });
+          console.warn(`[cron/followup] oportunidade ${opp.id}: número fora do WhatsApp — nutrição da etapa encerrada`);
+        } else {
+          console.error(`[cron/followup] falha ao enviar follow-up de etapa da oportunidade ${opp.id} — tenta de novo na próxima execução`);
+        }
         continue;
       }
 
@@ -182,6 +218,7 @@ O lead está na etapa "${stage.name}" do funil "${stage.pipeline.name}". Siga es
 
   for (const config of schedulingConfigs) {
     if (!config.uazapiToken) continue;
+    if (!(await canalConectado(config.uazapiToken, config.id))) continue;
 
     const dueAppointments = await prisma.appointment.findMany({
       where: {
@@ -240,6 +277,7 @@ O lead está na etapa "${stage.name}" do funil "${stage.pipeline.name}". Siga es
       : await prisma.agentConfig.findFirst({ where: { teamId: FLUXVENDA_TEAM_ID, multiAgenteDepartamentos: true } });
     if (!config?.uazapiToken || !config.active) continue;
     if (!dentroHorarioEnvio(config.horarioEnvioInicio, config.horarioEnvioFim)) continue;
+    if (!(await canalConectado(config.uazapiToken, config.id))) continue;
 
     const contactNumber = normalizePhone(submission.whatsapp!);
     const conversation = await prisma.conversation.findUnique({
@@ -256,9 +294,15 @@ O lead está na etapa "${stage.name}" do funil "${stage.pipeline.name}". Siga es
     const nome = submission.nome || "tudo bem";
     const texto = interpolateTexto(step.mensagem, { nome, link: submission.form.ctaUrl });
 
-    const sentId = await sendWhatsAppTextAsTeam(config.uazapiToken, contactNumber, texto);
+    const envio = await sendWhatsAppTextAsTeamDetailed(config.uazapiToken, contactNumber, texto);
+    const sentId = envio.id;
     if (!sentId) {
-      console.error(`[cron/followup] falha ao enviar passo do funil de formulário — submissão ${submission.id} — tenta de novo na próxima execução`);
+      if (numeroForaDoWhatsapp(envio.error)) {
+        await prisma.leadFormSubmission.update({ where: { id: submission.id }, data: { funnelStepsSent: steps.length } });
+        console.warn(`[cron/followup] submissão ${submission.id}: número fora do WhatsApp — funil encerrado`);
+      } else {
+        console.error(`[cron/followup] falha ao enviar passo do funil de formulário — submissão ${submission.id} — tenta de novo na próxima execução`);
+      }
       continue;
     }
 
@@ -284,6 +328,7 @@ O lead está na etapa "${stage.name}" do funil "${stage.pipeline.name}". Siga es
     const conversation = scheduled.conversation;
     const config = conversation.agentConfig;
     if (!config.uazapiToken) continue;
+    if (!(await canalConectado(config.uazapiToken, config.id))) continue;
 
     let signaturePrefix = "";
     if (config.signatureEnabled) {
