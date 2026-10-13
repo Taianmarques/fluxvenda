@@ -4,6 +4,7 @@ import { sendWhatsAppTextAsTeam } from "@/lib/whatsapp";
 import { notifyOrderWebhook } from "@/lib/order-webhook";
 import { confirmAppointmentAndNotify } from "@/lib/appointment-notify";
 import { notifyUsers } from "@/lib/onesignal";
+import { markLeadFormPaid } from "@/lib/lead-form-checkout";
 import { isSlotAvailable, resolveAvailability, busyStatusWhere, type AvailabilityRule } from "@/lib/scheduling";
 
 // Webhook de confirmação de pagamento do Asaas, um por agente (a URL já escopa o tenant).
@@ -41,6 +42,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
         ).catch(() => {});
       }
     }
+
+    // Checkout do quiz em telas (Pix confirma por aqui; cartão já confirma na hora, mas o
+    // webhook pode chegar também — markLeadFormPaid é idempotente)
+    const quizSub = await prisma.leadFormSubmission.findFirst({
+      where: { OR: [{ payAsaasId: paymentId }, ...(installmentId ? [{ payInstallmentId: installmentId }] : [])] },
+      select: { id: true },
+    });
+    if (quizSub) await markLeadFormPaid(quizSub.id).catch(err => console.error("[webhook-asaas] checkout do quiz:", err));
 
     // Sinal de agendamento (página pública): confirma a reserva quando o Pix cai.
     // Se o pagamento chegou depois da reserva expirar (CANCELADO) e o horário ainda

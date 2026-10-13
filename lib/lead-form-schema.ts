@@ -93,7 +93,21 @@ export const stepsSchema = z.array(z.discriminatedUnion("type", [
     })).max(MAX_METRICAS),
     botao: texto(40),
   }),
+  z.object({
+    id: z.string().min(1).max(40), type: z.literal("checkout"),
+    titulo: texto(400), produtoNome: z.string().trim().min(1, "Dê um nome ao produto do checkout").max(120),
+    produtoImageUrl: formImageUrl.optional(),
+    precoDe: z.number().min(0).max(100000), precoPor: z.number().min(5, "O preço do checkout precisa ser de pelo menos R$ 5,00").max(100000),
+    parcelasMax: z.number().int().min(1).max(12), parcelasSemJuros: z.number().int().min(1).max(12), jurosPorParcela: z.number().min(0).max(10),
+    pix: z.boolean(), cartao: z.boolean(),
+    timerMinutos: z.number().int().min(0).max(120), garantiaDias: z.number().int().min(0).max(365), compraSegura: z.boolean(),
+    botao: texto(40),
+    sucessoTitulo: texto(200), sucessoTexto: texto(1000),
+    acessoUrl: z.string().trim().max(500).refine(v => v === "" || isHttpUrl(v), "O link de acesso precisa começar com http:// ou https://"),
+    acessoBotao: texto(40), mensagemPago: texto(1000),
+  }),
 ])).max(40)
+  .refine(ss => ss.every(s => s.type !== "checkout" || s.pix || s.cartao), "O checkout precisa aceitar Pix ou cartão")
   .refine(ss => new Set(ss.map(s => s.id)).size === ss.length, "Etapas com identificador repetido")
   .refine(ss => ss.some(s => s.type === "pergunta"), "O quiz em telas precisa de pelo menos uma pergunta");
 

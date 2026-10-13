@@ -60,15 +60,16 @@ export type CreditCardHolderInfo = { name: string; email: string; cpfCnpj: strin
 // erro) na resposta, sem precisar de webhook pra saber se aprovou.
 export async function createAsaasCardCharge(
   apiKey: string, sandbox: boolean, customerId: string, value: number, description: string,
-  creditCard: CreditCardData, creditCardHolderInfo: CreditCardHolderInfo, remoteIp: string
-): Promise<{ id: string; status: string }> {
+  creditCard: CreditCardData, creditCardHolderInfo: CreditCardHolderInfo, remoteIp: string,
+  installmentCount?: number, // > 1: `value` é o total, dividido pelo Asaas em N parcelas
+): Promise<{ id: string; status: string; installment?: string }> {
   const dueDate = new Date().toISOString().slice(0, 10);
   return asaasFetch(apiKey, sandbox, "/payments", {
     method: "POST",
     body: JSON.stringify({
       customer: customerId,
       billingType: "CREDIT_CARD",
-      value,
+      ...(installmentCount && installmentCount > 1 ? { installmentCount, totalValue: value } : { value }),
       dueDate,
       description,
       creditCard,

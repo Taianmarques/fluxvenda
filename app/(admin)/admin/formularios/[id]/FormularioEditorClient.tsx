@@ -63,10 +63,11 @@ function resizeImageToBase64(file: File, maxSize = 200, quality = 0.85): Promise
 export function FormularioEditorClient({
   id, initialSlug, initialTitle, initialHeadline, initialActive, initialPixelId, initialAvatarUrl,
   initialAgentConfigId, initialAgentLabel, initialInviteMessage, initialDoneMessage, initialFunnelSteps, initialQuestions, submissions,
-  crmAgentId, whatsappOk = true, initialExtras, crmOptions, stats, initialQuizResults, initialStyle, initialSteps,
+  crmAgentId, whatsappOk = true, initialExtras, crmOptions, stats, initialQuizResults, initialStyle, initialSteps, asaasOk = false,
 }: {
   initialQuizResults: QuizResult[];
   initialStyle: FormStyle;
+  asaasOk?: boolean; // agente do formulário com conta Asaas (pro aviso do checkout)
   initialSteps: QuizStep[];
   id: string; initialSlug: string; initialTitle: string; initialHeadline: string; initialActive: boolean;
   initialPixelId: string; initialAvatarUrl: string | null;
@@ -560,7 +561,7 @@ export function FormularioEditorClient({
         {style === "TELAS" && (
           <StepsEditor
             steps={steps} onChange={s => { setSteps(s); setSaved(false); }}
-            quizOn={quizOn} quizResults={quizResults} onError={setError}
+            quizOn={quizOn} quizResults={quizResults} onError={setError} asaasOk={asaasOk}
           />
         )}
 

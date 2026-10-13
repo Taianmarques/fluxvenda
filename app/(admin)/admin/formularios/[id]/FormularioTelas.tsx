@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDown, ArrowUp, ImagePlus, Loader2, Plus, Trash2, X, HelpCircle, FileText, Timer, ShoppingCart, Gauge } from "lucide-react";
+import { ArrowDown, ArrowUp, ImagePlus, Loader2, Plus, Trash2, X, HelpCircle, FileText, Timer, ShoppingCart, Gauge, CreditCard } from "lucide-react";
 import {
   MAX_OPCOES_ESCOLHA, DESTAQUE_CORES, DEFAULT_NIVEIS, MAX_METRICAS,
   type QuizStep, type QuizStepType, type LeadFormQuestion, type QuizResult, type DestaqueCor,
@@ -22,6 +22,7 @@ const STEP_META: Record<QuizStepType, { label: string; icon: React.ReactNode }> 
   carregamento: { label: "Carregamento", icon: <Timer size={13} /> },
   resultado: { label: "Resultado", icon: <Gauge size={13} /> },
   oferta: { label: "Oferta", icon: <ShoppingCart size={13} /> },
+  checkout: { label: "Checkout", icon: <CreditCard size={13} /> },
 };
 
 const COR_LABEL: Record<DestaqueCor, string> = { vermelho: "Vermelho", verde: "Verde", azul: "Azul", amarelo: "Amarelo" };
@@ -54,6 +55,15 @@ function novaEtapa(type: QuizStepType, steps: QuizStep[]): QuizStep {
       return {
         id, type, titulo: "Seu resultado", medidorTitulo: "", niveis: [...DEFAULT_NIVEIS],
         compEsquerdaTitulo: "", compEsquerdaTexto: "", compDireitaTitulo: "", compDireitaTexto: "", metricas: [], botao: "Continuar",
+      };
+    case "checkout":
+      return {
+        id, type, titulo: "", produtoNome: "", precoDe: 197, precoPor: 47,
+        parcelasMax: 12, parcelasSemJuros: 1, jurosPorParcela: 2.99, pix: true, cartao: true,
+        timerMinutos: 10, garantiaDias: 7, compraSegura: true, botao: "",
+        sucessoTitulo: "Pagamento confirmado!", sucessoTexto: "Enviamos os detalhes do seu acesso no seu WhatsApp.",
+        acessoUrl: "", acessoBotao: "Acessar agora",
+        mensagemPago: "{{nome}}, pagamento confirmado! 🎉 Seja bem-vindo(a). Qualquer dúvida é só me chamar por aqui.",
       };
     case "oferta":
       return { id, type, titulo: "", texto: "", botao: "Quero agora", url: "", antesLabel: "ANTES", depoisLabel: "DEPOIS" };
@@ -248,8 +258,9 @@ function NiveisInput({ value, onChange }: { value: string[]; onChange: (v: strin
   );
 }
 
-export function StepsEditor({ steps, onChange, quizOn, quizResults, onError }: {
+export function StepsEditor({ steps, onChange, quizOn, quizResults, onError, asaasOk }: {
   steps: QuizStep[]; onChange: (steps: QuizStep[]) => void; quizOn: boolean; quizResults: QuizResult[]; onError: (m: string) => void;
+  asaasOk: boolean; // o agente do formulário tem conta Asaas conectada (exigida pelo checkout)
 }) {
   const update = (i: number, s: QuizStep) => onChange(steps.map((x, idx) => (idx === i ? s : x)));
   function move(i: number, d: -1 | 1) {
@@ -398,6 +409,88 @@ export function StepsEditor({ steps, onChange, quizOn, quizResults, onError }: {
               </div>
             </div>
           )}
+
+          {s.type === "checkout" && (() => {
+            const num = (v: string, min: number, max: number) => Math.min(max, Math.max(min, Number(v.replace(",", ".")) || 0));
+            const set = (patch: Partial<typeof s>) => update(i, { ...s, ...patch });
+            return (
+              <div className="space-y-2">
+                {!asaasOk && (
+                  <p className="text-xs text-amber-400 bg-amber-900/20 border border-amber-800/40 rounded-lg px-3 py-2">
+                    O agente deste formulário não tem conta Asaas conectada — o checkout aparece, mas não consegue cobrar. Conecte em Agente → Comércio (chave do Asaas).
+                  </p>
+                )}
+                <div>
+                  <label className={smallLabel}>Título (opcional)</label>
+                  <input value={s.titulo} onChange={e => set({ titulo: e.target.value })} maxLength={400} placeholder="Comece hoje mesmo" className={inputCls} />
+                </div>
+                <div className="grid sm:grid-cols-[2fr_1fr_1fr] gap-2">
+                  <div>
+                    <label className={smallLabel}>Produto</label>
+                    <input value={s.produtoNome} onChange={e => set({ produtoNome: e.target.value })} maxLength={120} placeholder="Nome do produto" className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={smallLabel}>Preço &quot;de&quot; (R$)</label>
+                    <input type="number" min={0} step="0.01" value={s.precoDe} onChange={e => set({ precoDe: num(e.target.value, 0, 100000) })} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={smallLabel}>Preço &quot;por&quot; (R$)</label>
+                    <input type="number" min={5} step="0.01" value={s.precoPor} onChange={e => set({ precoPor: num(e.target.value, 0, 100000) })} className={inputCls} />
+                  </div>
+                </div>
+                <ImageField value={s.produtoImageUrl} onChange={url => set({ produtoImageUrl: url })} onError={onError} label="Imagem do produto" />
+
+                <div className="flex flex-wrap items-center gap-4 text-sm text-gray-300 pt-1">
+                  <label className="flex items-center gap-2"><input type="checkbox" checked={s.pix} onChange={e => set({ pix: e.target.checked })} /> Pix</label>
+                  <label className="flex items-center gap-2"><input type="checkbox" checked={s.cartao} onChange={e => set({ cartao: e.target.checked })} /> Cartão</label>
+                  <label className="flex items-center gap-2"><input type="checkbox" checked={s.compraSegura} onChange={e => set({ compraSegura: e.target.checked })} /> Selo &quot;compra 100% segura&quot;</label>
+                </div>
+                {s.cartao && (
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className={smallLabel}>Parcelas (máx.)</label>
+                      <input type="number" min={1} max={12} value={s.parcelasMax} onChange={e => set({ parcelasMax: num(e.target.value, 1, 12) })} className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={smallLabel}>Sem juros até</label>
+                      <input type="number" min={1} max={12} value={s.parcelasSemJuros} onChange={e => set({ parcelasSemJuros: num(e.target.value, 1, 12) })} className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={smallLabel}>Juros por parcela (%)</label>
+                      <input type="number" min={0} max={10} step="0.01" value={s.jurosPorParcela} onChange={e => set({ jurosPorParcela: num(e.target.value, 0, 10) })} className={inputCls} />
+                    </div>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className={smallLabel}>Contador da oferta (min, 0 = sem)</label>
+                    <input type="number" min={0} max={120} value={s.timerMinutos} onChange={e => set({ timerMinutos: num(e.target.value, 0, 120) })} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={smallLabel}>Garantia (dias, 0 = sem selo)</label>
+                    <input type="number" min={0} max={365} value={s.garantiaDias} onChange={e => set({ garantiaDias: num(e.target.value, 0, 365) })} className={inputCls} />
+                  </div>
+                </div>
+
+                <div className="border-t border-gray-800 pt-2 space-y-2">
+                  <p className={smallLabel}>Depois do pagamento</p>
+                  <input value={s.sucessoTitulo} onChange={e => set({ sucessoTitulo: e.target.value })} maxLength={200} placeholder="Pagamento confirmado!" className={inputCls} />
+                  <textarea value={s.sucessoTexto} onChange={e => set({ sucessoTexto: e.target.value })} rows={2} maxLength={1000} placeholder="Texto na tela de sucesso" className={inputCls} />
+                  <div className="grid sm:grid-cols-[2fr_1fr] gap-2">
+                    <input value={s.acessoUrl} onChange={e => set({ acessoUrl: e.target.value })} maxLength={500} placeholder="Link de acesso (área de membros, grupo...) — opcional" className={`${inputCls} font-mono`} />
+                    <input value={s.acessoBotao} onChange={e => set({ acessoBotao: e.target.value })} maxLength={40} placeholder="Acessar agora" className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={smallLabel}>Mensagem no WhatsApp quando o pagamento confirmar ({"{{nome}}"} e {"{{link}}"} = link de acesso)</label>
+                    <textarea value={s.mensagemPago} onChange={e => set({ mensagemPago: e.target.value })} rows={2} maxLength={1000} className={inputCls} />
+                  </div>
+                </div>
+                <p className="text-[11px] text-gray-500">
+                  Nome, e-mail e telefone vêm preenchidos com as respostas do quiz (coloque uma pergunta de E-mail antes). Ao pagar: a oportunidade vira ganha no CRM com o valor, e o pixel registra Purchase.
+                </p>
+              </div>
+            );
+          })()}
 
           {s.type === "resultado" && (
             <div className="space-y-2">

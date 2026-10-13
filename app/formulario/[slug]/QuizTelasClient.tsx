@@ -7,6 +7,7 @@ import {
   type QuizStep, type LeadFormQuestion, type LeadFormUtm, type DestaqueCor,
 } from "@/lib/lead-form-shared";
 import { trackPixel, readUtm, registerVisit, MetaPixel } from "./form-runtime";
+import { CheckoutTela } from "./CheckoutTela";
 
 // Página pública do formulário no estilo "quiz em telas" (LeadForm.style = "TELAS"): uma etapa por
 // tela — pergunta, conteúdo, carregamento ou oferta — com barra de progresso e voltar. Usa a mesma
@@ -417,6 +418,14 @@ export function QuizTelasClient({
             </div>
           );
         })()}
+
+        {!finished && step?.type === "checkout" && (
+          <CheckoutTela
+            key={step.id} step={step} slug={slug} submissionId={submissionId} accent={accent}
+            lead={{ nome: answers.nome ?? nome, email: leadEmail ?? "", telefone: leadTelefone ?? "" }}
+            hasNext={idx + 1 < steps.length} onContinue={() => goNext()}
+          />
+        )}
 
         {!finished && step?.type === "oferta" && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300" key={step.id}>

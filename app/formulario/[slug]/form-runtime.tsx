@@ -7,9 +7,10 @@ import type { LeadFormUtm } from "@/lib/lead-form-shared";
 
 // Dispara evento pro Meta Pixel, se ele já tiver carregado (formulário sem pixelId não injeta
 // o script, então fbq nunca existe — a checagem evita erro nesse caso).
-export function trackPixel(event: string) {
+export function trackPixel(event: string, params?: Record<string, unknown>) {
   if (typeof window !== "undefined" && typeof (window as unknown as { fbq?: (...a: unknown[]) => void }).fbq === "function") {
-    (window as unknown as { fbq: (...a: unknown[]) => void }).fbq("track", event);
+    const fbq = (window as unknown as { fbq: (...a: unknown[]) => void }).fbq;
+    if (params) fbq("track", event, params); else fbq("track", event);
   }
 }
 

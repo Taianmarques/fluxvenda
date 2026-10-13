@@ -2031,6 +2031,22 @@ model LeadFormSubmission {
   inviteError String?  // por que o convite não saiu (ex: número fora do WhatsApp), pra o gestor ver
   quizResult  String?  // key do resultado do quiz (LeadForm.quizResults) — null = formulário comum ou não terminou
 
+  // Checkout dentro do quiz em telas (etapa "checkout"), cobrado na conta Asaas do agente do
+  // formulário. Uma compra por resposta — nova tentativa sobrescreve. Dados do cartão nunca são gravados.
+  payStatus        String?   // PENDENTE (Pix aguardando) | PAGO | RECUSADO
+  payMethod        String?   // PIX | CARTAO
+  payValueCents    Int?
+  payInstallments  Int?
+  payAsaasId       String?
+  payInstallmentId String?   // plano de parcelas no Asaas (cartão parcelado) — o webhook pode vir por ele
+  payPixPayload    String?   @db.Text
+  payCpf           String?
+  payEmail         String?
+  payAttempts      Int       @default(0) // limite de tentativas por resposta (endpoint público)
+  paidAt           DateTime?
+
+  @@index([payAsaasId])
+
   @@index([formId])
 }
 
