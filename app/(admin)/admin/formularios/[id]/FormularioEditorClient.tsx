@@ -4,11 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Plus, Trash2, Save, Check, ExternalLink, Copy, Target, ChevronDown, ImagePlus, X, Send, Search, Loader2 } from "lucide-react";
 
-import type { LeadFormQuestion, LeadFormUtm, QuizResult } from "@/lib/lead-form-shared";
+import type { LeadFormQuestion, LeadFormUtm, QuizResult, QuizStep, FormStyle } from "@/lib/lead-form-shared";
 import { MAX_OPCOES_ESCOLHA, DEFAULT_ACCENT } from "@/lib/lead-form-shared";
 import type { FormStats } from "@/lib/lead-form-stats";
 import { ExtrasPanel, TrackingLinks, StatsPanel, type FormExtras, type CrmFormOptions } from "./FormularioExtras";
 import { QuizPanel, novoResultado } from "./FormularioQuiz";
+import { StepsEditor, questionsToSteps } from "./FormularioTelas";
 
 export type { LeadFormQuestion };
 export type FunnelStep = { minutos: number; mensagem: string };
@@ -62,9 +63,11 @@ function resizeImageToBase64(file: File, maxSize = 200, quality = 0.85): Promise
 export function FormularioEditorClient({
   id, initialSlug, initialTitle, initialHeadline, initialActive, initialPixelId, initialAvatarUrl,
   initialAgentConfigId, initialAgentLabel, initialInviteMessage, initialDoneMessage, initialFunnelSteps, initialQuestions, submissions,
-  crmAgentId, whatsappOk = true, initialExtras, crmOptions, stats, initialQuizResults,
+  crmAgentId, whatsappOk = true, initialExtras, crmOptions, stats, initialQuizResults, initialStyle, initialSteps,
 }: {
   initialQuizResults: QuizResult[];
+  initialStyle: FormStyle;
+  initialSteps: QuizStep[];
   id: string; initialSlug: string; initialTitle: string; initialHeadline: string; initialActive: boolean;
   initialPixelId: string; initialAvatarUrl: string | null;
   initialAgentConfigId: string | null; initialAgentLabel: string | null; initialInviteMessage: string; initialDoneMessage: string;
@@ -102,6 +105,16 @@ export function FormularioEditorClient({
   const [optionsText, setOptionsText] = useState<Record<string, string>>(
     Object.fromEntries(initialQuestions.filter(q => q.type === "ESCOLHA").map(q => [q.key, (q.options ?? []).join("\n")])),
   );
+  // Estilo da página pública: conversa (perguntas) ou quiz em telas (etapas)
+  const [style, setStyle] = useState<FormStyle>(initialStyle);
+  const [steps, setSteps] = useState<QuizStep[]>(initialSteps);
+  function changeStyle(s: FormStyle) {
+    setStyle(s);
+    // 1ª vez em telas: começa com as perguntas que já existem, uma por tela
+    if (s === "TELAS" && steps.length === 0) setSteps(questionsToSteps(questions));
+    setSaved(false);
+  }
+
   // Quiz: desligar só esconde — os resultados digitados voltam se religar antes de salvar
   const [quizOn, setQuizOn] = useState(initialQuizResults.length > 0);
   const [quizResults, setQuizResults] = useState<QuizResult[]>(initialQuizResults);
@@ -229,6 +242,23 @@ export function FormularioEditorClient({
     setSaved(false);
   }
 
+  // Antes de salvar: tira opções vazias, emoji/foto e ligação de quiz de opções que não existem
+  // mais e ligações pra resultado apagado (ou com o quiz desligado)
+  function limparPergunta(q: LeadFormQuestion): LeadFormQuestion {
+    const { optionResults, optionMedia, ...base } = q;
+    if (q.type !== "ESCOLHA") return base;
+    const options = (q.options ?? []).map(o => o.trim()).filter(Boolean);
+    const out: LeadFormQuestion = { ...base, options };
+    const media = Object.fromEntries(Object.entries(optionMedia ?? {}).filter(([opt, m]) => options.includes(opt) && (m.emoji || m.imageUrl)));
+    if (Object.keys(media).length) out.optionMedia = media;
+    if (quizOn) {
+      const validas = Object.fromEntries(Object.entries(optionResults ?? {}).filter(([opt, key]) =>
+        options.includes(opt) && quizResults.some(r => r.key === key)));
+      if (Object.keys(validas).length) out.optionResults = validas;
+    }
+    return out;
+  }
+
   async function handleSave() {
     setError(null);
     setSaving(true);
@@ -238,14 +268,10 @@ export function FormularioEditorClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           slug, title, headline, active, pixelId: pixelId.trim() || null, avatarUrl,
-          // Só guarda ligações de opção que ainda existem e apontam pra um resultado que existe
-          questions: questions.map(q => {
-            const { optionResults, ...base } = q;
-            if (!quizOn || q.type !== "ESCOLHA" || !optionResults) return base;
-            const validas = Object.fromEntries(Object.entries(optionResults).filter(([opt, key]) =>
-              (q.options ?? []).includes(opt) && quizResults.some(r => r.key === key)));
-            return Object.keys(validas).length ? { ...base, optionResults: validas } : base;
-          }),
+          style,
+          ...(style === "TELAS"
+            ? { steps: steps.map(s => (s.type === "pergunta" ? { ...s, question: limparPergunta(s.question) } : s)) }
+            : { questions: questions.map(limparPergunta) }),
           quizResults: quizOn ? quizResults : null,
           ...(isCrm ? { etiquetaId: extras.etiquetaId, pipelineStageId: extras.pipelineStageId } : { agentConfigId }),
           inviteMessage: inviteMessage.trim() || null, doneMessage: doneMessage.trim() || null,
@@ -508,12 +534,37 @@ export function FormularioEditorClient({
           </button>
         </div>
 
+        <div className="border border-gray-800 rounded-xl p-4 space-y-2">
+          <label className="text-xs text-gray-500 uppercase tracking-wide">Estilo da página</label>
+          <div className="grid sm:grid-cols-2 gap-2">
+            {([
+              { v: "CHAT", t: "Conversa", d: "Perguntas em balões, como um chat." },
+              { v: "TELAS", t: "Quiz em telas", d: "Uma tela por vez: perguntas com emoji/fotos, conteúdo, carregamento e oferta." },
+            ] as const).map(o => (
+              <button
+                key={o.v} type="button" onClick={() => changeStyle(o.v)}
+                className={`text-left rounded-xl border px-3 py-2.5 ${style === o.v ? "border-blue-600 bg-blue-600/10" : "border-gray-800 hover:border-gray-700"}`}
+              >
+                <p className="text-sm font-semibold">{o.t}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{o.d}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <QuizPanel
           enabled={quizOn} onToggle={toggleQuiz} results={quizResults}
           onChange={rs => { setQuizResults(rs); setSaved(false); }} isCrm={isCrm} crmOptions={crmOptions}
         />
 
-        <div className="space-y-2">
+        {style === "TELAS" && (
+          <StepsEditor
+            steps={steps} onChange={s => { setSteps(s); setSaved(false); }}
+            quizOn={quizOn} quizResults={quizResults} onError={setError}
+          />
+        )}
+
+        <div className={`space-y-2 ${style === "TELAS" ? "hidden" : ""}`}>
           <label className="text-xs text-gray-500 uppercase tracking-wide">Perguntas, em ordem</label>
           {questions.map((q, i) => (
             <div key={i} className="space-y-1.5">

@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
-import { questionsSchema, extrasShape, quizResultsSchema } from "@/lib/lead-form-schema";
-import { quizOrderError, type QuizResult } from "@/lib/lead-form-shared";
+import { questionsSchema, extrasShape, quizResultsSchema, stepsSchema, styleSchema } from "@/lib/lead-form-schema";
+import { quizOrderError, stepsToQuestions, type QuizResult, type QuizStep } from "@/lib/lead-form-shared";
 import { Prisma } from "@/app/generated/prisma/client";
 
 async function assertAdmin(userId: string) {
@@ -16,6 +16,8 @@ const updateSchema = z.object({
   title: z.string().min(1).max(120).optional(),
   headline: z.string().min(1).max(1000).optional(),
   questions: questionsSchema.optional(),
+  style: styleSchema.optional(),
+  steps: stepsSchema.optional(),
   ...extrasShape,
   quizResults: quizResultsSchema,
   pixelId: z.string().max(40).nullable().optional(),
@@ -55,6 +57,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params;
   const body = updateSchema.safeParse(await req.json());
   if (!body.success) return NextResponse.json({ error: body.error.issues[0]?.message ?? "Dados inválidos" }, { status: 400 });
+
+  // Quiz em telas: as perguntas vêm das etapas
+  if (body.data.steps) {
+    const derived = questionsSchema.safeParse(stepsToQuestions(body.data.steps as QuizStep[]));
+    if (!derived.success) return NextResponse.json({ error: derived.error.issues[0]?.message ?? "Perguntas inválidas" }, { status: 400 });
+    body.data.questions = derived.data;
+  }
 
   if (body.data.slug) {
     const clash = await prisma.leadForm.findFirst({ where: { slug: body.data.slug, NOT: { id } } });

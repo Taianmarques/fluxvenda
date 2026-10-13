@@ -1,7 +1,9 @@
 import { z } from "zod";
-import { QUESTION_TYPES, MAX_OPCOES_ESCOLHA, MAX_QUIZ_RESULTS, isHttpUrl, isValidHexColor, isConversionEvent } from "@/lib/lead-form-shared";
+import { QUESTION_TYPES, MAX_OPCOES_ESCOLHA, MAX_QUIZ_RESULTS, DESTAQUE_CORES, FORM_STYLES, isHttpUrl, isValidHexColor, isConversionEvent } from "@/lib/lead-form-shared";
 
 // Validação compartilhada dos campos do formulário (editor do super admin e do CRM)
+
+const formImageUrl = z.string().regex(/^\/api\/formularios\/imagem\/[0-9a-f-]{36}\.(jpg|png|webp)$/i, "Imagem inválida");
 
 export const questionSchema = z.object({
   key: z.string().min(1).max(40),
@@ -10,10 +12,16 @@ export const questionSchema = z.object({
   options: z.array(z.string().trim().min(1).max(60)).max(MAX_OPCOES_ESCOLHA).optional(),
   optionResults: z.record(z.string().max(60), z.string().min(1).max(40)).optional(),
   // Só imagens enviadas pelo próprio editor — nunca um link externo qualquer
-  imageUrl: z.string().regex(/^\/api\/formularios\/imagem\/[0-9a-f-]{36}\.(jpg|png|webp)$/i, "Imagem da pergunta inválida").optional(),
+  imageUrl: formImageUrl.optional(),
+  subtitulo: z.string().trim().max(300).optional(),
+  layout: z.enum(["lista", "grade"]).optional(),
+  optionMedia: z.record(z.string().max(60), z.object({
+    emoji: z.string().trim().max(16).optional(),
+    imageUrl: formImageUrl.optional(),
+  })).optional(),
 }).refine(q => q.type !== "ESCOLHA" || (q.options?.length ?? 0) >= 2, "Pergunta de escolha precisa de pelo menos 2 opções");
 
-export const questionsSchema = z.array(questionSchema).min(1).max(10)
+export const questionsSchema = z.array(questionSchema).min(1).max(25)
   .refine(qs => new Set(qs.map(q => q.key)).size === qs.length, "Perguntas com identificador repetido");
 
 const emptyToNull = (v: unknown) => (typeof v === "string" && v.trim() === "" ? null : v);
@@ -47,3 +55,28 @@ export const extrasShape = {
   conversionEvent: z.preprocess(emptyToNull, z.string().refine(isConversionEvent, "Evento do pixel inválido").nullable().optional()),
   consentText: z.preprocess(emptyToNull, z.string().trim().max(500).nullable().optional()),
 };
+
+// Quiz em telas: sequência de etapas. As perguntas são validadas de novo por questionsSchema
+// depois de derivadas (stepsToQuestions), então aqui a pergunta só precisa do formato básico.
+const texto = (max: number) => z.string().trim().max(max);
+export const stepsSchema = z.array(z.discriminatedUnion("type", [
+  z.object({ id: z.string().min(1).max(40), type: z.literal("pergunta"), question: questionSchema }),
+  z.object({
+    id: z.string().min(1).max(40), type: z.literal("conteudo"),
+    titulo: texto(400), texto: texto(2000), imageUrl: formImageUrl.optional(),
+    destaqueTitulo: texto(200), destaqueTexto: texto(1000), destaqueCor: z.enum(DESTAQUE_CORES), botao: texto(40),
+  }),
+  z.object({
+    id: z.string().min(1).max(40), type: z.literal("carregamento"),
+    texto: texto(200), segundos: z.number().int().min(1).max(15),
+  }),
+  z.object({
+    id: z.string().min(1).max(40), type: z.literal("oferta"),
+    titulo: texto(400), texto: texto(2000), imageUrl: formImageUrl.optional(), botao: texto(40),
+    url: z.string().trim().max(500).refine(v => v === "" || isHttpUrl(v), "O link da oferta precisa começar com http:// ou https://"),
+  }),
+])).max(40)
+  .refine(ss => new Set(ss.map(s => s.id)).size === ss.length, "Etapas com identificador repetido")
+  .refine(ss => ss.some(s => s.type === "pergunta"), "O quiz em telas precisa de pelo menos uma pergunta");
+
+export const styleSchema = z.enum(FORM_STYLES);

@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { normalizeFormFunnelSteps } from "@/lib/lead-form-funnel";
 import { getFormStats } from "@/lib/lead-form-stats";
-import { formToExtras, normalizeQuizResults, type LeadFormUtm } from "@/lib/lead-form-shared";
+import { formToExtras, normalizeQuizResults, normalizeSteps, type LeadFormUtm } from "@/lib/lead-form-shared";
 import { FormularioEditorClient, type LeadFormQuestion } from "./FormularioEditorClient";
 
 // Auth já garantida pelo AdminLayout (só ADMIN chega até aqui)
@@ -36,6 +36,8 @@ export default async function AdminFormularioEditorPage({ params }: { params: Pr
       initialFunnelSteps={normalizeFormFunnelSteps(form.funnelSteps)}
       initialQuestions={form.questions as LeadFormQuestion[]}
       initialQuizResults={normalizeQuizResults(form.quizResults)}
+      initialStyle={form.style === "TELAS" ? "TELAS" : "CHAT"}
+      initialSteps={normalizeSteps(form.steps)}
       submissions={form.submissions.map(s => ({
         id: s.id,
         nome: s.nome,

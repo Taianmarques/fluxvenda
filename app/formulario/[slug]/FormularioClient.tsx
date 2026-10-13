@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import Script from "next/script";
 import { ArrowUp, Check, ExternalLink, MessageCircle } from "lucide-react";
+import { trackPixel, readUtm, registerVisit, MetaPixel } from "./form-runtime";
 import { buildWaLink, withTrackingParams, DEFAULT_ACCENT, type LeadFormQuestion, type LeadFormUtm } from "@/lib/lead-form-shared";
 
 export type { LeadFormQuestion };
@@ -28,29 +28,6 @@ const INPUT_MODE: Record<LeadFormQuestion["type"], string> = {
 
 const DEFAULT_DONE =
   "Prontinho! Te chamamos agora no seu WhatsApp com o convite pra testar grátis por 7 dias (ou marcar uma demonstração, se preferir). Fica de olho por lá.";
-
-// Dispara evento pro Meta Pixel, se ele já tiver carregado (formulário sem pixelId não injeta
-// o script, então fbq nunca existe — a checagem evita erro nesse caso).
-function trackPixel(event: string) {
-  if (typeof window !== "undefined" && typeof (window as unknown as { fbq?: (...a: unknown[]) => void }).fbq === "function") {
-    (window as unknown as { fbq: (...a: unknown[]) => void }).fbq("track", event);
-  }
-}
-
-// Origem do lead: parâmetros do link (utm_*, ref, src) + de que site veio o clique
-function readUtm(): LeadFormUtm {
-  const p = new URLSearchParams(window.location.search);
-  let referrer: string | undefined;
-  try { referrer = document.referrer ? new URL(document.referrer).hostname : undefined; } catch { /* referrer inválido */ }
-  const clean = (v: string | null) => (v ? v.slice(0, 120) : undefined);
-  return {
-    source: clean(p.get("utm_source") ?? p.get("ref") ?? p.get("src")),
-    medium: clean(p.get("utm_medium")),
-    campaign: clean(p.get("utm_campaign")),
-    content: clean(p.get("utm_content")),
-    referrer: referrer && referrer !== window.location.hostname ? referrer : undefined,
-  };
-}
 
 export function FormularioClient({
   slug, headline, questions, pixelId, avatarUrl, doneMessage, agentOwned, accentColor, coverUrl,
@@ -80,18 +57,7 @@ export function FormularioClient({
 
   useEffect(() => {
     utmRef.current = readUtm();
-    // 1 visita por sessão do navegador — denominador do funil (visitas → respostas)
-    try {
-      const key = `fv-visita-${slug}`;
-      if (!sessionStorage.getItem(key)) {
-        sessionStorage.setItem(key, "1");
-        fetch(`/api/formularios/${slug}/visita`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ source: utmRef.current.source }),
-        }).catch(() => {});
-      }
-    } catch { /* sessionStorage indisponível (modo privado) — só não conta a visita */ }
+    registerVisit(slug, utmRef.current.source);
 
     const t1 = setTimeout(() => {
       setBubbles(prev => [...prev, { from: "bot", text: questions[0]?.label ?? "", image: questions[0]?.imageUrl }]);
@@ -184,26 +150,7 @@ export function FormularioClient({
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
-      {pixelId && (
-        <>
-          <Script id="meta-pixel" strategy="afterInteractive">
-            {`!function(f,b,e,v,n,t,s)
-            {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-            n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-            if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-            n.queue=[];t=b.createElement(e);t.async=!0;
-            t.src=v;s=b.getElementsByTagName(e)[0];
-            s.parentNode.insertBefore(t,s)}(window, document,'script',
-            'https://connect.facebook.net/en_US/fbevents.js');
-            fbq('init', '${pixelId}');
-            fbq('track', 'PageView');`}
-          </Script>
-          <noscript>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img height="1" width="1" style={{ display: "none" }} src={`https://www.facebook.com/tr?id=${pixelId}&ev=PageView&noscript=1`} alt="" />
-          </noscript>
-        </>
-      )}
+      {pixelId && <MetaPixel pixelId={pixelId} />}
 
       {coverUrl && (
         // eslint-disable-next-line @next/next/no-img-element

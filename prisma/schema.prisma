@@ -1990,6 +1990,12 @@ model LeadForm {
   // ligado a ela (LeadFormQuestion.optionResults); vence o que somar mais. null = formulário comum.
   quizResults Json?
 
+  // Estilo da página pública: "CHAT" (conversa em balões) ou "TELAS" (uma etapa por tela, estilo
+  // funil de quiz). No TELAS, steps guarda a sequência (pergunta, conteúdo, carregamento, oferta) e
+  // questions é derivado das etapas de pergunta ao salvar — o resto do sistema só enxerga questions.
+  style String @default("CHAT")
+  steps Json?
+
   waNumber     String?
   waButtonText String?
 

@@ -77,7 +77,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   const isLast = currentIndex === questions.length - 1;
   const quizFechado = isLast || !questions.slice(currentIndex + 1).some(isQuizScoring);
   const prevQuizResult = submission.quizResult;
-  const quiz = quizResults.length > 0 && quizFechado && (question.type === "WHATSAPP" || isLast)
+  const quiz = quizResults.length > 0 && quizFechado && (question.type === "WHATSAPP" || isLast || isQuizScoring(question))
     ? computeQuizResult(questions, quizResults, answers)
     : null;
   if (quiz && prevQuizResult !== quiz.key) {
@@ -125,7 +125,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   // o texto original (as opções dependem exatamente do que foi escrito).
   const next = questions[currentIndex + 1];
   let nextMessage: string | null = null;
-  if (next && next.type !== "ESCOLHA") {
+  // No quiz em telas a pergunta aparece sozinha na tela, sem conversa — não faz sentido reescrever
+  if (next && next.type !== "ESCOLHA" && form.style !== "TELAS") {
     const respondidas = questions
       .slice(0, currentIndex + 1)
       .filter(q => answers[q.key] !== undefined)

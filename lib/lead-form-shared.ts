@@ -12,7 +12,63 @@ export type LeadFormQuestion = {
   // Só ESCOLHA em modo quiz: opção → key do resultado que ela pontua (opção sem entrada não pontua)
   optionResults?: Record<string, string>;
   imageUrl?: string; // imagem ilustrativa mostrada junto da pergunta (/api/formularios/imagem/...)
+  // Só no quiz em telas:
+  subtitulo?: string;
+  layout?: "lista" | "grade"; // ESCOLHA: lista de cartões (emoji/ícone) ou grade de fotos
+  optionMedia?: Record<string, { emoji?: string; imageUrl?: string }>; // opção → emoji ou foto
 };
+
+// ---- Quiz em telas (LeadForm.style = "TELAS") ----
+
+export const FORM_STYLES = ["CHAT", "TELAS"] as const;
+export type FormStyle = (typeof FORM_STYLES)[number];
+
+export const DESTAQUE_CORES = ["vermelho", "verde", "azul", "amarelo"] as const;
+export type DestaqueCor = (typeof DESTAQUE_CORES)[number];
+
+export type QuizStep =
+  | { id: string; type: "pergunta"; question: LeadFormQuestion }
+  | {
+      id: string; type: "conteudo"; titulo: string; texto: string; imageUrl?: string;
+      destaqueTitulo: string; destaqueTexto: string; destaqueCor: DestaqueCor; botao: string;
+    }
+  | { id: string; type: "carregamento"; texto: string; segundos: number }
+  | { id: string; type: "oferta"; titulo: string; texto: string; imageUrl?: string; botao: string; url: string };
+
+export type QuizStepType = QuizStep["type"];
+
+export function normalizeSteps(raw: unknown): QuizStep[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((s): s is QuizStep =>
+    Boolean(s) && typeof s === "object" && typeof (s as { id?: unknown }).id === "string"
+    && ["pergunta", "conteudo", "carregamento", "oferta"].includes((s as { type?: unknown }).type as string)
+    && ((s as { type: string }).type !== "pergunta" || Boolean((s as { question?: { key?: unknown } }).question?.key)));
+}
+
+// No quiz em telas as perguntas vivem dentro das etapas — o resto do sistema (respostas, funil,
+// desempenho, CSV) continua lendo LeadForm.questions, derivado daqui ao salvar.
+export function stepsToQuestions(steps: QuizStep[]): LeadFormQuestion[] {
+  return steps.flatMap(s => (s.type === "pergunta" ? [s.question] : []));
+}
+
+// Marcação simples dos títulos/textos do quiz em telas: **negrito**, ==destaque== (cor do
+// formulário), [vermelho]...[/vermelho] e [verde]...[/verde], {{nome}} = primeiro nome.
+export type RichPart = { text: string; bold?: boolean; color?: "accent" | "vermelho" | "verde" };
+export function parseRich(text: string, nome?: string | null): RichPart[] {
+  const src = text.replace(/\{\{\s*nome\s*\}\}/gi, (nome ?? "").split(" ")[0] || "");
+  const re = /\*\*(.+?)\*\*|==(.+?)==|\[(vermelho|verde)\]([\s\S]+?)\[\/\3\]/g;
+  const parts: RichPart[] = [];
+  let last = 0;
+  for (let m = re.exec(src); m; m = re.exec(src)) {
+    if (m.index > last) parts.push({ text: src.slice(last, m.index) });
+    if (m[1] !== undefined) parts.push({ text: m[1], bold: true });
+    else if (m[2] !== undefined) parts.push({ text: m[2], color: "accent" });
+    else parts.push({ text: m[4], color: m[3] as "vermelho" | "verde" });
+    last = re.lastIndex;
+  }
+  if (last < src.length) parts.push({ text: src.slice(last) });
+  return parts;
+}
 
 // Quiz de perfil: cada resultado tem o que mostrar na tela final e o que fazer com o lead
 export type QuizResult = {
