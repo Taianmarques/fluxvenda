@@ -2,27 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { getAgentConfigAsManager } from "@/lib/team";
+import { questionsSchema, extrasShape } from "@/lib/lead-form-schema";
 import { z } from "zod";
-
-const questionSchema = z.object({
-  key: z.string().min(1).max(40),
-  label: z.string().trim().min(1, "Toda pergunta precisa de um texto").max(200),
-  type: z.enum(["TEXTO", "WHATSAPP", "EMAIL", "NUMERO"]),
-});
 
 const updateSchema = z.object({
   slug: z.string().min(1).max(60).regex(/^[a-z0-9-]+$/, "Só letras minúsculas, números e hífen").optional(),
   title: z.string().trim().min(1).max(120).optional(),
   headline: z.string().trim().min(1).max(1000).optional(),
-  questions: z.array(questionSchema).min(1).max(10)
-    .refine(qs => new Set(qs.map(q => q.key)).size === qs.length, "Perguntas com identificador repetido")
+  questions: questionsSchema
     .refine(qs => qs.filter(q => q.type === "WHATSAPP").length === 1, "O formulário precisa de exatamente uma pergunta do tipo WhatsApp (é ela que dispara a primeira mensagem)")
     .optional(),
+  ...extrasShape,
   pixelId: z.string().max(40).nullable().optional(),
   avatarUrl: z.string().max(8_000_000).nullable().optional(),
   active: z.boolean().optional(),
   inviteMessage: z.string().max(1000).nullable().optional(),
   doneMessage: z.string().max(1000).nullable().optional(),
+  etiquetaId: z.string().nullable().optional(),
+  pipelineStageId: z.string().nullable().optional(),
   funnelSteps: z.array(z.object({
     minutos: z.number().int().min(1).max(43200),
     mensagem: z.string().trim().min(1).max(1000),
@@ -46,12 +43,24 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
   const owned = await loadOwnedForm(userId, agentId, id);
   if (!owned) return NextResponse.json({ error: "Formulário não encontrado" }, { status: 404 });
 
-  const body = updateSchema.safeParse(await req.json());
+  const body = updateSchema.safeParse(await req.json().catch(() => null));
   if (!body.success) return NextResponse.json({ error: body.error.issues[0]?.message ?? "Dados inválidos" }, { status: 400 });
 
   if (body.data.slug) {
     const clash = await prisma.leadForm.findFirst({ where: { slug: body.data.slug, NOT: { id } }, select: { id: true } });
     if (clash) return NextResponse.json({ error: "Já existe um formulário com esse link — escolha outro" }, { status: 400 });
+  }
+
+  // Etiqueta e etapa precisam ser DESTE agente — nunca grava um id de outro cliente
+  if (body.data.etiquetaId) {
+    const etiqueta = await prisma.etiqueta.findFirst({ where: { id: body.data.etiquetaId, agentConfigId: owned.config.id }, select: { id: true } });
+    if (!etiqueta) return NextResponse.json({ error: "Etiqueta não encontrada" }, { status: 400 });
+  }
+  if (body.data.pipelineStageId) {
+    const stage = await prisma.pipelineStage.findFirst({
+      where: { id: body.data.pipelineStageId, pipeline: { agentConfigId: owned.config.id } }, select: { id: true },
+    });
+    if (!stage) return NextResponse.json({ error: "Etapa do pipeline não encontrada" }, { status: 400 });
   }
 
   const form = await prisma.leadForm.update({ where: { id }, data: body.data });

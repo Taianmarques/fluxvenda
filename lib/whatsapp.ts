@@ -15,7 +15,11 @@ export function formatPhone(phone: string, isGroup = false): string {
 
 // `replyId` = messageid da mensagem citada (reply nativo do WhatsApp).
 // Retorna o messageid da mensagem enviada (usado pra permitir citações futuras), ou null.
-async function sendText(url: string, token: string, phone: string, text: string, replyId?: string, isGroup = false): Promise<string | null> {
+export type SendTextResult = { id: string | null; error?: string };
+
+// Mesmo envio de sendText, mas devolve também o motivo da falha (corpo da resposta da UazAPI) —
+// usado onde o chamador precisa explicar pro gestor por que a mensagem não saiu.
+async function sendTextDetailed(url: string, token: string, phone: string, text: string, replyId?: string, isGroup = false): Promise<SendTextResult> {
   const number = formatPhone(phone, isGroup);
 
   const res = await fetch(`${url}/send/text`, {
@@ -30,11 +34,15 @@ async function sendText(url: string, token: string, phone: string, text: string,
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     console.error(`[whatsapp] Erro ao enviar mensagem: ${res.status} ${body}`);
-    return null;
+    return { id: null, error: `${res.status} ${body}`.slice(0, 300) };
   }
 
   const data = await res.json().catch(() => null);
-  return data?.messageid ?? data?.id ?? null;
+  return { id: data?.messageid ?? data?.id ?? null };
+}
+
+async function sendText(url: string, token: string, phone: string, text: string, replyId?: string, isGroup = false): Promise<string | null> {
+  return (await sendTextDetailed(url, token, phone, text, replyId, isGroup)).id;
 }
 
 // Envia pela instância global da plataforma (notificações de onboarding, etc.)
@@ -53,6 +61,12 @@ export async function sendWhatsAppTextAsTeam(token: string, phone: string, text:
     return null;
   }
   return sendText(UAZAPI_URL, token, phone, text, replyId, isGroup);
+}
+
+// Igual a sendWhatsAppTextAsTeam, mas com o motivo da falha quando não sai (ver sendTextDetailed)
+export async function sendWhatsAppTextAsTeamDetailed(token: string, phone: string, text: string): Promise<SendTextResult> {
+  if (!UAZAPI_URL || !token) return { id: null, error: "WhatsApp do agente não configurado" };
+  return sendTextDetailed(UAZAPI_URL, token, phone, text);
 }
 
 // "audio" = arquivo comum (aparece como anexo encaminhado); "myaudio" = nota de voz nativa

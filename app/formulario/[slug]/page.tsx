@@ -9,7 +9,10 @@ export default async function FormularioPublicoPage({ params }: { params: Promis
   const { slug } = await params;
   const form = await prisma.leadForm.findUnique({
     where: { slug },
-    select: { headline: true, questions: true, pixelId: true, avatarUrl: true, active: true, agentOwned: true, doneMessage: true },
+    select: {
+      headline: true, questions: true, pixelId: true, avatarUrl: true, active: true, agentOwned: true, doneMessage: true,
+      accentColor: true, coverUrl: true, ctaLabel: true, ctaUrl: true, waNumber: true, waButtonText: true, consentText: true,
+    },
   });
   if (!form || !form.active) notFound();
 
@@ -21,6 +24,14 @@ export default async function FormularioPublicoPage({ params }: { params: Promis
       pixelId={form.pixelId}
       avatarUrl={form.avatarUrl}
       doneMessage={form.doneMessage?.trim() || (form.agentOwned ? DONE_NEUTRO : null)}
+      agentOwned={form.agentOwned}
+      accentColor={form.accentColor}
+      coverUrl={form.coverUrl}
+      ctaLabel={form.ctaLabel}
+      ctaUrl={form.ctaUrl}
+      waNumber={form.waNumber}
+      waButtonText={form.waButtonText}
+      consentText={form.consentText?.trim() || null}
     />
   );
 }

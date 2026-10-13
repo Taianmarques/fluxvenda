@@ -4,6 +4,8 @@ import { Lock } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getAgentConfigWithRole } from "@/lib/team";
 import { normalizeFormFunnelSteps } from "@/lib/lead-form-funnel";
+import { getFormStats } from "@/lib/lead-form-stats";
+import { formToExtras, type LeadFormUtm } from "@/lib/lead-form-shared";
 import { FormularioEditorClient, type LeadFormQuestion } from "@/app/(admin)/admin/formularios/[id]/FormularioEditorClient";
 
 export default async function FormularioEditorPage({ params }: { params: Promise<{ agentId: string; formId: string }> }) {
@@ -33,6 +35,15 @@ export default async function FormularioEditorPage({ params }: { params: Promise
   });
   if (!form) notFound();
 
+  const [stats, etiquetas, pipelines] = await Promise.all([
+    getFormStats(form.id, form.questions as LeadFormQuestion[]),
+    prisma.etiqueta.findMany({ where: { agentConfigId: result.config.id }, orderBy: { nome: "asc" }, select: { id: true, nome: true } }),
+    prisma.pipeline.findMany({
+      where: { agentConfigId: result.config.id }, orderBy: { order: "asc" },
+      select: { name: true, stages: { orderBy: { order: "asc" }, select: { id: true, name: true } } },
+    }),
+  ]);
+
   return (
     <div className="h-full overflow-y-auto bg-gray-950">
       <FormularioEditorClient
@@ -49,6 +60,12 @@ export default async function FormularioEditorPage({ params }: { params: Promise
         initialAgentLabel={null}
         initialInviteMessage={form.inviteMessage ?? ""}
         initialDoneMessage={form.doneMessage ?? ""}
+        initialExtras={formToExtras(form)}
+        stats={stats}
+        crmOptions={{
+          etiquetas,
+          stages: pipelines.flatMap(p => p.stages.map(s => ({ id: s.id, nome: s.name, pipeline: p.name }))),
+        }}
         initialFunnelSteps={normalizeFormFunnelSteps(form.funnelSteps)}
         initialQuestions={form.questions as LeadFormQuestion[]}
         submissions={form.submissions.map(s => ({
@@ -57,6 +74,8 @@ export default async function FormularioEditorPage({ params }: { params: Promise
           whatsapp: s.whatsapp,
           answers: s.answers as Record<string, string>,
           inviteSentAt: s.inviteSentAt?.toISOString() ?? null,
+          inviteError: s.inviteError,
+          utm: (s.utm as LeadFormUtm | null) ?? null,
           createdAt: s.createdAt.toISOString(),
         }))}
       />

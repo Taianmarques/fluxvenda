@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { sendWhatsAppTextAsTeam } from "@/lib/whatsapp";
+import { sendWhatsAppTextAsTeamDetailed } from "@/lib/whatsapp";
+import { interpolateTexto, type LeadFormUtm } from "@/lib/lead-form-shared";
 import { FLUXVENDA_TEAM_ID } from "@/lib/internal-agent";
 import { openai, MODEL } from "@/lib/openai";
 
@@ -24,10 +25,6 @@ const CONVITE_TEMPLATE = (nome: string) =>
 // teste grátis da FluxVenda, que só faz sentido nos formulários do super admin.
 const CONVITE_NEUTRO_TEMPLATE = (nome: string) =>
   `Oi, ${nome.split(" ")[0]}! Recebemos o seu cadastro por aqui. Como posso te ajudar?`;
-
-function interpolateNome(texto: string, nome: string): string {
-  return texto.replace(/\{\{\s*nome\s*\}\}/gi, nome.split(" ")[0]);
-}
 
 // Resolve o agente de destino de um formulário: o escolhido em LeadForm.agentConfigId, ou o
 // agente interno multi-setor da FluxVenda (ver lib/internal-agent.ts) quando o formulário não
@@ -104,26 +101,41 @@ export async function gerarProximaPergunta(params: {
   }
 }
 
+export type SendInviteResult = { ok: true } | { ok: false; error: string };
+
+// Traduz o erro cru da UazAPI numa frase que o gestor entende na lista de respostas
+function explicarFalhaEnvio(raw: string | undefined): string {
+  if (!raw) return "O WhatsApp não aceitou a mensagem.";
+  if (/not on whatsapp/i.test(raw)) return "Esse número não está no WhatsApp (provável erro de digitação).";
+  if (/disconnected|not reconnectable/i.test(raw)) return "O WhatsApp do agente está desconectado — reconecte em Canais.";
+  return `Falha no envio (${raw.slice(0, 120)}).`;
+}
+
 // Dispara a mensagem de abertura assim que o lead preenche o campo de WhatsApp no formulário
 // público — pro agente escolhido no formulário (LeadForm.agentConfigId), ou pelo agente interno
 // multi-setor que a FluxVenda usa pro seu próprio funil de trial (ver lib/internal-agent.ts)
 // quando o formulário não escolheu nenhum. Dali em diante, quem responder cai no atendimento
 // normal daquele agente — system prompt, pipeline e follow-ups próprios são o "funil" de cada
-// formulário, não algo reimplementado aqui.
+// formulário, não algo reimplementado aqui. Devolve o motivo quando não consegue enviar.
 export async function sendFormInviteToLead(params: {
   nome: string;
   whatsappRaw: string;
   agentConfigId: string | null;
   inviteMessage: string | null;
   agentOwned?: boolean;
-}): Promise<boolean> {
+  ctaUrl?: string | null;
+  etiquetaId?: string | null;
+  pipelineStageId?: string | null;
+  formTitle?: string;
+  utm?: LeadFormUtm | null;
+}): Promise<SendInviteResult> {
   const { nome, inviteMessage, agentOwned } = params;
   const contactNumber = normalizePhone(params.whatsappRaw);
 
   const agentConfig = await resolveFormAgent(params.agentConfigId);
   if (!agentConfig) {
     console.error("[lead-form-funnel] agente de destino não encontrado ou sem WhatsApp conectado", params.agentConfigId);
-    return false;
+    return { ok: false, error: "O agente não tem um WhatsApp (UazAPI) conectado — conecte em Canais." };
   }
 
   const conversation = await prisma.conversation.upsert({
@@ -133,14 +145,61 @@ export async function sendFormInviteToLead(params: {
   });
 
   const texto = inviteMessage?.trim()
-    ? interpolateNome(inviteMessage, nome)
+    ? interpolateTexto(inviteMessage, { nome, link: params.ctaUrl })
     : agentOwned ? CONVITE_NEUTRO_TEMPLATE(nome) : CONVITE_TEMPLATE(nome);
-  const waMessageId = await sendWhatsAppTextAsTeam(agentConfig.uazapiToken, contactNumber, texto);
-  if (!waMessageId) return false;
+  const sent = await sendWhatsAppTextAsTeamDetailed(agentConfig.uazapiToken, contactNumber, texto);
+  if (!sent.id) return { ok: false, error: explicarFalhaEnvio(sent.error) };
 
   await prisma.message.create({
-    data: { conversationId: conversation.id, role: "assistant", content: texto, waMessageId },
+    data: { conversationId: conversation.id, role: "assistant", content: texto, waMessageId: sent.id },
   });
 
-  return true;
+  await organizarLeadNoCrm({
+    conversationId: conversation.id, agentConfigId: agentConfig.id,
+    etiquetaId: params.etiquetaId ?? null, pipelineStageId: params.pipelineStageId ?? null,
+    formTitle: params.formTitle, utm: params.utm ?? null,
+  }).catch(err => console.error("[lead-form-funnel] falha ao organizar lead no CRM:", err));
+
+  return { ok: true };
+}
+
+// Deixa o lead do formulário pronto no CRM: nota com a origem pro atendente, etiqueta da
+// campanha e oportunidade na etapa escolhida. Etiqueta/etapa só valem se forem do mesmo agente
+// (nunca confia só no id salvo no formulário). Não duplica oportunidade se já houver uma aberta.
+async function organizarLeadNoCrm(p: {
+  conversationId: string; agentConfigId: string;
+  etiquetaId: string | null; pipelineStageId: string | null;
+  formTitle?: string; utm: LeadFormUtm | null;
+}) {
+  const origem = p.utm
+    ? [p.utm.source && `origem ${p.utm.source}`, p.utm.medium && `meio ${p.utm.medium}`, p.utm.campaign && `campanha ${p.utm.campaign}`, p.utm.content && `conteúdo ${p.utm.content}`]
+        .filter(Boolean).join(", ")
+    : "";
+  await prisma.message.create({
+    data: {
+      conversationId: p.conversationId, role: "note",
+      content: `Lead captado pelo formulário${p.formTitle ? ` "${p.formTitle}"` : ""}${origem ? ` — ${origem}` : ""}.`,
+    },
+  });
+
+  if (p.etiquetaId) {
+    const etiqueta = await prisma.etiqueta.findFirst({ where: { id: p.etiquetaId, agentConfigId: p.agentConfigId }, select: { id: true } });
+    if (etiqueta) {
+      await prisma.conversation.update({ where: { id: p.conversationId }, data: { etiquetas: { connect: { id: etiqueta.id } } } });
+    }
+  }
+
+  if (p.pipelineStageId) {
+    const stage = await prisma.pipelineStage.findFirst({
+      where: { id: p.pipelineStageId, pipeline: { agentConfigId: p.agentConfigId } }, select: { id: true },
+    });
+    if (stage) {
+      const aberta = await prisma.opportunity.findFirst({
+        where: { conversationId: p.conversationId, wonAt: null, lostAt: null }, select: { id: true },
+      });
+      if (!aberta) {
+        await prisma.opportunity.create({ data: { conversationId: p.conversationId, dealValue: 0, title: null, stageId: stage.id } });
+      }
+    }
+  }
 }

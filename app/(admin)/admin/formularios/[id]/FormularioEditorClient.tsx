@@ -4,12 +4,20 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Plus, Trash2, Save, Check, ExternalLink, Copy, Target, ChevronDown, ImagePlus, X, Send, Search, Loader2 } from "lucide-react";
 
-export type LeadFormQuestion = { key: string; label: string; type: "TEXTO" | "WHATSAPP" | "EMAIL" | "NUMERO" };
+import type { LeadFormQuestion, LeadFormUtm } from "@/lib/lead-form-shared";
+import { MAX_OPCOES_ESCOLHA, DEFAULT_ACCENT } from "@/lib/lead-form-shared";
+import type { FormStats } from "@/lib/lead-form-stats";
+import { ExtrasPanel, TrackingLinks, StatsPanel, type FormExtras, type CrmFormOptions } from "./FormularioExtras";
+
+export type { LeadFormQuestion };
 export type FunnelStep = { minutos: number; mensagem: string };
-type Submission = { id: string; nome: string | null; whatsapp: string | null; answers: Record<string, string>; inviteSentAt: string | null; createdAt: string };
+type Submission = {
+  id: string; nome: string | null; whatsapp: string | null; answers: Record<string, string>; inviteSentAt: string | null;
+  inviteError: string | null; utm: LeadFormUtm | null; createdAt: string;
+};
 type AgentOption = { id: string; nome: string; teamName: string; temWhatsapp: boolean };
 
-const TYPE_LABEL: Record<LeadFormQuestion["type"], string> = { TEXTO: "Texto", WHATSAPP: "WhatsApp", EMAIL: "E-mail", NUMERO: "Número" };
+const TYPE_LABEL: Record<LeadFormQuestion["type"], string> = { TEXTO: "Texto", WHATSAPP: "WhatsApp", EMAIL: "E-mail", NUMERO: "Número", ESCOLHA: "Escolha (botões)" };
 
 // Editor de tempo (valor + unidade) pra cada passo do funil — mesmo padrão já usado no follow-up
 // de etapa do pipeline (WhatsappPipeline.tsx), convertido pra/de minutos ao salvar.
@@ -53,7 +61,7 @@ function resizeImageToBase64(file: File, maxSize = 200, quality = 0.85): Promise
 export function FormularioEditorClient({
   id, initialSlug, initialTitle, initialHeadline, initialActive, initialPixelId, initialAvatarUrl,
   initialAgentConfigId, initialAgentLabel, initialInviteMessage, initialDoneMessage, initialFunnelSteps, initialQuestions, submissions,
-  crmAgentId, whatsappOk = true,
+  crmAgentId, whatsappOk = true, initialExtras, crmOptions, stats,
 }: {
   id: string; initialSlug: string; initialTitle: string; initialHeadline: string; initialActive: boolean;
   initialPixelId: string; initialAvatarUrl: string | null;
@@ -64,6 +72,9 @@ export function FormularioEditorClient({
   crmAgentId?: string;
   // false = o agente não tem WhatsApp via UazAPI conectado (único provedor que o formulário usa)
   whatsappOk?: boolean;
+  initialExtras: FormExtras;
+  crmOptions?: CrmFormOptions; // etiquetas e etapas do agente (só no CRM)
+  stats?: FormStats | null;
   initialQuestions: LeadFormQuestion[]; submissions: Submission[];
 }) {
   const [slug, setSlug] = useState(initialSlug);
@@ -84,6 +95,16 @@ export function FormularioEditorClient({
   const [agentLabel, setAgentLabel] = useState<string | null>(initialAgentLabel);
   const [inviteMessage, setInviteMessage] = useState(initialInviteMessage);
   const [doneMessage, setDoneMessage] = useState(initialDoneMessage);
+  const [extras, setExtras] = useState<FormExtras>({ ...initialExtras, accentColor: initialExtras.accentColor || DEFAULT_ACCENT });
+  // Opções das perguntas de escolha: uma por linha (texto cru, pra digitar Enter sem perder a linha em branco)
+  const [optionsText, setOptionsText] = useState<Record<string, string>>(
+    Object.fromEntries(initialQuestions.filter(q => q.type === "ESCOLHA").map(q => [q.key, (q.options ?? []).join("\n")])),
+  );
+  function updateExtras(patch: Partial<FormExtras>) {
+    setExtras(prev => ({ ...prev, ...patch }));
+    setSaved(false);
+  }
+  const exportHref = crmAgentId ? `/api/agentes/${crmAgentId}/formularios/${id}/exportar` : `/api/admin/formularios/${id}/exportar`;
   const isCrm = Boolean(crmAgentId);
   const apiUrl = isCrm ? `/api/agentes/${crmAgentId}/formularios/${id}` : `/api/admin/formularios/${id}`;
   const backHref = isCrm ? `/crm/${crmAgentId}/formularios` : "/admin/formularios";
@@ -178,7 +199,10 @@ export function FormularioEditorClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           slug, title, headline, active, questions, pixelId: pixelId.trim() || null, avatarUrl,
-          ...(isCrm ? {} : { agentConfigId }), inviteMessage: inviteMessage.trim() || null, doneMessage: doneMessage.trim() || null,
+          ...(isCrm ? { etiquetaId: extras.etiquetaId, pipelineStageId: extras.pipelineStageId } : { agentConfigId }),
+          inviteMessage: inviteMessage.trim() || null, doneMessage: doneMessage.trim() || null,
+          accentColor: extras.accentColor, coverUrl: extras.coverUrl, ctaLabel: extras.ctaLabel, ctaUrl: extras.ctaUrl,
+          waNumber: extras.waNumber, waButtonText: extras.waButtonText, consentText: extras.consentText,
           funnelSteps: funnelRows.filter(r => r.mensagem.trim()).map(rowToStep),
         }),
       });
@@ -279,6 +303,10 @@ export function FormularioEditorClient({
             <span className="font-mono">Lead</span> quando responde o WhatsApp e <span className="font-mono">CompleteRegistration</span> ao terminar o formulário.
           </p>
         </div>
+
+        <ExtrasPanel value={extras} onChange={updateExtras} isCrm={isCrm} crmOptions={crmOptions} onError={setError} />
+
+        <TrackingLinks slug={slug} />
 
         <div className="border border-gray-800 rounded-xl p-4 space-y-3">
           {isCrm && (
@@ -434,7 +462,8 @@ export function FormularioEditorClient({
         <div className="space-y-2">
           <label className="text-xs text-gray-500 uppercase tracking-wide">Perguntas, em ordem</label>
           {questions.map((q, i) => (
-            <div key={i} className="flex items-center gap-2">
+            <div key={i} className="space-y-1.5">
+            <div className="flex items-center gap-2">
               <span className="text-xs text-gray-600 w-5 flex-shrink-0">{i + 1}.</span>
               <input
                 value={q.label}
@@ -453,6 +482,23 @@ export function FormularioEditorClient({
                 <Trash2 size={14} />
               </button>
             </div>
+            {q.type === "ESCOLHA" && (
+              <div className="pl-7">
+                <textarea
+                  value={optionsText[q.key] ?? (q.options ?? []).join("\n")}
+                  onChange={e => {
+                    const text = e.target.value;
+                    setOptionsText(prev => ({ ...prev, [q.key]: text }));
+                    updateQuestion(i, { options: text.split("\n").map(o => o.trim()).filter(Boolean).slice(0, MAX_OPCOES_ESCOLHA) });
+                  }}
+                  rows={3}
+                  placeholder={"Uma opção por linha (2 a " + MAX_OPCOES_ESCOLHA + ")\nComeçando\nJá vendo\nEscalando"}
+                  className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+                />
+                <p className="text-[11px] text-gray-500 mt-0.5">O lead escolhe tocando num botão — a resposta já serve pra separar quem é quem.</p>
+              </div>
+            )}
+            </div>
           ))}
           <button onClick={addQuestion} className="flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300 mt-1">
             <Plus size={14} /> Adicionar pergunta
@@ -470,6 +516,8 @@ export function FormularioEditorClient({
           {saved && <span className="flex items-center gap-1 text-sm text-green-400"><Check size={14} /> Salvo</span>}
         </div>
       </div>
+
+      {stats && <StatsPanel stats={stats} exportHref={exportHref} />}
 
       <div>
         <h2 className="text-lg font-bold mb-3">Respostas ({submissions.length})</h2>
@@ -497,8 +545,15 @@ export function FormularioEditorClient({
                     </div>
                     <div className="flex items-center gap-3 text-xs text-gray-500 flex-shrink-0">
                       <span>{new Date(s.createdAt).toLocaleString("pt-BR")}</span>
+                      {s.utm?.source && (
+                        <span className="px-2 py-0.5 rounded-full bg-gray-800 text-gray-300" title={[s.utm.medium, s.utm.campaign, s.utm.content].filter(Boolean).join(" · ") || undefined}>
+                          {s.utm.source}
+                        </span>
+                      )}
                       {s.inviteSentAt ? (
                         <span className="font-semibold px-2 py-0.5 rounded-full bg-green-900/40 text-green-300 border border-green-800/50">convite enviado</span>
+                      ) : s.inviteError ? (
+                        <span className="font-semibold px-2 py-0.5 rounded-full bg-red-900/40 text-red-300 border border-red-800/50">envio falhou</span>
                       ) : (
                         <span className="font-semibold px-2 py-0.5 rounded-full bg-gray-800 text-gray-500">sem convite</span>
                       )}
@@ -506,6 +561,9 @@ export function FormularioEditorClient({
                   </button>
                   {isOpen && (
                     <div className="border-t border-gray-800 p-4 space-y-3 bg-gray-950/40">
+                      {s.inviteError && !s.inviteSentAt && (
+                        <p className="text-xs text-red-300 bg-red-900/20 border border-red-800/40 rounded-lg px-3 py-2">Por que a mensagem não saiu: {s.inviteError}</p>
+                      )}
                       {answerEntries.length === 0 ? (
                         <p className="text-sm text-gray-500">Nenhuma resposta registrada.</p>
                       ) : (

@@ -2,23 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { questionsSchema, extrasShape } from "@/lib/lead-form-schema";
 
 async function assertAdmin(userId: string) {
   const profile = await prisma.profile.findUnique({ where: { id: userId }, select: { role: true } });
   return profile?.role === "ADMIN";
 }
 
-const questionSchema = z.object({
-  key: z.string().min(1).max(40),
-  label: z.string().min(1).max(200),
-  type: z.enum(["TEXTO", "WHATSAPP", "EMAIL", "NUMERO"]),
-});
-
 const updateSchema = z.object({
   slug: z.string().min(1).max(60).regex(/^[a-z0-9-]+$/, "Só letras minúsculas, números e hífen").optional(),
   title: z.string().min(1).max(120).optional(),
   headline: z.string().min(1).max(1000).optional(),
-  questions: z.array(questionSchema).min(1).max(10).optional(),
+  questions: questionsSchema.optional(),
+  ...extrasShape,
   pixelId: z.string().max(40).nullable().optional(),
   avatarUrl: z.string().max(8_000_000).nullable().optional(),
   active: z.boolean().optional(),

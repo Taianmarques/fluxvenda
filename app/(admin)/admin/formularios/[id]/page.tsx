@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { normalizeFormFunnelSteps } from "@/lib/lead-form-funnel";
+import { getFormStats } from "@/lib/lead-form-stats";
+import { formToExtras, type LeadFormUtm } from "@/lib/lead-form-shared";
 import { FormularioEditorClient, type LeadFormQuestion } from "./FormularioEditorClient";
 
 // Auth já garantida pelo AdminLayout (só ADMIN chega até aqui)
@@ -14,6 +16,7 @@ export default async function AdminFormularioEditorPage({ params }: { params: Pr
     },
   });
   if (!form) notFound();
+  const stats = await getFormStats(form.id, form.questions as LeadFormQuestion[]);
 
   return (
     <FormularioEditorClient
@@ -28,6 +31,8 @@ export default async function AdminFormularioEditorPage({ params }: { params: Pr
       initialAgentLabel={form.agentConfig ? `${form.agentConfig.nome} — ${form.agentConfig.team.name}` : null}
       initialInviteMessage={form.inviteMessage ?? ""}
       initialDoneMessage={form.doneMessage ?? ""}
+      initialExtras={formToExtras(form)}
+      stats={stats}
       initialFunnelSteps={normalizeFormFunnelSteps(form.funnelSteps)}
       initialQuestions={form.questions as LeadFormQuestion[]}
       submissions={form.submissions.map(s => ({
@@ -36,6 +41,8 @@ export default async function AdminFormularioEditorPage({ params }: { params: Pr
         whatsapp: s.whatsapp,
         answers: s.answers as Record<string, string>,
         inviteSentAt: s.inviteSentAt?.toISOString() ?? null,
+        inviteError: s.inviteError,
+        utm: (s.utm as LeadFormUtm | null) ?? null,
         createdAt: s.createdAt.toISOString(),
       }))}
     />

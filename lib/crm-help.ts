@@ -283,6 +283,7 @@ export const CRM_HELP: Partial<Record<CrmPageKey, HelpArticle>> = {
     blocks: [
       { text: "Só para gestores. Crie um formulário em formato de conversa (nome, WhatsApp e o que mais quiser perguntar), copie o link e use em anúncio, bio do Instagram ou site. Assim que o lead preenche o WhatsApp, o agente já manda a primeira mensagem — a partir daí a conversa cai na caixa de Mensagens e a IA atende normalmente." },
       { text: "Dá pra personalizar a mensagem de abertura no WhatsApp (use {{nome}} pro primeiro nome do lead), a mensagem final da tela, a foto de quem \"conversa\", o Pixel do Facebook e um funil de mensagens automáticas depois do primeiro contato — que pausa sozinho se o lead responder. O envio usa o WhatsApp conectado em Canais (UazAPI) e respeita o horário de envio do agente." },
+      { text: "Pra quem divulga conteúdo: perguntas de escolha com botões, botão de entrega da isca na tela final (e-book, grupo, aula — também disponível como {{link}} na mensagem), cor e capa da sua marca, consentimento LGPD opcional e botão \"falar no WhatsApp\" como plano B quando a mensagem automática não consegue sair. Use os links por origem (bio, stories, anúncio...) pra ver, em Desempenho, de onde vêm os leads e em qual pergunta eles desistem; as respostas podem ser exportadas em CSV. Você também pode escolher uma etiqueta e uma etapa do pipeline pra o lead já entrar organizado." },
     ],
   },
 

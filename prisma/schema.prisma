@@ -1968,7 +1968,31 @@ model LeadForm {
   // Texto mostrado ao lead quando termina o formulário — null = texto padrão (ver FormularioClient)
   doneMessage String? @db.Text
 
+  // Aparência (pensada pra criadores de conteúdo): cor de destaque (#rrggbb) dos botões/balões do
+  // lead e imagem de capa (base64) no topo — null = padrão azul/sem capa
+  accentColor String?
+  coverUrl    String? @db.Text
+
+  // Botão na tela final (entrega da isca: e-book, grupo, aula...). ctaUrl também vira {{link}}
+  // na mensagem de abertura e nos passos do funil.
+  ctaLabel String?
+  ctaUrl   String?
+
+  // Plano B: botão "falar no WhatsApp" (wa.me) na tela final — aparece sempre que waNumber existe,
+  // e é o único caminho do lead quando o envio automático do convite falha. Só dígitos com DDI.
+  waNumber     String?
+  waButtonText String?
+
+  // Consentimento (LGPD) — se preenchido, o lead precisa marcar antes de informar o WhatsApp
+  consentText String? @db.Text
+
+  // Organização automática no CRM quando o convite sai: etiqueta na conversa e oportunidade
+  // criada na etapa escolhida (só se a conversa ainda não tiver oportunidade aberta)
+  etiquetaId      String?
+  pipelineStageId String?
+
   submissions LeadFormSubmission[]
+  views       LeadFormView[]
 }
 
 model LeadFormSubmission {
@@ -1985,7 +2009,23 @@ model LeadFormSubmission {
   funnelStepsSent  Int       @default(0)
   lastFunnelStepAt DateTime?
 
+  // Origem do lead (utm_source/medium/campaign/content, ref e referrer) capturada ao abrir o link
+  utm        Json?
+  consentAt  DateTime? // quando marcou o consentimento (null = formulário sem consentimento)
+  inviteError String?  // por que o convite não saiu (ex: número fora do WhatsApp), pra o gestor ver
+
   @@index([formId])
+}
+
+// Visita ao link público do formulário (1 por sessão) — base do funil de conversão
+model LeadFormView {
+  id        String   @id @default(cuid())
+  formId    String
+  form      LeadForm @relation(fields: [formId], references: [id], onDelete: Cascade)
+  source    String?  // utm_source (ou ref) da visita
+  createdAt DateTime @default(now())
+
+  @@index([formId, createdAt])
 }
 
 // ─── Agente de Ligação (Twilio + ElevenLabs) ─────────────────────────────────
