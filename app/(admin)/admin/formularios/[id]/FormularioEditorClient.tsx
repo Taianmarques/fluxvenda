@@ -554,7 +554,7 @@ export function FormularioEditorClient({
 
         <QuizPanel
           enabled={quizOn} onToggle={toggleQuiz} results={quizResults}
-          onChange={rs => { setQuizResults(rs); setSaved(false); }} isCrm={isCrm} crmOptions={crmOptions}
+          onChange={rs => { setQuizResults(rs); setSaved(false); }} isCrm={isCrm} crmOptions={crmOptions} telas={style === "TELAS"} onError={setError}
         />
 
         {style === "TELAS" && (

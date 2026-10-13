@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { QUESTION_TYPES, MAX_OPCOES_ESCOLHA, MAX_QUIZ_RESULTS, DESTAQUE_CORES, FORM_STYLES, isHttpUrl, isValidHexColor, isConversionEvent } from "@/lib/lead-form-shared";
+import { QUESTION_TYPES, MAX_OPCOES_ESCOLHA, MAX_QUIZ_RESULTS, MAX_METRICAS, DESTAQUE_CORES, FORM_STYLES, isHttpUrl, isValidHexColor, isConversionEvent } from "@/lib/lead-form-shared";
 
 // Validação compartilhada dos campos do formulário (editor do super admin e do CRM)
 
@@ -36,6 +36,8 @@ export const quizResultsSchema = z.array(z.object({
   pipelineStageId: z.preprocess(emptyToNull, z.string().nullable()),
   conversionUrl: z.string().trim().max(500)
     .refine(v => v === "" || isHttpUrl(v), "A página de conversão do resultado precisa começar com http:// ou https://"),
+  nivel: z.number().int().min(1).max(10).nullable().optional(),
+  imageUrl: formImageUrl.optional(),
 })).max(MAX_QUIZ_RESULTS)
   .refine(rs => new Set(rs.map(r => r.key)).size === rs.length, "Resultados do quiz com identificador repetido")
   .nullable().optional();
@@ -59,6 +61,8 @@ export const extrasShape = {
 // Quiz em telas: sequência de etapas. As perguntas são validadas de novo por questionsSchema
 // depois de derivadas (stepsToQuestions), então aqui a pergunta só precisa do formato básico.
 const texto = (max: number) => z.string().trim().max(max);
+// Nome de parâmetro de URL do checkout (ex: name, email, phone) — só caracteres seguros
+const paramName = z.string().trim().max(40).regex(/^[A-Za-z0-9_.\-\[\]]*$/, "Nome de parâmetro inválido");
 export const stepsSchema = z.array(z.discriminatedUnion("type", [
   z.object({ id: z.string().min(1).max(40), type: z.literal("pergunta"), question: questionSchema }),
   z.object({
@@ -74,6 +78,20 @@ export const stepsSchema = z.array(z.discriminatedUnion("type", [
     id: z.string().min(1).max(40), type: z.literal("oferta"),
     titulo: texto(400), texto: texto(2000), imageUrl: formImageUrl.optional(), botao: texto(40),
     url: z.string().trim().max(500).refine(v => v === "" || isHttpUrl(v), "O link da oferta precisa começar com http:// ou https://"),
+    antesImageUrl: formImageUrl.optional(), depoisImageUrl: formImageUrl.optional(),
+    antesLabel: texto(30).optional(), depoisLabel: texto(30).optional(),
+    preencher: z.boolean().optional(),
+    paramNome: paramName.optional(), paramEmail: paramName.optional(), paramTelefone: paramName.optional(),
+  }),
+  z.object({
+    id: z.string().min(1).max(40), type: z.literal("resultado"),
+    titulo: texto(400), medidorTitulo: texto(120),
+    niveis: z.array(z.string().trim().min(1).max(30)).min(2).max(7),
+    compEsquerdaTitulo: texto(60), compEsquerdaTexto: texto(400), compDireitaTitulo: texto(60), compDireitaTexto: texto(400),
+    metricas: z.array(z.object({
+      nome: z.string().trim().min(1).max(60), esquerda: z.number().min(0).max(100), direita: z.number().min(0).max(100),
+    })).max(MAX_METRICAS),
+    botao: texto(40),
   }),
 ])).max(40)
   .refine(ss => new Set(ss.map(s => s.id)).size === ss.length, "Etapas com identificador repetido")

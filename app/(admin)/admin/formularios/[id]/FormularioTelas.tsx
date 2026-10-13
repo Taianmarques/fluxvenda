@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDown, ArrowUp, ImagePlus, Loader2, Plus, Trash2, X, HelpCircle, FileText, Timer, ShoppingCart } from "lucide-react";
+import { ArrowDown, ArrowUp, ImagePlus, Loader2, Plus, Trash2, X, HelpCircle, FileText, Timer, ShoppingCart, Gauge } from "lucide-react";
 import {
-  MAX_OPCOES_ESCOLHA, DESTAQUE_CORES,
+  MAX_OPCOES_ESCOLHA, DESTAQUE_CORES, DEFAULT_NIVEIS, MAX_METRICAS,
   type QuizStep, type QuizStepType, type LeadFormQuestion, type QuizResult, type DestaqueCor,
 } from "@/lib/lead-form-shared";
 
@@ -20,6 +20,7 @@ const STEP_META: Record<QuizStepType, { label: string; icon: React.ReactNode }> 
   pergunta: { label: "Pergunta", icon: <HelpCircle size={13} /> },
   conteudo: { label: "Conteúdo", icon: <FileText size={13} /> },
   carregamento: { label: "Carregamento", icon: <Timer size={13} /> },
+  resultado: { label: "Resultado", icon: <Gauge size={13} /> },
   oferta: { label: "Oferta", icon: <ShoppingCart size={13} /> },
 };
 
@@ -49,8 +50,13 @@ function novaEtapa(type: QuizStepType, steps: QuizStep[]): QuizStep {
       return { id, type, titulo: "", texto: "", destaqueTitulo: "", destaqueTexto: "", destaqueCor: "vermelho", botao: "Continuar" };
     case "carregamento":
       return { id, type, texto: "Analisando suas respostas...", segundos: 4 };
+    case "resultado":
+      return {
+        id, type, titulo: "Seu resultado", medidorTitulo: "", niveis: [...DEFAULT_NIVEIS],
+        compEsquerdaTitulo: "", compEsquerdaTexto: "", compDireitaTitulo: "", compDireitaTexto: "", metricas: [], botao: "Continuar",
+      };
     case "oferta":
-      return { id, type, titulo: "", texto: "", botao: "Quero agora", url: "" };
+      return { id, type, titulo: "", texto: "", botao: "Quero agora", url: "", antesLabel: "ANTES", depoisLabel: "DEPOIS" };
   }
 }
 
@@ -84,7 +90,7 @@ async function uploadImagem(file: File): Promise<string> {
   return data.url;
 }
 
-function ImageField({ value, onChange, onError, label = "Imagem" }: {
+export function ImageField({ value, onChange, onError, label = "Imagem" }: {
   value?: string; onChange: (url: string | undefined) => void; onError: (msg: string) => void; label?: string;
 }) {
   const [busy, setBusy] = useState(false);
@@ -230,6 +236,18 @@ function PerguntaEditor({ q, onChange, quizOn, quizResults, onError }: {
   );
 }
 
+// Texto cru local (pra dar pra digitar a vírgula); a lista só é atualizada com os itens já completos
+function NiveisInput({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const [raw, setRaw] = useState(value.join(", "));
+  return (
+    <input
+      value={raw}
+      onChange={e => { setRaw(e.target.value); onChange(e.target.value.split(",").map(n => n.trim()).filter(Boolean).slice(0, 7)); }}
+      placeholder="Baixo, Normal, Médio, Alto, Muito alto" className={inputCls}
+    />
+  );
+}
+
 export function StepsEditor({ steps, onChange, quizOn, quizResults, onError }: {
   steps: QuizStep[]; onChange: (steps: QuizStep[]) => void; quizOn: boolean; quizResults: QuizResult[]; onError: (m: string) => void;
 }) {
@@ -342,6 +360,106 @@ export function StepsEditor({ steps, onChange, quizOn, quizResults, onError }: {
                 </div>
               </div>
               <p className="text-[11px] text-gray-500">Sem link, o botão só avança pra próxima tela. O link leva junto fbclid e utm.</p>
+
+              <div className="border-t border-gray-800 pt-2 space-y-2">
+                <p className={smallLabel}>Antes e depois (opcional) — duas imagens lado a lado</p>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <input value={s.antesLabel ?? ""} onChange={e => update(i, { ...s, antesLabel: e.target.value })} maxLength={30} placeholder="ANTES" className={inputCls} />
+                    <ImageField value={s.antesImageUrl} onChange={url => update(i, { ...s, antesImageUrl: url })} onError={onError} label="Imagem de antes" />
+                  </div>
+                  <div className="space-y-1">
+                    <input value={s.depoisLabel ?? ""} onChange={e => update(i, { ...s, depoisLabel: e.target.value })} maxLength={30} placeholder="DEPOIS" className={inputCls} />
+                    <ImageField value={s.depoisImageUrl} onChange={url => update(i, { ...s, depoisImageUrl: url })} onError={onError} label="Imagem de depois" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-gray-800 pt-2 space-y-2">
+                <label className="flex items-center gap-2 text-sm text-gray-300">
+                  <input type="checkbox" checked={Boolean(s.preencher)} onChange={e => update(i, { ...s, preencher: e.target.checked })} />
+                  Levar nome, e-mail e telefone do lead pro checkout (já vem preenchido)
+                </label>
+                {s.preencher && (
+                  <>
+                    <div className="grid grid-cols-3 gap-2">
+                      {([["paramNome", "name"], ["paramEmail", "email"], ["paramTelefone", "phone"]] as const).map(([campo, padrao]) => (
+                        <div key={campo}>
+                          <label className={smallLabel}>Parâmetro {campo === "paramNome" ? "do nome" : campo === "paramEmail" ? "do e-mail" : "do telefone"}</label>
+                          <input value={s[campo] ?? ""} onChange={e => update(i, { ...s, [campo]: e.target.value })} maxLength={40} placeholder={padrao} className={`${inputCls} font-mono`} />
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-gray-500">
+                      Vazio usa <span className="font-mono">name</span>, <span className="font-mono">email</span> e <span className="font-mono">phone</span> (padrão da maioria dos checkouts). Confira na sua plataforma quais nomes ela aceita. Precisa ter pergunta de e-mail no quiz pra levar o e-mail.
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {s.type === "resultado" && (
+            <div className="space-y-2">
+              <div>
+                <label className={smallLabel}>Título</label>
+                <textarea value={s.titulo} onChange={e => update(i, { ...s, titulo: e.target.value })} rows={2} maxLength={400} placeholder="Probabilidade de ==ser próspero==:" className={inputCls} />
+              </div>
+              <p className="text-[11px] text-gray-500">
+                Embaixo do título aparecem a imagem e a caixa (título + texto) do resultado do quiz em que o lead caiu — configure isso em cada resultado, no Modo quiz.
+              </p>
+
+              <div className="border-t border-gray-800 pt-2 space-y-2">
+                <p className={smallLabel}>Medidor de nível (o marcador &quot;Seu nível&quot; vai no nível de cada resultado)</p>
+                <input value={s.medidorTitulo} onChange={e => update(i, { ...s, medidorTitulo: e.target.value })} maxLength={120} placeholder="Título do medidor (ex: Probabilidade de enriquecer) — vazio esconde o medidor" className={inputCls} />
+                <NiveisInput value={s.niveis} onChange={niveis => update(i, { ...s, niveis })} />
+                <p className="text-[11px] text-gray-500">Níveis do mais baixo ao mais alto, separados por vírgula (2 a 7).</p>
+              </div>
+
+              <div className="border-t border-gray-800 pt-2 space-y-2">
+                <p className={smallLabel}>Comparação em duas colunas (opcional)</p>
+                <div className="grid sm:grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <input value={s.compEsquerdaTitulo} onChange={e => update(i, { ...s, compEsquerdaTitulo: e.target.value })} maxLength={60} placeholder="Esquerda: Bloqueado" className={inputCls} />
+                    <textarea value={s.compEsquerdaTexto} onChange={e => update(i, { ...s, compEsquerdaTexto: e.target.value })} rows={2} maxLength={400} placeholder="O padrão diagnosticado com base nas suas respostas" className={inputCls} />
+                  </div>
+                  <div className="space-y-1">
+                    <input value={s.compDireitaTitulo} onChange={e => update(i, { ...s, compDireitaTitulo: e.target.value })} maxLength={60} placeholder="Direita: Decide romper" className={inputCls} />
+                    <textarea value={s.compDireitaTexto} onChange={e => update(i, { ...s, compDireitaTexto: e.target.value })} rows={2} maxLength={400} placeholder="O padrão depois do método" className={inputCls} />
+                  </div>
+                </div>
+                {s.metricas.map((m, mi) => {
+                  const setM = (patch: Partial<typeof m>) => update(i, { ...s, metricas: s.metricas.map((x, xi) => (xi === mi ? { ...x, ...patch } : x)) });
+                  const pctInput = (v: number, on: (n: number) => void, title: string) => (
+                    <input
+                      type="number" min={0} max={100} value={v} title={title}
+                      onChange={e => on(Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
+                      className="w-20 bg-gray-950 border border-gray-800 rounded-lg px-2 py-2 text-sm"
+                    />
+                  );
+                  return (
+                    <div key={mi} className="flex items-center gap-2">
+                      <input value={m.nome} onChange={e => setM({ nome: e.target.value })} maxLength={60} placeholder="Nível de estresse" className="flex-1 min-w-0 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm" />
+                      {pctInput(m.esquerda, n => setM({ esquerda: n }), "% na coluna da esquerda")}
+                      {pctInput(m.direita, n => setM({ direita: n }), "% na coluna da direita")}
+                      <button type="button" onClick={() => update(i, { ...s, metricas: s.metricas.filter((_, xi) => xi !== mi) })} className="p-1.5 rounded-lg hover:bg-gray-800 text-red-400"><X size={13} /></button>
+                    </div>
+                  );
+                })}
+                {s.metricas.length < MAX_METRICAS && (
+                  <button
+                    type="button" onClick={() => update(i, { ...s, metricas: [...s.metricas, { nome: "", esquerda: 75, direita: 15 }] })}
+                    className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300"
+                  >
+                    <Plus size={12} /> Adicionar barra (nome, % esquerda, % direita)
+                  </button>
+                )}
+              </div>
+
+              <div className="sm:w-1/2">
+                <label className={smallLabel}>Texto do botão</label>
+                <input value={s.botao} onChange={e => update(i, { ...s, botao: e.target.value })} maxLength={40} placeholder="Continuar" className={inputCls} />
+              </div>
             </div>
           )}
         </div>

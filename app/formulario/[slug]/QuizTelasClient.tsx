@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Check, ExternalLink, MessageCircle } from "lucide-react";
 import {
-  buildWaLink, withTrackingParams, parseRich, DEFAULT_ACCENT,
+  buildWaLink, withTrackingParams, buildOfertaHref, parseRich, DEFAULT_ACCENT,
   type QuizStep, type LeadFormQuestion, type LeadFormUtm, type DestaqueCor,
 } from "@/lib/lead-form-shared";
 import { trackPixel, readUtm, registerVisit, MetaPixel } from "./form-runtime";
@@ -40,7 +40,52 @@ function Rich({ text, nome, accent }: { text: string; nome: string; accent: stri
   );
 }
 
-type QuizInfo = { titulo: string; descricao: string; conversionUrl: string | null };
+type QuizInfo = { titulo: string; descricao: string; conversionUrl: string | null; nivel?: number | null; imageUrl?: string | null };
+
+// Cor de cada nível do medidor: vermelho (mais baixo) → verde (mais alto)
+function corNivel(i: number, total: number): string {
+  const hue = total > 1 ? Math.round((i / (total - 1)) * 140) : 140;
+  return `hsl(${hue} 75% 48%)`;
+}
+
+function Medidor({ titulo, niveis, nivel }: { titulo: string; niveis: string[]; nivel: number | null | undefined }) {
+  const pos = nivel ? Math.min(nivel, niveis.length) - 1 : -1;
+  return (
+    <div className="space-y-2">
+      <p className="text-[17px] font-bold">{titulo}</p>
+      <div className="relative pt-10">
+        <div className="flex gap-1.5">
+          {niveis.map((_, i) => <div key={i} className="h-2.5 flex-1 rounded-full" style={{ backgroundColor: corNivel(i, niveis.length) }} />)}
+        </div>
+        {pos >= 0 && (
+          <div className="absolute top-0 -translate-x-1/2 flex flex-col items-center" style={{ left: `${((pos + 0.5) / niveis.length) * 100}%` }}>
+            <span className="bg-slate-800 text-white text-xs font-semibold rounded-md px-2 py-1 whitespace-nowrap">Seu nível</span>
+            <span className="w-4 h-4 mt-1.5 rounded-full border-[3px] border-blue-600 bg-white" />
+          </div>
+        )}
+        <div className="flex gap-1.5 mt-1.5">
+          {niveis.map((n, i) => (
+            <span key={i} className={`flex-1 text-[13px] text-center ${i === pos ? "font-bold text-slate-900" : "text-slate-600"}`}>{n}</span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Barra({ nome, pct, cor }: { nome: string; pct: number; cor: string }) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-end justify-between gap-2 text-[15px] font-medium leading-tight">
+        <span>{nome}</span><span className="flex-shrink-0">{pct}%</span>
+      </div>
+      <div className="relative h-2.5 rounded-full bg-slate-200">
+        <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: cor }} />
+        <span className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-5 rounded-full bg-white border-[3px] border-slate-300" style={{ left: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
 
 export function QuizTelasClient({
   slug, steps, pixelId, logoUrl, accentColor, doneMessage, ctaLabel, ctaUrl, waNumber, waButtonText, consentText, conversionUrl,
@@ -71,6 +116,12 @@ export function QuizTelasClient({
   const nome = answers.nome
     ?? steps.flatMap(s => (s.type === "pergunta" && s.question.type === "TEXTO" ? [answers[s.question.key]] : [])).find(Boolean)
     ?? "";
+
+  // Dados do lead pro checkout preenchido (oferta)
+  const respostaDoTipo = (tipo: LeadFormQuestion["type"]) =>
+    steps.flatMap(s => (s.type === "pergunta" && s.question.type === tipo ? [answers[s.question.key]] : [])).find(Boolean);
+  const leadEmail = respostaDoTipo("EMAIL");
+  const leadTelefone = respostaDoTipo("WHATSAPP");
 
   useEffect(() => {
     registerVisit(slug, utm.source);
@@ -324,6 +375,49 @@ export function QuizTelasClient({
           </div>
         )}
 
+        {!finished && step?.type === "resultado" && (() => {
+          const total = step.niveis.length;
+          const pos = quiz?.nivel ? Math.min(quiz.nivel, total) : null;
+          // Caixa do resultado na cor da faixa: terço de baixo vermelho, meio amarelo, de cima verde
+          const faixa = pos == null ? null : pos / total <= 1 / 3 ? "vermelho" : pos / total <= 2 / 3 ? "amarelo" : "verde";
+          const boxCls = faixa ? DESTAQUE_CLS[faixa].box : "bg-slate-50 border-slate-200 text-slate-800";
+          return (
+            <div className="space-y-7 animate-in fade-in slide-in-from-bottom-2 duration-300" key={step.id}>
+              {step.titulo && <h1 className={titleCls}><Rich text={step.titulo} nome={nome} accent={accent} /></h1>}
+              {quiz?.imageUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={quiz.imageUrl} alt="" className="mx-auto max-h-72 rounded-xl object-contain" />
+              )}
+              {step.medidorTitulo && total >= 2 && <Medidor titulo={step.medidorTitulo} niveis={step.niveis} nivel={pos} />}
+              {quiz && (
+                <div className={`rounded-xl border p-5 space-y-2 ${boxCls}`}>
+                  <p className="text-lg font-extrabold uppercase">{quiz.titulo}</p>
+                  {quiz.descricao && <p className="text-[16px] leading-relaxed whitespace-pre-line"><Rich text={quiz.descricao} nome={nome} accent={accent} /></p>}
+                </div>
+              )}
+              {(step.compEsquerdaTitulo || step.compDireitaTitulo) && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    {([[step.compEsquerdaTitulo, step.compEsquerdaTexto, "text-red-600"], [step.compDireitaTitulo, step.compDireitaTexto, "text-green-600"]] as const).map(([tt, tx, cor], ci) => (
+                      <div key={ci} className="rounded-xl border border-slate-200 p-4 text-center space-y-2">
+                        <p className={`text-xl font-extrabold leading-tight ${cor}`}>{tt}</p>
+                        {tx && <p className="text-[14px] text-slate-500 leading-snug">{tx}</p>}
+                      </div>
+                    ))}
+                  </div>
+                  {step.metricas.map((m, mi) => (
+                    <div key={mi} className="grid grid-cols-2 gap-4">
+                      <Barra nome={m.nome} pct={m.esquerda} cor="#ef4444" />
+                      <Barra nome={m.nome} pct={m.direita} cor="#22c55e" />
+                    </div>
+                  ))}
+                </div>
+              )}
+              {bottomBtn(step.botao || "Continuar", () => goNext())}
+            </div>
+          );
+        })()}
+
         {!finished && step?.type === "oferta" && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300" key={step.id}>
             {step.titulo && <h1 className={titleCls}><Rich text={step.titulo} nome={nome} accent={accent} /></h1>}
@@ -331,13 +425,26 @@ export function QuizTelasClient({
               // eslint-disable-next-line @next/next/no-img-element
               <img src={step.imageUrl} alt="" className="w-full rounded-xl object-cover" />
             )}
+            {(step.antesImageUrl || step.depoisImageUrl) && (
+              <div className="grid grid-cols-2 gap-3">
+                {([[step.antesLabel || "ANTES", step.antesImageUrl, "text-red-600"], [step.depoisLabel || "DEPOIS", step.depoisImageUrl, "text-green-600"]] as const).map(([lb, img, cor], ci) => (
+                  <div key={ci} className="space-y-2 text-center">
+                    <p className={`text-2xl font-extrabold ${cor}`}>{lb}</p>
+                    {img && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={img} alt="" className="w-full rounded-xl object-cover" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
             {step.texto && (
               <p className="text-center text-[17px] leading-relaxed text-slate-700 whitespace-pre-line"><Rich text={step.texto} nome={nome} accent={accent} /></p>
             )}
             {step.url
               ? bottomBtn(step.botao || "Quero agora", () => {
                   trackPixel("InitiateCheckout");
-                  window.location.assign(withTrackingParams(step.url, window.location.search));
+                  window.location.assign(buildOfertaHref(step, window.location.search, { nome, email: leadEmail, telefone: leadTelefone }));
                 })
               : bottomBtn(step.botao || "Continuar", () => goNext())}
           </div>

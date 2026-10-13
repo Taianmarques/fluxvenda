@@ -33,7 +33,45 @@ export type QuizStep =
       destaqueTitulo: string; destaqueTexto: string; destaqueCor: DestaqueCor; botao: string;
     }
   | { id: string; type: "carregamento"; texto: string; segundos: number }
-  | { id: string; type: "oferta"; titulo: string; texto: string; imageUrl?: string; botao: string; url: string };
+  | {
+      id: string; type: "resultado"; titulo: string;
+      // Medidor: rótulos do mais baixo ao mais alto; o marcador vai no QuizResult.nivel do lead
+      medidorTitulo: string; niveis: string[];
+      // Comparação em 2 colunas (ex: "Bloqueado" x "Decide romper") com barras de %
+      compEsquerdaTitulo: string; compEsquerdaTexto: string; compDireitaTitulo: string; compDireitaTexto: string;
+      metricas: { nome: string; esquerda: number; direita: number }[];
+      botao: string;
+    }
+  | {
+      id: string; type: "oferta"; titulo: string; texto: string; imageUrl?: string; botao: string; url: string;
+      antesImageUrl?: string; depoisImageUrl?: string; antesLabel?: string; depoisLabel?: string;
+      // Checkout já preenchido: manda nome, e-mail e telefone do lead nesses parâmetros do link
+      preencher?: boolean; paramNome?: string; paramEmail?: string; paramTelefone?: string;
+    };
+
+export const DEFAULT_NIVEIS = ["Baixo", "Normal", "Médio", "Alto", "Muito alto"];
+export const MAX_METRICAS = 6;
+
+// Link da oferta com fbclid/utm e, se ligado, os dados do lead nos parâmetros do checkout
+export function buildOfertaHref(
+  step: Extract<QuizStep, { type: "oferta" }>, search: string, lead: { nome?: string; email?: string; telefone?: string },
+): string {
+  const base = withTrackingParams(step.url, search);
+  if (!step.preencher) return base;
+  try {
+    const u = new URL(base);
+    const put = (param: string | undefined, v: string | undefined) => {
+      const k = param?.trim();
+      if (k && v && !u.searchParams.has(k)) u.searchParams.set(k, v);
+    };
+    put(step.paramNome || "name", lead.nome);
+    put(step.paramEmail || "email", lead.email);
+    put(step.paramTelefone || "phone", lead.telefone?.replace(/\D/g, ""));
+    return u.toString();
+  } catch {
+    return base;
+  }
+}
 
 export type QuizStepType = QuizStep["type"];
 
@@ -41,7 +79,7 @@ export function normalizeSteps(raw: unknown): QuizStep[] {
   if (!Array.isArray(raw)) return [];
   return raw.filter((s): s is QuizStep =>
     Boolean(s) && typeof s === "object" && typeof (s as { id?: unknown }).id === "string"
-    && ["pergunta", "conteudo", "carregamento", "oferta"].includes((s as { type?: unknown }).type as string)
+    && ["pergunta", "conteudo", "carregamento", "resultado", "oferta"].includes((s as { type?: unknown }).type as string)
     && ((s as { type: string }).type !== "pergunta" || Boolean((s as { question?: { key?: unknown } }).question?.key)));
 }
 
@@ -79,6 +117,8 @@ export type QuizResult = {
   etiquetaId: string | null;     // "" / null = a do formulário
   pipelineStageId: string | null;
   conversionUrl: string;         // "" = a página de conversão do formulário
+  nivel: number | null;          // posição no medidor da tela de resultado (1 = mais baixo); null = sem marcador
+  imageUrl?: string;             // imagem mostrada na tela de resultado pra quem caiu aqui
 };
 
 export const MAX_QUIZ_RESULTS = 6;
@@ -96,6 +136,8 @@ export function normalizeQuizResults(raw: unknown): QuizResult[] {
       etiquetaId: str(r.etiquetaId) || null,
       pipelineStageId: str(r.pipelineStageId) || null,
       conversionUrl: str(r.conversionUrl),
+      nivel: typeof r.nivel === "number" && r.nivel >= 1 ? Math.round(r.nivel) : null,
+      ...(str(r.imageUrl) && { imageUrl: str(r.imageUrl) }),
     }));
 }
 

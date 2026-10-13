@@ -3,6 +3,7 @@
 import { Plus, Trash2, Sparkles } from "lucide-react";
 import { MAX_QUIZ_RESULTS, type QuizResult } from "@/lib/lead-form-shared";
 import type { CrmFormOptions } from "./FormularioExtras";
+import { ImageField } from "./FormularioTelas";
 
 // Modo quiz de perfil do editor de formulário: liga/desliga e edita os resultados. A ligação
 // opção → resultado fica em cada pergunta de escolha (FormularioEditorClient), porque é lá que
@@ -13,12 +14,14 @@ const inputCls = "w-full mt-1 bg-gray-950 border border-gray-800 rounded-lg px-3
 export function novoResultado(existentes: QuizResult[]): QuizResult {
   let n = existentes.length + 1;
   while (existentes.some(r => r.key === `r${n}`)) n++;
-  return { key: `r${n}`, titulo: "", descricao: "", mensagem: "", etiquetaId: null, pipelineStageId: null, conversionUrl: "" };
+  return { key: `r${n}`, titulo: "", descricao: "", mensagem: "", etiquetaId: null, pipelineStageId: null, conversionUrl: "", nivel: null };
 }
 
 export function QuizPanel({
-  enabled, onToggle, results, onChange, isCrm, crmOptions,
+  enabled, onToggle, results, onChange, isCrm, crmOptions, telas = false, onError = () => {},
 }: {
+  telas?: boolean; // quiz em telas: mostra nível no medidor e imagem da tela de resultado
+  onError?: (msg: string) => void;
   enabled: boolean;
   onToggle: (on: boolean) => void;
   results: QuizResult[];
@@ -76,6 +79,21 @@ export function QuizPanel({
                   placeholder="Oi, {{nome}}! Seu perfil deu {{resultado}}..." className={inputCls}
                 />
               </div>
+              {telas && (
+                <div className="flex items-end gap-3 flex-wrap">
+                  <div>
+                    <label className="text-xs text-gray-500">Nível no medidor</label>
+                    <select
+                      value={r.nivel ?? ""} onChange={e => update(i, { nivel: e.target.value ? Number(e.target.value) : null })}
+                      className={`${inputCls} w-40`}
+                    >
+                      <option value="">Sem marcador</option>
+                      {[1, 2, 3, 4, 5, 6, 7].map(n => <option key={n} value={n}>{n}{n === 1 ? " (mais baixo)" : ""}</option>)}
+                    </select>
+                  </div>
+                  <ImageField value={r.imageUrl} onChange={url => update(i, { imageUrl: url })} onError={onError} label="Imagem do resultado" />
+                </div>
+              )}
               <div className={`grid gap-2 ${isCrm && crmOptions ? "sm:grid-cols-3" : ""}`}>
                 {isCrm && crmOptions && (
                   <>

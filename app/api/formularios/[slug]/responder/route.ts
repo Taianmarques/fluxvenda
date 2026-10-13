@@ -136,6 +136,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
 
   return NextResponse.json({
     submissionId: submission.id, nextMessage, inviteSent,
-    ...(quiz && { quiz: { titulo: quiz.titulo, descricao: quiz.descricao, conversionUrl: quiz.conversionUrl || null } }),
+    ...(quiz && {
+      quiz: {
+        titulo: quiz.titulo, descricao: quiz.descricao, conversionUrl: quiz.conversionUrl || null,
+        nivel: quiz.nivel, imageUrl: quiz.imageUrl ?? null,
+      },
+    }),
   });
 }
