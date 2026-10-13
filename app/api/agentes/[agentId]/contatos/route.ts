@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getAgentConfigWithRole } from "@/lib/team";
 import { maybeAlertHotLead } from "@/lib/hot-lead-alert";
 import { z } from "zod";
+import { canonicalBrPhone, phoneVariants, withDdi } from "@/lib/phone-match";
 
 // Volume que sinaliza uma importação "grande" o suficiente pra avisar o comercial durante o
 // teste grátis (ver lib/hot-lead-alert.ts) — abaixo disso é digitação manual normal.
@@ -47,11 +48,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
   }
   const nivelCarteira = body.data.nivelCarteira;
 
-  // Dedup interno + descarta números inválidos
+  // Dedup interno + descarta números inválidos. Deduplica pelo número "canônico" (com/sem 55,
+  // com/sem o 9) e grava sempre com DDI 55 — é como o WhatsApp entrega, então a resposta do
+  // cliente cai nesta mesma conversa em vez de abrir uma duplicada.
   const porNumero = new Map<string, { nome?: string; numero: string }>();
   for (const c of body.data.contatos) {
     if (c.numero.length < 10 || c.numero.length > 13) continue;
-    if (!porNumero.has(c.numero)) porNumero.set(c.numero, c);
+    const key = canonicalBrPhone(c.numero);
+    if (!porNumero.has(key)) porNumero.set(key, { ...c, numero: withDdi(c.numero) });
   }
   const validos = Array.from(porNumero.values());
   const ignorados = body.data.contatos.length - validos.length;
@@ -60,12 +64,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
   }
 
   const existentes = await prisma.conversation.findMany({
-    where: { agentConfigId: config.id, contactNumber: { in: validos.map(v => v.numero) } },
+    where: { agentConfigId: config.id, contactNumber: { in: validos.flatMap(v => phoneVariants(v.numero)) } },
     select: { id: true, contactNumber: true, contactName: true, assignedToId: true, nivelCarteira: true },
   });
-  const existentesPorNumero = new Map(existentes.map(e => [e.contactNumber, e]));
+  // Indexa pelo número canônico: o contato já existente pode estar gravado em outra forma
+  const existentesPorNumero = new Map(existentes.map(e => [canonicalBrPhone(e.contactNumber), e]));
 
-  const novos = validos.filter(v => !existentesPorNumero.has(v.numero));
+  const novos = validos.filter(v => !existentesPorNumero.has(canonicalBrPhone(v.numero)));
   await prisma.conversation.createMany({
     data: novos.map(v => ({
       agentConfigId: config.id,
@@ -78,7 +83,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
 
   let atualizados = 0;
   for (const v of validos) {
-    const existente = existentesPorNumero.get(v.numero);
+    const existente = existentesPorNumero.get(canonicalBrPhone(v.numero));
     if (!existente) continue;
     const data: { contactName?: string; assignedToId?: string; nivelCarteira?: string } = {};
     if (!existente.contactName && v.nome?.trim()) data.contactName = v.nome.trim();

@@ -7,6 +7,7 @@ import { dentroHorarioEnvio } from "@/lib/sending-hours";
 import { normalizeStageFollowup } from "@/lib/pipeline";
 import { normalizeFormFunnelSteps, normalizePhone } from "@/lib/lead-form-funnel";
 import { interpolateTexto } from "@/lib/lead-form-shared";
+import { findConversationByPhone } from "@/lib/conversation-lookup";
 import { FLUXVENDA_TEAM_ID } from "@/lib/internal-agent";
 
 // Erro permanente da UazAPI: o número não tem WhatsApp. Tentar de novo nunca resolve — o follow-up
@@ -280,9 +281,7 @@ O lead está na etapa "${stage.name}" do funil "${stage.pipeline.name}". Siga es
     if (!(await canalConectado(config.uazapiToken, config.id))) continue;
 
     const contactNumber = normalizePhone(submission.whatsapp!);
-    const conversation = await prisma.conversation.findUnique({
-      where: { agentConfigId_contactNumber: { agentConfigId: config.id, contactNumber } },
-    });
+    const conversation = await findConversationByPhone(config.id, contactNumber);
     if (!conversation || conversation.humanTakeover || conversation.status === "FINALIZADO") continue;
 
     const lastMessage = await prisma.message.findFirst({

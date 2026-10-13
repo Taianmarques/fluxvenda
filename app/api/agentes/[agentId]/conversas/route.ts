@@ -5,6 +5,8 @@ import { getAgentConfigWithRole } from "@/lib/team";
 import { podeVerNaoAtribuidos } from "@/lib/crm-access";
 import { Prisma } from "@/app/generated/prisma/client";
 import { z } from "zod";
+import { findConversationByPhone } from "@/lib/conversation-lookup";
+import { withDdi } from "@/lib/phone-match";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ agentId: string }> }) {
   const { userId } = await auth();
@@ -92,9 +94,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
     return NextResponse.json({ error: "Número inválido — use DDD + número" }, { status: 400 });
   }
 
-  const existing = await prisma.conversation.findUnique({
-    where: { agentConfigId_contactNumber: { agentConfigId: config.id, contactNumber: numero } },
-  });
+  // Aceita o mesmo número em outra forma (com/sem 55, com/sem o 9) — senão a resposta do cliente,
+  // que chega com 55 + DDD + número, abriria uma conversa duplicada
+  const existing = await findConversationByPhone(config.id, numero);
 
   if (existing) {
     // Mesma regra de sempre: atendente não abre uma conversa que já é de outro colega
@@ -108,7 +110,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
   }
 
   const conversation = await prisma.conversation.create({
-    data: { agentConfigId: config.id, contactNumber: numero, contactName: nome?.trim() || null, assignedToId: userId },
+    data: { agentConfigId: config.id, contactNumber: withDdi(numero), contactName: nome?.trim() || null, assignedToId: userId },
   });
   return NextResponse.json({ conversation });
 }

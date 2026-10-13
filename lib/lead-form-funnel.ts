@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppTextAsTeamDetailed } from "@/lib/whatsapp";
 import { interpolateTexto, type LeadFormUtm } from "@/lib/lead-form-shared";
+import { findConversationByPhone } from "@/lib/conversation-lookup";
 import { FLUXVENDA_TEAM_ID } from "@/lib/internal-agent";
 import { openai, MODEL } from "@/lib/openai";
 
@@ -138,11 +139,10 @@ export async function sendFormInviteToLead(params: {
     return { ok: false, error: "O agente não tem um WhatsApp (UazAPI) conectado — conecte em Canais." };
   }
 
-  const conversation = await prisma.conversation.upsert({
-    where: { agentConfigId_contactNumber: { agentConfigId: agentConfig.id, contactNumber } },
-    update: { contactName: nome },
-    create: { agentConfigId: agentConfig.id, contactNumber, contactName: nome },
-  });
+  const existingConversation = await findConversationByPhone(agentConfig.id, contactNumber);
+  const conversation = existingConversation
+    ? await prisma.conversation.update({ where: { id: existingConversation.id }, data: { contactName: nome } })
+    : await prisma.conversation.create({ data: { agentConfigId: agentConfig.id, contactNumber, contactName: nome } });
 
   const texto = inviteMessage?.trim()
     ? interpolateTexto(inviteMessage, { nome, link: params.ctaUrl })

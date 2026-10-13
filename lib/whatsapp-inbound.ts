@@ -24,6 +24,7 @@ import { getDemoSlotDays, isDemoSlotAvailable, DEMO_SLOT_MINUTES, DEFAULT_DEMO_T
 import { sendDemoBookingNotification } from "@/lib/email";
 import { FLUXVENDA_TEAM_ID } from "@/lib/internal-agent";
 import { phoneInList } from "@/lib/phone-match";
+import { findConversationByPhone } from "@/lib/conversation-lookup";
 
 type AgentConfigFull = NonNullable<Awaited<ReturnType<typeof prisma.agentConfig.findFirst>>>;
 
@@ -1604,11 +1605,28 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
   const { text, caption, contactNumber, contactName, mediaUrl, mediaType, imageUrl } = msg;
 
   // Cliente respondeu — zera o contador de follow-up e marca prospect como RESPONDEU se aplicável
-  const conversation = await prisma.conversation.upsert({
-    where: { agentConfigId_contactNumber: { agentConfigId: config.id, contactNumber } },
-    update: { status: "ATIVO", followupCount: 0, ...(contactName && { contactName }) },
-    create: { agentConfigId: config.id, contactNumber, contactName, status: "ATIVO", isGroup: msg.isGroup ?? false },
-  });
+  const conversationUpdate = { status: "ATIVO" as const, followupCount: 0, ...(contactName && { contactName }) };
+  // Grupo e Instagram (ig_...) usam id próprio, não telefone: chave exata. Telefone: acha a
+  // conversa já criada à mão com o mesmo número em outra forma (sem 55, sem o 9) antes de criar.
+  const phoneContact = !msg.isGroup && !contactNumber.startsWith("ig_");
+  const existingConversation = phoneContact ? await findConversationByPhone(config.id, contactNumber) : null;
+  let conversation;
+  if (existingConversation) {
+    conversation = await prisma.conversation.update({ where: { id: existingConversation.id }, data: conversationUpdate });
+  } else {
+    try {
+      conversation = await prisma.conversation.create({
+        data: { agentConfigId: config.id, contactNumber, contactName, status: "ATIVO", isGroup: msg.isGroup ?? false },
+      });
+    } catch (err) {
+      // Duas mensagens do mesmo contato chegando juntas: a outra já criou — usa a dela
+      if ((err as { code?: string })?.code !== "P2002") throw err;
+      conversation = await prisma.conversation.update({
+        where: { agentConfigId_contactNumber: { agentConfigId: config.id, contactNumber } },
+        data: conversationUpdate,
+      });
+    }
+  }
   if (config.prospeccaoEnabled) {
     await prisma.prospect.updateMany({
       where: { agentConfigId: config.id, telefone: contactNumber, status: "ABORDADO" },
