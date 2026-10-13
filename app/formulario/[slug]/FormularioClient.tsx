@@ -113,9 +113,11 @@ export function FormularioClient({
   const conversionHref = conversionUrl ? withTrackingParams(conversionUrl, typeof window === "undefined" ? "" : window.location.search) : null;
   useEffect(() => {
     if (!done || !conversionHref) return;
-    const t = setTimeout(() => { window.location.href = conversionHref; }, 2500);
+    // Com pixel, uma folga curta pro CompleteRegistration sair antes de trocar de página (o navegador
+    // pode cancelar a requisição em andamento); sem pixel não há o que esperar.
+    const t = setTimeout(() => { window.location.href = conversionHref; }, pixelId ? 800 : 0);
     return () => clearTimeout(t);
-  }, [done, conversionHref]);
+  }, [done, conversionHref, pixelId]);
 
   const needsConsent = current?.type === "WHATSAPP" && Boolean(consentText);
 
