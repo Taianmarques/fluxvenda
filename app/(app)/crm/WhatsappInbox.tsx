@@ -1140,24 +1140,10 @@ export function WhatsappInbox({
     }
   }
 
-  const statusCounts = {
-    ativos: conversations.filter(c => !c.isGroup && c.humanTakeover && c.status !== "FINALIZADO" && c.status !== "AGUARDANDO").length,
-    pendentes: conversations.filter(c => !c.isGroup && !c.humanTakeover && c.status !== "FINALIZADO" && c.status !== "AGUARDANDO").length,
-    aguardando: conversations.filter(c => !c.isGroup && c.status === "AGUARDANDO").length,
-    finalizados: conversations.filter(c => !c.isGroup && c.status === "FINALIZADO").length,
-    grupos: conversations.filter(c => c.isGroup).length,
-  };
-
-  const statusFiltered = conversations.filter(c => {
-    if (statusFilter === "grupos") return c.isGroup;
-    if (c.isGroup) return false;
-    if (statusFilter === "aguardando") return c.status === "AGUARDANDO";
-    if (statusFilter === "ativos") return c.humanTakeover && c.status !== "FINALIZADO" && c.status !== "AGUARDANDO";
-    if (statusFilter === "pendentes") return !c.humanTakeover && c.status !== "FINALIZADO" && c.status !== "AGUARDANDO";
-    return c.status === "FINALIZADO";
-  });
-
-  const extraFiltered = statusFiltered.filter(c => {
+  // Filtros do painel (atendente, status do lead...) e a busca valem pra tudo: lista E contadores
+  // das abas. Só a aba (Ativos/Pendentes/...) separa — por isso os contadores partem do resultado
+  // já filtrado, em vez do total de conversas.
+  const passaFiltros = (c: (typeof conversations)[number]) => {
     if (filters.attendantId === "__none__" && c.assignedToId) return false;
     if (filters.attendantId && filters.attendantId !== "__none__" && c.assignedToId !== filters.attendantId) return false;
     if (filters.leadStatusId && c.leadStatusId !== filters.leadStatusId) return false;
@@ -1168,17 +1154,32 @@ export function WhatsappInbox({
       const readAt = c.lastReadAt ? new Date(c.lastReadAt).getTime() : 0;
       if (!(lastAt > readAt)) return false;
     }
+    const q = search.trim().toLowerCase();
+    if (q) {
+      return (c.contactName ?? "").toLowerCase().includes(q)
+        || c.contactNumber.includes(q)
+        || (c.lastMessage ?? "").toLowerCase().includes(q);
+    }
     return true;
-  });
+  };
+  const visiveis = conversations.filter(passaFiltros);
 
-  const filteredConversations = search.trim()
-    ? extraFiltered.filter(c => {
-        const q = search.trim().toLowerCase();
-        return (c.contactName ?? "").toLowerCase().includes(q)
-          || c.contactNumber.includes(q)
-          || (c.lastMessage ?? "").toLowerCase().includes(q);
-      })
-    : extraFiltered;
+  const statusCounts = {
+    ativos: visiveis.filter(c => !c.isGroup && c.humanTakeover && c.status !== "FINALIZADO" && c.status !== "AGUARDANDO").length,
+    pendentes: visiveis.filter(c => !c.isGroup && !c.humanTakeover && c.status !== "FINALIZADO" && c.status !== "AGUARDANDO").length,
+    aguardando: visiveis.filter(c => !c.isGroup && c.status === "AGUARDANDO").length,
+    finalizados: visiveis.filter(c => !c.isGroup && c.status === "FINALIZADO").length,
+    grupos: visiveis.filter(c => c.isGroup).length,
+  };
+
+  const filteredConversations = visiveis.filter(c => {
+    if (statusFilter === "grupos") return c.isGroup;
+    if (c.isGroup) return false;
+    if (statusFilter === "aguardando") return c.status === "AGUARDANDO";
+    if (statusFilter === "ativos") return c.humanTakeover && c.status !== "FINALIZADO" && c.status !== "AGUARDANDO";
+    if (statusFilter === "pendentes") return !c.humanTakeover && c.status !== "FINALIZADO" && c.status !== "AGUARDANDO";
+    return c.status === "FINALIZADO";
+  });
 
   const showSelecaoLote = (statusFilter === "ativos" || statusFilter === "pendentes") && selecaoAtiva;
   const todosSelecionadosLote = filteredConversations.length > 0 && filteredConversations.every(c => selecionados.has(c.id));
