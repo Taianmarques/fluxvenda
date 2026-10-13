@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { getAgentConfigAsManager } from "@/lib/team";
-import { questionsSchema, extrasShape } from "@/lib/lead-form-schema";
+import { questionsSchema, extrasShape, quizResultsSchema } from "@/lib/lead-form-schema";
+import { quizOrderError, type QuizResult } from "@/lib/lead-form-shared";
+import { Prisma } from "@/app/generated/prisma/client";
 import { z } from "zod";
 
 const updateSchema = z.object({
@@ -13,6 +15,7 @@ const updateSchema = z.object({
     .refine(qs => qs.filter(q => q.type === "WHATSAPP").length === 1, "O formulário precisa de exatamente uma pergunta do tipo WhatsApp (é ela que dispara a primeira mensagem)")
     .optional(),
   ...extrasShape,
+  quizResults: quizResultsSchema,
   pixelId: z.string().max(40).nullable().optional(),
   avatarUrl: z.string().max(8_000_000).nullable().optional(),
   active: z.boolean().optional(),
@@ -63,7 +66,29 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ag
     if (!stage) return NextResponse.json({ error: "Etapa do pipeline não encontrada" }, { status: 400 });
   }
 
-  const form = await prisma.leadForm.update({ where: { id }, data: body.data });
+  // Quiz: ordem das perguntas + etiqueta/etapa de cada resultado também precisam ser DESTE agente
+  const { quizResults, ...rest } = body.data;
+  if (quizResults !== undefined) {
+    const results = (quizResults ?? []) as QuizResult[];
+    const orderError = quizOrderError(body.data.questions ?? (owned.form.questions as never), results);
+    if (orderError) return NextResponse.json({ error: orderError }, { status: 400 });
+    for (const r of results) {
+      if (r.etiquetaId && !(await prisma.etiqueta.findFirst({ where: { id: r.etiquetaId, agentConfigId: owned.config.id }, select: { id: true } }))) {
+        return NextResponse.json({ error: `Etiqueta do resultado "${r.titulo}" não encontrada` }, { status: 400 });
+      }
+      if (r.pipelineStageId && !(await prisma.pipelineStage.findFirst({ where: { id: r.pipelineStageId, pipeline: { agentConfigId: owned.config.id } }, select: { id: true } }))) {
+        return NextResponse.json({ error: `Etapa do resultado "${r.titulo}" não encontrada` }, { status: 400 });
+      }
+    }
+  }
+
+  const form = await prisma.leadForm.update({
+    where: { id },
+    data: {
+      ...rest,
+      ...(quizResults !== undefined && { quizResults: quizResults?.length ? quizResults : Prisma.DbNull }),
+    },
+  });
   return NextResponse.json({ form });
 }
 

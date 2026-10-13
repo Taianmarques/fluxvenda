@@ -71,6 +71,7 @@ export function FormularioClient({
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
   const [inviteSent, setInviteSent] = useState<boolean | undefined>(undefined);
+  const [quiz, setQuiz] = useState<{ titulo: string; descricao: string; conversionUrl: string | null } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const utmRef = useRef<LeadFormUtm>({});
@@ -110,7 +111,8 @@ export function FormularioClient({
 
   // Página de conversão em outro site: leva o lead pra lá (com fbclid/utm) logo depois do pixel do
   // formulário disparar. O botão cobre quem tem a navegação automática bloqueada.
-  const conversionHref = conversionUrl ? withTrackingParams(conversionUrl, typeof window === "undefined" ? "" : window.location.search) : null;
+  const destinoConversao = quiz?.conversionUrl || conversionUrl;
+  const conversionHref = destinoConversao ? withTrackingParams(destinoConversao, typeof window === "undefined" ? "" : window.location.search) : null;
   useEffect(() => {
     if (!done || !conversionHref) return;
     // Com pixel, uma folga curta pro CompleteRegistration sair antes de trocar de página (o navegador
@@ -155,6 +157,7 @@ export function FormularioClient({
       if (typeof data.submissionId === "string") setSubmissionId(data.submissionId);
       nextMessage = typeof data.nextMessage === "string" ? data.nextMessage : null;
       if (typeof data.inviteSent === "boolean") sent = data.inviteSent;
+      if (data.quiz && typeof data.quiz === "object") setQuiz(data.quiz as { titulo: string; descricao: string; conversionUrl: string | null });
     } catch {
       // segue o fluxo mesmo se o registro falhar — não trava o lead numa tela de erro
     }
@@ -314,6 +317,13 @@ export function FormularioClient({
 
         {done && (
           <div className="mt-4 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            {quiz && (
+              <div className="ml-12 rounded-2xl border-2 p-5 space-y-2" style={{ borderColor: accent }}>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Seu resultado</p>
+                <p className="text-2xl font-bold" style={{ color: accent }}>{quiz.titulo}</p>
+                {quiz.descricao && <p className="text-[15px] text-gray-700 leading-relaxed whitespace-pre-line">{quiz.descricao}</p>}
+              </div>
+            )}
             <div className="flex items-start gap-3">
               {avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element

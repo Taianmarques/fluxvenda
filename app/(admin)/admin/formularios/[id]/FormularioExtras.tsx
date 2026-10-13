@@ -331,6 +331,26 @@ export function StatsPanel({ stats, exportHref }: { stats: FormStats; exportHref
         ))}
       </div>
 
+      {stats.porResultado.length > 0 && (
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-2">
+          <p className="text-xs text-gray-500 uppercase tracking-wide">Resultados do quiz</p>
+          {stats.porResultado.map(r => {
+            const total = stats.porResultado.reduce((a, b) => a + b.leads, 0);
+            return (
+              <div key={r.titulo}>
+                <div className="flex items-center justify-between gap-3 text-xs">
+                  <span className="truncate text-gray-300">{r.titulo}</span>
+                  <span className="text-gray-500 flex-shrink-0">{r.leads} ({pct(r.leads, total)})</span>
+                </div>
+                <div className="h-1.5 bg-gray-800 rounded-full mt-1 overflow-hidden">
+                  <div className="h-full bg-purple-500 rounded-full" style={{ width: `${total ? (r.leads / total) * 100 : 0}%` }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {stats.porOrigem.length > 0 && (
         <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
           <div className="grid grid-cols-[2fr_1fr_1fr_1fr] gap-2 px-4 py-2 text-[11px] uppercase tracking-wide text-gray-500 border-b border-gray-800">

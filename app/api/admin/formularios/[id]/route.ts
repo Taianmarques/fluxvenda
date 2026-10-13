@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
-import { questionsSchema, extrasShape } from "@/lib/lead-form-schema";
+import { questionsSchema, extrasShape, quizResultsSchema } from "@/lib/lead-form-schema";
+import { quizOrderError, type QuizResult } from "@/lib/lead-form-shared";
+import { Prisma } from "@/app/generated/prisma/client";
 
 async function assertAdmin(userId: string) {
   const profile = await prisma.profile.findUnique({ where: { id: userId }, select: { role: true } });
@@ -15,6 +17,7 @@ const updateSchema = z.object({
   headline: z.string().min(1).max(1000).optional(),
   questions: questionsSchema.optional(),
   ...extrasShape,
+  quizResults: quizResultsSchema,
   pixelId: z.string().max(40).nullable().optional(),
   avatarUrl: z.string().max(8_000_000).nullable().optional(),
   active: z.boolean().optional(),
@@ -63,7 +66,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!agent) return NextResponse.json({ error: "Agente de destino inválido" }, { status: 400 });
   }
 
-  const form = await prisma.leadForm.update({ where: { id }, data: body.data });
+  const { quizResults, ...rest } = body.data;
+  if (quizResults !== undefined) {
+    const questions = body.data.questions
+      ?? ((await prisma.leadForm.findUnique({ where: { id }, select: { questions: true } }))?.questions as never) ?? [];
+    // Etiqueta/etapa por resultado é coisa do CRM — no super admin o resultado não leva nenhuma
+    const results = ((quizResults ?? []) as QuizResult[]).map(r => ({ ...r, etiquetaId: null, pipelineStageId: null }));
+    const orderError = quizOrderError(questions, results);
+    if (orderError) return NextResponse.json({ error: orderError }, { status: 400 });
+    const form = await prisma.leadForm.update({
+      where: { id },
+      data: { ...rest, quizResults: results.length ? results : Prisma.DbNull },
+    });
+    return NextResponse.json({ form });
+  }
+
+  const form = await prisma.leadForm.update({ where: { id }, data: rest });
   return NextResponse.json({ form });
 }
 

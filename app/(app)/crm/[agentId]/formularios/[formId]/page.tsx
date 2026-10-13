@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getAgentConfigWithRole } from "@/lib/team";
 import { normalizeFormFunnelSteps } from "@/lib/lead-form-funnel";
 import { getFormStats } from "@/lib/lead-form-stats";
-import { formToExtras, type LeadFormUtm } from "@/lib/lead-form-shared";
+import { formToExtras, normalizeQuizResults, type LeadFormUtm } from "@/lib/lead-form-shared";
 import { FormularioEditorClient, type LeadFormQuestion } from "@/app/(admin)/admin/formularios/[id]/FormularioEditorClient";
 
 export default async function FormularioEditorPage({ params }: { params: Promise<{ agentId: string; formId: string }> }) {
@@ -36,7 +36,7 @@ export default async function FormularioEditorPage({ params }: { params: Promise
   if (!form) notFound();
 
   const [stats, etiquetas, pipelines] = await Promise.all([
-    getFormStats(form.id, form.questions as LeadFormQuestion[]),
+    getFormStats(form.id, form.questions as LeadFormQuestion[], form.quizResults),
     prisma.etiqueta.findMany({ where: { agentConfigId: result.config.id }, orderBy: { nome: "asc" }, select: { id: true, nome: true } }),
     prisma.pipeline.findMany({
       where: { agentConfigId: result.config.id }, orderBy: { order: "asc" },
@@ -68,6 +68,7 @@ export default async function FormularioEditorPage({ params }: { params: Promise
         }}
         initialFunnelSteps={normalizeFormFunnelSteps(form.funnelSteps)}
         initialQuestions={form.questions as LeadFormQuestion[]}
+        initialQuizResults={normalizeQuizResults(form.quizResults)}
         submissions={form.submissions.map(s => ({
           id: s.id,
           nome: s.nome,
@@ -75,6 +76,7 @@ export default async function FormularioEditorPage({ params }: { params: Promise
           answers: s.answers as Record<string, string>,
           inviteSentAt: s.inviteSentAt?.toISOString() ?? null,
           inviteError: s.inviteError,
+        quizResult: s.quizResult,
           utm: (s.utm as LeadFormUtm | null) ?? null,
           createdAt: s.createdAt.toISOString(),
         }))}

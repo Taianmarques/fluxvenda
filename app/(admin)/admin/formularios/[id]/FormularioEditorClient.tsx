@@ -4,16 +4,17 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Plus, Trash2, Save, Check, ExternalLink, Copy, Target, ChevronDown, ImagePlus, X, Send, Search, Loader2 } from "lucide-react";
 
-import type { LeadFormQuestion, LeadFormUtm } from "@/lib/lead-form-shared";
+import type { LeadFormQuestion, LeadFormUtm, QuizResult } from "@/lib/lead-form-shared";
 import { MAX_OPCOES_ESCOLHA, DEFAULT_ACCENT } from "@/lib/lead-form-shared";
 import type { FormStats } from "@/lib/lead-form-stats";
 import { ExtrasPanel, TrackingLinks, StatsPanel, type FormExtras, type CrmFormOptions } from "./FormularioExtras";
+import { QuizPanel, novoResultado } from "./FormularioQuiz";
 
 export type { LeadFormQuestion };
 export type FunnelStep = { minutos: number; mensagem: string };
 type Submission = {
   id: string; nome: string | null; whatsapp: string | null; answers: Record<string, string>; inviteSentAt: string | null;
-  inviteError: string | null; utm: LeadFormUtm | null; createdAt: string;
+  inviteError: string | null; quizResult: string | null; utm: LeadFormUtm | null; createdAt: string;
 };
 type AgentOption = { id: string; nome: string; teamName: string; temWhatsapp: boolean };
 
@@ -61,8 +62,9 @@ function resizeImageToBase64(file: File, maxSize = 200, quality = 0.85): Promise
 export function FormularioEditorClient({
   id, initialSlug, initialTitle, initialHeadline, initialActive, initialPixelId, initialAvatarUrl,
   initialAgentConfigId, initialAgentLabel, initialInviteMessage, initialDoneMessage, initialFunnelSteps, initialQuestions, submissions,
-  crmAgentId, whatsappOk = true, initialExtras, crmOptions, stats,
+  crmAgentId, whatsappOk = true, initialExtras, crmOptions, stats, initialQuizResults,
 }: {
+  initialQuizResults: QuizResult[];
   id: string; initialSlug: string; initialTitle: string; initialHeadline: string; initialActive: boolean;
   initialPixelId: string; initialAvatarUrl: string | null;
   initialAgentConfigId: string | null; initialAgentLabel: string | null; initialInviteMessage: string; initialDoneMessage: string;
@@ -100,6 +102,21 @@ export function FormularioEditorClient({
   const [optionsText, setOptionsText] = useState<Record<string, string>>(
     Object.fromEntries(initialQuestions.filter(q => q.type === "ESCOLHA").map(q => [q.key, (q.options ?? []).join("\n")])),
   );
+  // Quiz: desligar só esconde — os resultados digitados voltam se religar antes de salvar
+  const [quizOn, setQuizOn] = useState(initialQuizResults.length > 0);
+  const [quizResults, setQuizResults] = useState<QuizResult[]>(initialQuizResults);
+  function toggleQuiz(on: boolean) {
+    setQuizOn(on);
+    if (on && quizResults.length === 0) setQuizResults(prev => { const a = novoResultado(prev); return [a, novoResultado([a])]; });
+    setSaved(false);
+  }
+  function setOptionResult(i: number, option: string, resultKey: string) {
+    const q = questions[i];
+    const map = { ...(q.optionResults ?? {}) };
+    if (resultKey) map[option] = resultKey; else delete map[option];
+    updateQuestion(i, { optionResults: map });
+  }
+
   function updateExtras(patch: Partial<FormExtras>) {
     setExtras(prev => ({ ...prev, ...patch }));
     setSaved(false);
@@ -198,7 +215,16 @@ export function FormularioEditorClient({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          slug, title, headline, active, questions, pixelId: pixelId.trim() || null, avatarUrl,
+          slug, title, headline, active, pixelId: pixelId.trim() || null, avatarUrl,
+          // Só guarda ligações de opção que ainda existem e apontam pra um resultado que existe
+          questions: questions.map(q => {
+            const { optionResults, ...base } = q;
+            if (!quizOn || q.type !== "ESCOLHA" || !optionResults) return base;
+            const validas = Object.fromEntries(Object.entries(optionResults).filter(([opt, key]) =>
+              (q.options ?? []).includes(opt) && quizResults.some(r => r.key === key)));
+            return Object.keys(validas).length ? { ...base, optionResults: validas } : base;
+          }),
+          quizResults: quizOn ? quizResults : null,
           ...(isCrm ? { etiquetaId: extras.etiquetaId, pipelineStageId: extras.pipelineStageId } : { agentConfigId }),
           inviteMessage: inviteMessage.trim() || null, doneMessage: doneMessage.trim() || null,
           accentColor: extras.accentColor, coverUrl: extras.coverUrl, ctaLabel: extras.ctaLabel, ctaUrl: extras.ctaUrl,
@@ -460,6 +486,11 @@ export function FormularioEditorClient({
           </button>
         </div>
 
+        <QuizPanel
+          enabled={quizOn} onToggle={toggleQuiz} results={quizResults}
+          onChange={rs => { setQuizResults(rs); setSaved(false); }} isCrm={isCrm} crmOptions={crmOptions}
+        />
+
         <div className="space-y-2">
           <label className="text-xs text-gray-500 uppercase tracking-wide">Perguntas, em ordem</label>
           {questions.map((q, i) => (
@@ -497,6 +528,24 @@ export function FormularioEditorClient({
                   className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
                 />
                 <p className="text-[11px] text-gray-500 mt-0.5">O lead escolhe tocando num botão — a resposta já serve pra separar quem é quem.</p>
+                {quizOn && (q.options ?? []).length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-[11px] text-gray-500">Cada opção conta para:</p>
+                    {(q.options ?? []).map(opt => (
+                      <div key={opt} className="flex items-center gap-2">
+                        <span className="text-xs text-gray-300 flex-1 min-w-0 truncate">{opt}</span>
+                        <select
+                          value={q.optionResults?.[opt] ?? ""}
+                          onChange={e => setOptionResult(i, opt, e.target.value)}
+                          className="bg-gray-950 border border-gray-800 rounded-lg px-2 py-1 text-xs w-44 flex-shrink-0"
+                        >
+                          <option value="">Não pontua</option>
+                          {quizResults.map((r, ri) => <option key={r.key} value={r.key}>{r.titulo.trim() || `Resultado ${ri + 1}`}</option>)}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
             </div>
@@ -546,6 +595,11 @@ export function FormularioEditorClient({
                     </div>
                     <div className="flex items-center gap-3 text-xs text-gray-500 flex-shrink-0">
                       <span>{new Date(s.createdAt).toLocaleString("pt-BR")}</span>
+                      {s.quizResult && (
+                        <span className="px-2 py-0.5 rounded-full bg-purple-900/40 text-purple-300 border border-purple-800/50">
+                          {quizResults.find(r => r.key === s.quizResult)?.titulo || s.quizResult}
+                        </span>
+                      )}
                       {s.utm?.source && (
                         <span className="px-2 py-0.5 rounded-full bg-gray-800 text-gray-300" title={[s.utm.medium, s.utm.campaign, s.utm.content].filter(Boolean).join(" · ") || undefined}>
                           {s.utm.source}

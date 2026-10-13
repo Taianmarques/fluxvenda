@@ -16,7 +16,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ age
   const form = await prisma.leadForm.findFirst({ where: { id, agentConfigId: config.id, agentOwned: true } });
   if (!form) return NextResponse.json({ error: "Formulário não encontrado" }, { status: 404 });
 
-  const csv = await buildSubmissionsCsv(form.id, form.questions as LeadFormQuestion[]);
+  const csv = await buildSubmissionsCsv(form.id, form.questions as LeadFormQuestion[], form.quizResults);
   return new NextResponse(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",

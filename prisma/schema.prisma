@@ -1985,6 +1985,11 @@ model LeadForm {
   conversionUrl   String?
   conversionEvent String?
 
+  // Modo quiz de perfil: lista de resultados ({ key, titulo, descricao, mensagem, etiquetaId,
+  // pipelineStageId, conversionUrl }). Cada opção das perguntas de escolha soma 1 ponto pro resultado
+  // ligado a ela (LeadFormQuestion.optionResults); vence o que somar mais. null = formulário comum.
+  quizResults Json?
+
   waNumber     String?
   waButtonText String?
 
@@ -2018,6 +2023,7 @@ model LeadFormSubmission {
   utm        Json?
   consentAt  DateTime? // quando marcou o consentimento (null = formulário sem consentimento)
   inviteError String?  // por que o convite não saiu (ex: número fora do WhatsApp), pra o gestor ver
+  quizResult  String?  // key do resultado do quiz (LeadForm.quizResults) — null = formulário comum ou não terminou
 
   @@index([formId])
 }

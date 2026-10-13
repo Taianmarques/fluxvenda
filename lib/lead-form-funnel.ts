@@ -129,6 +129,7 @@ export async function sendFormInviteToLead(params: {
   pipelineStageId?: string | null;
   formTitle?: string;
   utm?: LeadFormUtm | null;
+  quizResultado?: string | null; // título do resultado do quiz — vira {{resultado}} e entra na nota do CRM
 }): Promise<SendInviteResult> {
   const { nome, inviteMessage, agentOwned } = params;
   const contactNumber = normalizePhone(params.whatsappRaw);
@@ -145,7 +146,7 @@ export async function sendFormInviteToLead(params: {
     : await prisma.conversation.create({ data: { agentConfigId: agentConfig.id, contactNumber, contactName: nome } });
 
   const texto = inviteMessage?.trim()
-    ? interpolateTexto(inviteMessage, { nome, link: params.ctaUrl })
+    ? interpolateTexto(inviteMessage, { nome, link: params.ctaUrl, resultado: params.quizResultado })
     : agentOwned ? CONVITE_NEUTRO_TEMPLATE(nome) : CONVITE_TEMPLATE(nome);
   const sent = await sendWhatsAppTextAsTeamDetailed(agentConfig.uazapiToken, contactNumber, texto);
   if (!sent.id) return { ok: false, error: explicarFalhaEnvio(sent.error) };
@@ -157,7 +158,7 @@ export async function sendFormInviteToLead(params: {
   await organizarLeadNoCrm({
     conversationId: conversation.id, agentConfigId: agentConfig.id,
     etiquetaId: params.etiquetaId ?? null, pipelineStageId: params.pipelineStageId ?? null,
-    formTitle: params.formTitle, utm: params.utm ?? null,
+    formTitle: params.formTitle, utm: params.utm ?? null, quizResultado: params.quizResultado ?? null,
   }).catch(err => console.error("[lead-form-funnel] falha ao organizar lead no CRM:", err));
 
   return { ok: true };
@@ -169,7 +170,7 @@ export async function sendFormInviteToLead(params: {
 async function organizarLeadNoCrm(p: {
   conversationId: string; agentConfigId: string;
   etiquetaId: string | null; pipelineStageId: string | null;
-  formTitle?: string; utm: LeadFormUtm | null;
+  formTitle?: string; utm: LeadFormUtm | null; quizResultado: string | null;
 }) {
   const origem = p.utm
     ? [p.utm.source && `origem ${p.utm.source}`, p.utm.medium && `meio ${p.utm.medium}`, p.utm.campaign && `campanha ${p.utm.campaign}`, p.utm.content && `conteúdo ${p.utm.content}`]
@@ -178,7 +179,7 @@ async function organizarLeadNoCrm(p: {
   await prisma.message.create({
     data: {
       conversationId: p.conversationId, role: "note",
-      content: `Lead captado pelo formulário${p.formTitle ? ` "${p.formTitle}"` : ""}${origem ? ` — ${origem}` : ""}.`,
+      content: `Lead captado pelo formulário${p.formTitle ? ` "${p.formTitle}"` : ""}${origem ? ` — ${origem}` : ""}.${p.quizResultado ? ` Resultado do quiz: ${p.quizResultado}.` : ""}`,
     },
   });
 

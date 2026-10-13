@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { QUESTION_TYPES, MAX_OPCOES_ESCOLHA, isHttpUrl, isValidHexColor, isConversionEvent } from "@/lib/lead-form-shared";
+import { QUESTION_TYPES, MAX_OPCOES_ESCOLHA, MAX_QUIZ_RESULTS, isHttpUrl, isValidHexColor, isConversionEvent } from "@/lib/lead-form-shared";
 
 // Validação compartilhada dos campos do formulário (editor do super admin e do CRM)
 
@@ -8,12 +8,27 @@ export const questionSchema = z.object({
   label: z.string().trim().min(1, "Toda pergunta precisa de um texto").max(200),
   type: z.enum(QUESTION_TYPES),
   options: z.array(z.string().trim().min(1).max(60)).max(MAX_OPCOES_ESCOLHA).optional(),
+  optionResults: z.record(z.string().max(60), z.string().min(1).max(40)).optional(),
 }).refine(q => q.type !== "ESCOLHA" || (q.options?.length ?? 0) >= 2, "Pergunta de escolha precisa de pelo menos 2 opções");
 
 export const questionsSchema = z.array(questionSchema).min(1).max(10)
   .refine(qs => new Set(qs.map(q => q.key)).size === qs.length, "Perguntas com identificador repetido");
 
 const emptyToNull = (v: unknown) => (typeof v === "string" && v.trim() === "" ? null : v);
+
+// Resultados do quiz de perfil — lista vazia ou null desliga o modo quiz
+export const quizResultsSchema = z.array(z.object({
+  key: z.string().min(1).max(40),
+  titulo: z.string().trim().max(80),
+  descricao: z.string().trim().max(1000),
+  mensagem: z.string().trim().max(1000),
+  etiquetaId: z.preprocess(emptyToNull, z.string().nullable()),
+  pipelineStageId: z.preprocess(emptyToNull, z.string().nullable()),
+  conversionUrl: z.string().trim().max(500)
+    .refine(v => v === "" || isHttpUrl(v), "A página de conversão do resultado precisa começar com http:// ou https://"),
+})).max(MAX_QUIZ_RESULTS)
+  .refine(rs => new Set(rs.map(r => r.key)).size === rs.length, "Resultados do quiz com identificador repetido")
+  .nullable().optional();
 
 // Campos de aparência / entrega / plano B / consentimento — todos opcionais, "" vira null
 export const extrasShape = {

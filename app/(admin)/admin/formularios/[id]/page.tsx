@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { normalizeFormFunnelSteps } from "@/lib/lead-form-funnel";
 import { getFormStats } from "@/lib/lead-form-stats";
-import { formToExtras, type LeadFormUtm } from "@/lib/lead-form-shared";
+import { formToExtras, normalizeQuizResults, type LeadFormUtm } from "@/lib/lead-form-shared";
 import { FormularioEditorClient, type LeadFormQuestion } from "./FormularioEditorClient";
 
 // Auth já garantida pelo AdminLayout (só ADMIN chega até aqui)
@@ -16,7 +16,7 @@ export default async function AdminFormularioEditorPage({ params }: { params: Pr
     },
   });
   if (!form) notFound();
-  const stats = await getFormStats(form.id, form.questions as LeadFormQuestion[]);
+  const stats = await getFormStats(form.id, form.questions as LeadFormQuestion[], form.quizResults);
 
   return (
     <FormularioEditorClient
@@ -35,6 +35,7 @@ export default async function AdminFormularioEditorPage({ params }: { params: Pr
       stats={stats}
       initialFunnelSteps={normalizeFormFunnelSteps(form.funnelSteps)}
       initialQuestions={form.questions as LeadFormQuestion[]}
+      initialQuizResults={normalizeQuizResults(form.quizResults)}
       submissions={form.submissions.map(s => ({
         id: s.id,
         nome: s.nome,
@@ -42,6 +43,7 @@ export default async function AdminFormularioEditorPage({ params }: { params: Pr
         answers: s.answers as Record<string, string>,
         inviteSentAt: s.inviteSentAt?.toISOString() ?? null,
         inviteError: s.inviteError,
+        quizResult: s.quizResult,
         utm: (s.utm as LeadFormUtm | null) ?? null,
         createdAt: s.createdAt.toISOString(),
       }))}

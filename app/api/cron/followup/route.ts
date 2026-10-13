@@ -6,7 +6,7 @@ import { logTokenUsage } from "@/lib/token-usage";
 import { dentroHorarioEnvio } from "@/lib/sending-hours";
 import { normalizeStageFollowup } from "@/lib/pipeline";
 import { normalizeFormFunnelSteps, normalizePhone } from "@/lib/lead-form-funnel";
-import { interpolateTexto } from "@/lib/lead-form-shared";
+import { interpolateTexto, normalizeQuizResults } from "@/lib/lead-form-shared";
 import { findConversationByPhone } from "@/lib/conversation-lookup";
 import { FLUXVENDA_TEAM_ID } from "@/lib/internal-agent";
 
@@ -259,7 +259,7 @@ O lead está na etapa "${stage.name}" do funil "${stage.pipeline.name}". Siga es
 
   const dueFormSubmissions = await prisma.leadFormSubmission.findMany({
     where: { inviteSentAt: { not: null }, whatsapp: { not: null } },
-    include: { form: { select: { agentConfigId: true, funnelSteps: true, ctaUrl: true } } },
+    include: { form: { select: { agentConfigId: true, funnelSteps: true, ctaUrl: true, quizResults: true } } },
   });
 
   for (const submission of dueFormSubmissions) {
@@ -291,7 +291,10 @@ O lead está na etapa "${stage.name}" do funil "${stage.pipeline.name}". Siga es
     if (!lastMessage || lastMessage.role === "user") continue;
 
     const nome = submission.nome || "tudo bem";
-    const texto = interpolateTexto(step.mensagem, { nome, link: submission.form.ctaUrl });
+    const resultado = submission.quizResult
+      ? normalizeQuizResults(submission.form.quizResults).find(r => r.key === submission.quizResult)?.titulo ?? null
+      : null;
+    const texto = interpolateTexto(step.mensagem, { nome, link: submission.form.ctaUrl, resultado });
 
     const envio = await sendWhatsAppTextAsTeamDetailed(config.uazapiToken, contactNumber, texto);
     const sentId = envio.id;

@@ -9,7 +9,70 @@ export type LeadFormQuestion = {
   label: string;
   type: LeadFormQuestionType;
   options?: string[]; // só ESCOLHA: alternativas mostradas como botões
+  // Só ESCOLHA em modo quiz: opção → key do resultado que ela pontua (opção sem entrada não pontua)
+  optionResults?: Record<string, string>;
 };
+
+// Quiz de perfil: cada resultado tem o que mostrar na tela final e o que fazer com o lead
+export type QuizResult = {
+  key: string;
+  titulo: string;
+  descricao: string;
+  mensagem: string;              // 1ª mensagem no WhatsApp pra quem caiu aqui ("" = a do formulário)
+  etiquetaId: string | null;     // "" / null = a do formulário
+  pipelineStageId: string | null;
+  conversionUrl: string;         // "" = a página de conversão do formulário
+};
+
+export const MAX_QUIZ_RESULTS = 6;
+
+export function normalizeQuizResults(raw: unknown): QuizResult[] {
+  if (!Array.isArray(raw)) return [];
+  const str = (v: unknown) => (typeof v === "string" ? v : "");
+  return raw
+    .filter((r): r is Record<string, unknown> => Boolean(r) && typeof r === "object" && typeof (r as { key?: unknown }).key === "string")
+    .map(r => ({
+      key: str(r.key),
+      titulo: str(r.titulo),
+      descricao: str(r.descricao),
+      mensagem: str(r.mensagem),
+      etiquetaId: str(r.etiquetaId) || null,
+      pipelineStageId: str(r.pipelineStageId) || null,
+      conversionUrl: str(r.conversionUrl),
+    }));
+}
+
+// Soma 1 ponto por resposta de escolha pro resultado ligado à opção escolhida. Vence quem somar
+// mais; empate fica com o que vem primeiro na lista. Ninguém pontuou = primeiro resultado.
+export function computeQuizResult(
+  questions: LeadFormQuestion[], results: QuizResult[], answers: Record<string, string>,
+): QuizResult | null {
+  if (results.length === 0) return null;
+  const pontos = new Map(results.map(r => [r.key, 0]));
+  for (const q of questions) {
+    if (q.type !== "ESCOLHA" || !q.optionResults) continue;
+    const alvo = q.optionResults[answers[q.key] ?? ""];
+    if (alvo && pontos.has(alvo)) pontos.set(alvo, pontos.get(alvo)! + 1);
+  }
+  let melhor = results[0];
+  for (const r of results) if (pontos.get(r.key)! > pontos.get(melhor.key)!) melhor = r;
+  return melhor;
+}
+
+// O resultado precisa estar fechado quando a 1ª mensagem sai — então toda pergunta que pontua
+// tem que vir antes da pergunta de WhatsApp. Devolve o motivo quando a ordem não serve.
+export function quizOrderError(questions: LeadFormQuestion[], results: QuizResult[]): string | null {
+  if (results.length === 0) return null;
+  if (results.length < 2) return "O quiz precisa de pelo menos 2 resultados.";
+  if (results.some(r => !r.titulo.trim())) return "Todo resultado do quiz precisa de um título.";
+  const pontuam = questions.filter(q => q.type === "ESCOLHA" && Object.keys(q.optionResults ?? {}).length > 0);
+  if (pontuam.length === 0) return "No quiz, ligue as opções de pelo menos uma pergunta de escolha a um resultado.";
+  const wa = questions.findIndex(q => q.type === "WHATSAPP");
+  if (wa >= 0 && questions.findIndex((q, i) => i > wa && pontuam.includes(q)) >= 0) {
+    return "No quiz, a pergunta de WhatsApp precisa vir depois das perguntas que definem o resultado (a mensagem sai com o resultado).";
+  }
+  return null;
+}
 
 export const MAX_OPCOES_ESCOLHA = 6;
 
@@ -36,11 +99,13 @@ export function isPlausibleBrPhone(raw: string): boolean {
   return true;
 }
 
-// {{nome}} = primeiro nome do lead; {{link}} = botão/link da isca (LeadForm.ctaUrl)
-export function interpolateTexto(texto: string, vars: { nome: string; link?: string | null }): string {
+// {{nome}} = primeiro nome do lead; {{link}} = botão/link da isca (LeadForm.ctaUrl);
+// {{resultado}} = título do resultado do quiz
+export function interpolateTexto(texto: string, vars: { nome: string; link?: string | null; resultado?: string | null }): string {
   return texto
     .replace(/\{\{\s*nome\s*\}\}/gi, vars.nome.split(" ")[0])
-    .replace(/\{\{\s*link\s*\}\}/gi, vars.link ?? "");
+    .replace(/\{\{\s*link\s*\}\}/gi, vars.link ?? "")
+    .replace(/\{\{\s*resultado\s*\}\}/gi, vars.resultado ?? "");
 }
 
 export function buildWaLink(waNumber: string, text?: string): string {

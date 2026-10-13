@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { sendFormInviteToLead, gerarProximaPergunta } from "@/lib/lead-form-funnel";
-import { isPlausibleBrPhone, type LeadFormQuestion, type LeadFormUtm } from "@/lib/lead-form-shared";
+import { isPlausibleBrPhone, normalizeQuizResults, computeQuizResult, type LeadFormQuestion, type LeadFormUtm } from "@/lib/lead-form-shared";
 
 const utmField = z.string().trim().max(120).optional();
 
@@ -69,6 +69,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     data: { answers, ...extra },
   });
 
+  // Quiz: o resultado fecha na pergunta de WhatsApp (a 1ª mensagem já sai com ele — o editor
+  // garante que as perguntas que pontuam vêm antes) ou na última pergunta, se não houver WhatsApp.
+  const quizResults = normalizeQuizResults(form.quizResults);
+  const currentIndex = questions.findIndex(q => q.key === key);
+  const isLast = currentIndex === questions.length - 1;
+  const quiz = quizResults.length > 0 && (question.type === "WHATSAPP" || isLast)
+    ? computeQuizResult(questions, quizResults, answers)
+    : null;
+  if (quiz && submission.quizResult !== quiz.key) {
+    submission = await prisma.leadFormSubmission.update({ where: { id: submission.id }, data: { quizResult: quiz.key } });
+  }
+
   let inviteSent: boolean | undefined;
   if (question.type === "WHATSAPP") {
     if (submission.inviteSentAt) {
@@ -76,9 +88,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     } else {
       const nome = submission.nome || answers.nome || "tudo bem";
       const result = await sendFormInviteToLead({
-        nome, whatsappRaw: value, agentConfigId: form.agentConfigId, inviteMessage: form.inviteMessage,
-        agentOwned: form.agentOwned, ctaUrl: form.ctaUrl, etiquetaId: form.etiquetaId,
-        pipelineStageId: form.pipelineStageId, formTitle: form.title,
+        nome, whatsappRaw: value, agentConfigId: form.agentConfigId,
+        inviteMessage: quiz?.mensagem.trim() || form.inviteMessage,
+        agentOwned: form.agentOwned, ctaUrl: form.ctaUrl,
+        etiquetaId: quiz?.etiquetaId || form.etiquetaId,
+        pipelineStageId: quiz?.pipelineStageId || form.pipelineStageId, formTitle: form.title,
+        quizResultado: quiz?.titulo ?? null,
         utm: (submission.utm as LeadFormUtm | null) ?? null,
       }).catch((err): { ok: false; error: string } => {
         console.error("[formularios] falha ao enviar convite:", err);
@@ -95,7 +110,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   // A próxima pergunta é reescrita pela IA usando o que já foi respondido, pra soar como
   // continuação da conversa em vez do texto fixo cadastrado no admin. Pergunta de escolha mantém
   // o texto original (as opções dependem exatamente do que foi escrito).
-  const currentIndex = questions.findIndex(q => q.key === key);
   const next = questions[currentIndex + 1];
   let nextMessage: string | null = null;
   if (next && next.type !== "ESCOLHA") {
@@ -106,5 +120,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     nextMessage = await gerarProximaPergunta({ headline: form.headline, respondidas, proximaPergunta: next.label });
   }
 
-  return NextResponse.json({ submissionId: submission.id, nextMessage, inviteSent });
+  return NextResponse.json({
+    submissionId: submission.id, nextMessage, inviteSent,
+    ...(quiz && { quiz: { titulo: quiz.titulo, descricao: quiz.descricao, conversionUrl: quiz.conversionUrl || null } }),
+  });
 }
