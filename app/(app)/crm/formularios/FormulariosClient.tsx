@@ -16,6 +16,7 @@ export function FormulariosClient({ agentId, initialForms }: { agentId: string; 
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [style, setStyle] = useState<"CHAT" | "TELAS">("CHAT");
 
   async function handleCreate() {
     setError(null);
@@ -25,7 +26,7 @@ export function FormulariosClient({ agentId, initialForms }: { agentId: string; 
       const res = await fetch(`/api/agentes/${agentId}/formularios`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: title.trim(), headline: headline.trim() }),
+        body: JSON.stringify({ title: title.trim(), headline: headline.trim(), style }),
       });
       const data = await res.json().catch(() => ({} as { error?: string; form?: { id: string } }));
       if (!res.ok) { setError(data.error ?? "Não foi possível criar."); return; }
@@ -55,7 +56,7 @@ export function FormulariosClient({ agentId, initialForms }: { agentId: string; 
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2"><FileText size={22} /> Formulários</h1>
             <p className="text-gray-400 text-sm mt-1">
-              Formulário em formato de conversa pra captar leads (anúncio, bio, site). Ao preencher o WhatsApp, o lead já recebe a primeira mensagem do agente.
+              Formulário em conversa ou quiz em telas pra captar leads (anúncio, bio, site). Ao preencher o WhatsApp, o lead já recebe a primeira mensagem do agente.
             </p>
           </div>
           <button
@@ -68,6 +69,23 @@ export function FormulariosClient({ agentId, initialForms }: { agentId: string; 
 
         {creating && (
           <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
+            <div>
+              <label className="text-xs text-gray-500 uppercase tracking-wide">Tipo</label>
+              <div className="grid sm:grid-cols-2 gap-2 mt-1">
+                {([
+                  { v: "CHAT", t: "Formulário em conversa", d: "Perguntas em balões, como um chat." },
+                  { v: "TELAS", t: "Quiz em telas", d: "Uma tela por vez, com emoji/fotos nas opções, conteúdo, carregamento e oferta." },
+                ] as const).map(o => (
+                  <button
+                    key={o.v} type="button" onClick={() => setStyle(o.v)}
+                    className={`text-left rounded-xl border px-3 py-2.5 ${style === o.v ? "border-blue-600 bg-blue-600/10" : "border-gray-800 hover:border-gray-700"}`}
+                  >
+                    <p className="text-sm font-semibold">{o.t}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{o.d}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
             <div>
               <label className="text-xs text-gray-500 uppercase tracking-wide">Título (uso interno)</label>
               <input

@@ -18,6 +18,7 @@ const DEFAULT_QUESTIONS = [
 const createSchema = z.object({
   title: z.string().trim().min(1).max(120),
   headline: z.string().trim().min(1).max(1000),
+  style: z.enum(["CHAT", "TELAS"]).optional(),
 });
 
 function slugify(v: string): string {
@@ -67,6 +68,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
   const form = await prisma.leadForm.create({
     data: {
       slug, title: body.data.title, headline: body.data.headline, questions: DEFAULT_QUESTIONS,
+      // Quiz em telas começa com as mesmas perguntas, uma por tela (o gestor monta o resto no editor)
+      ...(body.data.style === "TELAS" && {
+        style: "TELAS",
+        steps: DEFAULT_QUESTIONS.map(q => ({ id: `s-${q.key}`, type: "pergunta", question: q })),
+      }),
       agentConfigId: config.id, agentOwned: true,
     },
   });

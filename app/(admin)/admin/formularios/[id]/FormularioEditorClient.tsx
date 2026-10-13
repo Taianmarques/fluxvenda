@@ -330,6 +330,24 @@ export function FormularioEditorClient({
           </a>
         </div>
 
+        <div className="border border-gray-800 rounded-xl p-4 space-y-2">
+          <label className="text-xs text-gray-500 uppercase tracking-wide">Estilo da página</label>
+          <div className="grid sm:grid-cols-2 gap-2">
+            {([
+              { v: "CHAT", t: "Conversa", d: "Perguntas em balões, como um chat." },
+              { v: "TELAS", t: "Quiz em telas", d: "Uma tela por vez: perguntas com emoji/fotos, conteúdo, carregamento e oferta." },
+            ] as const).map(o => (
+              <button
+                key={o.v} type="button" onClick={() => changeStyle(o.v)}
+                className={`text-left rounded-xl border px-3 py-2.5 ${style === o.v ? "border-blue-600 bg-blue-600/10" : "border-gray-800 hover:border-gray-700"}`}
+              >
+                <p className="text-sm font-semibold">{o.t}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{o.d}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div>
           <label className="text-xs text-gray-500 uppercase tracking-wide">Mensagem de abertura</label>
           <textarea
@@ -532,24 +550,6 @@ export function FormularioEditorClient({
           <button type="button" onClick={addFunnelStep} className="flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300">
             <Plus size={14} /> Adicionar passo
           </button>
-        </div>
-
-        <div className="border border-gray-800 rounded-xl p-4 space-y-2">
-          <label className="text-xs text-gray-500 uppercase tracking-wide">Estilo da página</label>
-          <div className="grid sm:grid-cols-2 gap-2">
-            {([
-              { v: "CHAT", t: "Conversa", d: "Perguntas em balões, como um chat." },
-              { v: "TELAS", t: "Quiz em telas", d: "Uma tela por vez: perguntas com emoji/fotos, conteúdo, carregamento e oferta." },
-            ] as const).map(o => (
-              <button
-                key={o.v} type="button" onClick={() => changeStyle(o.v)}
-                className={`text-left rounded-xl border px-3 py-2.5 ${style === o.v ? "border-blue-600 bg-blue-600/10" : "border-gray-800 hover:border-gray-700"}`}
-              >
-                <p className="text-sm font-semibold">{o.t}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{o.d}</p>
-              </button>
-            ))}
-          </div>
         </div>
 
         <QuizPanel
