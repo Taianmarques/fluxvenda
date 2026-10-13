@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FileText, Plus, ExternalLink, Copy, Check, Trash2 } from "lucide-react";
+import { FileText, Plus, ExternalLink, Copy, Check, Trash2, Sparkles } from "lucide-react";
 
 type FormRow = { id: string; slug: string; title: string; active: boolean; submissionCount: number; createdAt: string };
 
@@ -47,6 +47,21 @@ export function FormulariosAdminClient({ initialForms }: { initialForms: FormRow
     }
   }
 
+  async function handleCreateExemplo() {
+    setError(null);
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/formularios", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ template: "quiz-exemplo" }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? "Erro ao criar o exemplo."); return; }
+      router.push(`/admin/formularios/${data.form.id}`);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleDelete(id: string) {
     if (!confirm("Apagar esse formulário e todas as respostas dele?")) return;
     await fetch(`/api/admin/formularios/${id}`, { method: "DELETE" });
@@ -68,13 +83,24 @@ export function FormulariosAdminClient({ initialForms }: { initialForms: FormRow
           <h1 className="text-2xl font-bold flex items-center gap-2"><FileText size={22} /> Formulários</h1>
           <p className="text-gray-400 text-sm mt-1">Formulário conversacional pra captar lead (anúncio/bio) — ao preencher o WhatsApp, já recebe o convite pro teste grátis.</p>
         </div>
-        <button
-          onClick={() => setCreating(v => !v)}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-4 py-2.5 text-sm font-medium flex-shrink-0"
-        >
-          <Plus size={15} /> Novo formulário
-        </button>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button
+            onClick={handleCreateExemplo} disabled={saving}
+            className="flex items-center gap-2 border border-gray-700 hover:border-blue-600 text-gray-300 hover:text-blue-400 rounded-xl px-4 py-2.5 text-sm font-medium disabled:opacity-50"
+            title="Cria um quiz em telas completo (perguntas com emoji, conteúdo, carregamento, resultado e oferta) pra usar de base"
+          >
+            <Sparkles size={15} /> Quiz de exemplo
+          </button>
+          <button
+            onClick={() => setCreating(v => !v)}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-4 py-2.5 text-sm font-medium"
+          >
+            <Plus size={15} /> Novo formulário
+          </button>
+        </div>
       </div>
+
+      {error && !creating && <p className="text-sm text-red-400">{error}</p>}
 
       {creating && (
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
