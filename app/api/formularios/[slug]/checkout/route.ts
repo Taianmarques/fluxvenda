@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { createAsaasCustomer, createAsaasCharge, createAsaasCardCharge, getAsaasPixQrCode } from "@/lib/asaas";
+import { createAsaasCustomer, createAsaasCharge, createAsaasCardCharge, getAsaasPixQrCode, getAsaasPayment } from "@/lib/asaas";
 import { checkoutTotal } from "@/lib/lead-form-shared";
 import { resolvePaymentAccount, findCheckoutStep, markLeadFormPaid } from "@/lib/lead-form-checkout";
 
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Dados inválidos" }, { status: 400 });
   const b = parsed.data;
 
-  const form = await prisma.leadForm.findUnique({ where: { slug }, select: { id: true, active: true, agentConfigId: true, agentOwned: true, steps: true, title: true } });
+  const form = await prisma.leadForm.findUnique({ where: { slug }, select: { id: true, active: true, agentConfigId: true, agentOwned: true, checkoutSandbox: true, steps: true, title: true } });
   if (!form?.active) return NextResponse.json({ error: "Formulário não encontrado" }, { status: 404 });
   const step = findCheckoutStep(form.steps, b.stepId);
   if (!step) return NextResponse.json({ error: "Checkout não encontrado" }, { status: 404 });
@@ -103,13 +103,29 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   }
 }
 
-// Consulta do Pix — a tela do quiz pergunta de tempos em tempos até o webhook confirmar
+// Consulta do Pix — a tela do quiz pergunta de tempos em tempos. Além do webhook, confere o status
+// direto no Asaas (Pix de teste no sandbox e webhook atrasado/mal configurado confirmam igual).
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const submissionId = req.nextUrl.searchParams.get("submissionId") ?? "";
   const sub = await prisma.leadFormSubmission.findFirst({
     where: { id: submissionId, form: { slug } },
-    select: { payStatus: true },
+    select: {
+      id: true, payStatus: true, payAsaasId: true,
+      form: { select: { agentOwned: true, agentConfigId: true, checkoutSandbox: true } },
+    },
   });
-  return NextResponse.json({ status: sub?.payStatus ?? null });
+  if (!sub) return NextResponse.json({ status: null });
+
+  if (sub.payStatus === "PENDENTE" && sub.payAsaasId) {
+    const conta = await resolvePaymentAccount(sub.form);
+    if (conta) {
+      const payment = await getAsaasPayment(conta.apiKey, conta.sandbox, sub.payAsaasId).catch(() => null);
+      if (payment && (payment.status === "RECEIVED" || payment.status === "CONFIRMED")) {
+        await markLeadFormPaid(sub.id);
+        return NextResponse.json({ status: "PAGO" });
+      }
+    }
+  }
+  return NextResponse.json({ status: sub.payStatus });
 }

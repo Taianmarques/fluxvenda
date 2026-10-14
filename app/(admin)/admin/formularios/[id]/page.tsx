@@ -38,7 +38,9 @@ export default async function AdminFormularioEditorPage({ params }: { params: Pr
       initialQuizResults={normalizeQuizResults(form.quizResults)}
       initialStyle={form.style === "TELAS" ? "TELAS" : "CHAT"}
       // Formulário do super admin cobra na conta Asaas da plataforma (ver lib/lead-form-checkout.ts)
-      asaasOk={Boolean(process.env.ASAAS_PLATFORM_API_KEY)}
+      asaasOk={Boolean(form.checkoutSandbox ? process.env.ASAAS_PLATFORM_SANDBOX_API_KEY : process.env.ASAAS_PLATFORM_API_KEY)}
+      initialCheckoutSandbox={form.checkoutSandbox}
+      sandboxDisponivel={Boolean(process.env.ASAAS_PLATFORM_SANDBOX_API_KEY)}
       initialSteps={normalizeSteps(form.steps)}
       submissions={form.submissions.map(s => ({
         id: s.id,

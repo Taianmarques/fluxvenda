@@ -17,6 +17,7 @@ const updateSchema = z.object({
   headline: z.string().min(1).max(1000).optional(),
   questions: questionsSchema.optional(),
   style: styleSchema.optional(),
+  checkoutSandbox: z.boolean().optional(),
   steps: stepsSchema.optional(),
   ...extrasShape,
   quizResults: quizResultsSchema,

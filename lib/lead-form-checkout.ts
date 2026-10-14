@@ -23,8 +23,13 @@ export async function resolveCheckoutAgent(agentConfigId: string | null) {
 // conta Asaas do agente do cliente (confirma pelo webhook /api/webhooks/asaas/[agentId]).
 export type PaymentAccount = { apiKey: string; sandbox: boolean; agentIdForWebhook: string | null };
 
-export async function resolvePaymentAccount(form: { agentOwned: boolean; agentConfigId: string | null }): Promise<PaymentAccount | null> {
+export async function resolvePaymentAccount(form: { agentOwned: boolean; agentConfigId: string | null; checkoutSandbox?: boolean }): Promise<PaymentAccount | null> {
   if (!form.agentOwned) {
+    // Modo teste: conta sandbox da plataforma, sem dinheiro real
+    if (form.checkoutSandbox) {
+      const apiKey = process.env.ASAAS_PLATFORM_SANDBOX_API_KEY;
+      return apiKey ? { apiKey, sandbox: true, agentIdForWebhook: null } : null;
+    }
     const apiKey = process.env.ASAAS_PLATFORM_API_KEY;
     return apiKey ? { apiKey, sandbox: process.env.ASAAS_PLATFORM_SANDBOX !== "false", agentIdForWebhook: null } : null;
   }

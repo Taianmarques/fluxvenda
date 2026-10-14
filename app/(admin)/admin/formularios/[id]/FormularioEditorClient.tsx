@@ -63,11 +63,13 @@ function resizeImageToBase64(file: File, maxSize = 200, quality = 0.85): Promise
 export function FormularioEditorClient({
   id, initialSlug, initialTitle, initialHeadline, initialActive, initialPixelId, initialAvatarUrl,
   initialAgentConfigId, initialAgentLabel, initialInviteMessage, initialDoneMessage, initialFunnelSteps, initialQuestions, submissions,
-  crmAgentId, whatsappOk = true, initialExtras, crmOptions, stats, initialQuizResults, initialStyle, initialSteps, asaasOk = false,
+  crmAgentId, whatsappOk = true, initialExtras, crmOptions, stats, initialQuizResults, initialStyle, initialSteps, asaasOk = false, initialCheckoutSandbox = false, sandboxDisponivel = false,
 }: {
   initialQuizResults: QuizResult[];
   initialStyle: FormStyle;
   asaasOk?: boolean; // agente do formulário com conta Asaas (pro aviso do checkout)
+  initialCheckoutSandbox?: boolean; // só super admin: checkout na conta sandbox da plataforma
+  sandboxDisponivel?: boolean;
   initialSteps: QuizStep[];
   id: string; initialSlug: string; initialTitle: string; initialHeadline: string; initialActive: boolean;
   initialPixelId: string; initialAvatarUrl: string | null;
@@ -109,6 +111,7 @@ export function FormularioEditorClient({
   // Estilo da página pública: conversa (perguntas) ou quiz em telas (etapas)
   const [style, setStyle] = useState<FormStyle>(initialStyle);
   const [steps, setSteps] = useState<QuizStep[]>(initialSteps);
+  const [checkoutSandbox, setCheckoutSandbox] = useState(initialCheckoutSandbox);
   function changeStyle(s: FormStyle) {
     setStyle(s);
     // 1ª vez em telas: começa com as perguntas que já existem, uma por tela
@@ -270,6 +273,7 @@ export function FormularioEditorClient({
         body: JSON.stringify({
           slug, title, headline, active, pixelId: pixelId.trim() || null, avatarUrl,
           style,
+          ...(!isCrm && { checkoutSandbox }),
           ...(style === "TELAS"
             ? { steps: steps.map(s => (s.type === "pergunta" ? { ...s, question: limparPergunta(s.question) } : s)) }
             : { questions: questions.map(limparPergunta) }),
@@ -562,6 +566,7 @@ export function FormularioEditorClient({
           <StepsEditor
             steps={steps} onChange={s => { setSteps(s); setSaved(false); }}
             quizOn={quizOn} quizResults={quizResults} onError={setError} asaasOk={asaasOk}
+            sandbox={isCrm ? undefined : { on: checkoutSandbox, disponivel: sandboxDisponivel, set: v => { setCheckoutSandbox(v); setSaved(false); } }}
           />
         )}
 

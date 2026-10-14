@@ -258,9 +258,11 @@ function NiveisInput({ value, onChange }: { value: string[]; onChange: (v: strin
   );
 }
 
-export function StepsEditor({ steps, onChange, quizOn, quizResults, onError, asaasOk }: {
+export function StepsEditor({ steps, onChange, quizOn, quizResults, onError, asaasOk, sandbox }: {
   steps: QuizStep[]; onChange: (steps: QuizStep[]) => void; quizOn: boolean; quizResults: QuizResult[]; onError: (m: string) => void;
   asaasOk: boolean; // o agente do formulário tem conta Asaas conectada (exigida pelo checkout)
+  // Só super admin: modo teste do checkout (conta sandbox da plataforma)
+  sandbox?: { on: boolean; disponivel: boolean; set: (v: boolean) => void };
 }) {
   const update = (i: number, s: QuizStep) => onChange(steps.map((x, idx) => (idx === i ? s : x)));
   function move(i: number, d: -1 | 1) {
@@ -415,6 +417,16 @@ export function StepsEditor({ steps, onChange, quizOn, quizResults, onError, asa
             const set = (patch: Partial<typeof s>) => update(i, { ...s, ...patch });
             return (
               <div className="space-y-2">
+                {sandbox && (
+                  <label className={`flex items-start gap-2 text-sm rounded-lg px-3 py-2 border ${sandbox.on ? "border-amber-700/60 bg-amber-900/20 text-amber-300" : "border-gray-800 text-gray-300"}`}>
+                    <input type="checkbox" checked={sandbox.on} onChange={e => sandbox.set(e.target.checked)} className="mt-0.5" />
+                    <span>
+                      <b>Modo teste (sandbox)</b> — cobra na conta de testes do Asaas, sem dinheiro real. Use cartão de teste; o Pix de teste você marca como pago no painel sandbox.{" "}
+                      {sandbox.on ? "Desligue antes de divulgar o quiz." : "Desligado: cobra de verdade na conta da plataforma."}
+                      {sandbox.on && !sandbox.disponivel && <span className="block text-red-400 mt-1">A chave sandbox da plataforma ainda não está configurada no servidor.</span>}
+                    </span>
+                  </label>
+                )}
                 {!asaasOk && (
                   <p className="text-xs text-amber-400 bg-amber-900/20 border border-amber-800/40 rounded-lg px-3 py-2">
                     Nenhuma conta Asaas pra cobrar — o checkout aparece, mas não consegue cobrar. No CRM, conecte a chave do Asaas em Comércio do agente.

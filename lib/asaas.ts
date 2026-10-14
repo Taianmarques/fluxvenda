@@ -83,6 +83,12 @@ export async function getAsaasPixQrCode(apiKey: string, sandbox: boolean, paymen
   return asaasFetch(apiKey, sandbox, `/payments/${paymentId}/pixQrCode`);
 }
 
+// Status atual de uma cobrança (PENDING, RECEIVED, CONFIRMED, OVERDUE...) — usado pra confirmar
+// Pix consultando direto, sem depender só do webhook
+export async function getAsaasPayment(apiKey: string, sandbox: boolean, paymentId: string): Promise<{ id: string; status: string }> {
+  return asaasFetch(apiKey, sandbox, `/payments/${paymentId}`);
+}
+
 // Cancela uma cobrança no Asaas (necessário antes de reemitir boleto com nova data)
 export async function cancelAsaasCharge(apiKey: string, sandbox: boolean, paymentId: string): Promise<void> {
   await asaasFetch(apiKey, sandbox, `/payments/${paymentId}`, { method: "DELETE" });

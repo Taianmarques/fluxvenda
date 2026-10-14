@@ -1996,6 +1996,10 @@ model LeadForm {
   style String @default("CHAT")
   steps Json?
 
+  // Só formulários do super admin: checkout cobra na conta SANDBOX da plataforma
+  // (ASAAS_PLATFORM_SANDBOX_API_KEY) em vez da de produção — pra testar sem dinheiro real
+  checkoutSandbox Boolean @default(false)
+
   waNumber     String?
   waButtonText String?
 
