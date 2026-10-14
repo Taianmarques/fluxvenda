@@ -37,6 +37,15 @@ export async function POST(req: NextRequest) {
 
   let sent = 0;
   let checked = 0;
+  let expirados = 0;
+
+  // Follow-up que venceu há muito tempo não sai mais: acontece quando o WhatsApp do cliente ficou
+  // desconectado por dias (os envios foram pulados) ou quando um número é conectado num agente com
+  // conversas antigas — sem esse limite, ao (re)conectar o cron disparava de uma vez follow-ups de
+  // conversas que já esfriaram. A sequência é encerrada; se o cliente voltar a falar, ela recomeça
+  // (o inbound zera o followupCount). 24h cobre o atraso normal do horário de envio (noite/fim de dia).
+  const ATRASO_MAXIMO_MS = 24 * 60 * 60 * 1000;
+  const venceuHaMuito = (dueAt: Date) => Date.now() - dueAt.getTime() > ATRASO_MAXIMO_MS;
 
   // Canal desconectado (sessão caiu, QR expirou): nenhuma mensagem sai até reconectar, então nem
   // adianta gerar a resposta com IA nem tentar enviar — pula o canal inteiro nesta execução e
@@ -77,6 +86,11 @@ export async function POST(req: NextRequest) {
       const delayMinutes = delays[conversation.followupCount];
       const dueAt = new Date(referenceTime.getTime() + delayMinutes * 60000);
       if (dueAt > new Date()) continue;
+      if (venceuHaMuito(dueAt)) {
+        await prisma.conversation.update({ where: { id: conversation.id }, data: { followupCount: delays.length } });
+        expirados++;
+        continue;
+      }
 
       checked++;
       const lastMessage = conversation.messages[0];
@@ -173,6 +187,13 @@ O lead está na etapa "${stage.name}" do funil "${stage.pipeline.name}". Siga es
       // Só faz follow-up se a última mensagem foi nossa — se o cliente já respondeu, mesmo
       // sem a oportunidade ter avançado de etapa, não faz sentido mandar mensagem por cima.
       if (!lastMessage || lastMessage.role === "user") continue;
+      // Atraso contado de quando o envio passou a valer (vencido E com a última mensagem nossa) —
+      // lead que estava conversando não perde a nutrição só porque entrou na etapa há tempos
+      if (venceuHaMuito(new Date(Math.max(dueAt.getTime(), lastMessage.createdAt.getTime())))) {
+        await prisma.opportunity.update({ where: { id: opp.id }, data: { stageFollowupCount: delays.length } });
+        expirados++;
+        continue;
+      }
 
       const history = conversation.messages
         .slice()
@@ -289,6 +310,11 @@ O lead está na etapa "${stage.name}" do funil "${stage.pipeline.name}". Siga es
       orderBy: { createdAt: "desc" },
     });
     if (!lastMessage || lastMessage.role === "user") continue;
+    if (venceuHaMuito(new Date(Math.max(dueAt.getTime(), lastMessage.createdAt.getTime())))) {
+      await prisma.leadFormSubmission.update({ where: { id: submission.id }, data: { funnelStepsSent: steps.length } });
+      expirados++;
+      continue;
+    }
 
     const nome = submission.nome || "tudo bem";
     const resultado = submission.quizResult
@@ -360,7 +386,7 @@ O lead está na etapa "${stage.name}" do funil "${stage.pipeline.name}". Siga es
   }
 
   return NextResponse.json({
-    ok: true, checked, sent, stageFollowupChecked, stageFollowupSent,
+    ok: true, checked, sent, expirados, stageFollowupChecked, stageFollowupSent,
     remindersChecked, remindersSent, formFunnelChecked, formFunnelSent, scheduledChecked, scheduledSent,
   });
 }
