@@ -2,7 +2,7 @@ import type { QuizStep, QuizResult } from "@/lib/lead-form-shared";
 import { stepsToQuestions } from "@/lib/lead-form-shared";
 
 // Modelos prontos de formulário — ponto de partida e demonstração do quiz em telas. O conteúdo é
-// da própria FluxVenda (diagnóstico de maturidade comercial → teste grátis do CRM).
+// da própria FluxVenda (diagnóstico de maturidade comercial → plano de ação com checkout no quiz).
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://app.fluxvenda.com.br";
 
@@ -126,9 +126,23 @@ export function quizExemploTemplate() {
       id: "s-oferta", type: "oferta",
       titulo: "{{nome}}, o seu ==plano de ação== ficou pronto!",
       texto: "A FluxVenda **atende, qualifica e faz follow-up** dos seus leads pelo WhatsApp com IA, 24h por dia — e mostra tudo num funil de vendas.\n\nTeste grátis por 7 dias, sem cartão.",
-      botao: "QUERO TESTAR GRÁTIS", url: `${APP_URL}/sign-up?product=crm`,
+      // Sem link: o botão segue pra tela de checkout logo abaixo (pagamento dentro do quiz)
+      botao: "QUERO MEU PLANO", url: "",
       antesLabel: "ANTES", depoisLabel: "DEPOIS",
-      preencher: true, paramNome: "name", paramEmail: "email", paramTelefone: "phone",
+    },
+    {
+      id: "s-checkout", type: "checkout",
+      titulo: "Garanta seu plano de ação com desconto",
+      produtoNome: "Plano de ação comercial (exemplo)",
+      precoDe: 197, precoPor: 47,
+      parcelasMax: 11, parcelasSemJuros: 1, jurosPorParcela: 1.89,
+      pix: true, cartao: true,
+      timerMinutos: 10, garantiaDias: 7, compraSegura: true,
+      botao: "",
+      sucessoTitulo: "Pagamento confirmado!",
+      sucessoTexto: "Enviamos os próximos passos no seu WhatsApp.",
+      acessoUrl: "", acessoBotao: "Acessar agora",
+      mensagemPago: "{{nome}}, pagamento confirmado! 🎉 Já já te mando por aqui os próximos passos do seu plano de ação.",
     },
   ];
 
@@ -140,6 +154,8 @@ export function quizExemploTemplate() {
     questions: stepsToQuestions(steps),
     quizResults,
     accentColor: "#1d4ed8",
+    // Exemplo nasce em modo teste: o checkout cobra na conta sandbox (sem dinheiro real)
+    checkoutSandbox: true,
     inviteMessage: "Oi, {{nome}}! Aqui é da FluxVenda 👋 Recebi o início do seu diagnóstico comercial — termina o teste lá que eu te mando o resultado por aqui.",
     doneMessage: "Prontinho! Seu diagnóstico também foi pro seu WhatsApp.",
   };
