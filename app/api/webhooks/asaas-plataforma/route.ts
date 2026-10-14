@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { markLeadFormPaid } from "@/lib/lead-form-checkout";
 
 // Webhook da conta Asaas DA PRÓPRIA PLATAFORMA (créditos de IA) — diferente do webhook por
 // agente em /api/webhooks/asaas/[agentId], que é da conta de cada cliente. Autenticidade
@@ -24,6 +25,18 @@ export async function POST(req: NextRequest) {
         prisma.team.update({ where: { id: compra.teamId }, data: { aiCreditsBalance: { increment: compra.tokens } } }),
       ]);
     }
+
+    // Checkout do quiz em telas dos formulários do super admin (cobra na conta da plataforma).
+    // Cartão parcelado: cada parcela tem um payment.id próprio, por isso casa também pelo installment.
+    const installmentId = body?.payment?.installment as string | undefined;
+    const quizSub = await prisma.leadFormSubmission.findFirst({
+      where: {
+        form: { agentOwned: false },
+        OR: [{ payAsaasId: paymentId }, ...(installmentId ? [{ payInstallmentId: installmentId }] : [])],
+      },
+      select: { id: true },
+    });
+    if (quizSub) await markLeadFormPaid(quizSub.id).catch(err => console.error("[webhook-asaas-plataforma] checkout do quiz:", err));
 
     const planCompra = await prisma.planPurchase.findUnique({ where: { asaasPaymentId: paymentId } });
     if (planCompra && planCompra.status !== "PAGO") {

@@ -46,7 +46,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
     // Checkout do quiz em telas (Pix confirma por aqui; cartão já confirma na hora, mas o
     // webhook pode chegar também — markLeadFormPaid é idempotente)
     const quizSub = await prisma.leadFormSubmission.findFirst({
-      where: { OR: [{ payAsaasId: paymentId }, ...(installmentId ? [{ payInstallmentId: installmentId }] : [])] },
+      where: { form: { agentOwned: true }, OR: [{ payAsaasId: paymentId }, ...(installmentId ? [{ payInstallmentId: installmentId }] : [])] },
       select: { id: true },
     });
     if (quizSub) await markLeadFormPaid(quizSub.id).catch(err => console.error("[webhook-asaas] checkout do quiz:", err));

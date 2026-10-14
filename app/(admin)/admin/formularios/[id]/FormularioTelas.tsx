@@ -417,7 +417,7 @@ export function StepsEditor({ steps, onChange, quizOn, quizResults, onError, asa
               <div className="space-y-2">
                 {!asaasOk && (
                   <p className="text-xs text-amber-400 bg-amber-900/20 border border-amber-800/40 rounded-lg px-3 py-2">
-                    O agente deste formulário não tem conta Asaas conectada — o checkout aparece, mas não consegue cobrar. Conecte em Agente → Comércio (chave do Asaas).
+                    Nenhuma conta Asaas pra cobrar — o checkout aparece, mas não consegue cobrar. No CRM, conecte a chave do Asaas em Comércio do agente.
                   </p>
                 )}
                 <div>
@@ -486,7 +486,7 @@ export function StepsEditor({ steps, onChange, quizOn, quizResults, onError, asa
                   </div>
                 </div>
                 <p className="text-[11px] text-gray-500">
-                  Nome, e-mail e telefone vêm preenchidos com as respostas do quiz (coloque uma pergunta de E-mail antes). Ao pagar: a oportunidade vira ganha no CRM com o valor, e o pixel registra Purchase.
+                  Nome, e-mail e telefone vêm preenchidos com as respostas do quiz (coloque uma pergunta de E-mail antes). Ao pagar: a oportunidade vira ganha no CRM com o valor, e o pixel registra Purchase. Formulários do super admin cobram na conta Asaas da plataforma; os do CRM, na conta Asaas do agente.
                 </p>
               </div>
             );

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppTextAsTeam } from "@/lib/whatsapp";
 import { findConversationByPhone } from "@/lib/conversation-lookup";
@@ -14,6 +15,26 @@ export async function resolveCheckoutAgent(agentConfigId: string | null) {
   return agentConfigId
     ? prisma.agentConfig.findUnique({ where: { id: agentConfigId }, select })
     : prisma.agentConfig.findFirst({ where: { teamId: FLUXVENDA_TEAM_ID, multiAgenteDepartamentos: true }, select });
+}
+
+// Em qual conta Asaas o checkout cobra. Formulário do super admin (agentOwned = false) vende
+// produto da própria FluxVenda → conta DA PLATAFORMA (ASAAS_PLATFORM_*, a mesma de créditos e
+// planos; confirma pelo webhook /api/webhooks/asaas-plataforma). Formulário criado no CRM →
+// conta Asaas do agente do cliente (confirma pelo webhook /api/webhooks/asaas/[agentId]).
+export type PaymentAccount = { apiKey: string; sandbox: boolean; agentIdForWebhook: string | null };
+
+export async function resolvePaymentAccount(form: { agentOwned: boolean; agentConfigId: string | null }): Promise<PaymentAccount | null> {
+  if (!form.agentOwned) {
+    const apiKey = process.env.ASAAS_PLATFORM_API_KEY;
+    return apiKey ? { apiKey, sandbox: process.env.ASAAS_PLATFORM_SANDBOX !== "false", agentIdForWebhook: null } : null;
+  }
+  const agent = await resolveCheckoutAgent(form.agentConfigId);
+  if (!agent?.asaasApiKey) return null;
+  // Sem token o webhook do agente recusa a confirmação do Pix — gera na primeira cobrança
+  if (!agent.asaasWebhookToken) {
+    await prisma.agentConfig.update({ where: { id: agent.id }, data: { asaasWebhookToken: randomUUID() } });
+  }
+  return { apiKey: agent.asaasApiKey, sandbox: agent.asaasSandbox, agentIdForWebhook: agent.id };
 }
 
 export function findCheckoutStep(stepsRaw: unknown, stepId: string): CheckoutStep | null {

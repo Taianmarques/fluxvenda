@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { normalizeFormFunnelSteps } from "@/lib/lead-form-funnel";
 import { getFormStats } from "@/lib/lead-form-stats";
-import { resolveCheckoutAgent } from "@/lib/lead-form-checkout";
 import { formToExtras, normalizeQuizResults, normalizeSteps, type LeadFormUtm } from "@/lib/lead-form-shared";
 import { FormularioEditorClient, type LeadFormQuestion } from "./FormularioEditorClient";
 
@@ -17,7 +16,6 @@ export default async function AdminFormularioEditorPage({ params }: { params: Pr
     },
   });
   if (!form) notFound();
-  const checkoutAgent = await resolveCheckoutAgent(form.agentConfigId);
   const stats = await getFormStats(form.id, form.questions as LeadFormQuestion[], form.quizResults);
 
   return (
@@ -39,7 +37,8 @@ export default async function AdminFormularioEditorPage({ params }: { params: Pr
       initialQuestions={form.questions as LeadFormQuestion[]}
       initialQuizResults={normalizeQuizResults(form.quizResults)}
       initialStyle={form.style === "TELAS" ? "TELAS" : "CHAT"}
-      asaasOk={Boolean(checkoutAgent?.asaasApiKey)}
+      // Formulário do super admin cobra na conta Asaas da plataforma (ver lib/lead-form-checkout.ts)
+      asaasOk={Boolean(process.env.ASAAS_PLATFORM_API_KEY)}
       initialSteps={normalizeSteps(form.steps)}
       submissions={form.submissions.map(s => ({
         id: s.id,

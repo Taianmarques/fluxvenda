@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { createAsaasCustomer, createAsaasCharge, createAsaasCardCharge, getAsaasPixQrCode } from "@/lib/asaas";
 import { checkoutTotal } from "@/lib/lead-form-shared";
-import { resolveCheckoutAgent, findCheckoutStep, markLeadFormPaid } from "@/lib/lead-form-checkout";
+import { resolvePaymentAccount, findCheckoutStep, markLeadFormPaid } from "@/lib/lead-form-checkout";
 
 // Checkout dentro do quiz em telas (pública). O valor sai SEMPRE da etapa salva no formulário —
 // o navegador só manda a escolha (Pix/cartão, parcelas) e os dados do comprador. Dados do cartão
@@ -39,7 +38,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Dados inválidos" }, { status: 400 });
   const b = parsed.data;
 
-  const form = await prisma.leadForm.findUnique({ where: { slug }, select: { id: true, active: true, agentConfigId: true, steps: true, title: true } });
+  const form = await prisma.leadForm.findUnique({ where: { slug }, select: { id: true, active: true, agentConfigId: true, agentOwned: true, steps: true, title: true } });
   if (!form?.active) return NextResponse.json({ error: "Formulário não encontrado" }, { status: 404 });
   const step = findCheckoutStep(form.steps, b.stepId);
   if (!step) return NextResponse.json({ error: "Checkout não encontrado" }, { status: 404 });
@@ -55,12 +54,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     return NextResponse.json({ error: "Muitas tentativas de pagamento. Fale com a gente pelo WhatsApp." }, { status: 429 });
   }
 
-  const agent = await resolveCheckoutAgent(form.agentConfigId);
-  if (!agent?.asaasApiKey) return NextResponse.json({ error: "Pagamento indisponível no momento. Fale com a gente pelo WhatsApp." }, { status: 503 });
-  // Sem token o webhook de confirmação do Pix é recusado — gera na primeira cobrança (mesmo padrão do agendamento)
-  if (!agent.asaasWebhookToken) {
-    await prisma.agentConfig.update({ where: { id: agent.id }, data: { asaasWebhookToken: randomUUID() } });
-  }
+  const conta = await resolvePaymentAccount(form);
+  if (!conta) return NextResponse.json({ error: "Pagamento indisponível no momento. Fale com a gente pelo WhatsApp." }, { status: 503 });
 
   const parcelas = b.metodo === "CARTAO" ? Math.min(b.parcelas, step.parcelasMax) : 1;
   const valor = b.metodo === "CARTAO" ? checkoutTotal(step, parcelas) : step.precoPor;
@@ -75,13 +70,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   });
 
   try {
-    const customer = await createAsaasCustomer(agent.asaasApiKey, agent.asaasSandbox, b.nome, b.telefone, b.cpf);
+    const customer = await createAsaasCustomer(conta.apiKey, conta.sandbox, b.nome, b.telefone, b.cpf);
 
     if (b.metodo === "CARTAO") {
       const c = b.cartao!;
       const remoteIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "127.0.0.1";
       const payment = await createAsaasCardCharge(
-        agent.asaasApiKey, agent.asaasSandbox, customer.id, valor, descricao,
+        conta.apiKey, conta.sandbox, customer.id, valor, descricao,
         { holderName: c.holderName, number: c.number, expiryMonth: c.expiryMonth, expiryYear: c.expiryYear.slice(-2).padStart(4, "20"), ccv: c.ccv },
         { name: b.nome, email: b.email, cpfCnpj: b.cpf, postalCode: c.postalCode, addressNumber: c.addressNumber, phone: b.telefone },
         remoteIp, parcelas,
@@ -96,8 +91,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       return NextResponse.json({ status: "PAGO" });
     }
 
-    const payment = await createAsaasCharge(agent.asaasApiKey, agent.asaasSandbox, customer.id, valor, descricao, "PIX");
-    const qr = await getAsaasPixQrCode(agent.asaasApiKey, agent.asaasSandbox, payment.id);
+    const payment = await createAsaasCharge(conta.apiKey, conta.sandbox, customer.id, valor, descricao, "PIX");
+    const qr = await getAsaasPixQrCode(conta.apiKey, conta.sandbox, payment.id);
     await prisma.leadFormSubmission.update({ where: { id: sub.id }, data: { payAsaasId: payment.id, payPixPayload: qr.payload } });
     return NextResponse.json({ status: "PENDENTE", pixPayload: qr.payload, pixQrBase64: qr.encodedImage });
   } catch (err) {
