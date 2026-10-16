@@ -31,7 +31,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
 const schema = z.object({
   title: z.string().max(60).nullable().optional(),
-  dealValue: z.number().positive(),
+  dealValue: z.number().min(0), // 0 = negociação sem valor ainda (ex: criada ao escolher a etapa no chat)
   stageId: z.string().nullable().optional(),
 });
 

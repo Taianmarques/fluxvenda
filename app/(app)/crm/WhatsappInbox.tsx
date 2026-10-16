@@ -11,6 +11,7 @@ import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { EmojiPicker } from "./EmojiPicker";
 import { QuickReplies, type QuickReply } from "./QuickReplies";
 import { OpportunitiesPanel, type Opportunity } from "./OpportunitiesPanel";
+import { StageSelector } from "./StageSelector";
 import { ScheduledMessagesPanel, type ScheduledMessage } from "./ScheduledMessagesPanel";
 import { ConversationFiltersPanel, EMPTY_FILTERS, hasActiveFilters, type ConversationFilters } from "./ConversationFiltersPanel";
 import { formatDateSeparator, isSameLocalDay } from "@/lib/chat-date";
@@ -1515,6 +1516,15 @@ export function WhatsappInbox({
                         </p>
                       );
                     })()}
+                    {!detail.isGroup && (
+                      <StageSelector
+                        conversationId={detail.id}
+                        agentId={agentId}
+                        opportunities={detail.opportunities}
+                        onChange={() => refreshDetail(detail.id)}
+                        dark={theme === "dark"}
+                      />
+                    )}
                   </div>
                   </div>
                   <div className="flex items-center gap-0.5 md:gap-1.5 flex-nowrap flex-shrink-0">
