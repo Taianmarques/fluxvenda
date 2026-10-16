@@ -10,7 +10,15 @@ export type FormStats = {
   porPergunta: { key: string; label: string; respostas: number }[];
   porOrigem: { origem: string; visitas: number; respostas: number; concluiram: number }[];
   porResultado: { titulo: string; leads: number }[]; // só no modo quiz
+  porDia: { dia: string; visitas: number; inscricoes: number }[]; // últimos DIAS_GRAFICO dias, horário de Brasília
 };
+
+export const DIAS_GRAFICO = 30;
+
+// Dia (AAAA-MM-DD) no fuso de Brasília — independe do fuso do servidor
+function diaBR(d: Date): string {
+  return d.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+}
 
 const SEM_ORIGEM = "direto / sem origem";
 
@@ -22,13 +30,21 @@ function origemDe(utm: LeadFormUtm | null | undefined): string {
 // quem terminou, e o mesmo quebrado por origem (utm_source). Uma query por tabela, agregada em
 // memória — formulário tem no máximo alguns milhares de respostas.
 export async function getFormStats(formId: string, questions: LeadFormQuestion[], quizResultsRaw?: unknown): Promise<FormStats> {
-  const [views, submissions] = await Promise.all([
+  const desde = new Date(Date.now() - DIAS_GRAFICO * 24 * 60 * 60 * 1000);
+  const [views, submissions, viewsRecentes] = await Promise.all([
     prisma.leadFormView.groupBy({ by: ["source"], where: { formId }, _count: { _all: true } }),
     prisma.leadFormSubmission.findMany({
       where: { formId }, take: 20000,
-      select: { answers: true, utm: true, inviteSentAt: true, inviteError: true, quizResult: true },
+      select: { answers: true, utm: true, inviteSentAt: true, inviteError: true, quizResult: true, createdAt: true },
     }),
+    prisma.leadFormView.findMany({ where: { formId, createdAt: { gte: desde } }, select: { createdAt: true }, take: 200000 }),
   ]);
+
+  // Série diária dos últimos DIAS_GRAFICO dias (dias sem movimento entram com zero)
+  const dias = new Map<string, { visitas: number; inscricoes: number }>();
+  for (let i = DIAS_GRAFICO - 1; i >= 0; i--) dias.set(diaBR(new Date(Date.now() - i * 24 * 60 * 60 * 1000)), { visitas: 0, inscricoes: 0 });
+  for (const v of viewsRecentes) { const b = dias.get(diaBR(v.createdAt)); if (b) b.visitas++; }
+  for (const s of submissions) { const b = dias.get(diaBR(s.createdAt)); if (b) b.inscricoes++; }
 
   const ultima = questions[questions.length - 1]?.key;
   const respondida = (answers: unknown, key: string) =>
@@ -72,6 +88,7 @@ export async function getFormStats(formId: string, questions: LeadFormQuestion[]
     porOrigem: [...origens.entries()]
       .map(([origem, v]) => ({ origem, ...v }))
       .sort((a, b) => b.respostas - a.respostas || b.visitas - a.visitas),
+    porDia: [...dias.entries()].map(([dia, v]) => ({ dia, ...v })),
     porResultado: quizResults.map(r => ({ titulo: r.titulo || r.key, leads: porResultadoMap.get(r.key) ?? 0 })),
   };
 }

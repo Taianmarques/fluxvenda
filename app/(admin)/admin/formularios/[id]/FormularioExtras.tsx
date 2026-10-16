@@ -284,6 +284,97 @@ export function TrackingLinks({ slug }: { slug: string }) {
   );
 }
 
+// Cores das duas séries do gráfico diário — validadas pro fundo escuro do editor (lightness,
+// separação pra daltonismo e contraste); legenda + tooltip garantem que não dependem só da cor
+const COR_VISITAS = "#3b82f6";
+const COR_INSCRICOES = "#059669";
+
+function diaCurto(dia: string): string {
+  const [, m, d] = dia.split("-");
+  return `${d}/${m}`;
+}
+
+function AcessosPorDia({ porDia }: { porDia: FormStats["porDia"] }) {
+  const [hover, setHover] = useState<number | null>(null);
+  const [tabela, setTabela] = useState(false);
+  const max = Math.max(1, ...porDia.map(d => Math.max(d.visitas, d.inscricoes)));
+  const totalVisitas = porDia.reduce((a, d) => a + d.visitas, 0);
+  const totalInscricoes = porDia.reduce((a, d) => a + d.inscricoes, 0);
+  const h = hover != null ? porDia[hover] : null;
+
+  return (
+    <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-3">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <p className="text-xs text-gray-500 uppercase tracking-wide">Acessos por dia — últimos {porDia.length} dias</p>
+          <p className="text-sm text-gray-300 mt-0.5">{totalVisitas} visitas · {totalInscricoes} inscrições</p>
+        </div>
+        <div className="flex items-center gap-3 text-xs text-gray-400">
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COR_VISITAS }} /> Visitas</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COR_INSCRICOES }} /> Inscrições</span>
+          <button type="button" onClick={() => setTabela(t => !t)} className="text-blue-400 hover:text-blue-300">
+            {tabela ? "Ver gráfico" : "Ver tabela"}
+          </button>
+        </div>
+      </div>
+
+      {tabela ? (
+        <div className="max-h-64 overflow-y-auto text-sm">
+          <div className="grid grid-cols-3 gap-2 px-2 py-1 text-[11px] uppercase tracking-wide text-gray-500 border-b border-gray-800">
+            <span>Dia</span><span className="text-right">Visitas</span><span className="text-right">Inscrições</span>
+          </div>
+          {[...porDia].reverse().map(d => (
+            <div key={d.dia} className="grid grid-cols-3 gap-2 px-2 py-1 border-b border-gray-800/60 last:border-0">
+              <span className="text-gray-300">{diaCurto(d.dia)}</span>
+              <span className="text-right text-gray-400 tabular-nums">{d.visitas}</span>
+              <span className="text-right text-gray-400 tabular-nums">{d.inscricoes}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="relative">
+          {/* Tooltip do dia sob o cursor */}
+          {h && hover != null && (
+            <div
+              className="absolute -top-1 z-10 -translate-x-1/2 -translate-y-full pointer-events-none bg-gray-950 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs shadow-lg whitespace-nowrap"
+              style={{ left: `${((hover + 0.5) / porDia.length) * 100}%` }}
+            >
+              <p className="font-semibold text-gray-200">{diaCurto(h.dia)}</p>
+              <p className="text-gray-400 flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm" style={{ backgroundColor: COR_VISITAS }} /> {h.visitas} visitas</p>
+              <p className="text-gray-400 flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm" style={{ backgroundColor: COR_INSCRICOES }} /> {h.inscricoes} inscrições</p>
+            </div>
+          )}
+          <div className="flex gap-2">
+            <div className="flex flex-col justify-between text-[10px] text-gray-500 tabular-nums h-32 py-0.5 text-right w-6 flex-shrink-0">
+              <span>{max}</span><span>0</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="h-32 flex items-end border-b border-gray-700" onMouseLeave={() => setHover(null)}>
+                {porDia.map((d, i) => (
+                  // Coluna inteira é a área de hover (maior que as barras finas)
+                  <div
+                    key={d.dia}
+                    onMouseEnter={() => setHover(i)}
+                    className={`flex-1 h-full flex items-end justify-center gap-[2px] px-[1px] ${hover === i ? "bg-gray-800/60" : ""}`}
+                  >
+                    <div className="w-full max-w-[8px] rounded-t-[3px]" style={{ height: `${(d.visitas / max) * 100}%`, backgroundColor: COR_VISITAS, minHeight: d.visitas ? 2 : 0 }} />
+                    <div className="w-full max-w-[8px] rounded-t-[3px]" style={{ height: `${(d.inscricoes / max) * 100}%`, backgroundColor: COR_INSCRICOES, minHeight: d.inscricoes ? 2 : 0 }} />
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-between text-[10px] text-gray-500 mt-1">
+                <span>{diaCurto(porDia[0].dia)}</span>
+                <span>{diaCurto(porDia[Math.floor(porDia.length / 2)].dia)}</span>
+                <span>Hoje</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function pct(a: number, b: number): string {
   return b > 0 ? `${Math.round((a / b) * 100)}%` : "—";
 }
@@ -315,6 +406,8 @@ export function StatsPanel({ stats, exportHref }: { stats: FormStats; exportHref
           </div>
         ))}
       </div>
+
+      {stats.porDia.length > 0 && <AcessosPorDia porDia={stats.porDia} />}
 
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-2">
         <p className="text-xs text-gray-500 uppercase tracking-wide">Onde as pessoas desistem</p>
