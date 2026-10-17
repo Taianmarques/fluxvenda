@@ -64,44 +64,76 @@ export async function POST(req: NextRequest) {
   let mediaUrl: string | null = null;
   let mediaType: string | null = null;
 
+  // Download da mídia na UazAPI com nova tentativa: ela devolve 429 (limite de requisições) e 500
+  // de vez em quando, e sem a mídia a mensagem antes era descartada em silêncio (ver abaixo).
+  const uazToken = config.uazapiToken;
+  const msgId = message.id || message.messageid;
+  async function baixarMidia() {
+    let ultimoErro: unknown;
+    for (const espera of [0, 1500, 4000]) {
+      if (espera) await new Promise(r => setTimeout(r, espera));
+      try {
+        return await downloadMessageMedia(uazToken, msgId);
+      } catch (err) {
+        ultimoErro = err;
+      }
+    }
+    throw ultimoErro;
+  }
+
+  // Se a mídia não puder ser baixada (ou o áudio transcrito), a mensagem entra no CRM mesmo assim,
+  // com um aviso no lugar do conteúdo — nunca some. Antes, mídia sem legenda que falhava ficava
+  // com texto vazio e era descartada antes de chegar na conversa.
   if (!caption && mimetype?.startsWith("audio/")) {
+    mediaType = "audio";
     try {
-      const media = await downloadMessageMedia(config.uazapiToken, message.id || message.messageid);
-      text = await transcribeAudio(media.fileURL, media.mimetype);
+      const media = await baixarMidia();
       mediaUrl = await persistRemoteMedia(media.fileURL, media.mimetype);
-      mediaType = "audio";
+      try {
+        text = (await transcribeAudio(media.fileURL, media.mimetype)).trim();
+      } catch (err) {
+        console.error("[whatsapp-webhook] erro ao transcrever áudio:", err);
+      }
+      if (!text) text = "[Áudio enviado pelo cliente — não foi possível transcrever]";
     } catch (err) {
-      console.error("[whatsapp-webhook] erro ao transcrever áudio:", err);
+      console.error("[whatsapp-webhook] erro ao baixar áudio:", err);
+      mediaType = null;
+      text = "[Áudio enviado pelo cliente — não foi possível baixar o arquivo]";
     }
   } else if (mimetype?.startsWith("image/")) {
     try {
-      const media = await downloadMessageMedia(config.uazapiToken, message.id || message.messageid);
+      const media = await baixarMidia();
       imageUrl = media.fileURL;
       mediaUrl = await persistRemoteMedia(media.fileURL, media.mimetype);
       mediaType = "image";
       text = caption ? `[Imagem] ${caption}` : "[Imagem enviada pelo cliente]";
     } catch (err) {
       console.error("[whatsapp-webhook] erro ao baixar imagem:", err);
+      text = caption ? `[Imagem — não foi possível baixar] ${caption}` : "[Imagem enviada pelo cliente — não foi possível baixar o arquivo]";
     }
   } else if (mimetype?.startsWith("video/")) {
     try {
-      const media = await downloadMessageMedia(config.uazapiToken, message.id || message.messageid);
+      const media = await baixarMidia();
       mediaUrl = await persistRemoteMedia(media.fileURL, media.mimetype);
       mediaType = "video";
       text = caption ? `[Vídeo] ${caption}` : "[Vídeo enviado pelo cliente]";
     } catch (err) {
       console.error("[whatsapp-webhook] erro ao baixar vídeo:", err);
+      text = caption ? `[Vídeo — não foi possível baixar] ${caption}` : "[Vídeo enviado pelo cliente — não foi possível baixar o arquivo]";
     }
   } else if (mimetype && !mimetype.startsWith("audio/")) {
     // Qualquer outro mimetype (PDF, planilha, etc.) vira documento
+    const fileName = mediaFileName(message);
     try {
-      const media = await downloadMessageMedia(config.uazapiToken, message.id || message.messageid);
+      const media = await baixarMidia();
       mediaUrl = await persistRemoteMedia(media.fileURL, media.mimetype);
       mediaType = "document";
-      const fileName = mediaFileName(message);
       text = caption ? `[Documento] ${caption}` : `[Documento enviado pelo cliente${fileName ? `: ${fileName}` : ""}]`;
     } catch (err) {
       console.error("[whatsapp-webhook] erro ao baixar documento:", err);
+      text = caption
+        ? `[Documento — não foi possível baixar] ${caption}`
+        : `[Documento enviado pelo cliente${fileName ? `: ${fileName}` : ""} — não foi possível baixar o arquivo]`;
     }
   }
 
