@@ -7,6 +7,8 @@ import { transcribeAudio } from "@/lib/agent-engine";
 import { sendWhatsAppTextAsTeam, sendMediaAsTeam, downloadMessageMedia } from "@/lib/whatsapp";
 import { processIncomingMessage, type ChannelAdapter } from "@/lib/whatsapp-inbound";
 import { downloadAndStoreMedia } from "@/lib/media-storage";
+import { normalizePhoneBR } from "@/lib/phone";
+import { emitChatEvent } from "@/lib/realtime";
 
 function mediaMimetype(message: any): string | null {
   return typeof message?.content === "object" && typeof message.content?.mimetype === "string"
@@ -23,16 +25,44 @@ export async function POST(req: NextRequest) {
   const message = body.message;
   const token: string | undefined = body.token;
 
-  // Ignora eco de mensagens enviadas pela própria API ou payloads incompletos. Mensagem de
-  // grupo passa — vira uma conversa própria (aba Grupos no CRM), só que a IA nunca responde
-  // nela automaticamente (ver shouldAiHandle em lib/whatsapp-inbound.ts).
-  if (!message || !token || message.fromMe || message.wasSentByApi) {
+  // wasSentByApi = mensagem que SAIU pelo nosso próprio envio (CRM/IA) — a UazAPI já nem manda
+  // webhook pra essas (ver excludeMessages em lib/whatsapp.ts), esse check aqui é só segurança.
+  // Payload incompleto também é descartado.
+  if (!message || !token || message.wasSentByApi) {
     return NextResponse.json({ ok: true });
   }
   const isGroup = Boolean(message.isGroup);
 
   const config = await prisma.agentConfig.findFirst({ where: { uazapiToken: token, active: true } });
   if (!config || !config.systemPrompt || !config.uazapiToken) {
+    return NextResponse.json({ ok: true });
+  }
+
+  // fromMe + não veio da nossa API = alguém da equipe respondeu direto pelo WhatsApp do celular,
+  // por fora do CRM. Pausa a IA pra esse lead igual a um "aceitar" manual — sem isso a IA
+  // continuaria respondendo por cima de quem já está atendendo na mão. Grupo não tem IA
+  // respondendo de qualquer forma (shouldAiHandle), nada a pausar.
+  if (message.fromMe) {
+    if (isGroup) return NextResponse.json({ ok: true });
+
+    const contactNumber = normalizePhoneBR(String(message.chatid).split("@")[0]);
+    const text: string = (typeof message.text === "string" && message.text)
+      || (typeof message.content === "string" ? message.content : "")
+      || "[Mensagem enviada direto pelo WhatsApp, fora do CRM]";
+
+    const conversation = await prisma.conversation.upsert({
+      where: { agentConfigId_contactNumber: { agentConfigId: config.id, contactNumber } },
+      update: { humanTakeover: true, status: "ATIVO" },
+      create: {
+        agentConfigId: config.id, contactNumber, status: "ATIVO", humanTakeover: true, isGroup: false,
+        ...(config.iaLeadAttendantId && { assignedToId: config.iaLeadAttendantId }),
+      },
+    });
+    await prisma.message.create({
+      data: { conversationId: conversation.id, role: "human", content: text, waMessageId: message.id || message.messageid || null },
+    });
+    emitChatEvent(config.id, conversation.id);
+
     return NextResponse.json({ ok: true });
   }
 
