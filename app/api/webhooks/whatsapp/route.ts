@@ -49,11 +49,20 @@ export async function POST(req: NextRequest) {
   if (!caption && mimetype?.startsWith("audio/")) {
     try {
       const media = await downloadMessageMedia(config.uazapiToken, message.id || message.messageid);
-      text = await transcribeAudio(media.fileURL, media.mimetype);
+      // Baixa e salva o áudio ANTES de tentar transcrever — se a transcrição falhar (ex: sem
+      // crédito na OpenAI), a mensagem ainda é salva com o áudio tocável, só sem o texto
+      // automático. Transcrição é só "texto a mais", não pode ser pré-requisito pra guardar
+      // a mensagem (o "if (!text) return" logo abaixo descartaria ela inteira sem isso).
       mediaUrl = (await downloadAndStoreMedia(media.fileURL, media.mimetype)) ?? media.fileURL;
       mediaType = "audio";
+      try {
+        text = await transcribeAudio(media.fileURL, media.mimetype);
+      } catch (err) {
+        console.error("[whatsapp-webhook] erro ao transcrever áudio (mensagem salva mesmo assim):", err);
+      }
+      if (!text) text = "[Áudio enviado pelo cliente — transcrição indisponível no momento]";
     } catch (err) {
-      console.error("[whatsapp-webhook] erro ao transcrever áudio:", err);
+      console.error("[whatsapp-webhook] erro ao baixar áudio:", err);
     }
   } else if (mimetype?.startsWith("image/")) {
     try {
