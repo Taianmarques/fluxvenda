@@ -242,20 +242,16 @@ function Card({
         )}
       </div>
 
-      {/* Título + status do lead colado logo depois (compacto) */}
+      {/* Título + dias sem contato logo depois */}
       <div className="-mt-0.5 flex items-center gap-2 min-w-0">
         <p className="text-[15px] font-medium leading-snug tracking-[-0.005em] truncate" title={titulo}>{titulo}</p>
-        <div className={`flex-shrink-0 ${opp.leadStatusId ? "" : "md:opacity-0 md:group-hover/card:opacity-100 md:group-focus-within/card:opacity-100 transition-opacity duration-150"}`}>
-          <LeadStatusBadge
-            agentId={agentId}
-            leadStatusId={opp.leadStatusId}
-            statuses={leadStatuses}
-            onChange={id => onLeadStatusChange(opp.conversationId, id)}
-            onStatusesChange={onLeadStatusesChange}
-            dark={dark}
-            compact
-          />
-        </div>
+        <span
+          className={`flex items-center gap-1 flex-shrink-0 text-[11.5px] tabular-nums ${t.muted}`}
+          title={semContato == null ? "Sem mensagens ainda" : semContato === 0 ? "Teve contato hoje" : `${semContato} dia(s) sem contato`}
+        >
+          <MessageCircleDashed size={14} aria-hidden /> {semContato == null ? "—" : semContato === 0 ? "hoje" : `${semContato}d`}
+          <span className="sr-only"> sem contato</span>
+        </span>
       </div>
 
 
@@ -290,12 +286,16 @@ function Card({
               <Clock size={14} aria-hidden /> {daysSince(opp.stageEnteredAt)}d
               <span className="sr-only"> na etapa</span>
             </span>
-            <span
-              className="flex items-center gap-1"
-              title={semContato == null ? "Sem mensagens ainda" : semContato === 0 ? "Teve contato hoje" : `${semContato} dia(s) sem contato`}
-            >
-              <MessageCircleDashed size={14} aria-hidden /> {semContato == null ? "—" : semContato === 0 ? "hoje" : `${semContato}d`}
-              <span className="sr-only"> sem contato</span>
+            <span className={`flex items-center ${opp.leadStatusId ? "" : "md:opacity-0 md:group-hover/card:opacity-100 md:group-focus-within/card:opacity-100 transition-opacity duration-150"}`}>
+              <LeadStatusBadge
+                agentId={agentId}
+                leadStatusId={opp.leadStatusId}
+                statuses={leadStatuses}
+                onChange={id => onLeadStatusChange(opp.conversationId, id)}
+                onStatusesChange={onLeadStatusesChange}
+                dark={dark}
+                compact
+              />
             </span>
             {/* Etiquetas como pontos coloridos (nome no tooltip) — mantém todos os cards com a mesma altura */}
             {(opp.etiquetas?.length ?? 0) > 0 && (

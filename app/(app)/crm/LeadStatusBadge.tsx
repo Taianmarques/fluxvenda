@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 export type LeadStatus = { id: string; name: string; color: string; order: number };
 
@@ -15,9 +15,22 @@ export function LeadStatusBadge({
   onChange: (id: string | null) => void;
   onStatusesChange: () => void;
   dark: boolean;
-  compact?: boolean; // versão menor (card do pipeline): etiqueta mais baixa e menu abrindo pra esquerda
+  compact?: boolean; // versão menor (card do pipeline): etiqueta mais baixa e menu em posição fixa (o card corta o que sai dele)
 }) {
   const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  // Compacto: menu em position:fixed calculado do botão — abre pra cima quando não cabe embaixo
+  // (ex: status no rodapé do card) e nunca é cortado pelo overflow-hidden do card
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  function toggle() {
+    if (!open && compact && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      const altura = 96 + statuses.length * 30;
+      const top = r.bottom + 4 + altura > window.innerHeight ? Math.max(8, r.top - 4 - altura) : r.bottom + 4;
+      setPos({ top, left: Math.min(Math.max(8, r.left), window.innerWidth - 184) });
+    }
+    setOpen(o => !o);
+  }
   const [newName, setNewName] = useState("");
   const current = statuses.find(s => s.id === leadStatusId) ?? null;
 
@@ -46,7 +59,8 @@ export function LeadStatusBadge({
   return (
     <div className="relative inline-block" onClick={e => e.stopPropagation()} onPointerDown={e => e.stopPropagation()}>
       <button
-        onClick={() => setOpen(o => !o)}
+        ref={btnRef}
+        onClick={toggle}
         className={`${compact ? "text-[9.5px] leading-[14px] px-1.5" : "text-[10px] px-2 py-0.5"} font-medium rounded-full border transition-colors`}
         style={current
           ? { backgroundColor: `${current.color}22`, color: current.color, borderColor: `${current.color}66` }
@@ -57,8 +71,10 @@ export function LeadStatusBadge({
 
       {open && (
         <>
-        <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-        <div className={`absolute z-20 top-full ${compact ? "right-0" : "left-0"} mt-1 w-44 rounded-xl border shadow-xl p-1.5 space-y-0.5 ${dark ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}`}>
+        <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+        <div
+          style={compact && pos ? { top: pos.top, left: pos.left } : undefined}
+          className={`${compact ? "fixed z-50" : "absolute z-20 top-full left-0 mt-1"} w-44 rounded-xl border shadow-xl p-1.5 space-y-0.5 ${dark ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}`}>
           {current && (
             <button
               onClick={() => { onChange(null); setOpen(false); }}
