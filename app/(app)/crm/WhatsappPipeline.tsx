@@ -8,16 +8,12 @@ import {
 import { useDroppable, useDraggable } from "@dnd-kit/core";
 import { SortableContext, useSortable, arrayMove, horizontalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { JetBrains_Mono } from "next/font/google";
 import { ThumbsUp, ThumbsDown, MessageCircle, Bot, X, ListChecks, MoreVertical, ArrowRightLeft, Shuffle, GripVertical, Pencil, Trash2, Clock, Briefcase, Trophy, ArrowRight, Plus, Check, Inbox } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { ConversationPopup } from "./ConversationPopup";
 import { PipelineTaskPanel } from "./PipelineTaskPanel";
 import { OpportunityDetailModal } from "./OpportunityDetailModal";
 import type { Attendant } from "./PipelineFiltersPanel";
-
-// Rótulos e números do card em monoespaçada (estilo da referência aprovada pelo usuário)
-const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500"], display: "swap" });
 
 export type StageFollowupAttempt = { minutos: number; objetivo?: string };
 export type Stage = { id: string; name: string; color: string; order: number; agenteInstrucoes?: string; followupDelaysMinutes?: StageFollowupAttempt[] };
@@ -234,7 +230,7 @@ function Card({
       <span aria-hidden className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: stageColor }} />
 
       <div className="flex items-start justify-between gap-2">
-        <p className={`${mono.className} text-[10.5px] uppercase tracking-[0.08em] truncate pt-0.5 ${t.muted}`}>{sobretitulo}</p>
+        <p className={`text-[10.5px] uppercase tracking-[0.08em] truncate pt-0.5 ${t.muted}`}>{sobretitulo}</p>
         <div className={opp.leadStatusId ? "" : "md:opacity-0 md:group-hover/card:opacity-100 md:group-focus-within/card:opacity-100 transition-opacity duration-150"}>
           <LeadStatusBadge
             agentId={agentId}
@@ -274,7 +270,7 @@ function Card({
           </p>
         )}
         <span
-          className={`${mono.className} text-[11px] whitespace-nowrap ${daysSince(opp.stageEnteredAt) >= 7 ? "text-amber-600 font-medium" : t.muted}`}
+          className={`text-[11px] whitespace-nowrap ${daysSince(opp.stageEnteredAt) >= 7 ? "text-amber-600 font-medium" : t.muted}`}
           title={daysSince(opp.stageEnteredAt) >= 7 ? "Parada há uma semana ou mais nesta etapa" : "Tempo nesta etapa"}
         >
           {daysSince(opp.stageEnteredAt)}d na etapa
@@ -285,13 +281,13 @@ function Card({
           {(opp.etiquetas ?? []).slice(0, 3).map(et => (
             <span
               key={et.id}
-              className={`${mono.className} text-[10px] uppercase tracking-[0.06em] leading-none rounded-md border px-1.5 py-1 max-w-[110px] truncate flex-shrink-0`}
+              className={`text-[10px] uppercase tracking-[0.06em] leading-none rounded-md border px-1.5 py-1 max-w-[110px] truncate flex-shrink-0`}
               style={{ color: et.cor, borderColor: `${et.cor}55`, backgroundColor: `${et.cor}12` }}
             >
               {et.nome}
             </span>
           ))}
-          {(opp.etiquetas?.length ?? 0) > 3 && <span className={`${mono.className} text-[10px] leading-none px-1 py-1 flex-shrink-0 ${t.muted}`}>+{opp.etiquetas!.length - 3}</span>}
+          {(opp.etiquetas?.length ?? 0) > 3 && <span className={`text-[10px] leading-none px-1 py-1 flex-shrink-0 ${t.muted}`}>+{opp.etiquetas!.length - 3}</span>}
       </div>
 
       <div className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[12px] flex-shrink-0 ${t.soft}`}>
@@ -316,13 +312,13 @@ function Card({
         <span className={`flex-1 h-[3px] rounded-full overflow-hidden ${t.track}`}>
           <span className="block h-full rounded-full transition-[width] duration-300" style={{ width: `${opp.tasksTotal > 0 ? (feitas / opp.tasksTotal) * 100 : 0}%`, backgroundColor: stageColor }} />
         </span>
-        <span className={`${mono.className} text-[10.5px] uppercase tracking-[0.08em] tabular-nums whitespace-nowrap ${t.muted}`}>
+        <span className={`text-[10.5px] uppercase tracking-[0.08em] tabular-nums whitespace-nowrap ${t.muted}`}>
           {opp.tasksTotal > 0 ? `Tarefas ${feitas}/${opp.tasksTotal}` : "+ Tarefa"}
         </span>
       </button>
 
       <div className={`relative mt-auto flex-shrink-0 flex items-center justify-between gap-2 pt-2.5 border-t ${t.divider}`}>
-        <span className={`${mono.className} text-[10.5px] uppercase tracking-[0.08em] truncate ${opp.lostAt ? "text-red-500" : t.muted}`} title={opp.motivoPerdaNome ?? undefined}>
+        <span className={`text-[10.5px] uppercase tracking-[0.08em] truncate ${opp.lostAt ? "text-red-500" : t.muted}`} title={opp.motivoPerdaNome ?? undefined}>
           {opp.lostAt
             ? `Perdida${opp.motivoPerdaNome ? ` · ${opp.motivoPerdaNome}` : ""}`
             : semContato == null ? "Sem mensagens" : semContato === 0 ? "Contato hoje" : `Há ${semContato}d sem contato`}
@@ -573,7 +569,7 @@ function Column({
       <div className={`group mx-2 mt-2 px-3 py-2.5 rounded-xl border ${t.headerCard}`}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
-            {index >= 0 && <span className={`${mono.className} text-[11px] tabular-nums ${t.muted}`}>{String(index + 1).padStart(2, "0")}</span>}
+            {index >= 0 && <span className={`text-[11px] tabular-nums ${t.muted}`}>{String(index + 1).padStart(2, "0")}</span>}
             <span aria-hidden className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: stage.color }} />
             {isRealStage && (
               <button
@@ -633,7 +629,7 @@ function Column({
             </button>
             </>)}
             <span
-              className={`${mono.className} text-[10.5px] min-w-[20px] text-center px-1.5 py-0.5 rounded-full flex-shrink-0 tabular-nums ${t.chip}`}
+              className={`text-[10.5px] min-w-[20px] text-center px-1.5 py-0.5 rounded-full flex-shrink-0 tabular-nums ${t.chip}`}
               aria-label={`${opportunities.length} oportunidade${opportunities.length === 1 ? "" : "s"}`}
             >
               {opportunities.length}
@@ -759,7 +755,7 @@ function ResumoPipeline({ stages, opportunities, dark }: { stages: Stage[]; oppo
       <div className="grid grid-cols-2 md:grid-cols-4">
         {itens.map((it, i) => (
           <div key={it.rotulo} className={`px-4 py-3 ${i > 0 ? `md:border-l ${dark ? "border-gray-800" : "border-[#ebe8e2]"}` : ""}`}>
-            <p className={`${mono.className} text-[10.5px] uppercase tracking-[0.1em] ${muted}`}>{it.rotulo}</p>
+            <p className={`text-[10.5px] uppercase tracking-[0.1em] ${muted}`}>{it.rotulo}</p>
             <p className={`mt-1.5 text-[28px] font-semibold tabular-nums tracking-[-0.025em] leading-none ${it.cor}`} title={it.titulo}>{it.valor}</p>
           </div>
         ))}
