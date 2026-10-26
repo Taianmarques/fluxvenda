@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { FileUp, Loader2, Sparkles, X } from "lucide-react";
+import { Check, Copy, FileText, FileUp, Loader2, Sparkles, X } from "lucide-react";
 
 // Painel "Transformar roteiro em quiz": o usuário cola (ou anexa em .txt/.md) o roteiro/prompt do
 // quiz que ele já tem — perguntas, opções, resultados — e a IA converte fielmente pro quiz em telas.
@@ -22,6 +22,71 @@ Conservador — prioriza segurança...
 Moderado — ...
 Oferta final: consultoria gratuita de 30 min`;
 
+// Roteiro modelo no formato que a conversão entende melhor — o usuário troca os [campos]
+const ROTEIRO_MODELO = `TÍTULO DO QUIZ: [Ex: Descubra o seu perfil de cuidado com o carro]
+
+ABERTURA
+Título: [Frase chamativa da primeira tela]
+Texto: [1-2 frases dizendo o que a pessoa ganha ao responder]
+Botão: [Ex: Começar o teste]
+
+PERGUNTAS (cada opção indica qual RESULTADO ela soma)
+1. [Pergunta 1]
+- [Opção A] → [Resultado 1]
+- [Opção B] → [Resultado 2]
+- [Opção C] → [Resultado 3]
+
+2. [Pergunta 2]
+- [Opção A] → [Resultado 1]
+- [Opção B] → [Resultado 2]
+- [Opção C] → [Resultado 3]
+
+3. [Pergunta 3]
+- [Opção A] → [Resultado 1]
+- [Opção B] → [Resultado 2]
+- [Opção C] → [Resultado 3]
+
+(TELA DE CONTEÚDO — opcional, depois da pergunta 2)
+Título: [Ex: Você sabia?]
+Destaque: [Uma frase de impacto sobre o problema do cliente]
+
+RESULTADOS (do mais crítico ao mais avançado)
+[Resultado 1]: [2-3 frases explicando o perfil e o próximo passo]
+Mensagem no WhatsApp: [Ex: {{nome}}, seu resultado foi {{resultado}}. ...]
+
+[Resultado 2]: [descrição]
+Mensagem no WhatsApp: [mensagem]
+
+[Resultado 3]: [descrição]
+Mensagem no WhatsApp: [mensagem]
+
+OFERTA FINAL
+Título: [Ex: {{nome}}, o seu plano ficou pronto!]
+Texto: [O que você oferece e por que agora]
+Botão: [Ex: Quero agendar]
+
+PRIMEIRA MENSAGEM NO WHATSAPP (assim que a pessoa informar o número)
+[Ex: Oi, {{nome}}! Recebi o início do seu teste, termina lá que eu te mando o resultado por aqui.]`;
+
+// Prompt pra quem ainda não tem roteiro: cola numa IA (ChatGPT etc.), descreve o negócio e recebe
+// o roteiro já no formato do modelo acima
+const PROMPT_CHATGPT = `Você é especialista em funis de quiz para captação de leads no Brasil. Crie o roteiro de um quiz de perfil para o meu negócio, que termina numa oferta.
+
+Meu negócio: [descreva o que você vende]
+Meu público: [quem é o cliente ideal]
+Oferta no final do quiz: [ex: avaliação gratuita, desconto na primeira compra, consultoria]
+
+Regras:
+- 5 a 7 perguntas de múltipla escolha, com 3 ou 4 opções cada.
+- 3 resultados (perfis), do mais crítico ao mais avançado.
+- Cada opção indica qual resultado ela soma, com uma seta (→).
+- Não invente estatísticas com números exatos nem depoimentos.
+- Português do Brasil, frases curtas e diretas.
+
+Responda exatamente neste formato:
+
+${ROTEIRO_MODELO}`;
+
 const ETAPAS = ["Lendo o seu roteiro...", "Montando as perguntas e opções...", "Ligando as opções aos resultados...", "Preparando a oferta e as mensagens..."];
 const MAX = 20000;
 
@@ -35,6 +100,21 @@ export function GerarQuizIA({
 }) {
   const [material, setMaterial] = useState("");
   const [arquivo, setArquivo] = useState<string | null>(null);
+  const [copiado, setCopiado] = useState(false);
+
+  function inserirModelo() {
+    if (material.trim() && !confirm("Substituir o texto atual pelo roteiro modelo?")) return;
+    setMaterial(ROTEIRO_MODELO);
+    setArquivo(null);
+    setError(null);
+  }
+
+  function copiarPrompt() {
+    navigator.clipboard.writeText(PROMPT_CHATGPT).then(() => {
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2500);
+    });
+  }
   const [gerando, setGerando] = useState(false);
   const [etapa, setEtapa] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -128,6 +208,25 @@ export function GerarQuizIA({
           className="flex items-center gap-2 border border-gray-700 hover:border-blue-600 text-gray-300 hover:text-blue-400 rounded-xl px-4 py-2 text-sm font-medium disabled:opacity-60"
         >
           <FileUp size={15} /> Anexar arquivo
+        </button>
+        <button
+          type="button"
+          onClick={inserirModelo}
+          disabled={gerando}
+          className="flex items-center gap-2 border border-gray-700 hover:border-blue-600 text-gray-300 hover:text-blue-400 rounded-xl px-4 py-2 text-sm font-medium disabled:opacity-60"
+          title="Preenche a caixa com um roteiro no formato ideal — troque os [campos] pelo seu conteúdo"
+        >
+          <FileText size={15} /> Inserir roteiro modelo
+        </button>
+        <button
+          type="button"
+          onClick={copiarPrompt}
+          disabled={gerando}
+          className="flex items-center gap-2 text-gray-400 hover:text-blue-400 rounded-xl px-2 py-2 text-sm disabled:opacity-60"
+          title="Ainda não tem roteiro? Copie este prompt, cole no ChatGPT, descreva seu negócio e cole a resposta aqui"
+        >
+          {copiado ? <Check size={15} className="text-green-400" /> : <Copy size={15} />}
+          {copiado ? "Prompt copiado — cole no ChatGPT" : "Copiar prompt pro ChatGPT"}
         </button>
         <input ref={fileRef} type="file" accept=".txt,.md,.markdown,text/plain,text/markdown" onChange={anexar} className="hidden" />
         {gerando && <span className="text-xs text-gray-400">{ETAPAS[etapa]} pode levar até 1 minuto.</span>}
