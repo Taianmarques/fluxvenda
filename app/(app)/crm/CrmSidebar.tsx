@@ -28,7 +28,7 @@ const SIDEBAR_COLLAPSED_KEY = "crm_sidebar_collapsed";
 
 // Visual do menu: fundo marinho, item ativo preenchido em azul, itens compactos (cabe na altura
 // de um notebook sem rolar) e barra de rolagem fina que só aparece ao passar o mouse.
-const ITEM_BASE = "flex items-center gap-3 rounded-xl text-[13.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70";
+const ITEM_BASE = "crm-sb-item flex items-center gap-3 rounded-xl text-[13.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70";
 const ITEM_IDLE = "text-slate-400 hover:text-white hover:bg-white/[0.05]";
 const ITEM_ACTIVE = "text-white bg-gradient-to-r from-blue-600 to-blue-500 shadow-[0_6px_16px_-8px_rgba(37,99,235,0.8)]";
 const ITEM_GROUP_ACTIVE = "text-white bg-white/[0.07]";
@@ -282,14 +282,28 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo,
     {/* Sidebar vertical — desktop: seções com rótulo, grupos abrem submenu pro lado */}
     <aside className={`hidden md:flex flex-shrink-0 flex-col border-r border-white/[0.06] bg-gradient-to-b from-[#0c1326] via-[#090f1f] to-[#060a15] transition-[width] duration-150 ${collapsed ? "w-[68px]" : "w-60"}`}>
       <style>{`
-        .crm-nav-scroll { scrollbar-width: thin; scrollbar-color: transparent transparent; }
-        .crm-nav-scroll:hover { scrollbar-color: rgba(148,163,184,0.25) transparent; }
-        .crm-nav-scroll::-webkit-scrollbar { width: 6px; }
-        .crm-nav-scroll::-webkit-scrollbar-thumb { background: transparent; border-radius: 9999px; }
-        .crm-nav-scroll:hover::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.25); }
+        /* Sem barra de rolagem visível: se a tela for muito baixa, rola com a roda/trackpad */
+        .crm-nav-scroll { scrollbar-width: none; }
+        .crm-nav-scroll::-webkit-scrollbar { display: none; }
+        /* Notebook (1366x768 com barra de tarefas + abas do navegador sobra ~600px): compacta */
+        @media (max-height: 780px) {
+          .crm-sb-item { padding-top: 6px !important; padding-bottom: 6px !important; }
+          .crm-sb-sections > * + * { margin-top: 8px !important; }
+          .crm-sb-label { padding-bottom: 2px !important; }
+          .crm-sb-logo { padding-top: 12px !important; padding-bottom: 10px !important; }
+          .crm-sb-search { padding-top: 8px !important; }
+          .crm-sb-search label { padding-top: 6px !important; padding-bottom: 6px !important; }
+          .crm-sb-agent { padding: 6px !important; }
+        }
+        @media (max-height: 660px) {
+          .crm-sb-item { padding-top: 5px !important; padding-bottom: 5px !important; font-size: 13px !important; }
+          .crm-sb-sections > * + * { margin-top: 6px !important; }
+          .crm-sb-label { font-size: 10px !important; }
+          .crm-sb-agent-sub { display: none !important; }
+        }
       `}</style>
 
-      <div className={`pt-4 pb-3 flex items-center gap-2.5 ${collapsed ? "justify-center px-2" : "px-5"}`}>
+      <div className={`crm-sb-logo pt-4 pb-3 flex items-center gap-2.5 ${collapsed ? "justify-center px-2" : "px-5"}`}>
         {menuLogo ? (
           <img src={menuLogo} alt="FluxVenda" width={26} height={26} className="flex-shrink-0 rounded" />
         ) : (
@@ -305,7 +319,7 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo,
           title={collapsed ? (currentAgent?.nome ?? "Agente") : undefined}
           aria-haspopup={agents.length > 1 ? "menu" : undefined}
           aria-expanded={agents.length > 1 ? showSwitcher : undefined}
-          className={`w-full flex items-center gap-2.5 rounded-xl border border-white/[0.07] bg-white/[0.04] text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 ${
+          className={`crm-sb-agent w-full flex items-center gap-2.5 rounded-xl border border-white/[0.07] bg-white/[0.04] text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 ${
             agents.length > 1 ? "hover:bg-white/[0.07] cursor-pointer" : "cursor-default"
           } ${collapsed ? "justify-center p-1.5" : "p-2"}`}
         >
@@ -316,7 +330,7 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo,
             <>
               <span className="min-w-0 flex-1">
                 <span className="block text-[13.5px] font-semibold text-white truncate">{currentAgent?.nome ?? "Nenhum agente"}</span>
-                <span className="block text-[11.5px] text-slate-400 truncate">
+                <span className="crm-sb-agent-sub block text-[11.5px] text-slate-400 truncate">
                   {agents.length > 1 ? `${agents.length} agentes · trocar` : "Agente de IA"}
                 </span>
               </span>
@@ -347,7 +361,7 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo,
 
       {/* Pesquisar no menu: filtra todas as páginas; Enter abre a primeira */}
       {!collapsed && (
-        <div className="px-3 pt-2.5">
+        <div className="crm-sb-search px-3 pt-2.5">
           <label className="flex items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-2 focus-within:border-blue-500/60 transition-colors">
             <Search size={15} className="text-slate-500 flex-shrink-0" />
             <input
@@ -383,7 +397,7 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo,
             ))}
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="crm-sb-sections space-y-3">
             {/* Principal: Início, Agentes de IA (só gestor) e categorias de um item só (ex: Visão Geral) */}
             <div className="space-y-0.5">
               {[...(isManager ? [INICIO_ITEM, HUB_ITEM] : []), ...SINGLE_ITEM_CATEGORIES.map(c => c.items[0])].map(item => {
@@ -411,7 +425,7 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo,
                 <div key={sec.label} className="space-y-0.5">
                   {collapsed
                     ? <div className="mx-auto mb-1.5 w-5 border-t border-white/[0.08]" aria-hidden />
-                    : <p className="px-3 pb-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-500">{sec.label}</p>}
+                    : <p className="crm-sb-label px-3 pb-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-500">{sec.label}</p>}
                   {cats.map(cat => (
                     <CategoryFlyout key={cat.key} label={cat.label} icon={CATEGORY_ICONS[cat.key]} items={cat.items} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} collapsed={collapsed} />
                   ))}
@@ -428,11 +442,21 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo,
       </nav>
 
       {/* Rodapé compacto: usuário + notificações + recolher numa linha só */}
-      <div className={`border-t border-white/[0.06] py-3 ${collapsed ? "px-2 space-y-1" : "px-3 space-y-1.5"}`}>
+      <div className={`border-t border-white/[0.06] py-2.5 ${collapsed ? "px-2" : "px-3"}`}>
         <div className={collapsed ? "flex flex-col items-center gap-1" : "flex items-center gap-2 px-1"}>
           <UserMenu name={userName} />
           {!collapsed && <span className="flex-1 min-w-0 text-[13.5px] font-medium text-slate-200 truncate">{userName}</span>}
           <NotificationsButton compact />
+          {hasPlataforma && (
+            <Link
+              href="/dashboard"
+              title="Plataforma B2B"
+              aria-label="Ir para a Plataforma B2B"
+              className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
+            >
+              <ArrowLeft size={17} />
+            </Link>
+          )}
           <button
             onClick={toggleCollapsed}
             title={collapsed ? "Expandir menu" : "Recolher menu"}
@@ -442,16 +466,6 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo,
             {collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
           </button>
         </div>
-        {hasPlataforma && (
-          <Link
-            href="/dashboard"
-            title={collapsed ? "Plataforma B2B" : undefined}
-            className={`flex items-center gap-2 rounded-lg text-[12.5px] text-slate-500 hover:text-slate-200 hover:bg-white/[0.04] transition-colors ${collapsed ? "justify-center py-2" : "px-2 py-1.5"}`}
-          >
-            <ArrowLeft size={14} />
-            {!collapsed && "Plataforma B2B"}
-          </Link>
-        )}
       </div>
     </aside>
     </>
