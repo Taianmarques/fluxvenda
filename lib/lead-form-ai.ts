@@ -149,11 +149,22 @@ function montar(r: Rascunho) {
   });
 
   const conteudos = (r.conteudos ?? []).slice(0, 6);
-  r.perguntas.slice(0, 15).forEach((p, i) => {
-    const vistos = new Set<string>();
-    const opcoes = p.opcoes.slice(0, 6)
-      .map(o => ({ ...o, texto: corta(o.texto, 60) }))
-      .filter(o => o.texto && !vistos.has(o.texto) && vistos.add(o.texto));
+  // Só perguntas de escolha de verdade: a IA às vezes traz do roteiro "qual seu nome/WhatsApp?" sem
+  // opções — essas são descartadas (o quiz já pede nome e WhatsApp no começo)
+  const perguntas = r.perguntas
+    .map(p => {
+      const vistos = new Set<string>();
+      const opcoes = (p.opcoes ?? []).slice(0, 6)
+        .map(o => ({ ...o, texto: corta(o.texto, 60) }))
+        .filter(o => o.texto && !vistos.has(o.texto) && vistos.add(o.texto));
+      return { ...p, opcoes };
+    })
+    .filter(p => p.opcoes.length >= 2 && corta(p.pergunta, 200))
+    .slice(0, 15);
+  if (perguntas.length === 0) throw new Error("Não encontrei perguntas com opções no roteiro. Confira se cada pergunta tem pelo menos 2 opções.");
+
+  perguntas.forEach((p, i) => {
+    const opcoes = p.opcoes;
     steps.push({
       id: `s-p${i + 1}`, type: "pergunta",
       question: {
