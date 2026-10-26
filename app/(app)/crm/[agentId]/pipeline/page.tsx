@@ -55,7 +55,7 @@ export default async function PipelinePage({ params }: { params: Promise<{ agent
         conversation: {
           include: {
             messages: { where: { role: { not: "note" } }, orderBy: { createdAt: "desc" }, take: 1 },
-            assignedTo: { select: { name: true } },
+            assignedTo: { select: { name: true } }, etiquetas: { select: { id: true, nome: true, cor: true }, orderBy: { nome: "asc" } },
           },
         },
         motivoPerda: { select: { nome: true } },
@@ -105,6 +105,7 @@ export default async function PipelinePage({ params }: { params: Promise<{ agent
         tasksDone: taskMap.get(o.id)?.done ?? 0,
         tasks: taskMap.get(o.id)?.items ?? [],
         nextTask: taskMap.get(o.id)?.next ?? null,
+        etiquetas: o.conversation.etiquetas,
       }))}
     />
   );

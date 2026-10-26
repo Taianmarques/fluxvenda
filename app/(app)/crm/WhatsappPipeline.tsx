@@ -61,7 +61,17 @@ export type PipelineOpportunity = {
   tasks?: { id: string; title: string; done: boolean; dueDate: string | null }[]; // primeiras tarefas (checklist)
   nextTask?: { title: string; dueDate: string | null } | null; // próxima pendente (prazo mais próximo)
   lastContactAt?: string | null; // última mensagem da conversa
+  etiquetas?: { id: string; nome: string; cor: string }[]; // etiquetas da conversa (tags no card)
 };
+
+// "R$ 587,5k", "R$ 1,2mi" — totais de coluna e indicadores do topo
+function formatCompacto(value: number): string {
+  const abs = Math.abs(value);
+  const fmt = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+  if (abs >= 1_000_000) return `R$ ${fmt(value / 1_000_000)}mi`;
+  if (abs >= 1_000) return `R$ ${fmt(value / 1_000)}k`;
+  return `R$ ${fmt(value)}`;
+}
 
 // "hoje 15h", "amanhã 9h30", "12/10", com urgência pra cor do ponto
 function quandoTarefa(iso: string | null): { texto: string; urgencia: "atrasada" | "hoje" | "breve" | "depois" | "sem" } {
@@ -97,6 +107,7 @@ const PIPELINE_THEMES = {
     track: "bg-gray-800",
     divider: "border-gray-800",
     chip: "bg-gray-800 text-gray-200",
+    headerCard: "bg-gray-900 border-gray-800",
     cardSecondary: "text-gray-400",
     column: "bg-gray-950/50 border-gray-800",
     columnHeaderBorder: "border-gray-800",
@@ -113,6 +124,7 @@ const PIPELINE_THEMES = {
     track: "bg-[#ece9e3]",
     divider: "border-[#efece6]",
     chip: "bg-[#f1eee8] text-[#4a463f]",
+    headerCard: "bg-white border-[#ebe8e2]",
     cardSecondary: "text-[#4B5563]",
     column: "bg-[#f6f4f0] border-[#ebe8e2]",
     columnHeaderBorder: "border-gray-200",
@@ -225,15 +237,15 @@ function Card({
       {...listeners}
       {...attributes}
       onClick={onClick}
-      className={`group/card relative border rounded-2xl pl-5 pr-4 py-4 cursor-pointer transition-[border-color,box-shadow] duration-150 flex flex-col gap-3 overflow-hidden ${FOCUS_RING} ${t.card} ${
+      className={`group/card relative border rounded-xl pl-[18px] pr-3.5 py-3.5 cursor-pointer transition-[border-color,box-shadow] duration-150 flex flex-col gap-2.5 overflow-hidden ${FOCUS_RING} ${t.card} ${
         dark ? "shadow-[0_1px_2px_rgba(0,0,0,0.3)]" : "shadow-[0_1px_2px_rgba(28,25,23,0.04),0_6px_16px_-8px_rgba(28,25,23,0.10)] hover:shadow-[0_1px_2px_rgba(28,25,23,0.05),0_10px_24px_-10px_rgba(28,25,23,0.16)]"
       } ${isDragging ? "opacity-30" : ""}`}
     >
       {/* Faixa da cor da etapa (pedido do usuário, como na referência) */}
-      <span aria-hidden className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: stageColor }} />
+      <span aria-hidden className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: stageColor }} />
 
       <div className="flex items-start justify-between gap-2">
-        <p className={`${mono.className} text-[11px] uppercase tracking-[0.08em] truncate pt-0.5 ${t.muted}`}>{sobretitulo}</p>
+        <p className={`${mono.className} text-[10.5px] uppercase tracking-[0.08em] truncate pt-0.5 ${t.muted}`}>{sobretitulo}</p>
         <div className={opp.leadStatusId ? "" : "md:opacity-0 md:group-hover/card:opacity-100 md:group-focus-within/card:opacity-100 transition-opacity duration-150"}>
           <LeadStatusBadge
             agentId={agentId}
@@ -246,7 +258,7 @@ function Card({
         </div>
       </div>
 
-      <p className="-mt-1.5 text-[17px] font-semibold leading-snug tracking-[-0.01em] line-clamp-2">{titulo}</p>
+      <p className="-mt-1.5 text-[15px] font-medium leading-snug tracking-[-0.005em] line-clamp-2">{titulo}</p>
 
       <div className="flex items-end justify-between flex-wrap gap-x-2 gap-y-1">
         {editingValue ? (
@@ -260,51 +272,66 @@ function Card({
             onPointerDown={e => e.stopPropagation()}
             placeholder="0,00"
             aria-label="Valor da oportunidade"
-            className={`w-36 border rounded-lg px-2 py-1 text-base font-semibold tabular-nums ${t.input}`}
+            className={`w-32 border rounded-lg px-2 py-1 text-sm font-semibold tabular-nums ${t.input}`}
           />
         ) : (
           <p
-            className={`text-[22px] font-bold leading-none tracking-[-0.02em] tabular-nums ${opp.lostAt ? "line-through opacity-50" : opp.wonAt ? "text-green-600" : ""} ${!closed ? "cursor-text" : ""}`}
+            className={`text-[18px] font-semibold leading-none tracking-[-0.015em] tabular-nums ${opp.lostAt ? "line-through opacity-50" : opp.wonAt ? "text-green-600" : ""} ${!closed ? "cursor-text" : ""}`}
             onClick={e => { if (!closed) { e.stopPropagation(); setEditingValue(true); } }}
             onPointerDown={e => e.stopPropagation()}
             title={!closed ? "Clique para editar o valor" : undefined}
           >
-            {opp.wonAt ? <span className="inline-flex items-center gap-1.5"><Trophy size={16} aria-hidden /> {formatValorCard(opp.dealValue)}</span> : formatValorCard(opp.dealValue)}
+            {opp.wonAt ? <span className="inline-flex items-center gap-1.5"><Trophy size={14} aria-hidden /> {formatValorCard(opp.dealValue)}</span> : formatValorCard(opp.dealValue)}
           </p>
         )}
         <span
-          className={`${mono.className} text-[11.5px] whitespace-nowrap ${daysSince(opp.stageEnteredAt) >= 7 ? "text-amber-600 font-medium" : t.muted}`}
+          className={`${mono.className} text-[11px] whitespace-nowrap ${daysSince(opp.stageEnteredAt) >= 7 ? "text-amber-600 font-medium" : t.muted}`}
           title={daysSince(opp.stageEnteredAt) >= 7 ? "Parada há uma semana ou mais nesta etapa" : "Tempo nesta etapa"}
         >
           {daysSince(opp.stageEnteredAt)}d na etapa
         </span>
       </div>
 
+      {(opp.etiquetas?.length ?? 0) > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {opp.etiquetas!.slice(0, 3).map(et => (
+            <span
+              key={et.id}
+              className={`${mono.className} text-[10px] uppercase tracking-[0.06em] leading-none rounded-md border px-1.5 py-1 max-w-full truncate`}
+              style={{ color: et.cor, borderColor: `${et.cor}55`, backgroundColor: `${et.cor}12` }}
+            >
+              {et.nome}
+            </span>
+          ))}
+          {opp.etiquetas!.length > 3 && <span className={`${mono.className} text-[10px] leading-none px-1 py-1 ${t.muted}`}>+{opp.etiquetas!.length - 3}</span>}
+        </div>
+      )}
+
       {proxima && opp.nextTask && !closed && (
-        <div className={`flex items-center gap-2 rounded-xl px-3 py-2 text-[12.5px] ${t.soft}`}>
+        <div className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[12px] ${t.soft}`}>
           <span aria-hidden className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: corPonto }} />
-          <span className="truncate"><b className="font-semibold">Próx.:</b> {opp.nextTask.title} · {proxima.texto}</span>
+          <span className="truncate"><b className="font-medium">Próx.:</b> <span className={t.muted}>{opp.nextTask.title} · {proxima.texto}</span></span>
         </div>
       )}
 
       {opp.tasksTotal > 0 && (
         <div className="space-y-2" onClick={e => e.stopPropagation()} onPointerDown={e => e.stopPropagation()}>
-          <div className={`flex items-center justify-between ${mono.className} text-[11px] uppercase tracking-[0.08em] ${t.muted}`}>
+          <div className={`flex items-center justify-between ${mono.className} text-[10.5px] uppercase tracking-[0.08em] ${t.muted}`}>
             <span>Tarefas</span>
             <span className="tabular-nums">{feitas}/{opp.tasksTotal}</span>
           </div>
-          <div className={`h-1 rounded-full overflow-hidden ${t.track}`}>
+          <div className={`h-[3px] rounded-full overflow-hidden ${t.track}`}>
             <div className="h-full rounded-full transition-[width] duration-300" style={{ width: `${(feitas / opp.tasksTotal) * 100}%`, backgroundColor: stageColor }} />
           </div>
-          <ul className="space-y-1.5">
+          <ul className="space-y-1">
             {tarefas.map(tk => (
               <li key={tk.id}>
-                <label className="flex items-center gap-2.5 text-[13.5px] cursor-pointer">
+                <label className="flex items-center gap-2 text-[12.5px] cursor-pointer">
                   <input
                     type="checkbox"
                     checked={tk.done}
                     onChange={e => toggleTarefa(tk.id, e.target.checked)}
-                    className={`w-4 h-4 rounded accent-green-600 flex-shrink-0 ${dark ? "[color-scheme:dark]" : ""} ${FOCUS_RING}`}
+                    className={`w-3.5 h-3.5 rounded accent-green-600 flex-shrink-0 ${dark ? "[color-scheme:dark]" : ""} ${FOCUS_RING}`}
                   />
                   <span className={`truncate ${tk.done ? `line-through ${t.muted}` : ""}`}>{tk.title}</span>
                 </label>
@@ -312,22 +339,22 @@ function Card({
             ))}
           </ul>
           {opp.tasksTotal > tarefas.length && (
-            <button type="button" onClick={openTaskPanel} className={`text-[12px] ${t.muted} hover:underline rounded ${FOCUS_RING}`}>
+            <button type="button" onClick={openTaskPanel} className={`text-[11.5px] ${t.muted} hover:underline rounded ${FOCUS_RING}`}>
               + {opp.tasksTotal - tarefas.length} tarefa{opp.tasksTotal - tarefas.length === 1 ? "" : "s"}
             </button>
           )}
         </div>
       )}
 
-      <div className={`relative flex items-center justify-between gap-2 pt-3 border-t ${t.divider}`}>
-        <span className={`${mono.className} text-[11px] uppercase tracking-[0.08em] truncate ${opp.lostAt ? "text-red-500" : t.muted}`} title={opp.motivoPerdaNome ?? undefined}>
+      <div className={`relative flex items-center justify-between gap-2 pt-2.5 border-t ${t.divider}`}>
+        <span className={`${mono.className} text-[10.5px] uppercase tracking-[0.08em] truncate ${opp.lostAt ? "text-red-500" : t.muted}`} title={opp.motivoPerdaNome ?? undefined}>
           {opp.lostAt
             ? `Perdida${opp.motivoPerdaNome ? ` · ${opp.motivoPerdaNome}` : ""}`
             : semContato == null ? "Sem mensagens" : semContato === 0 ? "Contato hoje" : `Há ${semContato}d sem contato`}
         </span>
         <div className="flex items-center gap-0.5 flex-shrink-0">
           {/* Ações discretas: aparecem ao passar o mouse ou com foco do teclado; sempre visíveis no celular */}
-          <div className={`flex items-center gap-0.5 md:absolute md:right-9 md:bottom-0 md:pl-3 md:opacity-0 md:pointer-events-none md:group-hover/card:opacity-100 md:group-hover/card:pointer-events-auto md:group-focus-within/card:opacity-100 md:group-focus-within/card:pointer-events-auto transition-opacity duration-150 ${dark ? "md:bg-gray-900" : "md:bg-white"}`}>
+          <div className={`flex items-center gap-0.5 md:absolute md:right-8 md:-bottom-0.5 md:pl-3 md:opacity-0 md:pointer-events-none md:group-hover/card:opacity-100 md:group-hover/card:pointer-events-auto md:group-focus-within/card:opacity-100 md:group-focus-within/card:pointer-events-auto transition-opacity duration-150 ${dark ? "md:bg-gray-900" : "md:bg-white"}`}>
             <button
               onClick={e => { e.stopPropagation(); onOpenChat(opp.conversationId); }}
               onPointerDown={e => e.stopPropagation()}
@@ -353,13 +380,13 @@ function Card({
           </div>
           {opp.assignedToName ? (
             <span
-              className={`ml-1 w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold ${t.chip}`}
+              className={`ml-1 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold ${t.chip}`}
               title={`Vendedor: ${opp.assignedToName}`}
             >
               {iniciais(opp.assignedToName)}
             </span>
           ) : (
-            <span className={`ml-1 w-7 h-7 rounded-full border border-dashed flex-shrink-0 ${dark ? "border-gray-700" : "border-[#d9d4ca]"}`} title="Sem vendedor" aria-label="Sem vendedor" />
+            <span className={`ml-1 w-6 h-6 rounded-full border border-dashed flex-shrink-0 ${dark ? "border-gray-700" : "border-[#d9d4ca]"}`} title="Sem vendedor" aria-label="Sem vendedor" />
           )}
         </div>
       </div>
@@ -480,10 +507,11 @@ function Card({
 }
 
 function Column({
-  agentId, stage, allStages, opportunities, attendants, outrosPipelines, onOpenDetails, onRename, onDelete, onStagesChange, onValueChange, onLeadStatusChange, onMarcarGanho, onMarcarPerda, onTransfer, onMoverPipeline, onMoveStage, onDeleteOpportunity, onOpenChat, onOpportunitiesChange, leadStatuses, onLeadStatusesChange, dark, t,
+  agentId, stage, index, allStages, opportunities, attendants, outrosPipelines, onOpenDetails, onRename, onDelete, onStagesChange, onValueChange, onLeadStatusChange, onMarcarGanho, onMarcarPerda, onTransfer, onMoverPipeline, onMoveStage, onDeleteOpportunity, onOpenChat, onOpportunitiesChange, leadStatuses, onLeadStatusesChange, dark, t,
 }: {
   agentId: string;
   stage: Stage;
+  index: number; // posição exibida no cabeçalho (01, 02...); -1 = sem número
   allStages: Stage[];
   onMoveStage: (oppId: string, stageId: string) => void;
   opportunities: PipelineOpportunity[];
@@ -567,17 +595,18 @@ function Column({
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={`w-72 flex-shrink-0 flex flex-col rounded-2xl border overflow-hidden ${isColDragging ? "opacity-30" : ""} ${isOver ? "border-blue-500" : t.column}`}
     >
-      <div className="h-[3px] flex-shrink-0" style={{ backgroundColor: stage.color }} />
-      <div className={`group p-3 border-b ${t.columnHeaderBorder}`}>
+      <div className={`group mx-2 mt-2 px-3 py-2.5 rounded-xl border ${t.headerCard}`}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
+            {index >= 0 && <span className={`${mono.className} text-[11px] tabular-nums ${t.muted}`}>{String(index + 1).padStart(2, "0")}</span>}
+            <span aria-hidden className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: stage.color }} />
             {isRealStage && (
               <button
                 {...sortableAttrs}
                 {...sortableListeners}
                 title="Arrastar pra reordenar"
                 aria-label={`Reordenar etapa ${stage.name}`}
-                className={`flex-shrink-0 cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-300 touch-none rounded ${FOCUS_RING}`}
+                className={`flex-shrink-0 cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-300 touch-none rounded md:hidden md:group-hover:block md:group-focus-within:block ${FOCUS_RING}`}
               >
                 <GripVertical size={14} />
               </button>
@@ -594,20 +623,13 @@ function Column({
             ) : (
               <button
                 type="button"
-                className={`font-bold text-[12.5px] uppercase tracking-wide truncate cursor-text text-left rounded ${FOCUS_RING}`}
+                className={`font-semibold text-[14px] truncate cursor-text text-left rounded ${FOCUS_RING}`}
                 onClick={() => isRealStage && setEditing(true)}
                 title={isRealStage ? "Clique para renomear" : undefined}
               >
                 {stage.name}
               </button>
             )}
-            <span
-              className={`text-[11px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 tabular-nums ${dark ? "text-gray-200" : "text-gray-800"}`}
-              style={{ backgroundColor: `${stage.color}40` }}
-              aria-label={`${opportunities.length} oportunidade${opportunities.length === 1 ? "" : "s"}`}
-            >
-              {opportunities.length}
-            </span>
           </div>
           <div className="flex items-center gap-1.5 flex-shrink-0">
             {isRealStage && (<>
@@ -635,9 +657,15 @@ function Column({
               <X size={14} />
             </button>
             </>)}
-            {total > 0 && <p className="text-[11px] font-semibold leading-none text-green-500 whitespace-nowrap">{formatBRL(total)}</p>}
+            <span
+              className={`${mono.className} text-[10.5px] min-w-[20px] text-center px-1.5 py-0.5 rounded-full flex-shrink-0 tabular-nums ${t.chip}`}
+              aria-label={`${opportunities.length} oportunidade${opportunities.length === 1 ? "" : "s"}`}
+            >
+              {opportunities.length}
+            </span>
           </div>
         </div>
+        <p className="mt-1.5 text-[16px] font-semibold tabular-nums tracking-[-0.01em]" title={formatBRL(total)}>{formatCompacto(total)}</p>
 
         {showAgente && (
           <div className={`mt-2 rounded-xl border p-2.5 space-y-2 ${dark ? "bg-gray-950 border-gray-700" : "bg-white border-gray-300"}`}>
@@ -729,6 +757,41 @@ function Column({
             leadStatuses={leadStatuses} onLeadStatusesChange={onLeadStatusesChange}
             dark={dark} t={t}
           />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Indicadores do pipeline aberto: em aberto, ganho no mês, ativos e parados; e a barra com a fatia
+// de valor em aberto de cada etapa (na cor da etapa)
+function ResumoPipeline({ stages, opportunities, dark }: { stages: Stage[]; opportunities: PipelineOpportunity[]; dark: boolean }) {
+  const abertas = opportunities.filter(o => !o.wonAt && !o.lostAt);
+  const emAberto = abertas.reduce((s, o) => s + o.dealValue, 0);
+  const inicioMes = new Date(); inicioMes.setDate(1); inicioMes.setHours(0, 0, 0, 0);
+  const ganhoMes = opportunities.filter(o => o.wonAt && new Date(o.wonAt) >= inicioMes).reduce((s, o) => s + o.dealValue, 0);
+  const parados = abertas.filter(o => daysSince(o.stageEnteredAt) >= 7).length;
+  const fatias = stages.map(s => ({ s, v: abertas.filter(o => o.stageId === s.id).reduce((a, o) => a + o.dealValue, 0) })).filter(x => x.v > 0);
+  const muted = dark ? "text-gray-400" : "text-[#6f6b64]";
+  const itens = [
+    { rotulo: "Em aberto", valor: formatCompacto(emAberto), titulo: formatBRL(emAberto), cor: "" },
+    { rotulo: "Ganho no mês", valor: formatCompacto(ganhoMes), titulo: formatBRL(ganhoMes), cor: "text-green-600" },
+    { rotulo: "Negócios ativos", valor: String(abertas.length), titulo: undefined, cor: "" },
+    { rotulo: "Parados +7 dias", valor: String(parados), titulo: "Abertos há 7 dias ou mais na mesma etapa", cor: parados > 0 ? "text-amber-600" : "" },
+  ];
+  return (
+    <div className={`flex-shrink-0 border-b ${dark ? "border-gray-800" : "border-[#ebe8e2] bg-white"}`}>
+      <div className="grid grid-cols-2 md:grid-cols-4">
+        {itens.map((it, i) => (
+          <div key={it.rotulo} className={`px-4 py-3 ${i > 0 ? `md:border-l ${dark ? "border-gray-800" : "border-[#ebe8e2]"}` : ""}`}>
+            <p className={`${mono.className} text-[10.5px] uppercase tracking-[0.1em] ${muted}`}>{it.rotulo}</p>
+            <p className={`mt-1.5 text-[28px] font-semibold tabular-nums tracking-[-0.025em] leading-none ${it.cor}`} title={it.titulo}>{it.valor}</p>
+          </div>
+        ))}
+      </div>
+      <div className={`flex h-1 ${dark ? "bg-gray-800" : "bg-[#ece9e3]"}`} aria-hidden>
+        {fatias.map(({ s, v }) => (
+          <div key={s.id} style={{ width: `${(v / emAberto) * 100}%`, backgroundColor: s.color }} title={`${s.name}: ${formatBRL(v)}`} />
         ))}
       </div>
     </div>
@@ -955,12 +1018,14 @@ export function WhatsappPipeline({
   return (
     <>
     <DndContext sensors={sensors} collisionDetection={collisionDetectionStrategy} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <ResumoPipeline stages={localStages} opportunities={localOpportunities} dark={theme === "dark"} />
       <div className="flex-1 overflow-x-auto overflow-y-hidden p-4">
         <div className="flex gap-3 h-full">
           {semEtapa.length > 0 && (
             <Column
               agentId={agentId}
               stage={{ id: "__sem_etapa__", name: "Sem etapa", color: "#6b7280", order: -1 }}
+              index={-1}
               allStages={localStages}
               onMoveStage={moveToStage}
               opportunities={semEtapa}
@@ -986,9 +1051,10 @@ export function WhatsappPipeline({
             />
           )}
           <SortableContext items={localStages.map(s => `col:${s.id}`)} strategy={horizontalListSortingStrategy}>
-            {localStages.map(stage => (
+            {localStages.map((stage, index) => (
               <Column
                 key={stage.id}
+                index={index}
                 agentId={agentId}
                 stage={stage}
                 allStages={localStages}
