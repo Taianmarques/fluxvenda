@@ -258,20 +258,6 @@ function Card({
         </div>
       </div>
 
-      {(opp.etiquetas?.length ?? 0) > 0 && (
-      <div className="flex items-center gap-1 h-[20px] overflow-hidden flex-shrink-0">
-          {(opp.etiquetas ?? []).slice(0, 3).map(et => (
-            <span
-              key={et.id}
-              className={`text-[10px] uppercase tracking-[0.06em] leading-none rounded-md border px-1.5 py-1 max-w-[110px] truncate flex-shrink-0`}
-              style={{ color: et.cor, borderColor: `${et.cor}55`, backgroundColor: `${et.cor}12` }}
-            >
-              {et.nome}
-            </span>
-          ))}
-          {(opp.etiquetas?.length ?? 0) > 3 && <span className={`text-[10px] leading-none px-1 py-1 flex-shrink-0 ${t.muted}`}>+{opp.etiquetas!.length - 3}</span>}
-      </div>
-      )}
 
       {/* Tarefas resumidas: barra de progresso + contador; o clique abre o painel de tarefas */}
       <button
@@ -311,6 +297,16 @@ function Card({
               <MessageCircleDashed size={14} aria-hidden /> {semContato == null ? "—" : semContato === 0 ? "hoje" : `${semContato}d`}
               <span className="sr-only"> sem contato</span>
             </span>
+            {/* Etiquetas como pontos coloridos (nome no tooltip) — mantém todos os cards com a mesma altura */}
+            {(opp.etiquetas?.length ?? 0) > 0 && (
+              <span className="flex items-center gap-1" title={opp.etiquetas!.map(e => e.nome).join(", ")}>
+                {opp.etiquetas!.slice(0, 3).map(et => (
+                  <span key={et.id} className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: et.cor }} aria-hidden />
+                ))}
+                {opp.etiquetas!.length > 3 && <span className="text-[10.5px]">+{opp.etiquetas!.length - 3}</span>}
+                <span className="sr-only">Etiquetas: {opp.etiquetas!.map(e => e.nome).join(", ")}</span>
+              </span>
+            )}
           </span>
         )}
         <div className="flex items-center gap-0.5 flex-shrink-0">
