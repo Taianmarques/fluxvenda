@@ -5,7 +5,6 @@ import { getAgentConfigAsManager } from "@/lib/team";
 import { z } from "zod";
 import { gerarQuizComIA } from "@/lib/lead-form-ai";
 import { logTokenUsage, isOverQuota } from "@/lib/token-usage";
-import { MODEL as CLAUDE_MODEL } from "@/lib/anthropic";
 
 // Formulários de captação (link público /formulario/{slug}) criados pelo gestor no CRM pra um
 // agente específico — mesma tabela (LeadForm) do super admin, mas com agentOwned = true e sempre
@@ -67,8 +66,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
       return NextResponse.json({ error: "Os créditos de IA da equipe acabaram — compre mais em Configurações > Créditos de IA." }, { status: 402 });
     }
     try {
-      const { quiz, usage } = await gerarQuizComIA(descricao);
-      logTokenUsage({ teamId: config.teamId, provider: "anthropic", model: CLAUDE_MODEL, feature: "quiz-ia", ...usage });
+      const { quiz, usage, provider, model } = await gerarQuizComIA(descricao);
+      logTokenUsage({ teamId: config.teamId, provider, model, feature: "quiz-ia", ...usage });
       const base = slugify(quiz.title) || "quiz";
       let slug = base;
       for (let i = 0; i < 5 && (await prisma.leadForm.findUnique({ where: { slug }, select: { id: true } })); i++) {

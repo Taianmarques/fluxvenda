@@ -1,4 +1,5 @@
-import { anthropic, MODEL } from "@/lib/anthropic";
+import { anthropic, MODEL as CLAUDE_MODEL } from "@/lib/anthropic";
+import { openai, MODEL as OPENAI_MODEL } from "@/lib/openai";
 import { stepsSchema, questionsSchema, quizResultsSchema } from "@/lib/lead-form-schema";
 import { stepsToQuestions, DEFAULT_NIVEIS, DESTAQUE_CORES, type QuizStep, type QuizResult, type DestaqueCor } from "@/lib/lead-form-shared";
 
@@ -200,25 +201,48 @@ function montar(r: Rascunho) {
   };
 }
 
-export async function gerarQuizComIA(material: string): Promise<{ quiz: ReturnType<typeof montar>; usage: { inputTokens: number; outputTokens: number } }> {
-  const res = await anthropic.messages.create({
-    model: MODEL,
-    max_tokens: 10000,
-    tools: [TOOL],
-    tool_choice: { type: "tool", name: TOOL.name },
-    system:
-      "Você converte um roteiro/prompt de quiz que o usuário JÁ ESCREVEU para o formato de quiz em telas. NÃO crie um quiz novo: " +
-      "use as perguntas, opções, resultados, títulos e textos do material, na mesma ordem e com as mesmas palavras (pode só corrigir " +
-      "erros de digitação). Não acrescente perguntas, opções ou telas que não estejam no material. Só complete o que faltar pro quiz " +
-      "funcionar: emoji de cada opção, qual resultado cada opção pontua (deduza pelo sentido), nível de cada resultado no medidor " +
-      "(1 = mais crítico), mensagens do WhatsApp e textos de abertura/carregamento/resultado/oferta quando o material não trouxer. " +
-      "Perguntas de nome, telefone, WhatsApp ou e-mail do material NÃO entram em perguntas (o sistema já pede nome e WhatsApp no início). " +
-      "Nunca invente estatísticas com números exatos nem depoimentos com nomes de pessoas. Português do Brasil.",
-    messages: [{ role: "user", content: `Converta este material em quiz:\n\n<material>\n${material}\n</material>` }],
-  });
-  const bloco = res.content.find(c => c.type === "tool_use");
-  if (!bloco || bloco.type !== "tool_use") throw new Error("A IA não devolveu o quiz. Tente de novo.");
-  const quiz = montar(bloco.input as Rascunho);
+export async function gerarQuizComIA(material: string): Promise<{
+  quiz: ReturnType<typeof montar>; usage: { inputTokens: number; outputTokens: number }; provider: "anthropic" | "openai"; model: string;
+}> {
+  const system =
+    "Você converte um roteiro/prompt de quiz que o usuário JÁ ESCREVEU para o formato de quiz em telas. NÃO crie um quiz novo: " +
+    "use as perguntas, opções, resultados, títulos e textos do material, na mesma ordem e com as mesmas palavras (pode só corrigir " +
+    "erros de digitação). Não acrescente perguntas, opções ou telas que não estejam no material. Só complete o que faltar pro quiz " +
+    "funcionar: emoji de cada opção, qual resultado cada opção pontua (deduza pelo sentido), nível de cada resultado no medidor " +
+    "(1 = mais crítico), mensagens do WhatsApp e textos de abertura/carregamento/resultado/oferta quando o material não trouxer. " +
+    "Perguntas de nome, telefone, WhatsApp ou e-mail do material NÃO entram em perguntas (o sistema já pede nome e WhatsApp no início). " +
+    "Nunca invente estatísticas com números exatos nem depoimentos com nomes de pessoas. Português do Brasil.";
+  const user = `Converta este material em quiz:\n\n<material>\n${material}\n</material>`;
+
+  // Claude quando houver chave (escreve melhor); senão OpenAI — a mesma usada pelo agente do WhatsApp
+  let rascunho: Rascunho;
+  let usage: { inputTokens: number; outputTokens: number };
+  let provider: "anthropic" | "openai";
+  let model: string;
+  if (process.env.ANTHROPIC_API_KEY) {
+    const res = await anthropic.messages.create({
+      model: CLAUDE_MODEL, max_tokens: 10000, tools: [TOOL], tool_choice: { type: "tool", name: TOOL.name },
+      system, messages: [{ role: "user", content: user }],
+    });
+    const bloco = res.content.find(c => c.type === "tool_use");
+    if (!bloco || bloco.type !== "tool_use") throw new Error("A IA não devolveu o quiz. Tente de novo.");
+    rascunho = bloco.input as Rascunho;
+    usage = { inputTokens: res.usage.input_tokens, outputTokens: res.usage.output_tokens };
+    provider = "anthropic"; model = CLAUDE_MODEL;
+  } else {
+    const res = await openai.chat.completions.create({
+      model: OPENAI_MODEL, max_tokens: 10000, temperature: 0.3,
+      messages: [{ role: "system", content: system }, { role: "user", content: user }],
+      tools: [{ type: "function", function: { name: TOOL.name, description: TOOL.description, parameters: TOOL.input_schema } }],
+      tool_choice: { type: "function", function: { name: TOOL.name } },
+    });
+    const call = res.choices[0]?.message?.tool_calls?.[0];
+    if (!call || call.type !== "function") throw new Error("A IA não devolveu o quiz. Tente de novo.");
+    try { rascunho = JSON.parse(call.function.arguments) as Rascunho; } catch { throw new Error("A IA devolveu o quiz incompleto. Tente de novo."); }
+    usage = { inputTokens: res.usage?.prompt_tokens ?? 0, outputTokens: res.usage?.completion_tokens ?? 0 };
+    provider = "openai"; model = OPENAI_MODEL;
+  }
+  const quiz = montar(rascunho);
 
   // Mesmas regras do editor — se a IA errou algo, melhor falhar aqui do que salvar um quiz quebrado
   const s = stepsSchema.safeParse(quiz.steps);
@@ -228,5 +252,5 @@ export async function gerarQuizComIA(material: string): Promise<{ quiz: ReturnTy
     console.error("[lead-form-ai] quiz gerado inválido", s.error?.issues[0], q.error?.issues[0], r.error?.issues[0]);
     throw new Error("O quiz gerado veio incompleto. Tente de novo ou detalhe mais a descrição.");
   }
-  return { quiz, usage: { inputTokens: res.usage.input_tokens, outputTokens: res.usage.output_tokens } };
+  return { quiz, usage, provider, model };
 }
