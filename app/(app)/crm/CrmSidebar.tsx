@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { ArrowLeft, ChevronDown, Bot, Megaphone, TrendingUp, Zap, Settings, Headset, ShoppingBag, PanelLeftClose, PanelLeftOpen, Building2, LayoutDashboard, Home, type LucideIcon } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, Bot, Megaphone, TrendingUp, Zap, Settings, Headset, ShoppingBag, PanelLeftClose, PanelLeftOpen, LayoutDashboard, Home, Search, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { CRM_CATEGORIES, type CrmPageDef, type CrmPageKey } from "@/lib/crm-nav-config";
 import { NotificationsButton } from "./NotificationsButton";
@@ -26,47 +26,22 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
 
 const SIDEBAR_COLLAPSED_KEY = "crm_sidebar_collapsed";
 
-// Categoria que expande pra baixo (accordion) — usado pela maioria; Marketing e Automação
-// usam CategoryFlyout (submenu flutuante pro lado) em vez desse.
-function CategoryAccordion({ cat, isOpen, onToggle, isActive, pathname, onNavigate }: {
-  cat: NavCategory;
-  isOpen: boolean;
-  onToggle: (key: string) => void;
-  isActive: (item: NavItem) => boolean;
-  pathname: string;
-  onNavigate: (href: string) => void;
-}) {
-  return (
-    <div>
-      <button
-        onClick={() => onToggle(cat.key)}
-        className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-gray-500 hover:text-gray-300 uppercase tracking-wider transition-colors"
-      >
-        {cat.label}
-        <ChevronDown size={13} className={`transition-transform ${isOpen ? "rotate-180" : ""}`} />
-      </button>
-      {isOpen && (
-        <div className="space-y-0.5 mb-1">
-          {cat.items.map(item => {
-            const active = isActive(item);
-            return (
-              <Link
-                key={item.label}
-                href={item.href}
-                onClick={() => { if (pathname !== item.href) onNavigate(item.href); }}
-                className={`flex items-center gap-3 pl-4 pr-3 py-2 rounded-xl text-sm font-medium border-l-2 transition-colors ${
-                  active ? "text-white bg-blue-500/10 border-blue-500" : "text-gray-400 border-transparent hover:text-white hover:bg-white/5"
-                }`}
-              >
-                <item.icon size={16} className={active ? "text-blue-400" : ""} />
-                {item.label}
-              </Link>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
+// Visual do menu: fundo marinho, item ativo preenchido em azul, itens compactos (cabe na altura
+// de um notebook sem rolar) e barra de rolagem fina que só aparece ao passar o mouse.
+const ITEM_BASE = "flex items-center gap-3 rounded-xl text-[13.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70";
+const ITEM_IDLE = "text-slate-400 hover:text-white hover:bg-white/[0.05]";
+const ITEM_ACTIVE = "text-white bg-gradient-to-r from-blue-600 to-blue-500 shadow-[0_6px_16px_-8px_rgba(37,99,235,0.8)]";
+const ITEM_GROUP_ACTIVE = "text-white bg-white/[0.07]";
+
+// Seções do menu — agrupam as categorias do CRM_CATEGORIES (lib/crm-nav-config.ts) por assunto
+const SECTIONS: { label: string; keys: string[] }[] = [
+  { label: "Operação", keys: ["atendimento", "vendas"] },
+  { label: "Crescimento", keys: ["marketing", "automacao"] },
+  { label: "Administração", keys: ["gestao", "configuracoes"] },
+];
+
+function normaliza(s: string) {
+  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
 // Categoria com submenu flutuante pro lado (flyout), em vez de expandir pra baixo.
@@ -101,23 +76,32 @@ function CategoryFlyout({ label, icon: Icon, items, isActive, pathname, onNaviga
         ref={btnRef}
         onClick={toggle}
         title={collapsed ? label : undefined}
-        className={`w-full flex items-center gap-2 rounded-xl text-sm font-medium transition-colors ${
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className={`w-full ${ITEM_BASE} ${
           collapsed ? "justify-center px-0 py-2.5" : "justify-between px-3 py-2"
-        } ${active ? "text-white bg-blue-500/10" : "text-gray-400 hover:text-white hover:bg-white/5"}`}
+        } ${active ? ITEM_GROUP_ACTIVE : ITEM_IDLE}`}
       >
-        <span className="flex items-center gap-3">
+        <span className="flex items-center gap-3 min-w-0">
           <Icon size={17} className={active ? "text-blue-400" : ""} />
-          {!collapsed && label}
+          {!collapsed && <span className="truncate">{label}</span>}
         </span>
-        {!collapsed && <ChevronDown size={13} className={`-rotate-90 transition-transform ${open ? "rotate-0" : ""}`} />}
+        {!collapsed && (
+          <span className="flex items-center gap-1.5 min-w-0">
+            {active && <span className="text-[11px] text-slate-400 truncate max-w-[80px]">{items.find(isActive)?.label}</span>}
+            <ChevronRight size={14} className={`text-slate-500 flex-shrink-0 transition-transform ${open ? "translate-x-0.5" : ""}`} />
+          </span>
+        )}
       </button>
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
           <div
-            className="fixed z-20 w-52 bg-gray-900 border border-gray-800 rounded-xl shadow-xl p-1.5 space-y-0.5"
-            style={{ top: pos.top, left: pos.left }}
+            role="menu"
+            className="fixed z-20 w-56 bg-[#0e1529] border border-white/[0.08] rounded-xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.7)] p-1.5 space-y-0.5"
+            style={{ top: Math.min(pos.top, (typeof window !== "undefined" ? window.innerHeight : 800) - (items.length * 38 + 48)), left: pos.left }}
           >
+            <p className="px-3 pt-1 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
             {items.map(item => {
               const itemActive = isActive(item);
               return (
@@ -125,11 +109,10 @@ function CategoryFlyout({ label, icon: Icon, items, isActive, pathname, onNaviga
                   key={item.label}
                   href={item.href}
                   onClick={() => { setOpen(false); if (pathname !== item.href) onNavigate(item.href); }}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    itemActive ? "text-white bg-blue-500/10" : "text-gray-300 hover:text-white hover:bg-white/5"
-                  }`}
+                  role="menuitem"
+                  className={`${ITEM_BASE} px-3 py-2 ${itemActive ? ITEM_ACTIVE : "text-slate-300 hover:text-white hover:bg-white/[0.06]"}`}
                 >
-                  <item.icon size={16} className={itemActive ? "text-blue-400" : ""} />
+                  <item.icon size={16} />
                   {item.label}
                 </Link>
               );
@@ -218,8 +201,6 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo,
   // Categoria com um único item visível (ex: "Dashboards" só com "Visão Geral") vira link
   // direto — sem cabeçalho de categoria pra abrir, que ficaria redundante com o próprio item.
   const SINGLE_ITEM_CATEGORIES = CATEGORIES.filter(c => c.items.length === 1);
-  const ACCORDION_CATEGORIES = CATEGORIES.filter(c => c.variant === "accordion" && c.items.length > 1);
-  const FLYOUT_CATEGORIES = CATEGORIES.filter(c => c.variant === "flyout" && c.items.length > 1);
 
   // Ordem do menu mobile acompanha o desktop: Atendimento/Vendas primeiro, Hub de IA e
   // Visão Geral logo depois, resto por último.
@@ -229,27 +210,19 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo,
     ...CATEGORIES.filter(c => c.key !== "atendimento" && c.key !== "vendas").flatMap(c => c.items),
   ];
 
-  // Categorias abertas no menu desktop — a que contém a página atual abre sozinha; as demais
-  // o usuário abre/fecha manualmente, e várias podem ficar abertas ao mesmo tempo.
-  const [openCategories, setOpenCategories] = useState<Set<string>>(() => {
-    const active = ACCORDION_CATEGORIES.find(cat => cat.items.some(item => isActive(item)));
-    return new Set(active ? [active.key] : []);
-  });
-  useEffect(() => {
-    const active = ACCORDION_CATEGORIES.find(cat => cat.items.some(item => isActive(item)));
-    if (active) setOpenCategories(prev => (prev.has(active.key) ? prev : new Set(prev).add(active.key)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
-
-  function toggleCategory(key: string) {
-    setOpenCategories(prev => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
-      return next;
-    });
-  }
-
   const currentAgent = agents.find(a => a.id === agentId);
+  const MULTI_ITEM_CATEGORIES = CATEGORIES.filter(c => c.items.length > 1);
+
+  // Pesquisar no menu: todas as páginas visíveis, com o nome do grupo pra diferenciar
+  const [busca, setBusca] = useState("");
+  const TODAS_PAGINAS: (NavItem & { grupo?: string })[] = [
+    ...(isManager ? [INICIO_ITEM, HUB_ITEM] : []),
+    ...CATEGORIES.flatMap(c => c.items.map(i => ({ ...i, grupo: c.items.length > 1 ? c.label : undefined }))),
+  ];
+  const termo = normaliza(busca.trim());
+  const resultados = termo
+    ? TODAS_PAGINAS.filter(p => normaliza(p.label).includes(termo) || (p.grupo && normaliza(p.grupo).includes(termo))).slice(0, 12)
+    : [];
 
   function switchAgent(newAgentId: string) {
     setShowSwitcher(false);
@@ -306,179 +279,176 @@ export function CrmSidebar({ agentId, agents, allowedPages, isManager, menuLogo,
       </div>
     </div>
 
-    {/* Sidebar vertical — desktop, itens agrupados por categoria com dropdown */}
-    <aside className={`hidden md:flex flex-shrink-0 border-r border-gray-800 bg-black flex-col transition-[width] duration-150 ${collapsed ? "w-16" : "w-56"}`}>
-      <div className={`py-5 border-b border-gray-800 flex items-center justify-center gap-2 ${collapsed ? "px-2" : "px-5"}`}>
+    {/* Sidebar vertical — desktop: seções com rótulo, grupos abrem submenu pro lado */}
+    <aside className={`hidden md:flex flex-shrink-0 flex-col border-r border-white/[0.06] bg-gradient-to-b from-[#0c1326] via-[#090f1f] to-[#060a15] transition-[width] duration-150 ${collapsed ? "w-[68px]" : "w-60"}`}>
+      <style>{`
+        .crm-nav-scroll { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+        .crm-nav-scroll:hover { scrollbar-color: rgba(148,163,184,0.25) transparent; }
+        .crm-nav-scroll::-webkit-scrollbar { width: 6px; }
+        .crm-nav-scroll::-webkit-scrollbar-thumb { background: transparent; border-radius: 9999px; }
+        .crm-nav-scroll:hover::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.25); }
+      `}</style>
+
+      <div className={`pt-4 pb-3 flex items-center gap-2.5 ${collapsed ? "justify-center px-2" : "px-5"}`}>
         {menuLogo ? (
-          <img src={menuLogo} alt="FluxVenda" width={28} height={28} className="flex-shrink-0 rounded" />
+          <img src={menuLogo} alt="FluxVenda" width={26} height={26} className="flex-shrink-0 rounded" />
         ) : (
-          <Image src="/iconefluxvenda.png" alt="FluxVenda" width={28} height={28} className="flex-shrink-0" />
+          <Image src="/iconefluxvenda.png" alt="FluxVenda" width={26} height={26} className="flex-shrink-0" />
         )}
-        {!collapsed && <span className="font-bold text-lg text-white">FluxVenda</span>}
+        {!collapsed && <span className="font-bold text-[17px] tracking-[-0.01em] text-white">FluxVenda</span>}
       </div>
 
-      {agents.length > 1 && (
-        <div className={`relative border-b border-gray-800 ${collapsed ? "px-2 py-2" : "px-3 py-3"}`}>
-          <button
-            onClick={() => setShowSwitcher(s => !s)}
-            title={collapsed ? (currentAgent?.nome ?? "Agente") : undefined}
-            className={`w-full flex items-center gap-2 rounded-xl bg-gray-900 hover:bg-gray-800 text-sm text-left transition-colors ${
-              collapsed ? "justify-center px-0 py-2.5" : "justify-between px-3 py-2"
-            }`}
-          >
-            {collapsed ? <Building2 size={16} className="text-gray-400" /> : (
-              <>
-                <span className="truncate">{currentAgent?.nome ?? "Agente"}</span>
-                <ChevronDown size={15} className="text-gray-500 flex-shrink-0" />
-              </>
-            )}
-          </button>
-          {showSwitcher && (
+      {/* Agente atual em cartão (troca de agente quando há mais de um) */}
+      <div className={`relative ${collapsed ? "px-2" : "px-3"}`}>
+        <button
+          onClick={() => agents.length > 1 && setShowSwitcher(s => !s)}
+          title={collapsed ? (currentAgent?.nome ?? "Agente") : undefined}
+          aria-haspopup={agents.length > 1 ? "menu" : undefined}
+          aria-expanded={agents.length > 1 ? showSwitcher : undefined}
+          className={`w-full flex items-center gap-2.5 rounded-xl border border-white/[0.07] bg-white/[0.04] text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 ${
+            agents.length > 1 ? "hover:bg-white/[0.07] cursor-pointer" : "cursor-default"
+          } ${collapsed ? "justify-center p-1.5" : "p-2"}`}
+        >
+          <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-[13px] font-bold flex items-center justify-center flex-shrink-0">
+            {(currentAgent?.nome ?? "A").trim().charAt(0).toUpperCase()}
+          </span>
+          {!collapsed && (
             <>
-              <div className="fixed inset-0 z-10" onClick={() => setShowSwitcher(false)} />
-              <div className={`absolute z-20 top-full mt-1 bg-gray-900 border border-gray-800 rounded-xl shadow-xl p-1 space-y-0.5 ${
-                collapsed ? "left-2 w-52" : "left-3 right-3"
-              }`}>
-                {agents.map(a => (
-                  <button
-                    key={a.id}
-                    onClick={() => switchAgent(a.id)}
-                    className={`w-full text-left text-sm px-3 py-2 rounded-lg truncate ${a.id === agentId ? "text-blue-400 bg-blue-500/10" : "text-gray-300 hover:bg-gray-800"}`}
-                  >
-                    {a.nome}
-                  </button>
-                ))}
-              </div>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13.5px] font-semibold text-white truncate">{currentAgent?.nome ?? "Nenhum agente"}</span>
+                <span className="block text-[11.5px] text-slate-400 truncate">
+                  {agents.length > 1 ? `${agents.length} agentes · trocar` : "Agente de IA"}
+                </span>
+              </span>
+              {agents.length > 1 && <ChevronDown size={15} className="text-slate-500 flex-shrink-0" />}
             </>
           )}
+        </button>
+        {showSwitcher && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setShowSwitcher(false)} />
+            <div role="menu" className={`absolute z-20 top-full mt-1.5 bg-[#0e1529] border border-white/[0.08] rounded-xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.7)] p-1 space-y-0.5 max-h-72 overflow-y-auto ${
+              collapsed ? "left-2 w-56" : "left-3 right-3"
+            }`}>
+              {agents.map(a => (
+                <button
+                  key={a.id}
+                  role="menuitem"
+                  onClick={() => switchAgent(a.id)}
+                  className={`w-full text-left text-[13.5px] px-3 py-2 rounded-lg truncate ${a.id === agentId ? "text-white bg-blue-600/20" : "text-slate-300 hover:bg-white/[0.06]"}`}
+                >
+                  {a.nome}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Pesquisar no menu: filtra todas as páginas; Enter abre a primeira */}
+      {!collapsed && (
+        <div className="px-3 pt-2.5">
+          <label className="flex items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-2 focus-within:border-blue-500/60 transition-colors">
+            <Search size={15} className="text-slate-500 flex-shrink-0" />
+            <input
+              value={busca}
+              onChange={e => setBusca(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter" && resultados[0]) { setBusca(""); if (pathname !== resultados[0].href) setNavigatingTo(resultados[0].href); router.push(resultados[0].href); }
+                if (e.key === "Escape") setBusca("");
+              }}
+              placeholder="Pesquisar"
+              aria-label="Pesquisar no menu"
+              className="w-full bg-transparent text-[13.5px] text-white placeholder:text-slate-500 focus:outline-none"
+            />
+          </label>
         </div>
       )}
 
-      <nav className={`flex-1 overflow-y-auto py-4 space-y-0.5 ${collapsed ? "px-2" : "px-3"}`}>
-        {collapsed
-          ? (
-            <>
-              {ACCORDION_CATEGORIES.map(cat => (
-                <CategoryFlyout key={cat.key} label={cat.label} icon={CATEGORY_ICONS[cat.key]} items={cat.items} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} collapsed />
-              ))}
-
-              {/* Início e Hub de IA ficam abaixo de Atendimento e Vendas — só pro gestor */}
-              {isManager && [INICIO_ITEM, HUB_ITEM].map(navItem => {
-                const active = isActive(navItem);
-                return (
-                  <Link
-                    key={navItem.href}
-                    href={navItem.href}
-                    onClick={() => { if (pathname !== navItem.href) setNavigatingTo(navItem.href); }}
-                    title={navItem.label}
-                    className={`flex items-center justify-center py-2.5 rounded-xl transition-colors ${
-                      active ? "text-white bg-blue-500/10" : "text-gray-400 hover:text-white hover:bg-white/5"
-                    }`}
-                  >
-                    <navItem.icon size={17} className={active ? "text-blue-400" : ""} />
-                  </Link>
-                );
-              })}
-
-              {SINGLE_ITEM_CATEGORIES.map(cat => {
-                const item = cat.items[0];
+      <nav aria-label="Menu do CRM" className={`crm-nav-scroll flex-1 overflow-y-auto pt-2.5 pb-2 ${collapsed ? "px-2" : "px-3"}`}>
+        {busca.trim() && !collapsed ? (
+          <div className="space-y-0.5">
+            {resultados.length === 0 && <p className="px-3 py-2 text-[12.5px] text-slate-500">Nada encontrado.</p>}
+            {resultados.map(r => (
+              <Link
+                key={r.href + r.label}
+                href={r.href}
+                onClick={() => { setBusca(""); if (pathname !== r.href) setNavigatingTo(r.href); }}
+                className={`${ITEM_BASE} px-3 py-2 ${isActive(r) ? ITEM_ACTIVE : ITEM_IDLE}`}
+              >
+                <r.icon size={16} />
+                <span className="truncate flex-1">{r.label}</span>
+                {r.grupo && <span className="text-[11px] text-slate-500 truncate">{r.grupo}</span>}
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {/* Principal: Início, Agentes de IA (só gestor) e categorias de um item só (ex: Visão Geral) */}
+            <div className="space-y-0.5">
+              {[...(isManager ? [INICIO_ITEM, HUB_ITEM] : []), ...SINGLE_ITEM_CATEGORIES.map(c => c.items[0])].map(item => {
                 const active = isActive(item);
                 return (
                   <Link
-                    key={cat.key}
+                    key={item.href + item.label}
                     href={item.href}
                     onClick={() => { if (pathname !== item.href) setNavigatingTo(item.href); }}
-                    title={item.label}
-                    className={`flex items-center justify-center py-2.5 rounded-xl transition-colors ${
-                      active ? "text-white bg-blue-500/10" : "text-gray-400 hover:text-white hover:bg-white/5"
-                    }`}
+                    title={collapsed ? item.label : undefined}
+                    aria-current={active ? "page" : undefined}
+                    className={`${ITEM_BASE} ${collapsed ? "justify-center py-2.5" : "px-3 py-2"} ${active ? ITEM_ACTIVE : ITEM_IDLE}`}
                   >
-                    <item.icon size={17} className={active ? "text-blue-400" : ""} />
+                    <item.icon size={17} />
+                    {!collapsed && <span className="truncate">{item.label}</span>}
                   </Link>
                 );
               })}
+            </div>
 
-              {FLYOUT_CATEGORIES.map(cat => (
-                <CategoryFlyout key={cat.key} label={cat.label} icon={CATEGORY_ICONS[cat.key]} items={cat.items} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} collapsed />
-              ))}
-            </>
-          )
-          : (
-            <>
-              {ACCORDION_CATEGORIES.map(cat => (
-                <CategoryAccordion key={cat.key} cat={cat} isOpen={openCategories.has(cat.key)} onToggle={toggleCategory} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} />
-              ))}
+            {SECTIONS.map(sec => {
+              const cats = MULTI_ITEM_CATEGORIES.filter(c => sec.keys.includes(c.key));
+              if (cats.length === 0) return null;
+              return (
+                <div key={sec.label} className="space-y-0.5">
+                  {collapsed
+                    ? <div className="mx-auto mb-1.5 w-5 border-t border-white/[0.08]" aria-hidden />
+                    : <p className="px-3 pb-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-500">{sec.label}</p>}
+                  {cats.map(cat => (
+                    <CategoryFlyout key={cat.key} label={cat.label} icon={CATEGORY_ICONS[cat.key]} items={cat.items} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} collapsed={collapsed} />
+                  ))}
+                </div>
+              );
+            })}
 
-              {/* Início e Hub de IA ficam abaixo de Atendimento e Vendas — só pro gestor */}
-              {isManager && [INICIO_ITEM, HUB_ITEM].map(navItem => {
-                const active = isActive(navItem);
-                return (
-                  <Link
-                    key={navItem.href}
-                    href={navItem.href}
-                    onClick={() => { if (pathname !== navItem.href) setNavigatingTo(navItem.href); }}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium border-l-2 transition-colors ${
-                      active ? "text-white bg-blue-500/10 border-blue-500" : "text-gray-400 border-transparent hover:text-white hover:bg-white/5"
-                    }`}
-                  >
-                    <navItem.icon size={17} className={active ? "text-blue-400" : ""} />
-                    {navItem.label}
-                  </Link>
-                );
-              })}
-
-              {SINGLE_ITEM_CATEGORIES.map(cat => {
-                const item = cat.items[0];
-                const active = isActive(item);
-                return (
-                  <Link
-                    key={cat.key}
-                    href={item.href}
-                    onClick={() => { if (pathname !== item.href) setNavigatingTo(item.href); }}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium border-l-2 transition-colors ${
-                      active ? "text-white bg-blue-500/10 border-blue-500" : "text-gray-400 border-transparent hover:text-white hover:bg-white/5"
-                    }`}
-                  >
-                    <item.icon size={16} className={active ? "text-blue-400" : ""} />
-                    {item.label}
-                  </Link>
-                );
-              })}
-
-              {FLYOUT_CATEGORIES.map(cat => (
-                <CategoryFlyout key={cat.key} label={cat.label} icon={CATEGORY_ICONS[cat.key]} items={cat.items} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} />
-              ))}
-            </>
-          )}
+            {/* Categorias fora das seções conhecidas (caso surjam novas no config) */}
+            {MULTI_ITEM_CATEGORIES.filter(c => !SECTIONS.some(s => s.keys.includes(c.key))).map(cat => (
+              <CategoryFlyout key={cat.key} label={cat.label} icon={CATEGORY_ICONS[cat.key] ?? LayoutDashboard} items={cat.items} isActive={isActive} pathname={pathname} onNavigate={setNavigatingTo} collapsed={collapsed} />
+            ))}
+          </div>
+        )}
       </nav>
 
-      <div className={`py-4 border-t border-gray-800 space-y-0.5 ${collapsed ? "px-2" : "px-3"}`}>
-        <div className={collapsed ? "flex justify-center pb-2" : "flex items-center gap-2.5 px-1 pb-3"}>
+      {/* Rodapé compacto: usuário + notificações + recolher numa linha só */}
+      <div className={`border-t border-white/[0.06] py-3 ${collapsed ? "px-2 space-y-1" : "px-3 space-y-1.5"}`}>
+        <div className={collapsed ? "flex flex-col items-center gap-1" : "flex items-center gap-2 px-1"}>
           <UserMenu name={userName} />
-          {!collapsed && <span className="text-sm font-medium text-gray-300 truncate">{userName}</span>}
+          {!collapsed && <span className="flex-1 min-w-0 text-[13.5px] font-medium text-slate-200 truncate">{userName}</span>}
+          <NotificationsButton compact />
+          <button
+            onClick={toggleCollapsed}
+            title={collapsed ? "Expandir menu" : "Recolher menu"}
+            aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
+            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
+          >
+            {collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
+          </button>
         </div>
-        <div className={collapsed ? "flex justify-center" : ""}>
-          <NotificationsButton compact={collapsed} />
-        </div>
-        <button
-          onClick={toggleCollapsed}
-          title={collapsed ? "Expandir menu" : "Recolher menu"}
-          className={`flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-colors w-full ${
-            collapsed ? "justify-center px-0" : "px-3"
-          }`}
-        >
-          {collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
-          {!collapsed && "Recolher menu"}
-        </button>
         {hasPlataforma && (
           <Link
             href="/dashboard"
             title={collapsed ? "Plataforma B2B" : undefined}
-            className={`flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-colors ${
-              collapsed ? "justify-center px-0" : "px-3"
-            }`}
+            className={`flex items-center gap-2 rounded-lg text-[12.5px] text-slate-500 hover:text-slate-200 hover:bg-white/[0.04] transition-colors ${collapsed ? "justify-center py-2" : "px-2 py-1.5"}`}
           >
-            <ArrowLeft size={17} />
+            <ArrowLeft size={14} />
             {!collapsed && "Plataforma B2B"}
           </Link>
         )}
