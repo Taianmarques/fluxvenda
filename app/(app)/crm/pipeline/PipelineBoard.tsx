@@ -189,7 +189,7 @@ export function PipelineBoard({
                 </button>
               )}
               {p.id === active?.id && pipelines.length > 1 && (
-                <button onClick={() => handleDeletePipeline(p.id)} className="text-gray-500 hover:text-red-400 text-xs px-1.5" title="Excluir pipeline">✕</button>
+                <button onClick={() => handleDeletePipeline(p.id)} className="text-gray-500 hover:text-red-400 px-1.5 py-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" title="Excluir pipeline" aria-label={`Excluir pipeline ${p.name}`}><X size={13} /></button>
               )}
             </div>
           ))}

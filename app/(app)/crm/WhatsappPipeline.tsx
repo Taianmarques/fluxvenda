@@ -8,7 +8,7 @@ import {
 import { useDroppable, useDraggable } from "@dnd-kit/core";
 import { SortableContext, useSortable, arrayMove, horizontalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ThumbsUp, ThumbsDown, MessageCircle, Bot, X, ListChecks, MoreVertical, ArrowRightLeft, Shuffle, GripVertical, Pencil, Trash2, Clock, Briefcase } from "lucide-react";
+import { ThumbsUp, ThumbsDown, MessageCircle, Bot, X, ListChecks, MoreVertical, ArrowRightLeft, Shuffle, GripVertical, Pencil, Trash2, Clock, Briefcase, Trophy, UserRound, ArrowRight, Plus, Check, Inbox } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { ConversationPopup } from "./ConversationPopup";
 import { PipelineTaskPanel } from "./PipelineTaskPanel";
@@ -95,6 +95,16 @@ function formatBRL(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+// Aceita o valor como o usuário digita no Brasil: "1.234,56", "1234,56", "1234.56", "R$ 500"
+function parseValorBR(raw: string): number {
+  const limpo = raw.replace(/[^\d.,]/g, "");
+  const normalizado = limpo.includes(",") ? limpo.replace(/\./g, "").replace(",", ".") : limpo;
+  return Number(normalizado);
+}
+
+// Foco de teclado visível em todo controle do quadro (o contorno padrão some no tema escuro)
+const FOCUS_RING = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500";
+
 // Cor consistente por contato (mesma paleta usada no chat/Ao vivo) — hash simples do nome/número
 const AVATAR_COLORS = ["bg-blue-600", "bg-purple-600", "bg-emerald-600", "bg-amber-600", "bg-pink-600", "bg-cyan-600", "bg-indigo-600", "bg-rose-600"];
 function avatarColor(seed: string): string {
@@ -126,11 +136,11 @@ function CardAvatar({ agentId, conversationId, seed }: { agentId: string; conver
 }
 
 function Card({
-  agentId, opp, stageColor, attendants, outrosPipelines, onClick, onValueChange, onLeadStatusChange, onMarcarGanho, onMarcarPerda, onTransfer, onMoverPipeline, onDeleteOpportunity, onOpenChat, onOpportunitiesChange, leadStatuses, onLeadStatusesChange, dark, t,
+  agentId, opp, stages, attendants, outrosPipelines, onClick, onValueChange, onLeadStatusChange, onMarcarGanho, onMarcarPerda, onTransfer, onMoverPipeline, onMoveStage, onDeleteOpportunity, onOpenChat, onOpportunitiesChange, leadStatuses, onLeadStatusesChange, dark, t,
 }: {
   agentId: string;
   opp: PipelineOpportunity;
-  stageColor?: string;
+  stages: Stage[]; // etapas deste pipeline, pra mover sem arrastar (teclado, celular)
   attendants: { id: string; name: string; isManager: boolean }[];
   outrosPipelines: OtherPipeline[];
   onClick: () => void;
@@ -140,6 +150,7 @@ function Card({
   onMarcarPerda: (id: string) => void;
   onTransfer: (conversationId: string, attendantId: string) => void;
   onMoverPipeline: (oppId: string, stageId: string) => void;
+  onMoveStage: (oppId: string, stageId: string) => void;
   onDeleteOpportunity: (id: string) => void;
   onOpenChat: (conversationId: string) => void;
   onOpportunitiesChange: () => void;
@@ -153,7 +164,7 @@ function Card({
   const [valueInput, setValueInput] = useState(String(opp.dealValue));
   const menuBtnRef = useRef<HTMLButtonElement>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
-  const [menuView, setMenuView] = useState<"main" | "transfer" | "pipeline">("main");
+  const [menuView, setMenuView] = useState<"main" | "transfer" | "pipeline" | "stage">("main");
   const [taskPanelPos, setTaskPanelPos] = useState<{ top: number; left: number } | null>(null);
   const closed = Boolean(opp.wonAt || opp.lostAt);
 
@@ -173,7 +184,7 @@ function Card({
 
   function commitValue() {
     setEditingValue(false);
-    const parsed = Number(valueInput.replace(",", "."));
+    const parsed = parseValorBR(valueInput);
     if (Number.isFinite(parsed) && parsed > 0 && parsed !== opp.dealValue) onValueChange(opp.id, parsed);
     else setValueInput(String(opp.dealValue));
   }
@@ -186,8 +197,7 @@ function Card({
       {...listeners}
       {...attributes}
       onClick={onClick}
-      className={`border rounded-xl p-3 cursor-pointer transition-colors shadow-sm flex flex-col min-h-[152px] ${t.card} ${isDragging ? "opacity-30" : ""} ${stageColor ? "border-l-4" : ""}`}
-      style={stageColor ? { borderLeftColor: stageColor } : undefined}
+      className={`border rounded-xl p-3 cursor-pointer transition-colors shadow-sm flex flex-col min-h-[152px] ${FOCUS_RING} ${t.card} ${isDragging ? "opacity-30" : ""}`}
     >
       <div className="flex items-center gap-2">
         <CardAvatar agentId={agentId} conversationId={opp.conversationId} seed={opp.contactName || opp.contactNumber} />
@@ -196,7 +206,8 @@ function Card({
           onClick={e => { e.stopPropagation(); onOpenChat(opp.conversationId); }}
           onPointerDown={e => e.stopPropagation()}
           title="Abrir conversa"
-          className={`p-1 rounded flex-shrink-0 ${dark ? "text-gray-400 hover:text-white hover:bg-gray-800" : "text-gray-500 hover:text-slate-900 hover:bg-gray-100"}`}
+          aria-label="Abrir conversa"
+          className={`p-1 rounded flex-shrink-0 ${FOCUS_RING} ${dark ? "text-gray-400 hover:text-white hover:bg-gray-800" : "text-gray-500 hover:text-slate-900 hover:bg-gray-100"}`}
         >
           <MessageCircle size={14} />
         </button>
@@ -204,7 +215,8 @@ function Card({
           onClick={e => { e.stopPropagation(); onClick(); }}
           onPointerDown={e => e.stopPropagation()}
           title="Detalhes"
-          className={`p-1 rounded flex-shrink-0 ${dark ? "text-gray-400 hover:text-white hover:bg-gray-800" : "text-gray-500 hover:text-slate-900 hover:bg-gray-100"}`}
+          aria-label="Detalhes da oportunidade"
+          className={`p-1 rounded flex-shrink-0 ${FOCUS_RING} ${dark ? "text-gray-400 hover:text-white hover:bg-gray-800" : "text-gray-500 hover:text-slate-900 hover:bg-gray-100"}`}
         >
           <Briefcase size={14} />
         </button>
@@ -213,24 +225,32 @@ function Card({
           onClick={toggleMenu}
           onPointerDown={e => e.stopPropagation()}
           title="Mais opções"
-          className={`p-1 rounded flex-shrink-0 ${dark ? "text-gray-400 hover:text-white hover:bg-gray-800" : "text-gray-500 hover:text-slate-900 hover:bg-gray-100"}`}
+          aria-label="Mais opções"
+          aria-haspopup="menu"
+          aria-expanded={Boolean(menuPos)}
+          className={`p-1 rounded flex-shrink-0 ${FOCUS_RING} ${dark ? "text-gray-400 hover:text-white hover:bg-gray-800" : "text-gray-500 hover:text-slate-900 hover:bg-gray-100"}`}
         >
           <MoreVertical size={14} />
         </button>
       </div>
       <p className={`text-[11.5px] truncate mt-1 ${t.cardSecondary}`}>{opp.title || opp.lastMessage || "—"}</p>
-      <div className={`flex items-center justify-between gap-2 mt-2 text-[9.5px] font-medium uppercase tracking-wide ${t.cardSecondary}`}>
-        <span>Aberta {formatDate(opp.createdAt)}</span>
-        <span className={daysSince(opp.stageEnteredAt) >= 7 ? "text-amber-500" : ""}>
-          {daysSince(opp.stageEnteredAt)}d na etapa
+      <div className={`flex items-center justify-between gap-2 mt-2 text-[11px] tabular-nums ${t.cardSecondary}`}>
+        <span>Aberta em {formatDate(opp.createdAt)}</span>
+        <span
+          className={`flex items-center gap-1 ${daysSince(opp.stageEnteredAt) >= 7 ? "text-amber-500 font-medium" : ""}`}
+          title={daysSince(opp.stageEnteredAt) >= 7 ? "Parada há uma semana ou mais nesta etapa" : undefined}
+        >
+          <Clock size={11} aria-hidden /> {daysSince(opp.stageEnteredAt)}d na etapa
         </span>
       </div>
       <div className="flex items-center justify-between gap-2 mt-1">
         {opp.assignedToName ? (
-          <p className={`text-[9.5px] font-medium uppercase tracking-wide truncate ${t.cardSecondary}`}>Vendedor · {opp.assignedToName}</p>
+          <p className={`text-[11px] truncate flex items-center gap-1 ${t.cardSecondary}`} title="Vendedor responsável">
+            <UserRound size={11} className="flex-shrink-0" aria-hidden /> {opp.assignedToName}
+          </p>
         ) : <span />}
         {opp.lostAt && (
-          <span className="text-[9px] font-bold uppercase tracking-wide text-red-400 flex-shrink-0" title={opp.motivoPerdaNome ?? undefined}>
+          <span className="text-[11px] font-semibold text-red-400 flex-shrink-0 truncate max-w-[60%]" title={opp.motivoPerdaNome ?? undefined}>
             Perdida{opp.motivoPerdaNome ? ` · ${opp.motivoPerdaNome}` : ""}
           </span>
         )}
@@ -240,7 +260,8 @@ function Card({
         <>
           <div className="fixed inset-0 z-40" onClick={e => { e.stopPropagation(); closeMenu(); }} onPointerDown={e => e.stopPropagation()} />
           <div
-            className={`fixed z-50 w-48 rounded-xl border shadow-xl py-1 ${dark ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-slate-900"}`}
+            role="menu"
+            className={`fixed z-50 w-52 max-h-[60vh] overflow-y-auto rounded-xl border shadow-xl py-1 ${dark ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-slate-900"}`}
             style={{ top: menuPos.top, left: menuPos.left }}
             onClick={e => e.stopPropagation()}
             onPointerDown={e => e.stopPropagation()}
@@ -253,6 +274,11 @@ function Card({
                 {!closed && (
                   <button onClick={() => { closeMenu(); setEditingValue(true); }} className={menuItemClass}>
                     <Pencil size={13} /> Editar valor
+                  </button>
+                )}
+                {!closed && stages.length > 1 && (
+                  <button onClick={e => { e.stopPropagation(); setMenuView("stage"); }} className={menuItemClass}>
+                    <ArrowRight size={13} /> Mover etapa
                   </button>
                 )}
                 <button onClick={e => { e.stopPropagation(); setMenuView("transfer"); }} className={menuItemClass}>
@@ -283,9 +309,25 @@ function Card({
                   <Trash2 size={13} /> Excluir
                 </button>
               </>
+            ) : menuView === "stage" ? (
+              <>
+                <div className={`px-3 py-1.5 text-[11px] font-medium ${t.cardSecondary}`}>Mover para a etapa</div>
+                {stages.map(s => (
+                  <button
+                    key={s.id}
+                    onClick={() => { closeMenu(); if (s.id !== opp.stageId) onMoveStage(opp.id, s.id); }}
+                    className={`${menuItemClass} ${s.id === opp.stageId ? "font-semibold" : ""}`}
+                    aria-current={s.id === opp.stageId ? "true" : undefined}
+                  >
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} aria-hidden />
+                    <span className="flex-1 truncate">{s.name}</span>
+                    {s.id === opp.stageId && <Check size={12} aria-hidden />}
+                  </button>
+                ))}
+              </>
             ) : menuView === "transfer" ? (
               <>
-                <div className={`px-3 py-1.5 text-[10px] uppercase tracking-wide font-medium ${t.cardSecondary}`}>Transferir para</div>
+                <div className={`px-3 py-1.5 text-[11px] font-medium ${t.cardSecondary}`}>Transferir para</div>
                 {attendants.length === 0 && <p className="px-3 py-1.5 text-xs text-gray-500">Nenhum atendente</p>}
                 {attendants.map(a => (
                   <button key={a.id} onClick={() => { closeMenu(); onTransfer(opp.conversationId, a.id); }} className={menuItemClass}>
@@ -295,7 +337,7 @@ function Card({
               </>
             ) : (
               <>
-                <div className={`px-3 py-1.5 text-[10px] uppercase tracking-wide font-medium ${t.cardSecondary}`}>Mover pra pipeline</div>
+                <div className={`px-3 py-1.5 text-[11px] font-medium ${t.cardSecondary}`}>Mover para o pipeline</div>
                 {outrosPipelines.map(p => (
                   <button
                     key={p.id}
@@ -346,7 +388,9 @@ function Card({
             onClick={e => { if (!closed) { e.stopPropagation(); setEditingValue(true); } }}
             onPointerDown={e => e.stopPropagation()}
           >
-            {opp.wonAt ? `🏆 ${formatBRL(opp.dealValue)}` : formatBRL(opp.dealValue)}
+            {opp.wonAt ? (
+              <span className="flex items-center gap-1"><Trophy size={13} aria-hidden /> {formatBRL(opp.dealValue)}</span>
+            ) : formatBRL(opp.dealValue)}
           </p>
           <LeadStatusBadge
             agentId={agentId}
@@ -363,10 +407,12 @@ function Card({
 }
 
 function Column({
-  agentId, stage, opportunities, attendants, outrosPipelines, onOpenDetails, onRename, onDelete, onStagesChange, onValueChange, onLeadStatusChange, onMarcarGanho, onMarcarPerda, onTransfer, onMoverPipeline, onDeleteOpportunity, onOpenChat, onOpportunitiesChange, leadStatuses, onLeadStatusesChange, dark, t,
+  agentId, stage, allStages, opportunities, attendants, outrosPipelines, onOpenDetails, onRename, onDelete, onStagesChange, onValueChange, onLeadStatusChange, onMarcarGanho, onMarcarPerda, onTransfer, onMoverPipeline, onMoveStage, onDeleteOpportunity, onOpenChat, onOpportunitiesChange, leadStatuses, onLeadStatusesChange, dark, t,
 }: {
   agentId: string;
   stage: Stage;
+  allStages: Stage[];
+  onMoveStage: (oppId: string, stageId: string) => void;
   opportunities: PipelineOpportunity[];
   attendants: Attendant[];
   outrosPipelines: OtherPipeline[];
@@ -457,7 +503,8 @@ function Column({
                 {...sortableAttrs}
                 {...sortableListeners}
                 title="Arrastar pra reordenar"
-                className="flex-shrink-0 cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-300 touch-none"
+                aria-label={`Reordenar etapa ${stage.name}`}
+                className={`flex-shrink-0 cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-300 touch-none rounded ${FOCUS_RING}`}
               >
                 <GripVertical size={14} />
               </button>
@@ -472,21 +519,25 @@ function Column({
                 className={`border rounded px-2 py-0.5 text-sm ${t.nameInput}`}
               />
             ) : (
-              <p
-                className="font-bold text-[12.5px] uppercase tracking-wide truncate cursor-text"
-                onClick={() => setEditing(true)}
+              <button
+                type="button"
+                className={`font-bold text-[12.5px] uppercase tracking-wide truncate cursor-text text-left rounded ${FOCUS_RING}`}
+                onClick={() => isRealStage && setEditing(true)}
+                title={isRealStage ? "Clique para renomear" : undefined}
               >
                 {stage.name}
-              </p>
+              </button>
             )}
             <span
-              className="text-[11px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
-              style={{ backgroundColor: `${stage.color}33`, color: stage.color }}
+              className={`text-[11px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 tabular-nums ${dark ? "text-gray-200" : "text-gray-800"}`}
+              style={{ backgroundColor: `${stage.color}40` }}
+              aria-label={`${opportunities.length} oportunidade${opportunities.length === 1 ? "" : "s"}`}
             >
               {opportunities.length}
             </span>
           </div>
           <div className="flex items-center gap-1.5 flex-shrink-0">
+            {isRealStage && (<>
             <button
               onClick={() => {
                 setInstrucoes(stage.agenteInstrucoes ?? "");
@@ -495,18 +546,22 @@ function Column({
               }}
               title={temAgente || temFollowup ? "Agente da etapa configurado — clique para editar" : "Configurar agente responsável por esta etapa"}
               className={`flex-shrink-0 flex ${
-                temAgente || temFollowup ? "text-blue-400 hover:text-blue-300" : "md:hidden md:group-hover:flex text-gray-600 hover:text-gray-400"
-              }`}
+                temAgente || temFollowup ? "text-blue-400 hover:text-blue-300" : "md:hidden md:group-hover:flex md:group-focus-within:flex text-gray-600 hover:text-gray-400"
+              } rounded ${FOCUS_RING}`}
+              aria-label={`Agente da etapa ${stage.name}`}
+              aria-expanded={showAgente}
             >
               <Bot size={14} />
             </button>
             <button
               onClick={() => onDelete(stage.id)}
               title="Excluir etapa"
-              className="flex-shrink-0 flex md:hidden md:group-hover:flex text-gray-500 hover:text-red-400"
+              aria-label={`Excluir etapa ${stage.name}`}
+              className={`flex-shrink-0 flex md:hidden md:group-hover:flex md:group-focus-within:flex text-gray-500 hover:text-red-400 rounded ${FOCUS_RING}`}
             >
               <X size={14} />
             </button>
+            </>)}
             {total > 0 && <p className="text-[11px] font-semibold leading-none text-green-500 whitespace-nowrap">{formatBRL(total)}</p>}
           </div>
         </div>
@@ -515,7 +570,7 @@ function Column({
           <div className={`mt-2 rounded-xl border p-2.5 space-y-2 ${dark ? "bg-gray-950 border-gray-700" : "bg-white border-gray-300"}`}>
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold flex items-center gap-1"><Bot size={11} /> Agente desta etapa</p>
-              <button onClick={() => setShowAgente(false)} className="text-gray-500 hover:text-gray-300"><X size={12} /></button>
+              <button onClick={() => setShowAgente(false)} aria-label="Fechar" className={`text-gray-500 hover:text-gray-300 rounded ${FOCUS_RING}`}><X size={12} /></button>
             </div>
             <textarea
               value={instrucoes}
@@ -551,7 +606,7 @@ function Column({
                           <option value="minutos">min</option>
                         </select>
                         {followupRows.length > 1 && (
-                          <button onClick={() => removeFollowupRow(i)} className="text-gray-500 hover:text-red-400 ml-auto"><X size={12} /></button>
+                          <button onClick={() => removeFollowupRow(i)} aria-label="Remover tentativa" className={`text-gray-500 hover:text-red-400 ml-auto rounded ${FOCUS_RING}`}><X size={12} /></button>
                         )}
                       </div>
                       <input
@@ -584,10 +639,19 @@ function Column({
         )}
       </div>
       <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[120px]">
+        {opportunities.length === 0 && (
+          <div className={`h-full min-h-[104px] rounded-xl border border-dashed flex flex-col items-center justify-center gap-1 px-4 text-center ${
+            isOver ? "border-blue-500 text-blue-400" : dark ? "border-gray-800 text-gray-500" : "border-gray-300 text-gray-500"
+          }`}>
+            <Inbox size={16} aria-hidden />
+            <p className="text-xs">{isOver ? "Solte aqui" : "Nenhuma oportunidade nesta etapa"}</p>
+            {!isOver && <p className="text-[11px] opacity-80">Arraste um card pra cá ou use &quot;Mover etapa&quot; no menu do card.</p>}
+          </div>
+        )}
         {opportunities.map(o => (
           <Card
-            key={o.id} agentId={agentId} opp={o} stageColor={stage.color} attendants={attendants} outrosPipelines={outrosPipelines} onClick={() => onOpenDetails(o)} onValueChange={onValueChange}
-            onLeadStatusChange={onLeadStatusChange} onMarcarGanho={onMarcarGanho} onMarcarPerda={onMarcarPerda} onTransfer={onTransfer} onMoverPipeline={onMoverPipeline} onDeleteOpportunity={onDeleteOpportunity}
+            key={o.id} agentId={agentId} opp={o} stages={allStages} attendants={attendants} outrosPipelines={outrosPipelines} onClick={() => onOpenDetails(o)} onValueChange={onValueChange}
+            onLeadStatusChange={onLeadStatusChange} onMarcarGanho={onMarcarGanho} onMarcarPerda={onMarcarPerda} onTransfer={onTransfer} onMoverPipeline={onMoverPipeline} onMoveStage={onMoveStage} onDeleteOpportunity={onDeleteOpportunity}
             onOpenChat={onOpenChat} onOpportunitiesChange={onOpportunitiesChange}
             leadStatuses={leadStatuses} onLeadStatusesChange={onLeadStatusesChange}
             dark={dark} t={t}
@@ -670,28 +734,41 @@ export function WhatsappPipeline({
       return;
     }
 
-    const oppId = activeIdStr;
-    const stageId = overIdStr;
+    if (overIdStr === "__sem_etapa__") return; // pseudo-coluna: não é destino válido
+    await moveToStage(activeIdStr, overIdStr);
+  }
+
+  // Arrastar e "Mover etapa" do menu passam por aqui: atualiza na hora e desfaz se o servidor recusar
+  async function moveToStage(oppId: string, stageId: string) {
     const opp = localOpportunities.find(o => o.id === oppId);
     if (!opp || opp.stageId === stageId) return;
-
+    const anterior = { stageId: opp.stageId, stageEnteredAt: opp.stageEnteredAt };
     setLocalOpportunities(prev => prev.map(o => o.id === oppId ? { ...o, stageId, stageEnteredAt: new Date().toISOString() } : o));
-    await fetch(`/api/ferramentas/whatsapp/conversas/${opp.conversationId}/oportunidades/${oppId}`, {
+    const res = await fetch(`/api/ferramentas/whatsapp/conversas/${opp.conversationId}/oportunidades/${oppId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ stageId }),
-    });
+    }).catch(() => null);
+    if (!res?.ok) {
+      setLocalOpportunities(prev => prev.map(o => o.id === oppId ? { ...o, ...anterior } : o));
+      alert("Não foi possível mover a oportunidade de etapa. Verifique a conexão e tente de novo.");
+    }
   }
 
   async function handleValueChange(oppId: string, value: number) {
     const opp = localOpportunities.find(o => o.id === oppId);
     if (!opp) return;
+    const anterior = opp.dealValue;
     setLocalOpportunities(prev => prev.map(o => o.id === oppId ? { ...o, dealValue: value } : o));
-    await fetch(`/api/ferramentas/whatsapp/conversas/${opp.conversationId}/oportunidades/${oppId}`, {
+    const res = await fetch(`/api/ferramentas/whatsapp/conversas/${opp.conversationId}/oportunidades/${oppId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ dealValue: value }),
-    });
+    }).catch(() => null);
+    if (!res?.ok) {
+      setLocalOpportunities(prev => prev.map(o => o.id === oppId ? { ...o, dealValue: anterior } : o));
+      alert("Não foi possível salvar o valor. Tente de novo.");
+    }
   }
 
   async function handleLeadStatusChange(conversationId: string, leadStatusId: string | null) {
@@ -791,6 +868,13 @@ export function WhatsappPipeline({
     onStagesChange();
   }
 
+  useEffect(() => {
+    if (!perdaOppId) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setPerdaOppId(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [perdaOppId]);
+
   const activeOpp = activeId && !activeId.startsWith("col:") ? localOpportunities.find(o => o.id === activeId) : null;
   const activeCol = activeId?.startsWith("col:") ? localStages.find(s => s.id === activeId.slice(4)) : null;
   const detailOpp = detailOppId ? localOpportunities.find(o => o.id === detailOppId) : null;
@@ -804,6 +888,8 @@ export function WhatsappPipeline({
             <Column
               agentId={agentId}
               stage={{ id: "__sem_etapa__", name: "Sem etapa", color: "#6b7280", order: -1 }}
+              allStages={localStages}
+              onMoveStage={moveToStage}
               opportunities={semEtapa}
               attendants={attendants}
               outrosPipelines={outrosPipelines}
@@ -832,6 +918,8 @@ export function WhatsappPipeline({
                 key={stage.id}
                 agentId={agentId}
                 stage={stage}
+                allStages={localStages}
+                onMoveStage={moveToStage}
                 opportunities={localOpportunities.filter(o => o.stageId === stage.id)}
                 attendants={attendants}
                 outrosPipelines={outrosPipelines}
@@ -862,9 +950,18 @@ export function WhatsappPipeline({
                 onChange={e => setNewStageName(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && handleAddStage()}
                 placeholder="Nova etapa..."
+                aria-label="Nome da nova etapa"
                 className={`flex-1 border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600 ${t.addInput}`}
               />
-              <button onClick={handleAddStage} className="bg-blue-600 hover:bg-blue-500 rounded-xl px-3 py-2 text-sm font-medium text-white">+</button>
+              <button
+                onClick={handleAddStage}
+                disabled={!newStageName.trim()}
+                aria-label="Adicionar etapa"
+                title="Adicionar etapa"
+                className={`bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:hover:bg-blue-600 rounded-xl px-3 py-2 text-white ${FOCUS_RING}`}
+              >
+                <Plus size={16} />
+              </button>
             </div>
           </div>
         </div>
@@ -906,9 +1003,12 @@ export function WhatsappPipeline({
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setPerdaOppId(null)}>
         <div
           onClick={e => e.stopPropagation()}
-          className={`w-80 rounded-2xl border p-4 space-y-3 ${theme === "dark" ? "bg-gray-900 border-gray-800 text-white" : "bg-white border-gray-200 text-slate-900"}`}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="perda-titulo"
+          className={`w-80 max-w-[calc(100vw-2rem)] rounded-2xl border p-4 space-y-3 ${theme === "dark" ? "bg-gray-900 border-gray-800 text-white" : "bg-white border-gray-200 text-slate-900"}`}
         >
-          <p className="text-sm font-semibold">Motivo da perda</p>
+          <p id="perda-titulo" className="text-sm font-semibold">Motivo da perda</p>
           {motivosPerda.length === 0 ? (
             <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
               Nenhum motivo cadastrado ainda — configure em Configurações &gt; Motivos de perda.
