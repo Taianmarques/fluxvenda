@@ -214,7 +214,21 @@ function Card({
 
       {/* Topo: contato à esquerda, valor negociado discreto à direita (clique edita) */}
       <div className="flex items-center justify-between gap-2">
-        <p className={`text-[10.5px] uppercase tracking-[0.08em] truncate ${t.muted}`}>{sobretitulo}</p>
+        {/* Contato + status do lead (compacto) na mesma linha */}
+        <div className="flex items-center gap-1.5 min-w-0">
+          <p className={`text-[10.5px] uppercase tracking-[0.08em] truncate ${t.muted}`}>{sobretitulo}</p>
+          <div className={`flex-shrink-0 ${opp.leadStatusId ? "" : "md:opacity-0 md:group-hover/card:opacity-100 md:group-focus-within/card:opacity-100 transition-opacity duration-150"}`}>
+            <LeadStatusBadge
+              agentId={agentId}
+              leadStatusId={opp.leadStatusId}
+              statuses={leadStatuses}
+              onChange={id => onLeadStatusChange(opp.conversationId, id)}
+              onStatusesChange={onLeadStatusesChange}
+              dark={dark}
+              compact
+            />
+          </div>
+        </div>
         {editingValue ? (
           <input
             autoFocus
@@ -242,21 +256,9 @@ function Card({
         )}
       </div>
 
-      {/* Título + etiqueta do lead */}
-      <div className="flex items-center justify-between gap-2 -mt-0.5">
-        <p className="text-[15px] font-medium leading-snug tracking-[-0.005em] truncate" title={titulo}>{titulo}</p>
-        <div className={`flex-shrink-0 ${opp.leadStatusId ? "" : "md:opacity-0 md:group-hover/card:opacity-100 md:group-focus-within/card:opacity-100 transition-opacity duration-150"}`}>
-          <LeadStatusBadge
-            agentId={agentId}
-            leadStatusId={opp.leadStatusId}
-            statuses={leadStatuses}
-            onChange={id => onLeadStatusChange(opp.conversationId, id)}
-            onStatusesChange={onLeadStatusesChange}
-            dark={dark}
-          />
-        </div>
-      </div>
+      <p className="-mt-0.5 text-[15px] font-medium leading-snug tracking-[-0.005em] truncate" title={titulo}>{titulo}</p>
 
+      {(opp.etiquetas?.length ?? 0) > 0 && (
       <div className="flex items-center gap-1 h-[20px] overflow-hidden flex-shrink-0">
           {(opp.etiquetas ?? []).slice(0, 3).map(et => (
             <span
@@ -269,6 +271,7 @@ function Card({
           ))}
           {(opp.etiquetas?.length ?? 0) > 3 && <span className={`text-[10px] leading-none px-1 py-1 flex-shrink-0 ${t.muted}`}>+{opp.etiquetas!.length - 3}</span>}
       </div>
+      )}
 
       {/* Tarefas resumidas: barra de progresso + contador; o clique abre o painel de tarefas */}
       <button
