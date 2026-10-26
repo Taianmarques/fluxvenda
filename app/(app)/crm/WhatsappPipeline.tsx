@@ -69,21 +69,6 @@ function formatCompacto(value: number): string {
   return `R$ ${fmt(value)}`;
 }
 
-// "hoje 15h", "amanhã 9h30", "12/10", com urgência pra cor do ponto
-function quandoTarefa(iso: string | null): { texto: string; urgencia: "atrasada" | "hoje" | "breve" | "depois" | "sem" } {
-  if (!iso) return { texto: "sem prazo", urgencia: "sem" };
-  const d = new Date(iso);
-  const agora = new Date();
-  const dia = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
-  const diffDias = Math.round((dia(d) - dia(agora)) / 86400000);
-  const h = d.getHours(), m = d.getMinutes();
-  const hora = h === 0 && m === 0 ? "" : ` ${h}h${m ? String(m).padStart(2, "0") : ""}`;
-  if (d.getTime() < agora.getTime() && diffDias <= 0 && (hora || diffDias < 0)) return { texto: `atrasada · ${d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}`, urgencia: "atrasada" };
-  if (diffDias === 0) return { texto: `hoje${hora}`, urgencia: "hoje" };
-  if (diffDias === 1) return { texto: `amanhã${hora}`, urgencia: "breve" };
-  return { texto: d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) + hora, urgencia: diffDias <= 3 ? "breve" : "depois" };
-}
-
 function iniciais(nome: string): string {
   const partes = nome.trim().split(/\s+/);
   return ((partes[0]?.[0] ?? "") + (partes.length > 1 ? partes[partes.length - 1][0] : "")).toUpperCase();
@@ -209,8 +194,6 @@ function Card({
   const menuItemClass = `w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs ${dark ? "hover:bg-gray-800" : "hover:bg-gray-100"}`;
 
   const feitas = opp.tasksDone;
-  const proxima = opp.nextTask ? quandoTarefa(opp.nextTask.dueDate) : null;
-  const corPonto = proxima?.urgencia === "atrasada" || proxima?.urgencia === "hoje" ? "#e5484d" : proxima?.urgencia === "breve" ? "#f5a524" : "#a8a29e";
   const semContato = opp.lastContactAt ? daysSince(opp.lastContactAt) : null;
   const titulo = opp.title?.trim() || opp.contactName || opp.contactNumber;
   const sobretitulo = opp.title?.trim() ? (opp.contactName || opp.contactNumber) : opp.contactNumber;
@@ -222,30 +205,16 @@ function Card({
       {...listeners}
       {...attributes}
       onClick={onClick}
-      className={`group/card relative h-[238px] flex-shrink-0 [&>*]:shrink-0 border rounded-xl pl-[18px] pr-3.5 py-3.5 cursor-pointer transition-[border-color,box-shadow] duration-150 flex flex-col gap-2 overflow-hidden ${FOCUS_RING} ${t.card} ${
+      className={`group/card relative h-[178px] flex-shrink-0 [&>*]:shrink-0 border rounded-xl pl-[18px] pr-3.5 py-3.5 cursor-pointer transition-[border-color,box-shadow] duration-150 flex flex-col gap-2 overflow-hidden ${FOCUS_RING} ${t.card} ${
         dark ? "shadow-[0_1px_2px_rgba(0,0,0,0.3)]" : "shadow-[0_1px_2px_rgba(28,25,23,0.04),0_6px_16px_-8px_rgba(28,25,23,0.10)] hover:shadow-[0_1px_2px_rgba(28,25,23,0.05),0_10px_24px_-10px_rgba(28,25,23,0.16)]"
       } ${isDragging ? "opacity-30" : ""}`}
     >
       {/* Faixa da cor da etapa (pedido do usuário, como na referência) */}
       <span aria-hidden className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: stageColor }} />
 
-      <div className="flex items-start justify-between gap-2">
-        <p className={`text-[10.5px] uppercase tracking-[0.08em] truncate pt-0.5 ${t.muted}`}>{sobretitulo}</p>
-        <div className={opp.leadStatusId ? "" : "md:opacity-0 md:group-hover/card:opacity-100 md:group-focus-within/card:opacity-100 transition-opacity duration-150"}>
-          <LeadStatusBadge
-            agentId={agentId}
-            leadStatusId={opp.leadStatusId}
-            statuses={leadStatuses}
-            onChange={id => onLeadStatusChange(opp.conversationId, id)}
-            onStatusesChange={onLeadStatusesChange}
-            dark={dark}
-          />
-        </div>
-      </div>
-
-      <p className="-mt-1 text-[15px] font-medium leading-snug tracking-[-0.005em] truncate" title={titulo}>{titulo}</p>
-
-      <div className="flex items-end justify-between flex-wrap gap-x-2 gap-y-1">
+      {/* Topo: contato à esquerda, valor negociado discreto à direita (clique edita) */}
+      <div className="flex items-center justify-between gap-2">
+        <p className={`text-[10.5px] uppercase tracking-[0.08em] truncate ${t.muted}`}>{sobretitulo}</p>
         {editingValue ? (
           <input
             autoFocus
@@ -257,24 +226,35 @@ function Card({
             onPointerDown={e => e.stopPropagation()}
             placeholder="0,00"
             aria-label="Valor da oportunidade"
-            className={`w-32 border rounded-lg px-2 py-1 text-sm font-semibold tabular-nums ${t.input}`}
+            className={`w-24 border rounded-md px-1.5 py-0.5 text-[12.5px] font-medium tabular-nums text-right ${t.input}`}
           />
         ) : (
-          <p
-            className={`text-[18px] font-semibold leading-none tracking-[-0.015em] tabular-nums ${opp.lostAt ? "line-through opacity-50" : opp.wonAt ? "text-green-600" : ""} ${!closed ? "cursor-text" : ""}`}
+          <span
+            className={`text-[12.5px] font-medium tabular-nums whitespace-nowrap flex-shrink-0 ${
+              opp.lostAt ? `line-through ${t.muted}` : opp.wonAt ? "text-green-600" : dark ? "text-gray-300" : "text-[#4a463f]"
+            } ${!closed ? "cursor-text hover:underline decoration-dotted underline-offset-2" : ""}`}
             onClick={e => { if (!closed) { e.stopPropagation(); setEditingValue(true); } }}
             onPointerDown={e => e.stopPropagation()}
-            title={!closed ? "Clique para editar o valor" : undefined}
+            title={!closed ? "Valor negociado — clique para editar" : "Valor negociado"}
           >
-            {opp.wonAt ? <span className="inline-flex items-center gap-1.5"><Trophy size={14} aria-hidden /> {formatValorCard(opp.dealValue)}</span> : formatValorCard(opp.dealValue)}
-          </p>
+            {opp.wonAt ? <span className="inline-flex items-center gap-1"><Trophy size={12} aria-hidden /> {formatValorCard(opp.dealValue)}</span> : formatValorCard(opp.dealValue)}
+          </span>
         )}
-        <span
-          className={`text-[11px] whitespace-nowrap ${daysSince(opp.stageEnteredAt) >= 7 ? "text-amber-600 font-medium" : t.muted}`}
-          title={daysSince(opp.stageEnteredAt) >= 7 ? "Parada há uma semana ou mais nesta etapa" : "Tempo nesta etapa"}
-        >
-          {daysSince(opp.stageEnteredAt)}d na etapa
-        </span>
+      </div>
+
+      {/* Título + etiqueta do lead */}
+      <div className="flex items-center justify-between gap-2 -mt-0.5">
+        <p className="text-[15px] font-medium leading-snug tracking-[-0.005em] truncate" title={titulo}>{titulo}</p>
+        <div className={`flex-shrink-0 ${opp.leadStatusId ? "" : "md:opacity-0 md:group-hover/card:opacity-100 md:group-focus-within/card:opacity-100 transition-opacity duration-150"}`}>
+          <LeadStatusBadge
+            agentId={agentId}
+            leadStatusId={opp.leadStatusId}
+            statuses={leadStatuses}
+            onChange={id => onLeadStatusChange(opp.conversationId, id)}
+            onStatusesChange={onLeadStatusesChange}
+            dark={dark}
+          />
+        </div>
       </div>
 
       <div className="flex items-center gap-1 h-[20px] overflow-hidden flex-shrink-0">
@@ -288,17 +268,6 @@ function Card({
             </span>
           ))}
           {(opp.etiquetas?.length ?? 0) > 3 && <span className={`text-[10px] leading-none px-1 py-1 flex-shrink-0 ${t.muted}`}>+{opp.etiquetas!.length - 3}</span>}
-      </div>
-
-      <div className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[12px] flex-shrink-0 ${t.soft}`}>
-        {proxima && opp.nextTask && !closed ? (
-          <>
-            <span aria-hidden className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: corPonto }} />
-            <span className="truncate"><b className="font-medium">Próx.:</b> <span className={t.muted}>{opp.nextTask.title} · {proxima.texto}</span></span>
-          </>
-        ) : (
-          <span className={`truncate ${t.muted}`}>{closed ? (opp.wonAt ? "Negócio ganho" : "Negócio perdido") : "Sem próxima tarefa"}</span>
-        )}
       </div>
 
       {/* Tarefas resumidas: barra de progresso + contador; o clique abre o painel de tarefas */}
@@ -321,7 +290,13 @@ function Card({
         <span className={`text-[10.5px] uppercase tracking-[0.08em] truncate ${opp.lostAt ? "text-red-500" : t.muted}`} title={opp.motivoPerdaNome ?? undefined}>
           {opp.lostAt
             ? `Perdida${opp.motivoPerdaNome ? ` · ${opp.motivoPerdaNome}` : ""}`
-            : semContato == null ? "Sem mensagens" : semContato === 0 ? "Contato hoje" : `Há ${semContato}d sem contato`}
+            : <>
+                <span className={daysSince(opp.stageEnteredAt) >= 7 ? "text-amber-600 font-medium" : ""} title={daysSince(opp.stageEnteredAt) >= 7 ? "Parada há uma semana ou mais nesta etapa" : "Tempo nesta etapa"}>
+                  {daysSince(opp.stageEnteredAt)}d na etapa
+                </span>
+                {" · "}
+                {semContato == null ? "sem mensagens" : semContato === 0 ? "contato hoje" : `${semContato}d sem contato`}
+              </>}
         </span>
         <div className="flex items-center gap-0.5 flex-shrink-0">
           {/* Ações discretas: aparecem ao passar o mouse ou com foco do teclado; sempre visíveis no celular */}
