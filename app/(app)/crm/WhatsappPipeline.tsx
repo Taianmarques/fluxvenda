@@ -8,7 +8,7 @@ import {
 import { useDroppable, useDraggable } from "@dnd-kit/core";
 import { SortableContext, useSortable, arrayMove, horizontalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ThumbsUp, ThumbsDown, MessageCircle, Bot, X, ListChecks, MoreVertical, ArrowRightLeft, Shuffle, GripVertical, Pencil, Trash2, Clock, Briefcase, Trophy, ArrowRight, Plus, Check, Inbox } from "lucide-react";
+import { ThumbsUp, ThumbsDown, MessageCircle, Bot, X, ListChecks, MoreVertical, ArrowRightLeft, Shuffle, GripVertical, Pencil, Trash2, Clock, Briefcase, Trophy, ArrowRight, Plus, Check, Inbox, MessageCircleDashed } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { ConversationPopup } from "./ConversationPopup";
 import { PipelineTaskPanel } from "./PipelineTaskPanel";
@@ -287,17 +287,29 @@ function Card({
       </button>
 
       <div className={`relative mt-auto flex-shrink-0 flex items-center justify-between gap-2 pt-2.5 border-t ${t.divider}`}>
-        <span className={`text-[10.5px] uppercase tracking-[0.08em] truncate ${opp.lostAt ? "text-red-500" : t.muted}`} title={opp.motivoPerdaNome ?? undefined}>
-          {opp.lostAt
-            ? `Perdida${opp.motivoPerdaNome ? ` · ${opp.motivoPerdaNome}` : ""}`
-            : <>
-                <span className={daysSince(opp.stageEnteredAt) >= 7 ? "text-amber-600 font-medium" : ""} title={daysSince(opp.stageEnteredAt) >= 7 ? "Parada há uma semana ou mais nesta etapa" : "Tempo nesta etapa"}>
-                  {daysSince(opp.stageEnteredAt)}d na etapa
-                </span>
-                {" · "}
-                {semContato == null ? "sem mensagens" : semContato === 0 ? "contato hoje" : `${semContato}d sem contato`}
-              </>}
-        </span>
+        {opp.lostAt ? (
+          <span className="text-[10.5px] uppercase tracking-[0.08em] truncate text-red-500" title={opp.motivoPerdaNome ?? undefined}>
+            Perdida{opp.motivoPerdaNome ? ` · ${opp.motivoPerdaNome}` : ""}
+          </span>
+        ) : (
+          // Tempo na etapa e sem contato como ícones (mesmo traço dos botões do hover) + número
+          <span className={`flex items-center gap-3 text-[11.5px] tabular-nums ${t.muted}`}>
+            <span
+              className={`flex items-center gap-1 ${daysSince(opp.stageEnteredAt) >= 7 ? "text-amber-600 font-medium" : ""}`}
+              title={`${daysSince(opp.stageEnteredAt)} dia(s) nesta etapa${daysSince(opp.stageEnteredAt) >= 7 ? " — parada há uma semana ou mais" : ""}`}
+            >
+              <Clock size={14} aria-hidden /> {daysSince(opp.stageEnteredAt)}d
+              <span className="sr-only"> na etapa</span>
+            </span>
+            <span
+              className="flex items-center gap-1"
+              title={semContato == null ? "Sem mensagens ainda" : semContato === 0 ? "Teve contato hoje" : `${semContato} dia(s) sem contato`}
+            >
+              <MessageCircleDashed size={14} aria-hidden /> {semContato == null ? "—" : semContato === 0 ? "hoje" : `${semContato}d`}
+              <span className="sr-only"> sem contato</span>
+            </span>
+          </span>
+        )}
         <div className="flex items-center gap-0.5 flex-shrink-0">
           {/* Ações discretas: aparecem ao passar o mouse ou com foco do teclado; sempre visíveis no celular */}
           <div className={`flex items-center gap-0.5 md:absolute md:right-8 md:-bottom-0.5 md:pl-3 md:opacity-0 md:pointer-events-none md:group-hover/card:opacity-100 md:group-hover/card:pointer-events-auto md:group-focus-within/card:opacity-100 md:group-focus-within/card:pointer-events-auto transition-opacity duration-150 ${dark ? "md:bg-gray-900" : "md:bg-white"}`}>
