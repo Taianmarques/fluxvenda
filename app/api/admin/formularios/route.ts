@@ -58,8 +58,8 @@ export async function POST(req: NextRequest) {
   // Quiz gerado com IA a partir de uma descrição em texto
   if (raw?.template === "ia") {
     const descricao = typeof raw.descricao === "string" ? raw.descricao.trim() : "";
-    if (descricao.length < 20) return NextResponse.json({ error: "Descreva o quiz com um pouco mais de detalhe (produto, público e objetivo)." }, { status: 400 });
-    if (descricao.length > 3000) return NextResponse.json({ error: "Descrição longa demais (máx. 3000 caracteres)." }, { status: 400 });
+    if (descricao.length < 20) return NextResponse.json({ error: "Cole o roteiro do quiz (perguntas, opções e resultados) ou anexe o arquivo." }, { status: 400 });
+    if (descricao.length > 20000) return NextResponse.json({ error: "Material longo demais (máx. 20 mil caracteres)." }, { status: 400 });
     try {
       const { quiz, usage } = await gerarQuizComIA(descricao);
       logTokenUsage({ teamId: FLUXVENDA_TEAM_ID, provider: "anthropic", model: CLAUDE_MODEL, feature: "quiz-ia", ...usage });

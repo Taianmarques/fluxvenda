@@ -66,7 +66,7 @@ export function FormulariosClient({ agentId, initialForms }: { agentId: string; 
             onClick={() => { setGerandoIA(v => !v); setCreating(false); }}
             className="flex items-center gap-2 border border-blue-700/60 text-blue-300 hover:bg-blue-600/10 rounded-xl px-4 py-2.5 text-sm font-medium"
           >
-            <Sparkles size={15} /> Criar quiz com IA
+            <Sparkles size={15} /> Roteiro → quiz (IA)
           </button>
           <button
             onClick={() => { setCreating(v => !v); setGerandoIA(false); }}

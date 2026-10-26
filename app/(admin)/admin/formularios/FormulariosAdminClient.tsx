@@ -90,7 +90,7 @@ export function FormulariosAdminClient({ initialForms }: { initialForms: FormRow
             onClick={() => { setGerandoIA(v => !v); setCreating(false); }}
             className="flex items-center gap-2 border border-blue-700/60 text-blue-300 hover:bg-blue-600/10 rounded-xl px-4 py-2.5 text-sm font-medium"
           >
-            <Wand2 size={15} /> Criar quiz com IA
+            <Wand2 size={15} /> Roteiro → quiz (IA)
           </button>
           <button
             onClick={handleCreateExemplo} disabled={saving}

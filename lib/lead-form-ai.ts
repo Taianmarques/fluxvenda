@@ -2,7 +2,9 @@ import { anthropic, MODEL } from "@/lib/anthropic";
 import { stepsSchema, questionsSchema, quizResultsSchema } from "@/lib/lead-form-schema";
 import { stepsToQuestions, DEFAULT_NIVEIS, DESTAQUE_CORES, type QuizStep, type QuizResult, type DestaqueCor } from "@/lib/lead-form-shared";
 
-// Gera um quiz em telas completo a partir de uma descrição em texto livre do usuário ("prompt").
+// Converte o roteiro/prompt de quiz que o usuário traz pronto (colado ou anexado) num quiz em telas.
+// A IA não cria o quiz do zero: usa as perguntas, opções, resultados e textos do material e só
+// completa o que faltar pro quiz funcionar (emojis, ligação opção → perfil, mensagens do WhatsApp).
 // A IA devolve um rascunho estruturado (tool use, sempre no formato certo) e aqui ele vira as
 // etapas do LeadForm — nome e WhatsApp no começo (1ª mensagem sai na hora), perguntas com emoji
 // que pontuam pros resultados, conteúdos de reforço, carregamento, tela de resultado e oferta.
@@ -10,7 +12,7 @@ import { stepsToQuestions, DEFAULT_NIVEIS, DESTAQUE_CORES, type QuizStep, type Q
 
 const TOOL = {
   name: "criar_quiz",
-  description: "Cria um quiz de captação de leads em telas (estilo funil de quiz) em português do Brasil.",
+  description: "Registra o quiz convertido do material do usuário no formato de quiz em telas.",
   input_schema: {
     type: "object" as const,
     required: ["nomeInterno", "abertura", "perguntas", "resultados", "carregamento", "telaResultado", "oferta", "mensagemWhatsapp", "mensagemFinal"],
@@ -26,14 +28,14 @@ const TOOL = {
         },
       },
       perguntas: {
-        type: "array", minItems: 4, maxItems: 7,
-        description: "Perguntas de múltipla escolha que definem o perfil. Cada opção pontua pra UM resultado (use as keys de resultados).",
+        type: "array", minItems: 1, maxItems: 15,
+        description: "As perguntas de múltipla escolha DO MATERIAL, na mesma ordem e com o mesmo texto. Cada opção pontua pra UM resultado (use as keys de resultados).",
         items: {
           type: "object", required: ["pergunta", "opcoes"],
           properties: {
             pergunta: { type: "string", description: "Pergunta curta e direta. Pode usar **negrito**." },
             opcoes: {
-              type: "array", minItems: 2, maxItems: 5,
+              type: "array", minItems: 2, maxItems: 6,
               items: {
                 type: "object", required: ["texto", "emoji", "resultado"],
                 properties: {
@@ -47,8 +49,8 @@ const TOOL = {
         },
       },
       conteudos: {
-        type: "array", maxItems: 2,
-        description: "Telas de reforço entre as perguntas (dado, provocação ou depoimento genérico — sem inventar estatísticas com números exatos).",
+        type: "array", maxItems: 6,
+        description: "Telas de conteúdo/reforço que EXISTEM no material (textos entre as perguntas). Se o material não tiver nenhuma, devolva lista vazia.",
         items: {
           type: "object", required: ["depoisDaPergunta", "titulo", "destaqueTitulo", "destaqueTexto", "cor"],
           properties: {
@@ -61,7 +63,8 @@ const TOOL = {
         },
       },
       resultados: {
-        type: "array", minItems: 2, maxItems: 4,
+        type: "array", minItems: 2, maxItems: 6,
+        description: "Os resultados/perfis do material. Se o material não definir resultados, derive 2 a 3 perfis coerentes com as perguntas.",
         items: {
           type: "object", required: ["key", "titulo", "descricao", "nivel", "mensagemWhatsapp"],
           properties: {
@@ -123,7 +126,7 @@ const corta = (s: unknown, max: number) => String(s ?? "").trim().slice(0, max);
 function montar(r: Rascunho) {
   // keys de resultado seguras e únicas
   const keys = new Map<string, string>();
-  const quizResults: QuizResult[] = r.resultados.slice(0, 4).map((res, i) => {
+  const quizResults: QuizResult[] = r.resultados.slice(0, 6).map((res, i) => {
     let k = corta(res.key, 30).toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || `r${i + 1}`;
     while ([...keys.values()].includes(k)) k = `${k}_${i}`;
     keys.set(res.key, k);
@@ -144,10 +147,10 @@ function montar(r: Rascunho) {
     question: { key: "whatsapp", label: "{{nome}}, qual o seu WhatsApp com DDD?", subtitulo: "Seu resultado também chega por lá.", type: "WHATSAPP" },
   });
 
-  const conteudos = (r.conteudos ?? []).slice(0, 2);
-  r.perguntas.slice(0, 7).forEach((p, i) => {
+  const conteudos = (r.conteudos ?? []).slice(0, 6);
+  r.perguntas.slice(0, 15).forEach((p, i) => {
     const vistos = new Set<string>();
-    const opcoes = p.opcoes.slice(0, 5)
+    const opcoes = p.opcoes.slice(0, 6)
       .map(o => ({ ...o, texto: corta(o.texto, 60) }))
       .filter(o => o.texto && !vistos.has(o.texto) && vistos.add(o.texto));
     steps.push({
@@ -197,18 +200,21 @@ function montar(r: Rascunho) {
   };
 }
 
-export async function gerarQuizComIA(descricao: string): Promise<{ quiz: ReturnType<typeof montar>; usage: { inputTokens: number; outputTokens: number } }> {
+export async function gerarQuizComIA(material: string): Promise<{ quiz: ReturnType<typeof montar>; usage: { inputTokens: number; outputTokens: number } }> {
   const res = await anthropic.messages.create({
     model: MODEL,
-    max_tokens: 6000,
+    max_tokens: 10000,
     tools: [TOOL],
     tool_choice: { type: "tool", name: TOOL.name },
     system:
-      "Você é um especialista em funis de quiz para captação de leads no Brasil (estilo quiz de perfil que termina numa oferta). " +
-      "Escreva em português do Brasil, frases curtas, tom humano e persuasivo sem exageros. Nunca invente estatísticas com números exatos, " +
-      "nem depoimentos com nomes de pessoas reais. As perguntas devem diagnosticar o lead e cada opção deve apontar pra um perfil (resultado). " +
-      "Os resultados vão do perfil mais crítico (nível 1) ao mais avançado (nível 4-5).",
-    messages: [{ role: "user", content: `Crie o quiz a partir desta descrição do usuário:\n\n${descricao}` }],
+      "Você converte um roteiro/prompt de quiz que o usuário JÁ ESCREVEU para o formato de quiz em telas. NÃO crie um quiz novo: " +
+      "use as perguntas, opções, resultados, títulos e textos do material, na mesma ordem e com as mesmas palavras (pode só corrigir " +
+      "erros de digitação). Não acrescente perguntas, opções ou telas que não estejam no material. Só complete o que faltar pro quiz " +
+      "funcionar: emoji de cada opção, qual resultado cada opção pontua (deduza pelo sentido), nível de cada resultado no medidor " +
+      "(1 = mais crítico), mensagens do WhatsApp e textos de abertura/carregamento/resultado/oferta quando o material não trouxer. " +
+      "Perguntas de nome, telefone, WhatsApp ou e-mail do material NÃO entram em perguntas (o sistema já pede nome e WhatsApp no início). " +
+      "Nunca invente estatísticas com números exatos nem depoimentos com nomes de pessoas. Português do Brasil.",
+    messages: [{ role: "user", content: `Converta este material em quiz:\n\n<material>\n${material}\n</material>` }],
   });
   const bloco = res.content.find(c => c.type === "tool_use");
   if (!bloco || bloco.type !== "tool_use") throw new Error("A IA não devolveu o quiz. Tente de novo.");
