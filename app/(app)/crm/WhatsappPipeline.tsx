@@ -242,8 +242,8 @@ function Card({
         )}
       </div>
 
-      {/* Título + dias sem contato logo depois */}
-      <div className="-mt-0.5 flex items-center gap-2 min-w-0">
+      {/* Título à esquerda, dias sem contato alinhados à direita */}
+      <div className="-mt-0.5 flex items-center justify-between gap-2 min-w-0">
         <p className="text-[15px] font-medium leading-snug tracking-[-0.005em] truncate" title={titulo}>{titulo}</p>
         <span
           className={`flex items-center gap-1 flex-shrink-0 text-[11.5px] tabular-nums ${t.muted}`}
