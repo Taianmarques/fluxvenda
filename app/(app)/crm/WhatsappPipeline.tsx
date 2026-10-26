@@ -286,7 +286,7 @@ function Card({
               <Clock size={14} aria-hidden /> {daysSince(opp.stageEnteredAt)}d
               <span className="sr-only"> na etapa</span>
             </span>
-            <span className={`flex items-center ${opp.leadStatusId ? "" : "md:opacity-0 md:group-hover/card:opacity-100 md:group-focus-within/card:opacity-100 transition-opacity duration-150"}`}>
+            <span className="flex items-center">
               <LeadStatusBadge
                 agentId={agentId}
                 leadStatusId={opp.leadStatusId}
@@ -310,8 +310,8 @@ function Card({
           </span>
         )}
         <div className="flex items-center gap-0.5 flex-shrink-0">
-          {/* Ações discretas: aparecem ao passar o mouse ou com foco do teclado; sempre visíveis no celular */}
-          <div className={`flex items-center gap-0.5 md:absolute md:right-8 md:-bottom-0.5 md:pl-3 md:opacity-0 md:pointer-events-none md:group-hover/card:opacity-100 md:group-hover/card:pointer-events-auto md:group-focus-within/card:opacity-100 md:group-focus-within/card:pointer-events-auto transition-opacity duration-150 ${dark ? "md:bg-gray-900" : "md:bg-white"}`}>
+          {/* Ações sempre visíveis: abrir conversa, detalhes e menu */}
+          <div className="flex items-center gap-0.5">
             <button
               onClick={e => { e.stopPropagation(); onOpenChat(opp.conversationId); }}
               onPointerDown={e => e.stopPropagation()}
