@@ -8,12 +8,16 @@ import {
 import { useDroppable, useDraggable } from "@dnd-kit/core";
 import { SortableContext, useSortable, arrayMove, horizontalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ThumbsUp, ThumbsDown, MessageCircle, Bot, X, ListChecks, MoreVertical, ArrowRightLeft, Shuffle, GripVertical, Pencil, Trash2, Clock, Briefcase, Trophy, UserRound, ArrowRight, Plus, Check, Inbox } from "lucide-react";
+import { JetBrains_Mono } from "next/font/google";
+import { ThumbsUp, ThumbsDown, MessageCircle, Bot, X, ListChecks, MoreVertical, ArrowRightLeft, Shuffle, GripVertical, Pencil, Trash2, Clock, Briefcase, Trophy, ArrowRight, Plus, Check, Inbox } from "lucide-react";
 import { LeadStatusBadge, type LeadStatus } from "./LeadStatusBadge";
 import { ConversationPopup } from "./ConversationPopup";
 import { PipelineTaskPanel } from "./PipelineTaskPanel";
 import { OpportunityDetailModal } from "./OpportunityDetailModal";
 import type { Attendant } from "./PipelineFiltersPanel";
+
+// Rótulos e números do card em monoespaçada (estilo da referência aprovada pelo usuário)
+const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500"], display: "swap" });
 
 export type StageFollowupAttempt = { minutos: number; objetivo?: string };
 export type Stage = { id: string; name: string; color: string; order: number; agenteInstrucoes?: string; followupDelaysMinutes?: StageFollowupAttempt[] };
@@ -54,10 +58,29 @@ export type PipelineOpportunity = {
   updatedAt: string;
   tasksTotal: number;
   tasksDone: number;
+  tasks?: { id: string; title: string; done: boolean; dueDate: string | null }[]; // primeiras tarefas (checklist)
+  nextTask?: { title: string; dueDate: string | null } | null; // próxima pendente (prazo mais próximo)
+  lastContactAt?: string | null; // última mensagem da conversa
 };
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+// "hoje 15h", "amanhã 9h30", "12/10", com urgência pra cor do ponto
+function quandoTarefa(iso: string | null): { texto: string; urgencia: "atrasada" | "hoje" | "breve" | "depois" | "sem" } {
+  if (!iso) return { texto: "sem prazo", urgencia: "sem" };
+  const d = new Date(iso);
+  const agora = new Date();
+  const dia = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diffDias = Math.round((dia(d) - dia(agora)) / 86400000);
+  const h = d.getHours(), m = d.getMinutes();
+  const hora = h === 0 && m === 0 ? "" : ` ${h}h${m ? String(m).padStart(2, "0") : ""}`;
+  if (d.getTime() < agora.getTime() && diffDias <= 0 && (hora || diffDias < 0)) return { texto: `atrasada · ${d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}`, urgencia: "atrasada" };
+  if (diffDias === 0) return { texto: `hoje${hora}`, urgencia: "hoje" };
+  if (diffDias === 1) return { texto: `amanhã${hora}`, urgencia: "breve" };
+  return { texto: d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) + hora, urgencia: diffDias <= 3 ? "breve" : "depois" };
+}
+
+function iniciais(nome: string): string {
+  const partes = nome.trim().split(/\s+/);
+  return ((partes[0]?.[0] ?? "") + (partes.length > 1 ? partes[partes.length - 1][0] : "")).toUpperCase();
 }
 
 function daysSince(iso: string): number {
@@ -68,7 +91,12 @@ type PipelineTheme = "dark" | "light";
 
 const PIPELINE_THEMES = {
   dark: {
-    card: "bg-gray-900 border-gray-800 hover:border-gray-600",
+    card: "bg-gray-900 border-gray-800 hover:border-gray-700",
+    muted: "text-gray-400",
+    soft: "bg-gray-800/70 text-gray-300",
+    track: "bg-gray-800",
+    divider: "border-gray-800",
+    chip: "bg-gray-800 text-gray-200",
     cardSecondary: "text-gray-400",
     column: "bg-gray-950/50 border-gray-800",
     columnHeaderBorder: "border-gray-800",
@@ -79,9 +107,14 @@ const PIPELINE_THEMES = {
     overlay: "bg-gray-900 border-blue-600",
   },
   light: {
-    card: "bg-white border-gray-200 hover:border-gray-400",
+    card: "bg-white border-[#ebe8e2] hover:border-[#d9d4ca]",
+    muted: "text-[#6f6b64]",
+    soft: "bg-[#f3f1ec] text-[#3f3c37]",
+    track: "bg-[#ece9e3]",
+    divider: "border-[#efece6]",
+    chip: "bg-[#f1eee8] text-[#4a463f]",
     cardSecondary: "text-[#4B5563]",
-    column: "bg-gray-100 border-gray-200",
+    column: "bg-[#f6f4f0] border-[#ebe8e2]",
     columnHeaderBorder: "border-gray-200",
     columnCount: "text-gray-500",
     input: "bg-white border-gray-300 text-green-700",
@@ -93,6 +126,11 @@ const PIPELINE_THEMES = {
 
 function formatBRL(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+// No card: "R$ 210.000" quando redondo, "R$ 1.890,50" quando tem centavos
+function formatValorCard(value: number): string {
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: Number.isInteger(value) ? 0 : 2 });
 }
 
 // Aceita o valor como o usuário digita no Brasil: "1.234,56", "1234,56", "1234.56", "R$ 500"
@@ -136,11 +174,12 @@ function CardAvatar({ agentId, conversationId, seed }: { agentId: string; conver
 }
 
 function Card({
-  agentId, opp, stages, attendants, outrosPipelines, onClick, onValueChange, onLeadStatusChange, onMarcarGanho, onMarcarPerda, onTransfer, onMoverPipeline, onMoveStage, onDeleteOpportunity, onOpenChat, onOpportunitiesChange, leadStatuses, onLeadStatusesChange, dark, t,
+  agentId, opp, stages, stageColor, attendants, outrosPipelines, onClick, onValueChange, onLeadStatusChange, onMarcarGanho, onMarcarPerda, onTransfer, onMoverPipeline, onMoveStage, onDeleteOpportunity, onOpenChat, onOpportunitiesChange, leadStatuses, onLeadStatusesChange, dark, t,
 }: {
   agentId: string;
   opp: PipelineOpportunity;
   stages: Stage[]; // etapas deste pipeline, pra mover sem arrastar (teclado, celular)
+  stageColor: string;
   attendants: { id: string; name: string; isManager: boolean }[];
   outrosPipelines: OtherPipeline[];
   onClick: () => void;
@@ -167,6 +206,16 @@ function Card({
   const [menuView, setMenuView] = useState<"main" | "transfer" | "pipeline" | "stage">("main");
   const [taskPanelPos, setTaskPanelPos] = useState<{ top: number; left: number } | null>(null);
   const closed = Boolean(opp.wonAt || opp.lostAt);
+  // Checklist do card: marcar/desmarcar já aparece na hora; a recarga do quadro confirma
+  const [tarefasLocal, setTarefasLocal] = useState<Record<string, boolean>>({});
+  async function toggleTarefa(taskId: string, done: boolean) {
+    setTarefasLocal(prev => ({ ...prev, [taskId]: done }));
+    const res = await fetch(`/api/ferramentas/whatsapp/conversas/${opp.conversationId}/oportunidades/${opp.id}/tarefas/${taskId}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ done }),
+    }).catch(() => null);
+    if (!res?.ok) setTarefasLocal(prev => ({ ...prev, [taskId]: !done }));
+    onOpportunitiesChange();
+  }
 
   function toggleMenu(e: React.MouseEvent) {
     e.stopPropagation();
@@ -191,69 +240,158 @@ function Card({
 
   const menuItemClass = `w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs ${dark ? "hover:bg-gray-800" : "hover:bg-gray-100"}`;
 
+  const tarefas = (opp.tasks ?? []).map(x => ({ ...x, done: tarefasLocal[x.id] ?? x.done }));
+  const feitas = opp.tasksDone + tarefas.reduce((n, x) => n + (x.done !== (opp.tasks ?? []).find(o => o.id === x.id)?.done ? (x.done ? 1 : -1) : 0), 0);
+  const proxima = opp.nextTask ? quandoTarefa(opp.nextTask.dueDate) : null;
+  const corPonto = proxima?.urgencia === "atrasada" || proxima?.urgencia === "hoje" ? "#e5484d" : proxima?.urgencia === "breve" ? "#f5a524" : "#a8a29e";
+  const semContato = opp.lastContactAt ? daysSince(opp.lastContactAt) : null;
+  const titulo = opp.title?.trim() || opp.contactName || opp.contactNumber;
+  const sobretitulo = opp.title?.trim() ? (opp.contactName || opp.contactNumber) : opp.contactNumber;
+  const iconBtn = `p-1 rounded-md flex-shrink-0 ${FOCUS_RING} ${dark ? "text-gray-400 hover:text-white hover:bg-gray-800" : "text-[#8a857d] hover:text-[#2b2925] hover:bg-[#f1eee8]"}`;
+
   return (
     <div
       ref={setNodeRef}
       {...listeners}
       {...attributes}
       onClick={onClick}
-      className={`border rounded-xl p-3 cursor-pointer transition-colors shadow-sm flex flex-col min-h-[152px] ${FOCUS_RING} ${t.card} ${isDragging ? "opacity-30" : ""}`}
+      className={`group/card relative border rounded-2xl pl-5 pr-4 py-4 cursor-pointer transition-[border-color,box-shadow] duration-150 flex flex-col gap-3 overflow-hidden ${FOCUS_RING} ${t.card} ${
+        dark ? "shadow-[0_1px_2px_rgba(0,0,0,0.3)]" : "shadow-[0_1px_2px_rgba(28,25,23,0.04),0_6px_16px_-8px_rgba(28,25,23,0.10)] hover:shadow-[0_1px_2px_rgba(28,25,23,0.05),0_10px_24px_-10px_rgba(28,25,23,0.16)]"
+      } ${isDragging ? "opacity-30" : ""}`}
     >
-      <div className="flex items-center gap-2">
-        <CardAvatar agentId={agentId} conversationId={opp.conversationId} seed={opp.contactName || opp.contactNumber} />
-        <p className="font-semibold text-[13.5px] leading-tight truncate flex-1">{opp.contactName || opp.contactNumber}</p>
-        <button
-          onClick={e => { e.stopPropagation(); onOpenChat(opp.conversationId); }}
-          onPointerDown={e => e.stopPropagation()}
-          title="Abrir conversa"
-          aria-label="Abrir conversa"
-          className={`p-1 rounded flex-shrink-0 ${FOCUS_RING} ${dark ? "text-gray-400 hover:text-white hover:bg-gray-800" : "text-gray-500 hover:text-slate-900 hover:bg-gray-100"}`}
-        >
-          <MessageCircle size={14} />
-        </button>
-        <button
-          onClick={e => { e.stopPropagation(); onClick(); }}
-          onPointerDown={e => e.stopPropagation()}
-          title="Detalhes"
-          aria-label="Detalhes da oportunidade"
-          className={`p-1 rounded flex-shrink-0 ${FOCUS_RING} ${dark ? "text-gray-400 hover:text-white hover:bg-gray-800" : "text-gray-500 hover:text-slate-900 hover:bg-gray-100"}`}
-        >
-          <Briefcase size={14} />
-        </button>
-        <button
-          ref={menuBtnRef}
-          onClick={toggleMenu}
-          onPointerDown={e => e.stopPropagation()}
-          title="Mais opções"
-          aria-label="Mais opções"
-          aria-haspopup="menu"
-          aria-expanded={Boolean(menuPos)}
-          className={`p-1 rounded flex-shrink-0 ${FOCUS_RING} ${dark ? "text-gray-400 hover:text-white hover:bg-gray-800" : "text-gray-500 hover:text-slate-900 hover:bg-gray-100"}`}
-        >
-          <MoreVertical size={14} />
-        </button>
+      {/* Faixa da cor da etapa (pedido do usuário, como na referência) */}
+      <span aria-hidden className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: stageColor }} />
+
+      <div className="flex items-start justify-between gap-2">
+        <p className={`${mono.className} text-[11px] uppercase tracking-[0.08em] truncate pt-0.5 ${t.muted}`}>{sobretitulo}</p>
+        <div className={opp.leadStatusId ? "" : "md:opacity-0 md:group-hover/card:opacity-100 md:group-focus-within/card:opacity-100 transition-opacity duration-150"}>
+          <LeadStatusBadge
+            agentId={agentId}
+            leadStatusId={opp.leadStatusId}
+            statuses={leadStatuses}
+            onChange={id => onLeadStatusChange(opp.conversationId, id)}
+            onStatusesChange={onLeadStatusesChange}
+            dark={dark}
+          />
+        </div>
       </div>
-      <p className={`text-[11.5px] truncate mt-1 ${t.cardSecondary}`}>{opp.title || opp.lastMessage || "—"}</p>
-      <div className={`flex items-center justify-between gap-2 mt-2 text-[11px] tabular-nums ${t.cardSecondary}`}>
-        <span>Aberta em {formatDate(opp.createdAt)}</span>
+
+      <p className="-mt-1.5 text-[17px] font-semibold leading-snug tracking-[-0.01em] line-clamp-2">{titulo}</p>
+
+      <div className="flex items-end justify-between flex-wrap gap-x-2 gap-y-1">
+        {editingValue ? (
+          <input
+            autoFocus
+            value={valueInput}
+            onClick={e => e.stopPropagation()}
+            onChange={e => setValueInput(e.target.value)}
+            onBlur={commitValue}
+            onKeyDown={e => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
+            onPointerDown={e => e.stopPropagation()}
+            placeholder="0,00"
+            aria-label="Valor da oportunidade"
+            className={`w-36 border rounded-lg px-2 py-1 text-base font-semibold tabular-nums ${t.input}`}
+          />
+        ) : (
+          <p
+            className={`text-[22px] font-bold leading-none tracking-[-0.02em] tabular-nums ${opp.lostAt ? "line-through opacity-50" : opp.wonAt ? "text-green-600" : ""} ${!closed ? "cursor-text" : ""}`}
+            onClick={e => { if (!closed) { e.stopPropagation(); setEditingValue(true); } }}
+            onPointerDown={e => e.stopPropagation()}
+            title={!closed ? "Clique para editar o valor" : undefined}
+          >
+            {opp.wonAt ? <span className="inline-flex items-center gap-1.5"><Trophy size={16} aria-hidden /> {formatValorCard(opp.dealValue)}</span> : formatValorCard(opp.dealValue)}
+          </p>
+        )}
         <span
-          className={`flex items-center gap-1 ${daysSince(opp.stageEnteredAt) >= 7 ? "text-amber-500 font-medium" : ""}`}
-          title={daysSince(opp.stageEnteredAt) >= 7 ? "Parada há uma semana ou mais nesta etapa" : undefined}
+          className={`${mono.className} text-[11.5px] whitespace-nowrap ${daysSince(opp.stageEnteredAt) >= 7 ? "text-amber-600 font-medium" : t.muted}`}
+          title={daysSince(opp.stageEnteredAt) >= 7 ? "Parada há uma semana ou mais nesta etapa" : "Tempo nesta etapa"}
         >
-          <Clock size={11} aria-hidden /> {daysSince(opp.stageEnteredAt)}d na etapa
+          {daysSince(opp.stageEnteredAt)}d na etapa
         </span>
       </div>
-      <div className="flex items-center justify-between gap-2 mt-1">
-        {opp.assignedToName ? (
-          <p className={`text-[11px] truncate flex items-center gap-1 ${t.cardSecondary}`} title="Vendedor responsável">
-            <UserRound size={11} className="flex-shrink-0" aria-hidden /> {opp.assignedToName}
-          </p>
-        ) : <span />}
-        {opp.lostAt && (
-          <span className="text-[11px] font-semibold text-red-400 flex-shrink-0 truncate max-w-[60%]" title={opp.motivoPerdaNome ?? undefined}>
-            Perdida{opp.motivoPerdaNome ? ` · ${opp.motivoPerdaNome}` : ""}
-          </span>
-        )}
+
+      {proxima && opp.nextTask && !closed && (
+        <div className={`flex items-center gap-2 rounded-xl px-3 py-2 text-[12.5px] ${t.soft}`}>
+          <span aria-hidden className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: corPonto }} />
+          <span className="truncate"><b className="font-semibold">Próx.:</b> {opp.nextTask.title} · {proxima.texto}</span>
+        </div>
+      )}
+
+      {opp.tasksTotal > 0 && (
+        <div className="space-y-2" onClick={e => e.stopPropagation()} onPointerDown={e => e.stopPropagation()}>
+          <div className={`flex items-center justify-between ${mono.className} text-[11px] uppercase tracking-[0.08em] ${t.muted}`}>
+            <span>Tarefas</span>
+            <span className="tabular-nums">{feitas}/{opp.tasksTotal}</span>
+          </div>
+          <div className={`h-1 rounded-full overflow-hidden ${t.track}`}>
+            <div className="h-full rounded-full transition-[width] duration-300" style={{ width: `${(feitas / opp.tasksTotal) * 100}%`, backgroundColor: stageColor }} />
+          </div>
+          <ul className="space-y-1.5">
+            {tarefas.map(tk => (
+              <li key={tk.id}>
+                <label className="flex items-center gap-2.5 text-[13.5px] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={tk.done}
+                    onChange={e => toggleTarefa(tk.id, e.target.checked)}
+                    className={`w-4 h-4 rounded accent-green-600 flex-shrink-0 ${dark ? "[color-scheme:dark]" : ""} ${FOCUS_RING}`}
+                  />
+                  <span className={`truncate ${tk.done ? `line-through ${t.muted}` : ""}`}>{tk.title}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          {opp.tasksTotal > tarefas.length && (
+            <button type="button" onClick={openTaskPanel} className={`text-[12px] ${t.muted} hover:underline rounded ${FOCUS_RING}`}>
+              + {opp.tasksTotal - tarefas.length} tarefa{opp.tasksTotal - tarefas.length === 1 ? "" : "s"}
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className={`relative flex items-center justify-between gap-2 pt-3 border-t ${t.divider}`}>
+        <span className={`${mono.className} text-[11px] uppercase tracking-[0.08em] truncate ${opp.lostAt ? "text-red-500" : t.muted}`} title={opp.motivoPerdaNome ?? undefined}>
+          {opp.lostAt
+            ? `Perdida${opp.motivoPerdaNome ? ` · ${opp.motivoPerdaNome}` : ""}`
+            : semContato == null ? "Sem mensagens" : semContato === 0 ? "Contato hoje" : `Há ${semContato}d sem contato`}
+        </span>
+        <div className="flex items-center gap-0.5 flex-shrink-0">
+          {/* Ações discretas: aparecem ao passar o mouse ou com foco do teclado; sempre visíveis no celular */}
+          <div className={`flex items-center gap-0.5 md:absolute md:right-9 md:bottom-0 md:pl-3 md:opacity-0 md:pointer-events-none md:group-hover/card:opacity-100 md:group-hover/card:pointer-events-auto md:group-focus-within/card:opacity-100 md:group-focus-within/card:pointer-events-auto transition-opacity duration-150 ${dark ? "md:bg-gray-900" : "md:bg-white"}`}>
+            <button
+              onClick={e => { e.stopPropagation(); onOpenChat(opp.conversationId); }}
+              onPointerDown={e => e.stopPropagation()}
+              title="Abrir conversa" aria-label="Abrir conversa" className={iconBtn}
+            >
+              <MessageCircle size={14} />
+            </button>
+            <button
+              onClick={e => { e.stopPropagation(); onClick(); }}
+              onPointerDown={e => e.stopPropagation()}
+              title="Detalhes" aria-label="Detalhes da oportunidade" className={iconBtn}
+            >
+              <Briefcase size={14} />
+            </button>
+            <button
+              ref={menuBtnRef}
+              onClick={toggleMenu}
+              onPointerDown={e => e.stopPropagation()}
+              title="Mais opções" aria-label="Mais opções" aria-haspopup="menu" aria-expanded={Boolean(menuPos)} className={iconBtn}
+            >
+              <MoreVertical size={14} />
+            </button>
+          </div>
+          {opp.assignedToName ? (
+            <span
+              className={`ml-1 w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold ${t.chip}`}
+              title={`Vendedor: ${opp.assignedToName}`}
+            >
+              {iniciais(opp.assignedToName)}
+            </span>
+          ) : (
+            <span className={`ml-1 w-7 h-7 rounded-full border border-dashed flex-shrink-0 ${dark ? "border-gray-700" : "border-[#d9d4ca]"}`} title="Sem vendedor" aria-label="Sem vendedor" />
+          )}
+        </div>
       </div>
 
       {menuPos && (
@@ -367,41 +505,6 @@ function Card({
         />
       )}
 
-      {editingValue ? (
-        <input
-          autoFocus
-          value={valueInput}
-          onClick={e => e.stopPropagation()}
-          onChange={e => setValueInput(e.target.value)}
-          onBlur={commitValue}
-          onKeyDown={e => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
-          onPointerDown={e => e.stopPropagation()}
-          placeholder="0,00"
-          className={`w-full mt-auto border rounded px-2 py-1 text-xs ${t.input}`}
-        />
-      ) : (
-        <div className="flex items-center justify-between gap-2 mt-auto pt-2">
-          <p
-            className={`text-[15px] font-bold leading-none ${
-              opp.lostAt ? "text-gray-500 line-through" : "text-green-500"
-            } ${!closed ? "cursor-text" : ""}`}
-            onClick={e => { if (!closed) { e.stopPropagation(); setEditingValue(true); } }}
-            onPointerDown={e => e.stopPropagation()}
-          >
-            {opp.wonAt ? (
-              <span className="flex items-center gap-1"><Trophy size={13} aria-hidden /> {formatBRL(opp.dealValue)}</span>
-            ) : formatBRL(opp.dealValue)}
-          </p>
-          <LeadStatusBadge
-            agentId={agentId}
-            leadStatusId={opp.leadStatusId}
-            statuses={leadStatuses}
-            onChange={id => onLeadStatusChange(opp.conversationId, id)}
-            onStatusesChange={onLeadStatusesChange}
-            dark={dark}
-          />
-        </div>
-      )}
     </div>
   );
 }
@@ -638,7 +741,7 @@ function Column({
           </div>
         )}
       </div>
-      <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[120px]">
+      <div className="flex-1 overflow-y-auto p-2.5 space-y-2.5 min-h-[120px]">
         {opportunities.length === 0 && (
           <div className={`h-full min-h-[104px] rounded-xl border border-dashed flex flex-col items-center justify-center gap-1 px-4 text-center ${
             isOver ? "border-blue-500 text-blue-400" : dark ? "border-gray-800 text-gray-500" : "border-gray-300 text-gray-500"
@@ -650,7 +753,7 @@ function Column({
         )}
         {opportunities.map(o => (
           <Card
-            key={o.id} agentId={agentId} opp={o} stages={allStages} attendants={attendants} outrosPipelines={outrosPipelines} onClick={() => onOpenDetails(o)} onValueChange={onValueChange}
+            key={o.id} agentId={agentId} opp={o} stages={allStages} stageColor={stage.color} attendants={attendants} outrosPipelines={outrosPipelines} onClick={() => onOpenDetails(o)} onValueChange={onValueChange}
             onLeadStatusChange={onLeadStatusChange} onMarcarGanho={onMarcarGanho} onMarcarPerda={onMarcarPerda} onTransfer={onTransfer} onMoverPipeline={onMoverPipeline} onMoveStage={onMoveStage} onDeleteOpportunity={onDeleteOpportunity}
             onOpenChat={onOpenChat} onOpportunitiesChange={onOpportunitiesChange}
             leadStatuses={leadStatuses} onLeadStatusesChange={onLeadStatusesChange}

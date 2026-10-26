@@ -1,5 +1,6 @@
 import { currentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
+import { loadTaskSummaries } from "@/lib/pipeline-cards";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { KanbanSquare } from "lucide-react";
@@ -63,18 +64,8 @@ export default async function PipelinePage({ params }: { params: Promise<{ agent
     prisma.leadStatus.findMany({ where: { agentConfigId: config.id }, orderBy: { order: "asc" } }),
   ]);
 
-  // Contador de tarefas (total/concluídas) por oportunidade — uma query só, sem N+1
-  const oppIds = opportunities.map(o => o.id);
-  const taskCounts = oppIds.length > 0
-    ? await prisma.opportunityTask.groupBy({ by: ["opportunityId", "done"], where: { opportunityId: { in: oppIds } }, _count: true })
-    : [];
-  const taskMap = new Map<string, { total: number; done: number }>();
-  for (const row of taskCounts) {
-    const entry = taskMap.get(row.opportunityId) ?? { total: 0, done: 0 };
-    entry.total += row._count;
-    if (row.done) entry.done += row._count;
-    taskMap.set(row.opportunityId, entry);
-  }
+  // Tarefas de cada card (contagem, checklist e próxima) — ver lib/pipeline-cards.ts
+  const taskMap = await loadTaskSummaries(opportunities.map(o => o.id));
 
   return (
     <PipelineBoard
@@ -109,8 +100,11 @@ export default async function PipelinePage({ params }: { params: Promise<{ agent
         stageEnteredAt: o.stageEnteredAt.toISOString(),
         updatedAt: o.updatedAt.toISOString(),
         lastMessage: o.conversation.messages[0]?.content ?? null,
+        lastContactAt: o.conversation.messages[0]?.createdAt.toISOString() ?? null,
         tasksTotal: taskMap.get(o.id)?.total ?? 0,
         tasksDone: taskMap.get(o.id)?.done ?? 0,
+        tasks: taskMap.get(o.id)?.items ?? [],
+        nextTask: taskMap.get(o.id)?.next ?? null,
       }))}
     />
   );
