@@ -3,6 +3,9 @@ import { auth } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { getAgentConfigAsManager } from "@/lib/team";
 import { z } from "zod";
+import { gerarQuizComIA } from "@/lib/lead-form-ai";
+import { logTokenUsage, isOverQuota } from "@/lib/token-usage";
+import { MODEL as CLAUDE_MODEL } from "@/lib/anthropic";
 
 // Formulários de captação (link público /formulario/{slug}) criados pelo gestor no CRM pra um
 // agente específico — mesma tabela (LeadForm) do super admin, mas com agentOwned = true e sempre
@@ -49,7 +52,39 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ age
   const config = await getAgentConfigAsManager(userId, agentId);
   if (!config) return NextResponse.json({ error: "Agente não encontrado" }, { status: 404 });
 
-  const body = createSchema.safeParse(await req.json());
+  const raw = await req.json().catch(() => null);
+
+  // Criar quiz com IA a partir de uma descrição em texto (o usuário só ajusta fotos/links depois)
+  if (raw?.modo === "ia") {
+    const descricao = typeof raw.descricao === "string" ? raw.descricao.trim() : "";
+    if (descricao.length < 20) return NextResponse.json({ error: "Descreva o quiz com um pouco mais de detalhe (produto, público e objetivo)." }, { status: 400 });
+    if (descricao.length > 3000) return NextResponse.json({ error: "Descrição longa demais (máx. 3000 caracteres)." }, { status: 400 });
+    const total = await prisma.leadForm.count({ where: { agentConfigId: config.id, agentOwned: true } });
+    if (total >= MAX_FORMULARIOS_POR_AGENTE) {
+      return NextResponse.json({ error: `Limite de ${MAX_FORMULARIOS_POR_AGENTE} formulários por agente.` }, { status: 400 });
+    }
+    if (await isOverQuota(config.teamId)) {
+      return NextResponse.json({ error: "Os créditos de IA da equipe acabaram — compre mais em Configurações > Créditos de IA." }, { status: 402 });
+    }
+    try {
+      const { quiz, usage } = await gerarQuizComIA(descricao);
+      logTokenUsage({ teamId: config.teamId, provider: "anthropic", model: CLAUDE_MODEL, feature: "quiz-ia", ...usage });
+      const base = slugify(quiz.title) || "quiz";
+      let slug = base;
+      for (let i = 0; i < 5 && (await prisma.leadForm.findUnique({ where: { slug }, select: { id: true } })); i++) {
+        slug = `${base}-${Math.random().toString(36).slice(2, 6)}`;
+      }
+      const form = await prisma.leadForm.create({
+        data: { ...quiz, slug, agentConfigId: config.id, agentOwned: true },
+      });
+      return NextResponse.json({ form });
+    } catch (err) {
+      console.error("[formularios] quiz com IA", err);
+      return NextResponse.json({ error: err instanceof Error ? err.message : "Não foi possível gerar o quiz agora." }, { status: 502 });
+    }
+  }
+
+  const body = createSchema.safeParse(raw);
   if (!body.success) return NextResponse.json({ error: body.error.issues[0]?.message ?? "Dados inválidos" }, { status: 400 });
 
   const total = await prisma.leadForm.count({ where: { agentConfigId: config.id, agentOwned: true } });

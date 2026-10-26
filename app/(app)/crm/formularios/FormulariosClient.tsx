@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FileText, Plus, ExternalLink, Copy, Check, Trash2 } from "lucide-react";
+import { FileText, Plus, ExternalLink, Copy, Check, Trash2, Sparkles } from "lucide-react";
+import { GerarQuizIA } from "./GerarQuizIA";
 
 type FormRow = { id: string; slug: string; title: string; active: boolean; submissionCount: number; createdAt: string };
 
@@ -17,6 +18,7 @@ export function FormulariosClient({ agentId, initialForms }: { agentId: string; 
   const [saving, setSaving] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [style, setStyle] = useState<"CHAT" | "TELAS">("CHAT");
+  const [gerandoIA, setGerandoIA] = useState(false);
 
   async function handleCreate() {
     setError(null);
@@ -59,13 +61,30 @@ export function FormulariosClient({ agentId, initialForms }: { agentId: string; 
               Formulário em conversa ou quiz em telas pra captar leads (anúncio, bio, site). Ao preencher o WhatsApp, o lead já recebe a primeira mensagem do agente.
             </p>
           </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
           <button
-            onClick={() => setCreating(v => !v)}
+            onClick={() => { setGerandoIA(v => !v); setCreating(false); }}
+            className="flex items-center gap-2 border border-blue-700/60 text-blue-300 hover:bg-blue-600/10 rounded-xl px-4 py-2.5 text-sm font-medium"
+          >
+            <Sparkles size={15} /> Criar quiz com IA
+          </button>
+          <button
+            onClick={() => { setCreating(v => !v); setGerandoIA(false); }}
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-4 py-2.5 text-sm font-medium flex-shrink-0"
           >
             <Plus size={15} /> Novo formulário
           </button>
+          </div>
         </div>
+
+        {gerandoIA && (
+          <GerarQuizIA
+            endpoint={`/api/agentes/${agentId}/formularios`}
+            extraBody={{ modo: "ia" }}
+            onCreated={id => router.push(`/crm/${agentId}/formularios/${id}`)}
+            onClose={() => setGerandoIA(false)}
+          />
+        )}
 
         {creating && (
           <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">

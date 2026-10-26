@@ -4,6 +4,10 @@ import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { questionsSchema } from "@/lib/lead-form-schema";
 import { quizExemploTemplate } from "@/lib/lead-form-templates";
+import { gerarQuizComIA } from "@/lib/lead-form-ai";
+import { logTokenUsage } from "@/lib/token-usage";
+import { MODEL as CLAUDE_MODEL } from "@/lib/anthropic";
+import { FLUXVENDA_TEAM_ID } from "@/lib/internal-agent";
 
 async function assertAdmin(userId: string) {
   const profile = await prisma.profile.findUnique({ where: { id: userId }, select: { role: true } });
@@ -49,6 +53,27 @@ export async function POST(req: NextRequest) {
     }
     const form = await prisma.leadForm.create({ data: { ...t, slug } });
     return NextResponse.json({ form });
+  }
+
+  // Quiz gerado com IA a partir de uma descrição em texto
+  if (raw?.template === "ia") {
+    const descricao = typeof raw.descricao === "string" ? raw.descricao.trim() : "";
+    if (descricao.length < 20) return NextResponse.json({ error: "Descreva o quiz com um pouco mais de detalhe (produto, público e objetivo)." }, { status: 400 });
+    if (descricao.length > 3000) return NextResponse.json({ error: "Descrição longa demais (máx. 3000 caracteres)." }, { status: 400 });
+    try {
+      const { quiz, usage } = await gerarQuizComIA(descricao);
+      logTokenUsage({ teamId: FLUXVENDA_TEAM_ID, provider: "anthropic", model: CLAUDE_MODEL, feature: "quiz-ia", ...usage });
+      const base = quiz.title.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 40) || "quiz";
+      let slug = base;
+      for (let i = 0; i < 5 && (await prisma.leadForm.findUnique({ where: { slug }, select: { id: true } })); i++) {
+        slug = `${base}-${Math.random().toString(36).slice(2, 6)}`;
+      }
+      const form = await prisma.leadForm.create({ data: { ...quiz, slug } });
+      return NextResponse.json({ form });
+    } catch (err) {
+      console.error("[admin/formularios] quiz com IA", err);
+      return NextResponse.json({ error: err instanceof Error ? err.message : "Não foi possível gerar o quiz agora." }, { status: 502 });
+    }
   }
 
   const body = createSchema.safeParse(raw);

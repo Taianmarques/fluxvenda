@@ -1,0 +1,226 @@
+import { anthropic, MODEL } from "@/lib/anthropic";
+import { stepsSchema, questionsSchema, quizResultsSchema } from "@/lib/lead-form-schema";
+import { stepsToQuestions, DEFAULT_NIVEIS, DESTAQUE_CORES, type QuizStep, type QuizResult, type DestaqueCor } from "@/lib/lead-form-shared";
+
+// Gera um quiz em telas completo a partir de uma descrição em texto livre do usuário ("prompt").
+// A IA devolve um rascunho estruturado (tool use, sempre no formato certo) e aqui ele vira as
+// etapas do LeadForm — nome e WhatsApp no começo (1ª mensagem sai na hora), perguntas com emoji
+// que pontuam pros resultados, conteúdos de reforço, carregamento, tela de resultado e oferta.
+// O usuário depois só ajusta imagens, links e detalhes no editor.
+
+const TOOL = {
+  name: "criar_quiz",
+  description: "Cria um quiz de captação de leads em telas (estilo funil de quiz) em português do Brasil.",
+  input_schema: {
+    type: "object" as const,
+    required: ["nomeInterno", "abertura", "perguntas", "resultados", "carregamento", "telaResultado", "oferta", "mensagemWhatsapp", "mensagemFinal"],
+    properties: {
+      nomeInterno: { type: "string", description: "Nome curto do quiz pra uso interno (ex: Quiz Mentalidade Financeira)" },
+      corDestaque: { type: "string", description: "Cor principal em hex #rrggbb que combine com o tema" },
+      abertura: {
+        type: "object", required: ["titulo", "texto", "botao"],
+        properties: {
+          titulo: { type: "string", description: "Título chamativo da 1ª tela. Pode usar ==palavra== pra destacar na cor do quiz e [vermelho]...[/vermelho] / [verde]...[/verde]." },
+          texto: { type: "string", description: "1-2 frases explicando o que a pessoa ganha ao responder" },
+          botao: { type: "string", description: "Texto do botão (ex: Começar o teste)" },
+        },
+      },
+      perguntas: {
+        type: "array", minItems: 4, maxItems: 7,
+        description: "Perguntas de múltipla escolha que definem o perfil. Cada opção pontua pra UM resultado (use as keys de resultados).",
+        items: {
+          type: "object", required: ["pergunta", "opcoes"],
+          properties: {
+            pergunta: { type: "string", description: "Pergunta curta e direta. Pode usar **negrito**." },
+            opcoes: {
+              type: "array", minItems: 2, maxItems: 5,
+              items: {
+                type: "object", required: ["texto", "emoji", "resultado"],
+                properties: {
+                  texto: { type: "string", description: "Opção curta (até 50 caracteres)" },
+                  emoji: { type: "string", description: "Um único emoji que represente a opção" },
+                  resultado: { type: "string", description: "key do resultado que essa opção pontua" },
+                },
+              },
+            },
+          },
+        },
+      },
+      conteudos: {
+        type: "array", maxItems: 2,
+        description: "Telas de reforço entre as perguntas (dado, provocação ou depoimento genérico — sem inventar estatísticas com números exatos).",
+        items: {
+          type: "object", required: ["depoisDaPergunta", "titulo", "destaqueTitulo", "destaqueTexto", "cor"],
+          properties: {
+            depoisDaPergunta: { type: "integer", description: "Mostrar depois da pergunta de número N (1 = primeira)" },
+            titulo: { type: "string" },
+            destaqueTitulo: { type: "string", description: "Título da caixa de destaque" },
+            destaqueTexto: { type: "string", description: "Texto da caixa de destaque (1-2 frases)" },
+            cor: { type: "string", enum: [...DESTAQUE_CORES] },
+          },
+        },
+      },
+      resultados: {
+        type: "array", minItems: 2, maxItems: 4,
+        items: {
+          type: "object", required: ["key", "titulo", "descricao", "nivel", "mensagemWhatsapp"],
+          properties: {
+            key: { type: "string", description: "Identificador curto sem espaço (ex: iniciante)" },
+            titulo: { type: "string", description: "Nome do perfil (ex: Comercial no improviso)" },
+            descricao: { type: "string", description: "2-3 frases explicando o perfil e o próximo passo. Pode usar **negrito**." },
+            nivel: { type: "integer", minimum: 1, maximum: 5, description: "Posição no medidor: 1 = mais baixo, 5 = mais alto" },
+            mensagemWhatsapp: { type: "string", description: "Mensagem enviada no WhatsApp quando o lead cai nesse perfil. Use {{nome}} e {{resultado}}. Tom humano, curto, termina com uma pergunta." },
+          },
+        },
+      },
+      carregamento: { type: "string", description: "Texto da tela de 'calculando...' (ex: Analisando suas respostas...)" },
+      telaResultado: {
+        type: "object", required: ["titulo", "medidorTitulo", "compEsquerdaTitulo", "compEsquerdaTexto", "compDireitaTitulo", "compDireitaTexto", "metricas"],
+        properties: {
+          titulo: { type: "string", description: "Título da tela de resultado (pode usar ==destaque==)" },
+          medidorTitulo: { type: "string", description: "Rótulo do medidor de nível" },
+          compEsquerdaTitulo: { type: "string", description: "Coluna 'antes' (ex: Hoje)" },
+          compEsquerdaTexto: { type: "string" },
+          compDireitaTitulo: { type: "string", description: "Coluna 'depois' (ex: Com o método)" },
+          compDireitaTexto: { type: "string" },
+          metricas: {
+            type: "array", minItems: 2, maxItems: 4,
+            items: {
+              type: "object", required: ["nome", "esquerda", "direita"],
+              properties: { nome: { type: "string" }, esquerda: { type: "integer", minimum: 0, maximum: 100 }, direita: { type: "integer", minimum: 0, maximum: 100 } },
+            },
+          },
+        },
+      },
+      oferta: {
+        type: "object", required: ["titulo", "texto", "botao"],
+        properties: {
+          titulo: { type: "string", description: "Título da oferta, pode usar {{nome}} e ==destaque==" },
+          texto: { type: "string" },
+          botao: { type: "string" },
+        },
+      },
+      mensagemWhatsapp: { type: "string", description: "1ª mensagem enviada assim que o lead informa o WhatsApp (antes de terminar o quiz). Use {{nome}}. Curta." },
+      mensagemFinal: { type: "string", description: "Texto curto da tela final" },
+    },
+  },
+};
+
+type Rascunho = {
+  nomeInterno: string; corDestaque?: string;
+  abertura: { titulo: string; texto: string; botao: string };
+  perguntas: { pergunta: string; opcoes: { texto: string; emoji: string; resultado: string }[] }[];
+  conteudos?: { depoisDaPergunta: number; titulo: string; destaqueTitulo: string; destaqueTexto: string; cor: string }[];
+  resultados: { key: string; titulo: string; descricao: string; nivel: number; mensagemWhatsapp: string }[];
+  carregamento: string;
+  telaResultado: { titulo: string; medidorTitulo: string; compEsquerdaTitulo: string; compEsquerdaTexto: string; compDireitaTitulo: string; compDireitaTexto: string; metricas: { nome: string; esquerda: number; direita: number }[] };
+  oferta: { titulo: string; texto: string; botao: string };
+  mensagemWhatsapp: string; mensagemFinal: string;
+};
+
+const corta = (s: unknown, max: number) => String(s ?? "").trim().slice(0, max);
+
+function montar(r: Rascunho) {
+  // keys de resultado seguras e únicas
+  const keys = new Map<string, string>();
+  const quizResults: QuizResult[] = r.resultados.slice(0, 4).map((res, i) => {
+    let k = corta(res.key, 30).toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || `r${i + 1}`;
+    while ([...keys.values()].includes(k)) k = `${k}_${i}`;
+    keys.set(res.key, k);
+    return {
+      key: k, titulo: corta(res.titulo, 80), descricao: corta(res.descricao, 1000), mensagem: corta(res.mensagemWhatsapp, 1000),
+      etiquetaId: null, pipelineStageId: null, conversionUrl: "", nivel: Math.min(5, Math.max(1, Math.round(Number(res.nivel) || 1))),
+    };
+  });
+
+  const steps: QuizStep[] = [];
+  steps.push({
+    id: "s-intro", type: "conteudo", titulo: corta(r.abertura.titulo, 400), texto: corta(r.abertura.texto, 2000),
+    destaqueTitulo: "", destaqueTexto: "", destaqueCor: "azul", botao: corta(r.abertura.botao, 40) || "Começar",
+  });
+  steps.push({ id: "s-nome", type: "pergunta", question: { key: "nome", label: "Antes de começar, qual é o seu nome?", type: "TEXTO" } });
+  steps.push({
+    id: "s-whatsapp", type: "pergunta",
+    question: { key: "whatsapp", label: "{{nome}}, qual o seu WhatsApp com DDD?", subtitulo: "Seu resultado também chega por lá.", type: "WHATSAPP" },
+  });
+
+  const conteudos = (r.conteudos ?? []).slice(0, 2);
+  r.perguntas.slice(0, 7).forEach((p, i) => {
+    const vistos = new Set<string>();
+    const opcoes = p.opcoes.slice(0, 5)
+      .map(o => ({ ...o, texto: corta(o.texto, 60) }))
+      .filter(o => o.texto && !vistos.has(o.texto) && vistos.add(o.texto));
+    steps.push({
+      id: `s-p${i + 1}`, type: "pergunta",
+      question: {
+        key: `p${i + 1}`, label: corta(p.pergunta, 200), type: "ESCOLHA", layout: "lista",
+        options: opcoes.map(o => o.texto),
+        optionMedia: Object.fromEntries(opcoes.map(o => [o.texto, { emoji: corta(o.emoji, 8) }])),
+        optionResults: Object.fromEntries(opcoes.filter(o => keys.has(o.resultado)).map(o => [o.texto, keys.get(o.resultado)!])),
+      },
+    });
+    conteudos.filter(c => Number(c.depoisDaPergunta) === i + 1).forEach((c, j) => {
+      steps.push({
+        id: `s-c${i + 1}-${j}`, type: "conteudo", titulo: corta(c.titulo, 400), texto: "",
+        destaqueTitulo: corta(c.destaqueTitulo, 200), destaqueTexto: corta(c.destaqueTexto, 1000),
+        destaqueCor: (DESTAQUE_CORES as readonly string[]).includes(c.cor) ? (c.cor as DestaqueCor) : "vermelho", botao: "Continuar",
+      });
+    });
+  });
+
+  steps.push({ id: "s-calculando", type: "carregamento", texto: corta(r.carregamento, 200) || "Analisando suas respostas...", segundos: 5 });
+  const tr = r.telaResultado;
+  steps.push({
+    id: "s-resultado", type: "resultado", titulo: corta(tr.titulo, 400), medidorTitulo: corta(tr.medidorTitulo, 120), niveis: [...DEFAULT_NIVEIS],
+    compEsquerdaTitulo: corta(tr.compEsquerdaTitulo, 60), compEsquerdaTexto: corta(tr.compEsquerdaTexto, 400),
+    compDireitaTitulo: corta(tr.compDireitaTitulo, 60), compDireitaTexto: corta(tr.compDireitaTexto, 400),
+    metricas: (tr.metricas ?? []).slice(0, 4).map(m => ({
+      nome: corta(m.nome, 60) || "Indicador",
+      esquerda: Math.min(100, Math.max(0, Math.round(Number(m.esquerda) || 0))),
+      direita: Math.min(100, Math.max(0, Math.round(Number(m.direita) || 0))),
+    })),
+    botao: "Ver minha oferta",
+  });
+  // Sem link: o usuário coloca o checkout/página depois (ou troca por uma tela de Checkout)
+  steps.push({ id: "s-oferta", type: "oferta", titulo: corta(r.oferta.titulo, 400), texto: corta(r.oferta.texto, 2000), botao: corta(r.oferta.botao, 40) || "Quero agora", url: "" });
+
+  return {
+    title: corta(r.nomeInterno, 120) || "Quiz gerado com IA",
+    headline: corta(r.abertura.titulo, 1000).replace(/==|\*\*|\[\/?(vermelho|verde)\]/g, "") || "Quiz",
+    style: "TELAS" as const,
+    steps,
+    questions: stepsToQuestions(steps),
+    quizResults,
+    accentColor: /^#[0-9a-fA-F]{6}$/.test(r.corDestaque ?? "") ? r.corDestaque! : "#1d4ed8",
+    inviteMessage: corta(r.mensagemWhatsapp, 1000) || null,
+    doneMessage: corta(r.mensagemFinal, 1000) || null,
+  };
+}
+
+export async function gerarQuizComIA(descricao: string): Promise<{ quiz: ReturnType<typeof montar>; usage: { inputTokens: number; outputTokens: number } }> {
+  const res = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 6000,
+    tools: [TOOL],
+    tool_choice: { type: "tool", name: TOOL.name },
+    system:
+      "Você é um especialista em funis de quiz para captação de leads no Brasil (estilo quiz de perfil que termina numa oferta). " +
+      "Escreva em português do Brasil, frases curtas, tom humano e persuasivo sem exageros. Nunca invente estatísticas com números exatos, " +
+      "nem depoimentos com nomes de pessoas reais. As perguntas devem diagnosticar o lead e cada opção deve apontar pra um perfil (resultado). " +
+      "Os resultados vão do perfil mais crítico (nível 1) ao mais avançado (nível 4-5).",
+    messages: [{ role: "user", content: `Crie o quiz a partir desta descrição do usuário:\n\n${descricao}` }],
+  });
+  const bloco = res.content.find(c => c.type === "tool_use");
+  if (!bloco || bloco.type !== "tool_use") throw new Error("A IA não devolveu o quiz. Tente de novo.");
+  const quiz = montar(bloco.input as Rascunho);
+
+  // Mesmas regras do editor — se a IA errou algo, melhor falhar aqui do que salvar um quiz quebrado
+  const s = stepsSchema.safeParse(quiz.steps);
+  const q = questionsSchema.safeParse(quiz.questions);
+  const r = quizResultsSchema.safeParse(quiz.quizResults);
+  if (!s.success || !q.success || !r.success) {
+    console.error("[lead-form-ai] quiz gerado inválido", s.error?.issues[0], q.error?.issues[0], r.error?.issues[0]);
+    throw new Error("O quiz gerado veio incompleto. Tente de novo ou detalhe mais a descrição.");
+  }
+  return { quiz, usage: { inputTokens: res.usage.input_tokens, outputTokens: res.usage.output_tokens } };
+}

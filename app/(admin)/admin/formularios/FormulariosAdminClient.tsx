@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FileText, Plus, ExternalLink, Copy, Check, Trash2, Sparkles } from "lucide-react";
+import { FileText, Plus, ExternalLink, Copy, Check, Trash2, Sparkles, Wand2 } from "lucide-react";
+import { GerarQuizIA } from "@/app/(app)/crm/formularios/GerarQuizIA";
 
 type FormRow = { id: string; slug: string; title: string; active: boolean; submissionCount: number; createdAt: string };
 
@@ -23,6 +24,7 @@ export function FormulariosAdminClient({ initialForms }: { initialForms: FormRow
   );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [gerandoIA, setGerandoIA] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   function slugify(v: string) {
@@ -83,7 +85,13 @@ export function FormulariosAdminClient({ initialForms }: { initialForms: FormRow
           <h1 className="text-2xl font-bold flex items-center gap-2"><FileText size={22} /> Formulários</h1>
           <p className="text-gray-400 text-sm mt-1">Formulário conversacional pra captar lead (anúncio/bio) — ao preencher o WhatsApp, já recebe o convite pro teste grátis.</p>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+          <button
+            onClick={() => { setGerandoIA(v => !v); setCreating(false); }}
+            className="flex items-center gap-2 border border-blue-700/60 text-blue-300 hover:bg-blue-600/10 rounded-xl px-4 py-2.5 text-sm font-medium"
+          >
+            <Wand2 size={15} /> Criar quiz com IA
+          </button>
           <button
             onClick={handleCreateExemplo} disabled={saving}
             className="flex items-center gap-2 border border-gray-700 hover:border-blue-600 text-gray-300 hover:text-blue-400 rounded-xl px-4 py-2.5 text-sm font-medium disabled:opacity-50"
@@ -101,6 +109,15 @@ export function FormulariosAdminClient({ initialForms }: { initialForms: FormRow
       </div>
 
       {error && !creating && <p className="text-sm text-red-400">{error}</p>}
+
+      {gerandoIA && (
+        <GerarQuizIA
+          endpoint="/api/admin/formularios"
+          extraBody={{ template: "ia" }}
+          onCreated={id => router.push(`/admin/formularios/${id}`)}
+          onClose={() => setGerandoIA(false)}
+        />
+      )}
 
       {creating && (
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
