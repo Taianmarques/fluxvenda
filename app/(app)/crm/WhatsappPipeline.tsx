@@ -205,7 +205,7 @@ function Card({
       {...listeners}
       {...attributes}
       onClick={onClick}
-      className={`group/card relative h-[178px] flex-shrink-0 [&>*]:shrink-0 border rounded-xl pl-[18px] pr-3.5 py-3.5 cursor-pointer transition-[border-color,box-shadow] duration-150 flex flex-col gap-2 overflow-hidden ${FOCUS_RING} ${t.card} ${
+      className={`group/card relative flex-shrink-0 [&>*]:shrink-0 border rounded-xl pl-[18px] pr-3.5 py-3.5 cursor-pointer transition-[border-color,box-shadow] duration-150 flex flex-col gap-2 overflow-hidden ${FOCUS_RING} ${t.card} ${
         dark ? "shadow-[0_1px_2px_rgba(0,0,0,0.3)]" : "shadow-[0_1px_2px_rgba(28,25,23,0.04),0_6px_16px_-8px_rgba(28,25,23,0.10)] hover:shadow-[0_1px_2px_rgba(28,25,23,0.05),0_10px_24px_-10px_rgba(28,25,23,0.16)]"
       } ${isDragging ? "opacity-30" : ""}`}
     >
@@ -214,21 +214,7 @@ function Card({
 
       {/* Topo: contato à esquerda, valor negociado discreto à direita (clique edita) */}
       <div className="flex items-center justify-between gap-2">
-        {/* Contato + status do lead (compacto) na mesma linha */}
-        <div className="flex items-center gap-1.5 min-w-0">
-          <p className={`text-[10.5px] uppercase tracking-[0.08em] truncate ${t.muted}`}>{sobretitulo}</p>
-          <div className={`flex-shrink-0 ${opp.leadStatusId ? "" : "md:opacity-0 md:group-hover/card:opacity-100 md:group-focus-within/card:opacity-100 transition-opacity duration-150"}`}>
-            <LeadStatusBadge
-              agentId={agentId}
-              leadStatusId={opp.leadStatusId}
-              statuses={leadStatuses}
-              onChange={id => onLeadStatusChange(opp.conversationId, id)}
-              onStatusesChange={onLeadStatusesChange}
-              dark={dark}
-              compact
-            />
-          </div>
-        </div>
+        <p className={`text-[10.5px] uppercase tracking-[0.08em] truncate ${t.muted}`}>{sobretitulo}</p>
         {editingValue ? (
           <input
             autoFocus
@@ -256,7 +242,21 @@ function Card({
         )}
       </div>
 
-      <p className="-mt-0.5 text-[15px] font-medium leading-snug tracking-[-0.005em] truncate" title={titulo}>{titulo}</p>
+      {/* Título + status do lead colado logo depois (compacto) */}
+      <div className="-mt-0.5 flex items-center gap-2 min-w-0">
+        <p className="text-[15px] font-medium leading-snug tracking-[-0.005em] truncate" title={titulo}>{titulo}</p>
+        <div className={`flex-shrink-0 ${opp.leadStatusId ? "" : "md:opacity-0 md:group-hover/card:opacity-100 md:group-focus-within/card:opacity-100 transition-opacity duration-150"}`}>
+          <LeadStatusBadge
+            agentId={agentId}
+            leadStatusId={opp.leadStatusId}
+            statuses={leadStatuses}
+            onChange={id => onLeadStatusChange(opp.conversationId, id)}
+            onStatusesChange={onLeadStatusesChange}
+            dark={dark}
+            compact
+          />
+        </div>
+      </div>
 
       {(opp.etiquetas?.length ?? 0) > 0 && (
       <div className="flex items-center gap-1 h-[20px] overflow-hidden flex-shrink-0">
