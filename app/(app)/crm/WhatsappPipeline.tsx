@@ -188,16 +188,6 @@ function Card({
   const [menuView, setMenuView] = useState<"main" | "transfer" | "pipeline" | "stage">("main");
   const [taskPanelPos, setTaskPanelPos] = useState<{ top: number; left: number } | null>(null);
   const closed = Boolean(opp.wonAt || opp.lostAt);
-  // Checklist do card: marcar/desmarcar já aparece na hora; a recarga do quadro confirma
-  const [tarefasLocal, setTarefasLocal] = useState<Record<string, boolean>>({});
-  async function toggleTarefa(taskId: string, done: boolean) {
-    setTarefasLocal(prev => ({ ...prev, [taskId]: done }));
-    const res = await fetch(`/api/ferramentas/whatsapp/conversas/${opp.conversationId}/oportunidades/${opp.id}/tarefas/${taskId}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ done }),
-    }).catch(() => null);
-    if (!res?.ok) setTarefasLocal(prev => ({ ...prev, [taskId]: !done }));
-    onOpportunitiesChange();
-  }
 
   function toggleMenu(e: React.MouseEvent) {
     e.stopPropagation();
@@ -222,8 +212,7 @@ function Card({
 
   const menuItemClass = `w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs ${dark ? "hover:bg-gray-800" : "hover:bg-gray-100"}`;
 
-  const tarefas = (opp.tasks ?? []).map(x => ({ ...x, done: tarefasLocal[x.id] ?? x.done }));
-  const feitas = opp.tasksDone + tarefas.reduce((n, x) => n + (x.done !== (opp.tasks ?? []).find(o => o.id === x.id)?.done ? (x.done ? 1 : -1) : 0), 0);
+  const feitas = opp.tasksDone;
   const proxima = opp.nextTask ? quandoTarefa(opp.nextTask.dueDate) : null;
   const corPonto = proxima?.urgencia === "atrasada" || proxima?.urgencia === "hoje" ? "#e5484d" : proxima?.urgencia === "breve" ? "#f5a524" : "#a8a29e";
   const semContato = opp.lastContactAt ? daysSince(opp.lastContactAt) : null;
@@ -237,7 +226,7 @@ function Card({
       {...listeners}
       {...attributes}
       onClick={onClick}
-      className={`group/card relative h-[292px] flex-shrink-0 border rounded-xl pl-[18px] pr-3.5 py-3.5 cursor-pointer transition-[border-color,box-shadow] duration-150 flex flex-col gap-2 overflow-hidden ${FOCUS_RING} ${t.card} ${
+      className={`group/card relative h-[238px] flex-shrink-0 [&>*]:shrink-0 border rounded-xl pl-[18px] pr-3.5 py-3.5 cursor-pointer transition-[border-color,box-shadow] duration-150 flex flex-col gap-2 overflow-hidden ${FOCUS_RING} ${t.card} ${
         dark ? "shadow-[0_1px_2px_rgba(0,0,0,0.3)]" : "shadow-[0_1px_2px_rgba(28,25,23,0.04),0_6px_16px_-8px_rgba(28,25,23,0.10)] hover:shadow-[0_1px_2px_rgba(28,25,23,0.05),0_10px_24px_-10px_rgba(28,25,23,0.16)]"
       } ${isDragging ? "opacity-30" : ""}`}
     >
@@ -316,35 +305,21 @@ function Card({
         )}
       </div>
 
-      <div className="flex-1 min-h-0 space-y-1.5 overflow-hidden" onClick={e => e.stopPropagation()} onPointerDown={e => e.stopPropagation()}>
-          <div className={`flex items-center justify-between ${mono.className} text-[10.5px] uppercase tracking-[0.08em] ${t.muted}`}>
-            <span>Tarefas</span>
-            <span className="tabular-nums">{opp.tasksTotal > 0 ? `${feitas}/${opp.tasksTotal}` : "—"}</span>
-          </div>
-          <div className={`h-[3px] rounded-full overflow-hidden ${t.track}`}>
-            <div className="h-full rounded-full transition-[width] duration-300" style={{ width: `${opp.tasksTotal > 0 ? (feitas / opp.tasksTotal) * 100 : 0}%`, backgroundColor: stageColor }} />
-          </div>
-          {opp.tasksTotal === 0 && (
-            <button type="button" onClick={openTaskPanel} className={`text-[12px] ${t.muted} hover:underline rounded ${FOCUS_RING}`}>
-              Nenhuma tarefa · adicionar
-            </button>
-          )}
-          <ul className="space-y-1">
-            {tarefas.slice(0, 2).map(tk => (
-              <li key={tk.id}>
-                <label className="flex items-center gap-2 text-[12.5px] cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={tk.done}
-                    onChange={e => toggleTarefa(tk.id, e.target.checked)}
-                    className={`w-3.5 h-3.5 rounded accent-green-600 flex-shrink-0 ${dark ? "[color-scheme:dark]" : ""} ${FOCUS_RING}`}
-                  />
-                  <span className={`truncate ${tk.done ? `line-through ${t.muted}` : ""}`}>{tk.title}</span>
-                </label>
-              </li>
-            ))}
-          </ul>
-      </div>
+      {/* Tarefas resumidas: barra de progresso + contador; o clique abre o painel de tarefas */}
+      <button
+        type="button"
+        onClick={e => { e.stopPropagation(); openTaskPanel(); }}
+        onPointerDown={e => e.stopPropagation()}
+        title={opp.tasksTotal > 0 ? `${feitas} de ${opp.tasksTotal} tarefas concluídas — clique para ver` : "Adicionar tarefa"}
+        className={`flex items-center gap-2.5 rounded flex-shrink-0 ${FOCUS_RING}`}
+      >
+        <span className={`flex-1 h-[3px] rounded-full overflow-hidden ${t.track}`}>
+          <span className="block h-full rounded-full transition-[width] duration-300" style={{ width: `${opp.tasksTotal > 0 ? (feitas / opp.tasksTotal) * 100 : 0}%`, backgroundColor: stageColor }} />
+        </span>
+        <span className={`${mono.className} text-[10.5px] uppercase tracking-[0.08em] tabular-nums whitespace-nowrap ${t.muted}`}>
+          {opp.tasksTotal > 0 ? `Tarefas ${feitas}/${opp.tasksTotal}` : "+ Tarefa"}
+        </span>
+      </button>
 
       <div className={`relative mt-auto flex-shrink-0 flex items-center justify-between gap-2 pt-2.5 border-t ${t.divider}`}>
         <span className={`${mono.className} text-[10.5px] uppercase tracking-[0.08em] truncate ${opp.lostAt ? "text-red-500" : t.muted}`} title={opp.motivoPerdaNome ?? undefined}>
