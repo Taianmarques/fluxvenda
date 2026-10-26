@@ -237,7 +237,7 @@ function Card({
       {...listeners}
       {...attributes}
       onClick={onClick}
-      className={`group/card relative border rounded-xl pl-[18px] pr-3.5 py-3.5 cursor-pointer transition-[border-color,box-shadow] duration-150 flex flex-col gap-2.5 overflow-hidden ${FOCUS_RING} ${t.card} ${
+      className={`group/card relative h-[292px] flex-shrink-0 border rounded-xl pl-[18px] pr-3.5 py-3.5 cursor-pointer transition-[border-color,box-shadow] duration-150 flex flex-col gap-2 overflow-hidden ${FOCUS_RING} ${t.card} ${
         dark ? "shadow-[0_1px_2px_rgba(0,0,0,0.3)]" : "shadow-[0_1px_2px_rgba(28,25,23,0.04),0_6px_16px_-8px_rgba(28,25,23,0.10)] hover:shadow-[0_1px_2px_rgba(28,25,23,0.05),0_10px_24px_-10px_rgba(28,25,23,0.16)]"
       } ${isDragging ? "opacity-30" : ""}`}
     >
@@ -258,7 +258,7 @@ function Card({
         </div>
       </div>
 
-      <p className="-mt-1.5 text-[15px] font-medium leading-snug tracking-[-0.005em] line-clamp-2">{titulo}</p>
+      <p className="-mt-1 text-[15px] font-medium leading-snug tracking-[-0.005em] truncate" title={titulo}>{titulo}</p>
 
       <div className="flex items-end justify-between flex-wrap gap-x-2 gap-y-1">
         {editingValue ? (
@@ -292,39 +292,45 @@ function Card({
         </span>
       </div>
 
-      {(opp.etiquetas?.length ?? 0) > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {opp.etiquetas!.slice(0, 3).map(et => (
+      <div className="flex items-center gap-1 h-[20px] overflow-hidden flex-shrink-0">
+          {(opp.etiquetas ?? []).slice(0, 3).map(et => (
             <span
               key={et.id}
-              className={`${mono.className} text-[10px] uppercase tracking-[0.06em] leading-none rounded-md border px-1.5 py-1 max-w-full truncate`}
+              className={`${mono.className} text-[10px] uppercase tracking-[0.06em] leading-none rounded-md border px-1.5 py-1 max-w-[110px] truncate flex-shrink-0`}
               style={{ color: et.cor, borderColor: `${et.cor}55`, backgroundColor: `${et.cor}12` }}
             >
               {et.nome}
             </span>
           ))}
-          {opp.etiquetas!.length > 3 && <span className={`${mono.className} text-[10px] leading-none px-1 py-1 ${t.muted}`}>+{opp.etiquetas!.length - 3}</span>}
-        </div>
-      )}
+          {(opp.etiquetas?.length ?? 0) > 3 && <span className={`${mono.className} text-[10px] leading-none px-1 py-1 flex-shrink-0 ${t.muted}`}>+{opp.etiquetas!.length - 3}</span>}
+      </div>
 
-      {proxima && opp.nextTask && !closed && (
-        <div className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[12px] ${t.soft}`}>
-          <span aria-hidden className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: corPonto }} />
-          <span className="truncate"><b className="font-medium">Próx.:</b> <span className={t.muted}>{opp.nextTask.title} · {proxima.texto}</span></span>
-        </div>
-      )}
+      <div className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[12px] flex-shrink-0 ${t.soft}`}>
+        {proxima && opp.nextTask && !closed ? (
+          <>
+            <span aria-hidden className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: corPonto }} />
+            <span className="truncate"><b className="font-medium">Próx.:</b> <span className={t.muted}>{opp.nextTask.title} · {proxima.texto}</span></span>
+          </>
+        ) : (
+          <span className={`truncate ${t.muted}`}>{closed ? (opp.wonAt ? "Negócio ganho" : "Negócio perdido") : "Sem próxima tarefa"}</span>
+        )}
+      </div>
 
-      {opp.tasksTotal > 0 && (
-        <div className="space-y-2" onClick={e => e.stopPropagation()} onPointerDown={e => e.stopPropagation()}>
+      <div className="flex-1 min-h-0 space-y-1.5 overflow-hidden" onClick={e => e.stopPropagation()} onPointerDown={e => e.stopPropagation()}>
           <div className={`flex items-center justify-between ${mono.className} text-[10.5px] uppercase tracking-[0.08em] ${t.muted}`}>
             <span>Tarefas</span>
-            <span className="tabular-nums">{feitas}/{opp.tasksTotal}</span>
+            <span className="tabular-nums">{opp.tasksTotal > 0 ? `${feitas}/${opp.tasksTotal}` : "—"}</span>
           </div>
           <div className={`h-[3px] rounded-full overflow-hidden ${t.track}`}>
-            <div className="h-full rounded-full transition-[width] duration-300" style={{ width: `${(feitas / opp.tasksTotal) * 100}%`, backgroundColor: stageColor }} />
+            <div className="h-full rounded-full transition-[width] duration-300" style={{ width: `${opp.tasksTotal > 0 ? (feitas / opp.tasksTotal) * 100 : 0}%`, backgroundColor: stageColor }} />
           </div>
+          {opp.tasksTotal === 0 && (
+            <button type="button" onClick={openTaskPanel} className={`text-[12px] ${t.muted} hover:underline rounded ${FOCUS_RING}`}>
+              Nenhuma tarefa · adicionar
+            </button>
+          )}
           <ul className="space-y-1">
-            {tarefas.map(tk => (
+            {tarefas.slice(0, 2).map(tk => (
               <li key={tk.id}>
                 <label className="flex items-center gap-2 text-[12.5px] cursor-pointer">
                   <input
@@ -338,15 +344,9 @@ function Card({
               </li>
             ))}
           </ul>
-          {opp.tasksTotal > tarefas.length && (
-            <button type="button" onClick={openTaskPanel} className={`text-[11.5px] ${t.muted} hover:underline rounded ${FOCUS_RING}`}>
-              + {opp.tasksTotal - tarefas.length} tarefa{opp.tasksTotal - tarefas.length === 1 ? "" : "s"}
-            </button>
-          )}
-        </div>
-      )}
+      </div>
 
-      <div className={`relative flex items-center justify-between gap-2 pt-2.5 border-t ${t.divider}`}>
+      <div className={`relative mt-auto flex-shrink-0 flex items-center justify-between gap-2 pt-2.5 border-t ${t.divider}`}>
         <span className={`${mono.className} text-[10.5px] uppercase tracking-[0.08em] truncate ${opp.lostAt ? "text-red-500" : t.muted}`} title={opp.motivoPerdaNome ?? undefined}>
           {opp.lostAt
             ? `Perdida${opp.motivoPerdaNome ? ` · ${opp.motivoPerdaNome}` : ""}`
