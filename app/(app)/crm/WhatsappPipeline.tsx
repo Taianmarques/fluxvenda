@@ -143,36 +143,6 @@ function parseValorBR(raw: string): number {
 // Foco de teclado visível em todo controle do quadro (o contorno padrão some no tema escuro)
 const FOCUS_RING = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500";
 
-// Cor consistente por contato (mesma paleta usada no chat/Ao vivo) — hash simples do nome/número
-const AVATAR_COLORS = ["bg-blue-600", "bg-purple-600", "bg-emerald-600", "bg-amber-600", "bg-pink-600", "bg-cyan-600", "bg-indigo-600", "bg-rose-600"];
-function avatarColor(seed: string): string {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) % AVATAR_COLORS.length;
-  return AVATAR_COLORS[hash];
-}
-
-// Foto real do WhatsApp (mesmo proxy usado no chat) sobre o círculo de iniciais — cai pras
-// iniciais se não tiver foto (Instagram, contato sem foto, ou erro ao buscar)
-function CardAvatar({ agentId, conversationId, seed }: { agentId: string; conversationId: string; seed: string }) {
-  const [imgFailed, setImgFailed] = useState(false);
-  return (
-    <div className="relative w-8 h-8 rounded-full flex-shrink-0">
-      <div className={`absolute inset-0 rounded-full ${avatarColor(seed)} text-white text-[11px] font-bold flex items-center justify-center`}>
-        {(seed || "?").charAt(0).toUpperCase()}
-      </div>
-      {!imgFailed && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={`/api/agentes/${agentId}/conversas/${conversationId}/foto`}
-          alt=""
-          className="absolute inset-0 w-8 h-8 rounded-full object-cover"
-          onError={() => setImgFailed(true)}
-        />
-      )}
-    </div>
-  );
-}
-
 function Card({
   agentId, opp, stages, stageColor, attendants, outrosPipelines, onClick, onValueChange, onLeadStatusChange, onMarcarGanho, onMarcarPerda, onTransfer, onMoverPipeline, onMoveStage, onDeleteOpportunity, onOpenChat, onOpportunitiesChange, leadStatuses, onLeadStatusesChange, dark, t,
 }: {
