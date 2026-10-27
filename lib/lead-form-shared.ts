@@ -202,6 +202,8 @@ export function quizOrderError(questions: LeadFormQuestion[], results: QuizResul
 }
 
 export const MAX_OPCOES_ESCOLHA = 6;
+// Tamanho máximo do texto de cada opção (respostas longas de quiz cabem — o card quebra linha)
+export const MAX_OPCAO_CHARS = 150;
 
 export const DEFAULT_ACCENT = "#2563eb";
 

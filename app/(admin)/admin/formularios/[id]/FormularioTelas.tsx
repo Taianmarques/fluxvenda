@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ArrowDown, ArrowUp, ImagePlus, Loader2, Plus, Trash2, X, HelpCircle, FileText, Timer, ShoppingCart, Gauge, CreditCard } from "lucide-react";
 import {
-  MAX_OPCOES_ESCOLHA, DESTAQUE_CORES, DEFAULT_NIVEIS, MAX_METRICAS,
+  MAX_OPCOES_ESCOLHA, MAX_OPCAO_CHARS, DESTAQUE_CORES, DEFAULT_NIVEIS, MAX_METRICAS,
   type QuizStep, type QuizStepType, type LeadFormQuestion, type QuizResult, type DestaqueCor,
 } from "@/lib/lead-form-shared";
 
@@ -221,7 +221,7 @@ function PerguntaEditor({ q, onChange, quizOn, quizResults, onError }: {
                 placeholder="😀" title="Emoji da opção" className="w-12 text-center bg-gray-950 border border-gray-800 rounded-lg px-1 py-2 text-base"
               />
               <OptionImage value={q.optionMedia?.[opt]?.imageUrl} onChange={url => setMedia(opt, { imageUrl: url })} onError={onError} />
-              <input value={opt} onChange={e => renameOption(i, e.target.value)} maxLength={60} placeholder={`Opção ${i + 1}`} className="flex-1 min-w-0 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-600" />
+              <textarea value={opt} onChange={e => renameOption(i, e.target.value.replace(/\n/g, " "))} rows={1} maxLength={MAX_OPCAO_CHARS} placeholder={`Opção ${i + 1}`} className="flex-1 min-w-0 resize-none [field-sizing:content] bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-600" />
               {quizOn && (
                 <select value={q.optionResults?.[opt] ?? ""} onChange={e => setResult(opt, e.target.value)} className="bg-gray-950 border border-gray-800 rounded-lg px-2 py-2 text-xs w-32 flex-shrink-0" title="Conta para qual resultado do quiz">
                   <option value="">Não pontua</option>

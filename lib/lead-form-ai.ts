@@ -1,7 +1,7 @@
 import { anthropic, MODEL as CLAUDE_MODEL } from "@/lib/anthropic";
 import { openai, MODEL as OPENAI_MODEL } from "@/lib/openai";
 import { stepsSchema, questionsSchema, quizResultsSchema } from "@/lib/lead-form-schema";
-import { stepsToQuestions, DEFAULT_NIVEIS, DESTAQUE_CORES, type QuizStep, type QuizResult, type DestaqueCor } from "@/lib/lead-form-shared";
+import { stepsToQuestions, DEFAULT_NIVEIS, DESTAQUE_CORES, MAX_OPCAO_CHARS, type QuizStep, type QuizResult, type DestaqueCor } from "@/lib/lead-form-shared";
 
 // Converte o roteiro/prompt de quiz que o usuário traz pronto (colado ou anexado) num quiz em telas.
 // A IA não cria o quiz do zero: usa as perguntas, opções, resultados e textos do material e só
@@ -40,7 +40,7 @@ const TOOL = {
               items: {
                 type: "object", required: ["texto", "emoji", "resultado"],
                 properties: {
-                  texto: { type: "string", description: "Opção curta (até 50 caracteres)" },
+                  texto: { type: "string", description: "Texto da opção, copiado do roteiro sem resumir nem cortar (até 150 caracteres)" },
                   emoji: { type: "string", description: "Um único emoji que represente a opção" },
                   resultado: { type: "string", description: "key do resultado que essa opção pontua" },
                 },
@@ -155,7 +155,7 @@ function montar(r: Rascunho) {
     .map(p => {
       const vistos = new Set<string>();
       const opcoes = (p.opcoes ?? []).slice(0, 6)
-        .map(o => ({ ...o, texto: corta(o.texto, 60) }))
+        .map(o => ({ ...o, texto: corta(o.texto, MAX_OPCAO_CHARS) }))
         .filter(o => o.texto && !vistos.has(o.texto) && vistos.add(o.texto));
       return { ...p, opcoes };
     })

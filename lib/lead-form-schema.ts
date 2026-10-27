@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { QUESTION_TYPES, MAX_OPCOES_ESCOLHA, MAX_QUIZ_RESULTS, MAX_METRICAS, DESTAQUE_CORES, FORM_STYLES, isHttpUrl, isValidHexColor, isConversionEvent } from "@/lib/lead-form-shared";
+import { QUESTION_TYPES, MAX_OPCOES_ESCOLHA, MAX_OPCAO_CHARS, MAX_QUIZ_RESULTS, MAX_METRICAS, DESTAQUE_CORES, FORM_STYLES, isHttpUrl, isValidHexColor, isConversionEvent } from "@/lib/lead-form-shared";
 
 // Validação compartilhada dos campos do formulário (editor do super admin e do CRM)
 
@@ -9,13 +9,13 @@ export const questionSchema = z.object({
   key: z.string().min(1).max(40),
   label: z.string().trim().min(1, "Toda pergunta precisa de um texto").max(200),
   type: z.enum(QUESTION_TYPES),
-  options: z.array(z.string().trim().min(1).max(60)).max(MAX_OPCOES_ESCOLHA).optional(),
-  optionResults: z.record(z.string().max(60), z.string().min(1).max(40)).optional(),
+  options: z.array(z.string().trim().min(1).max(MAX_OPCAO_CHARS)).max(MAX_OPCOES_ESCOLHA).optional(),
+  optionResults: z.record(z.string().max(MAX_OPCAO_CHARS), z.string().min(1).max(40)).optional(),
   // Só imagens enviadas pelo próprio editor — nunca um link externo qualquer
   imageUrl: formImageUrl.optional(),
   subtitulo: z.string().trim().max(300).optional(),
   layout: z.enum(["lista", "grade"]).optional(),
-  optionMedia: z.record(z.string().max(60), z.object({
+  optionMedia: z.record(z.string().max(MAX_OPCAO_CHARS), z.object({
     emoji: z.string().trim().max(16).optional(),
     imageUrl: formImageUrl.optional(),
   })).optional(),
