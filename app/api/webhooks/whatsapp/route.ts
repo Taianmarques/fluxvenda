@@ -7,6 +7,7 @@ import { transcribeAudio } from "@/lib/agent-engine";
 import { sendWhatsAppTextAsTeam, sendMediaAsTeam, downloadMessageMedia } from "@/lib/whatsapp";
 import { persistRemoteMedia } from "@/lib/media-store";
 import { processIncomingMessage, type ChannelAdapter } from "@/lib/whatsapp-inbound";
+import { findConversationByPhone } from "@/lib/conversation-lookup";
 
 function mediaMimetype(message: any): string | null {
   return typeof message?.content === "object" && typeof message.content?.mimetype === "string"
@@ -29,6 +30,74 @@ function mediaCaption(message: any): string {
   return typeof message?.caption === "string" ? message.caption : "";
 }
 
+// Resposta dada direto no WhatsApp do número conectado: registra no CRM (pra conversa não ficar
+// com buraco) e pausa a IA nessa conversa (humanTakeover, status ATIVO) — é o mesmo efeito de
+// "Assumir atendimento" no CRM. Eco do que a própria plataforma enviou não chega aqui
+// (wasSentByApi), e o waMessageId repetido é ignorado por garantia.
+async function handleMensagemDoCelular(token: string, message: any, body: any) {
+  const config = await prisma.agentConfig.findFirst({ where: { uazapiToken: token, active: true }, select: { id: true } });
+  if (!config) return;
+
+  // Em mensagem nossa, chatid é o contato; quando vier como @lid, tenta o telefone do chat
+  const jid = String(message.chatid ?? "");
+  const raw = jid.endsWith("@lid") ? String(body.chat?.phone ?? body.chat?.wa_chatid ?? "") : jid;
+  const contactNumber = raw.split("@")[0].replace(/\D/g, "");
+  if (!contactNumber) return;
+
+  const waMessageId: string | null = message.id || message.messageid || null;
+  const texto: string = (typeof message.text === "string" && message.text)
+    || mediaCaption(message)
+    || (typeof message.content === "string" ? message.content : "")
+    || (mediaMimetype(message) ? "[Mídia enviada pelo WhatsApp do celular]" : "");
+
+  let conversation = await findConversationByPhone(config.id, contactNumber);
+  if (conversation) {
+    if (waMessageId) {
+      const jaTem = await prisma.message.findFirst({ where: { conversationId: conversation.id, waMessageId }, select: { id: true } });
+      if (jaTem) return;
+    }
+    // Rede de segurança contra eco sem wasSentByApi: a IA e os crons salvam sem waMessageId, então
+    // se a plataforma acabou de mandar esse mesmo texto (ou uma mídia) aqui, é eco — não pausa
+    const semLegenda = !mediaCaption(message) && !(typeof message.text === "string" && message.text);
+    const eco = await prisma.message.findFirst({
+      where: {
+        conversationId: conversation.id,
+        role: { in: ["assistant", "human"] },
+        createdAt: { gte: new Date(Date.now() - 2 * 60_000) },
+        ...(mediaMimetype(message) && semLegenda ? { mediaType: { not: null } } : { content: texto }),
+      },
+      select: { id: true },
+    });
+    if (eco) return;
+  }
+
+  if (conversation) {
+    conversation = await prisma.conversation.update({
+      where: { id: conversation.id },
+      data: { humanTakeover: true, status: "ATIVO" },
+    });
+  } else {
+    // Primeiro contato puxado pelo celular: a conversa já nasce com atendimento humano
+    try {
+      conversation = await prisma.conversation.create({
+        data: { agentConfigId: config.id, contactNumber, contactName: body.chat?.wa_contactName || body.chat?.name || null, status: "ATIVO", humanTakeover: true },
+      });
+    } catch (err) {
+      if ((err as { code?: string })?.code !== "P2002") throw err;
+      conversation = await prisma.conversation.update({
+        where: { agentConfigId_contactNumber: { agentConfigId: config.id, contactNumber } },
+        data: { humanTakeover: true, status: "ATIVO" },
+      });
+    }
+  }
+
+  if (texto) {
+    await prisma.message.create({
+      data: { conversationId: conversation.id, role: "human", content: texto, waMessageId },
+    });
+  }
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ ok: true });
@@ -37,6 +106,13 @@ export async function POST(req: NextRequest) {
 
   const message = body.message;
   const token: string | undefined = body.token;
+
+  // Mensagem enviada pelo WhatsApp do próprio celular (ou WhatsApp Web), não pela plataforma:
+  // alguém da equipe assumiu o atendimento na mão — pausa a IA pra esse lead.
+  if (message && token && message.fromMe && !message.wasSentByApi && !message.isGroup) {
+    await handleMensagemDoCelular(token, message, body);
+    return NextResponse.json({ ok: true });
+  }
 
   // Ignora eco de mensagens enviadas pela própria API ou payloads incompletos. Mensagem de
   // grupo passa — vira uma conversa própria (aba Grupos no CRM), só que a IA nunca responde

@@ -1700,6 +1700,9 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
       orderBy: { createdAt: "desc" },
     });
     if (latestUserMsg?.id !== savedMsg.id) return; // mensagem mais nova chegou, ela assumirá o contexto
+    // Alguém respondeu pelo WhatsApp do celular durante a espera (ver handleMensagemDoCelular)
+    const atual = await prisma.conversation.findUnique({ where: { id: conversation.id }, select: { humanTakeover: true } });
+    if (atual?.humanTakeover) return;
   }
 
   // Proteção contra loop IA-com-IA em duas camadas:
