@@ -845,6 +845,12 @@ export function WhatsappPipeline({
     if (!res?.ok) {
       setLocalOpportunities(prev => prev.map(o => o.id === oppId ? { ...o, ...anterior } : o));
       alert("Não foi possível mover a oportunidade de etapa. Verifique a conexão e tente de novo.");
+      return;
+    }
+    // Mover pra/desde a etapa "Fechado" marca/desmarca ganho no servidor — reflete no resumo do topo
+    const data = await res.json().catch(() => null);
+    if (data?.opportunity) {
+      setLocalOpportunities(prev => prev.map(o => o.id === oppId ? { ...o, wonAt: data.opportunity.wonAt ?? null } : o));
     }
   }
 
