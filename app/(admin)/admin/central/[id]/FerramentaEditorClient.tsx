@@ -3,10 +3,9 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Plus, Trash2, ChevronUp, ChevronDown, Loader2, Play, Save, AlertTriangle, ExternalLink } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, ChevronUp, ChevronDown, Loader2, Eye, Save, AlertTriangle, ExternalLink } from "lucide-react";
 import { CENTRAL_ICONES, CentralIcone } from "@/lib/central-icons";
 import { ACESSOS, ACESSO_LABEL, CAMPO_TIPOS, PERFIL_CAMPOS, marcacoesDoPrompt, slugify, type AcessoFerramenta, type CampoFerramenta, type PerfilKey } from "@/lib/central-shared";
-import { Markdown } from "@/app/(app)/central/Markdown";
 
 type Dados = {
   id?: string; slug: string; moduloId: string; nome: string; descricao: string; objetivo: string;
@@ -37,6 +36,7 @@ export function FerramentaEditorClient({ modulos, todas, inicial }: {
   const [testando, setTestando] = useState(false);
   const [resultadoTeste, setResultadoTeste] = useState<string | null>(null);
   const [erroTeste, setErroTeste] = useState<string | null>(null);
+  const [sobrando, setSobrando] = useState<string[]>([]); // marcações {{...}} que ficaram sem preencher
 
   const set = (p: Partial<Dados>) => setD(prev => ({ ...prev, ...p }));
   const setCampo = (i: number, p: Partial<CampoFerramenta>) => set({ campos: d.campos.map((c, j) => j === i ? { ...c, ...p } : c) });
@@ -45,7 +45,7 @@ export function FerramentaEditorClient({ modulos, todas, inicial }: {
   const avisos = useMemo(() => {
     const marcas = marcacoesDoPrompt(d.prompt);
     const keys = new Set(d.campos.map(c => c.key));
-    const semCampo = marcas.filter(m => !keys.has(m));
+    const semCampo = marcas.filter(m => !keys.has(m) && m !== "empresa" && !m.startsWith("empresa."));
     const naoUsados = d.campos.filter(c => !marcas.includes(c.key)).map(c => c.key);
     return { semCampo, naoUsados };
   }, [d.prompt, d.campos]);
@@ -105,13 +105,14 @@ export function FerramentaEditorClient({ modulos, todas, inicial }: {
     setResultadoTeste(null);
     setTestando(true);
     try {
-      const res = await fetch("/api/admin/central/testar", {
+      const res = await fetch("/api/admin/central/previa", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: d.prompt, instrucoes: d.instrucoes, formatoResposta: d.formatoResposta, campos: limparCampos(), entradas: teste }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setErroTeste(data.error ?? "Falhou."); return; }
-      setResultadoTeste(data.resultado);
+      setResultadoTeste(data.prompt);
+      setSobrando(data.sobrando ?? []);
     } finally {
       setTestando(false);
     }
@@ -184,7 +185,6 @@ export function FerramentaEditorClient({ modulos, todas, inicial }: {
             </div>
             <div className="flex flex-wrap gap-5 pt-1">
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={d.publicada} onChange={e => set({ publicada: e.target.checked })} /> Publicada (visível para os clientes)</label>
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={d.permitirCopiarPrompt} onChange={e => set({ permitirCopiarPrompt: e.target.checked })} /> Permitir &quot;Copiar prompt&quot;</label>
             </div>
           </section>
 
@@ -340,8 +340,8 @@ export function FerramentaEditorClient({ modulos, todas, inicial }: {
         {/* Teste */}
         <aside className="space-y-3 lg:sticky lg:top-4 self-start">
           <section className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
-            <p className="font-semibold">Testar agora</p>
-            <p className="text-xs text-gray-500">Roda o prompt do editor (mesmo sem salvar) com o seu perfil de empresa. Campos ligados ao perfil vazios usam o perfil.</p>
+            <p className="font-semibold">Pré-visualizar prompt</p>
+            <p className="text-xs text-gray-500">Mostra exatamente o prompt que o cliente vai copiar, com o que está no editor (mesmo sem salvar) e o seu perfil de empresa. Não usa IA.</p>
             {d.campos.map(c => (
               <div key={c.key}>
                 <label className="text-xs text-gray-400">{c.label || c.key}</label>
@@ -357,12 +357,15 @@ export function FerramentaEditorClient({ modulos, todas, inicial }: {
             ))}
             {erroTeste && <p className="text-sm text-red-400">{erroTeste}</p>}
             <button onClick={testar} disabled={testando || !d.prompt.trim()} className="w-full inline-flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-700 rounded-xl px-4 py-2 text-sm font-medium disabled:opacity-50">
-              {testando ? <Loader2 size={15} className="animate-spin" /> : <Play size={15} />} {testando ? "Gerando..." : "Testar"}
+              {testando ? <Loader2 size={15} className="animate-spin" /> : <Eye size={15} />} {testando ? "Montando..." : "Pré-visualizar"}
             </button>
           </section>
           {resultadoTeste && (
-            <section className="bg-white rounded-2xl p-5 max-h-[60vh] overflow-y-auto">
-              <Markdown texto={resultadoTeste} />
+            <section className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-2">
+              {sobrando.length > 0 && (
+                <p className="text-xs text-amber-300 bg-amber-500/10 rounded-lg px-3 py-2 flex items-center gap-1.5"><AlertTriangle size={13} /> Ficou sem preencher: {sobrando.map(s => `{{${s}}}`).join(", ")}</p>
+              )}
+              <pre className="whitespace-pre-wrap break-words text-xs leading-relaxed text-gray-300 font-mono max-h-[60vh] overflow-y-auto">{resultadoTeste}</pre>
             </section>
           )}
         </aside>

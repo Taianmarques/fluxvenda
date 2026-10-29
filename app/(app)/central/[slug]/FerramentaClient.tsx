@@ -1,61 +1,53 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  ArrowLeft, Star, Sparkles, Loader2, Copy, Check, Bookmark, BookmarkCheck, RotateCcw, Building2, History, Trash2,
-  ClipboardCopy, AlertTriangle, Maximize2, Lightbulb, Lock, ChevronRight, Wand2, Pencil,
+  ArrowLeft, Star, Loader2, Copy, Check, Building2, History, Trash2, AlertTriangle, Maximize2,
+  Lock, ChevronRight, Wand2, ExternalLink, RotateCcw, Eye, ClipboardList, Lightbulb,
 } from "lucide-react";
-
-// Atalhos da área "Ajustar resultado" — o texto vai como pedido de ajuste pra IA
-const AJUSTES_RAPIDOS = ["Mais curto", "Mais detalhado", "Tom mais formal", "Tom mais descontraído", "Mais persuasivo", "Sem emojis", "Mais simples de entender"];
 import { CentralIcone, corDoModulo } from "@/lib/central-icons";
 import type { FerramentaTelaDados, GeracaoTela } from "@/lib/central-dados";
-import { Markdown, paraTextoPuro } from "../Markdown";
 
-const ETAPAS = ["Analisando as informações do seu negócio...", "Aplicando a estratégia da ferramenta...", "Escrevendo o resultado...", "Revisando os detalhes..."];
+// Uma ferramenta da Central: o usuário preenche o formulário, clica em "Preparar meu prompt" e
+// recebe o prompt completo (template oficial + dados dele) pra colar no ChatGPT ou no Claude.
+// A plataforma não executa IA nenhuma. modo "pagina" = /central/<slug>, com histórico ao lado;
+// modo "painel" = coluna direita da biblioteca, mais compacta.
+
+const CHATGPT_URL = "https://chatgpt.com/";
+const CLAUDE_URL = "https://claude.ai/";
 
 function quando(iso: string) {
   const d = new Date(iso);
   const min = Math.round((Date.now() - d.getTime()) / 60000);
-  if (min < 1) return "Gerado agora";
+  if (min < 1) return "Agora";
   if (min < 60) return `Há ${min} min`;
   const hora = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   return d.toDateString() === new Date().toDateString() ? `Hoje, ${hora}` : `${d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}, ${hora}`;
 }
 
-// Uma ferramenta da Central: formulário → "Gerar com IA" → resultado (versões em abas) com
-// Copiar / Gerar novamente / Salvar. modo "pagina" = /central/<slug>, com histórico ao lado;
-// modo "painel" = coluna direita da biblioteca, mais compacta.
-// Resultado dividido nos blocos "## ..." que a IA devolve (cada mensagem, anúncio, roteiro...),
-// cada um com o próprio Copiar — é o que a pessoa realmente leva pro WhatsApp/Instagram
-function separarBlocos(texto: string) {
-  const partes = texto.split(/\n(?=#{2,3}\s)/);
-  const blocos = partes.map(p => {
-    const m = p.match(/^#{2,3}\s+(.*)\n?([\s\S]*)$/);
-    return m ? { titulo: m[1].replace(/\*\*/g, "").trim(), corpo: m[2].trim() } : { titulo: "", corpo: p.trim() };
-  }).filter(b => b.titulo || b.corpo);
-  return blocos;
+// Copia exatamente o texto; se o navegador bloquear a área de transferência, cai pro método antigo
+async function copiarTexto(texto: string) {
+  try {
+    await navigator.clipboard.writeText(texto);
+    return true;
+  } catch {
+    const ta = document.createElement("textarea");
+    ta.value = texto;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  }
 }
 
-function BlocoResultado({ titulo, corpo }: { titulo: string; corpo: string }) {
-  const [copiado, setCopiado] = useState(false);
-  async function copiar() {
-    await navigator.clipboard.writeText(paraTextoPuro(corpo));
-    setCopiado(true);
-    setTimeout(() => setCopiado(false), 1800);
-  }
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white">
-      <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-100">
-        <p className="text-sm font-semibold text-slate-900 min-w-0">{titulo}</p>
-        <button onClick={copiar} className="flex-shrink-0 inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-900 rounded-md px-2 py-1 hover:bg-slate-50">
-          {copiado ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />} {copiado ? "Copiado" : "Copiar"}
-        </button>
-      </div>
-      <div className="px-4 py-3"><Markdown texto={corpo} /></div>
-    </div>
-  );
+// Resumo de um prompt do histórico: os primeiros dados que a pessoa preencheu
+function resumoEntradas(e: Record<string, string>) {
+  const v = Object.values(e).map(x => (x ?? "").trim()).filter(Boolean);
+  return v.length ? v.slice(0, 2).join(" · ").slice(0, 120) : "Sem dados extras (só o perfil da empresa)";
 }
 
 export function FerramentaClient({
@@ -69,156 +61,84 @@ export function FerramentaClient({
 }) {
   const { ferramenta, perfilOk, nomeEmpresa } = dados;
   const cor = corDoModulo(ferramenta.modulo.id);
+  const painel = modo === "painel";
+
+  // Valores iniciais: prompt reutilizado > último prompt preparado > perfil da empresa
   const [valores, setValores] = useState<Record<string, string>>(() => {
-    // Começa com o que a pessoa usou da última vez (costuma ser o mesmo produto/cliente); campo
-    // ligado ao perfil da empresa vem preenchido com o perfil
-    const ultima = dados.historico[0]?.entradas ?? {};
-    return Object.fromEntries(ferramenta.campos.map(c => [c.key, ultima[c.key] || (c.perfil ? dados.perfilValores[c.perfil] ?? "" : "")]));
+    const base = dados.reusarEntradas ?? dados.historico[0]?.entradas ?? {};
+    return Object.fromEntries(ferramenta.campos.map(c => [c.key, base[c.key] || (c.perfil ? dados.perfilValores[c.perfil] ?? "" : "")]));
   });
   const [favorito, setFavorito] = useState(dados.favorito);
-  const [gerando, setGerando] = useState(false);
-  const [etapa, setEtapa] = useState(0);
+  const [preparando, setPreparando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [errosCampo, setErrosCampo] = useState<Record<string, string>>({});
   const [historico, setHistorico] = useState<GeracaoTela[]>(dados.historico);
   const [atualId, setAtualId] = useState<string | null>(null);
-  const [copiado, setCopiado] = useState<"resultado" | "prompt" | null>(null);
-  const [promptCopiado, setPromptCopiado] = useState(false); // mostra os atalhos pro ChatGPT/Claude
+  const [copiado, setCopiado] = useState<string | null>(null); // id do prompt copiado
   const [uso, setUso] = useState(dados.uso);
-  // Área de ajuste: pedir à IA (gera nova versão) ou editar o texto à mão
-  const [pedido, setPedido] = useState("");
-  const [ajustando, setAjustando] = useState(false);
-  const [erroAjuste, setErroAjuste] = useState<string | null>(null);
-  const [editando, setEditando] = useState(false);
-  const [textoEdit, setTextoEdit] = useState("");
-  const [salvandoEdit, setSalvandoEdit] = useState(false);
-  const [verComoUsar, setVerComoUsar] = useState(false);
+  const resultadoRef = useRef<HTMLElement>(null);
   const bloqueada = !uso.permitido;
 
   const atual = historico.find(h => h.id === atualId) ?? null;
-  const blocos = atual ? separarBlocos(atual.resultado) : [];
-  // Abas de versões: as 3 gerações mais recentes (a 1ª aba é a mais antiga das três)
-  const versoes = historico.slice(0, 3).reverse();
+  // Mudou o formulário depois de preparar? Avisa que o prompt mostrado é o anterior
+  const desatualizado = useMemo(
+    () => Boolean(atual) && ferramenta.campos.some(c => (valores[c.key] ?? "").trim() !== (atual!.entradas[c.key] ?? "").trim()),
+    [atual, valores, ferramenta.campos],
+  );
 
-  useEffect(() => {
-    if (!gerando) return;
-    const t = setInterval(() => setEtapa(e => Math.min(e + 1, ETAPAS.length - 1)), 3500);
-    return () => clearInterval(t);
-  }, [gerando]);
-
-  function faltando() {
-    return ferramenta.campos.find(c => c.obrigatorio && !(valores[c.key] ?? "").trim());
+  function validar() {
+    const e: Record<string, string> = {};
+    for (const c of ferramenta.campos) {
+      const v = (valores[c.key] ?? "").trim();
+      if (c.obrigatorio && !v) e[c.key] = "Preencha este campo.";
+      else if (c.tipo === "numero" && v) {
+        const n = Number(v.replace(",", "."));
+        if (!Number.isFinite(n)) e[c.key] = "Digite um número.";
+        else if (c.min != null && n < c.min) e[c.key] = `Mínimo: ${c.min}.`;
+        else if (c.max != null && n > c.max) e[c.key] = `Máximo: ${c.max}.`;
+      }
+    }
+    setErrosCampo(e);
+    return Object.keys(e).length === 0;
   }
 
-  function rolarProResultado() {
-    requestAnimationFrame(() => document.getElementById(`resultado-${modo}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
-  }
-
-  async function gerar() {
-    if (gerando) return;
-    const f = faltando();
-    if (f) { setErro(`Preencha "${f.label}".`); return; }
+  async function preparar() {
+    if (preparando || bloqueada) return;
+    if (!validar()) { setErro("Confira os campos destacados."); return; }
     setErro(null);
-    setEtapa(0);
-    setGerando(true);
+    setPreparando(true);
     try {
-      const res = await fetch(`/api/central/ferramentas/${ferramenta.slug}/gerar`, {
+      const res = await fetch(`/api/central/ferramentas/${ferramenta.slug}/preparar`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ entradas: valores }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.geracao) {
-        setErro(data.error ?? "Não foi possível gerar agora. Tente de novo.");
+        setErro(data.error ?? "Não foi possível preparar o prompt. Tente de novo.");
         if (res.status === 429) setUso(u => ({ ...u, permitido: false, motivo: data.error ?? u.motivo }));
         return;
       }
       if (typeof data.usosHoje === "number" && uso.limite) {
-        setUso(u => ({ ...u, usosHoje: data.usosHoje, permitido: data.usosHoje < (u.limite ?? Infinity), motivo: data.usosHoje >= (u.limite ?? Infinity) ? "Você atingiu o limite diário desta ferramenta. Volte amanhã!" : null }));
+        const limite = uso.limite;
+        setUso(u => ({ ...u, usosHoje: data.usosHoje, permitido: data.usosHoje < limite, motivo: data.usosHoje >= limite ? "Você atingiu o limite diário desta ferramenta. Volte amanhã!" : null }));
       }
       const g: GeracaoTela = { ...data.geracao, createdAt: new Date(data.geracao.createdAt).toISOString() };
       setHistorico(prev => [g, ...prev].slice(0, 30));
       setAtualId(g.id);
-      rolarProResultado();
+      requestAnimationFrame(() => resultadoRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
     } catch {
       setErro("Falha de conexão. Tente de novo.");
     } finally {
-      setGerando(false);
+      setPreparando(false);
     }
   }
 
-  async function ajustar(texto: string) {
-    if (!atual || ajustando) return;
-    const p = texto.trim();
-    if (p.length < 3) { setErroAjuste("Escreva o que você quer mudar."); return; }
-    setErroAjuste(null);
-    setAjustando(true);
-    try {
-      const res = await fetch(`/api/central/geracoes/${atual.id}/ajustar`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pedido: p }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.geracao) {
-        setErroAjuste(data.error ?? "Não foi possível ajustar agora. Tente de novo.");
-        if (res.status === 429) setUso(u => ({ ...u, permitido: false, motivo: data.error ?? u.motivo }));
-        return;
-      }
-      if (typeof data.usosHoje === "number" && uso.limite) {
-        setUso(u => ({ ...u, usosHoje: data.usosHoje, permitido: data.usosHoje < (u.limite ?? Infinity), motivo: data.usosHoje >= (u.limite ?? Infinity) ? "Você atingiu o limite diário desta ferramenta. Volte amanhã!" : null }));
-      }
-      const g: GeracaoTela = { ...data.geracao, createdAt: new Date(data.geracao.createdAt).toISOString() };
-      setHistorico(prev => [g, ...prev].slice(0, 30));
-      setAtualId(g.id);
-      setPedido("");
-      rolarProResultado();
-    } catch {
-      setErroAjuste("Falha de conexão. Tente de novo.");
-    } finally {
-      setAjustando(false);
+  async function copiar(g: GeracaoTela) {
+    if (await copiarTexto(g.resultado)) {
+      setCopiado(g.id);
+      setTimeout(() => setCopiado(c => (c === g.id ? null : c)), 2500);
+    } else {
+      setErro("Não foi possível copiar automaticamente. Selecione o texto do prompt e copie com Ctrl+C.");
     }
-  }
-
-  function comecarEdicao() {
-    if (!atual) return;
-    setTextoEdit(atual.resultado);
-    setEditando(true);
-  }
-
-  async function salvarEdicao() {
-    if (!atual || salvandoEdit) return;
-    const texto = textoEdit.trim();
-    if (!texto) return;
-    setSalvandoEdit(true);
-    const anterior = atual.resultado;
-    setHistorico(prev => prev.map(h => h.id === atual.id ? { ...h, resultado: texto, editado: true } : h));
-    const res = await fetch(`/api/central/geracoes/${atual.id}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ resultado: texto }),
-    }).catch(() => null);
-    setSalvandoEdit(false);
-    if (!res?.ok) {
-      setHistorico(prev => prev.map(h => h.id === atual.id ? { ...h, resultado: anterior } : h));
-      setErroAjuste("Não foi possível salvar a edição. Tente de novo.");
-      return;
-    }
-    setEditando(false);
-  }
-
-  async function copiarResultado() {
-    if (!atual) return;
-    await navigator.clipboard.writeText(paraTextoPuro(atual.resultado));
-    setCopiado("resultado");
-    setTimeout(() => setCopiado(null), 2000);
-  }
-
-  async function copiarPrompt() {
-    const f = faltando();
-    if (f) { setErro(`Preencha "${f.label}" antes de copiar o prompt.`); return; }
-    const res = await fetch(`/api/central/ferramentas/${ferramenta.slug}/prompt`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ entradas: valores }),
-    }).catch(() => null);
-    const data = await res?.json().catch(() => ({}));
-    if (!res?.ok || !data?.prompt) { setErro(data?.error ?? "Não foi possível copiar o prompt."); return; }
-    await navigator.clipboard.writeText(data.prompt);
-    setPromptCopiado(true);
-    setCopiado("prompt");
-    setTimeout(() => setCopiado(null), 2500);
   }
 
   async function alternarSalvo(g: GeracaoTela) {
@@ -230,11 +150,23 @@ export function FerramentaClient({
     if (!res?.ok) setHistorico(prev => prev.map(h => h.id === g.id ? { ...h, salvo: !salvo } : h));
   }
 
-  async function apagar(g: GeracaoTela) {
-    if (!confirm("Apagar este resultado do histórico?")) return;
+  async function excluir(g: GeracaoTela) {
+    if (!confirm("Excluir este prompt do seu histórico?")) return;
     setHistorico(prev => prev.filter(h => h.id !== g.id));
     if (atualId === g.id) setAtualId(null);
     await fetch(`/api/central/geracoes/${g.id}`, { method: "DELETE" }).catch(() => null);
+  }
+
+  function reutilizar(g: GeracaoTela) {
+    setValores(Object.fromEntries(ferramenta.campos.map(c => [c.key, g.entradas[c.key] ?? ""])));
+    setErrosCampo({});
+    setAtualId(g.id);
+    requestAnimationFrame(() => document.getElementById(`form-${modo}`)?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+
+  function ver(g: GeracaoTela) {
+    setAtualId(g.id);
+    requestAnimationFrame(() => resultadoRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
 
   async function alternarFavorito() {
@@ -245,15 +177,10 @@ export function FerramentaClient({
     if (!res?.ok) { setFavorito(!novo); onFavoritoChange?.(ferramenta.slug, !novo); }
   }
 
-  function abrirDoHistorico(g: GeracaoTela) {
-    setAtualId(g.id);
-    setValores(Object.fromEntries(ferramenta.campos.map(c => [c.key, g.entradas[c.key] ?? ""])));
-    rolarProResultado();
-  }
-
-  const inputCls = "w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 disabled:opacity-60";
-  const painel = modo === "painel";
+  const inputCls = (erroCampo?: string) =>
+    `w-full bg-white border rounded-lg px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 disabled:opacity-60 ${erroCampo ? "border-red-400 focus:border-red-500 focus:ring-red-500/15" : "border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/15"}`;
   const cartao = "rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]";
+  const beneficio = ferramenta.formatoResposta || ferramenta.objetivo.replace(/^Você recebe:\s*/i, "");
 
   const cabecalho = (
     <div className={`${cartao} p-5`}>
@@ -273,7 +200,7 @@ export function FerramentaClient({
               <Maximize2 size={15} />
             </Link>
           )}
-          <button onClick={alternarFavorito} aria-pressed={favorito} aria-label={favorito ? "Remover dos favoritos" : "Favoritar"} className="p-1.5 rounded-lg hover:bg-slate-100">
+          <button onClick={alternarFavorito} aria-pressed={favorito} aria-label={favorito ? "Remover ferramenta dos favoritos" : "Favoritar ferramenta"} title={favorito ? "Ferramenta favorita" : "Favoritar ferramenta"} className="p-1.5 rounded-lg hover:bg-slate-100">
             <Star size={18} className={favorito ? "fill-amber-400 text-amber-400" : "text-slate-300 hover:text-slate-500"} />
           </button>
         </div>
@@ -283,30 +210,31 @@ export function FerramentaClient({
           <CentralIcone nome={ferramenta.icone} size={22} />
         </div>
         <div className="min-w-0">
-          <h1 className={`${painel ? "text-lg" : "text-2xl"} font-bold leading-tight text-slate-900`}>{ferramenta.nome}</h1>
+          <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${cor.etiqueta}`}>{ferramenta.modulo.nome}</span>
+          <h1 className={`${painel ? "text-lg" : "text-2xl"} mt-1.5 font-bold leading-tight text-slate-900`}>{ferramenta.nome}</h1>
           {ferramenta.descricao && <p className="text-sm text-slate-500 mt-1">{ferramenta.descricao}</p>}
-          <span className={`inline-block mt-2.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${cor.etiqueta}`}>{ferramenta.modulo.nome}</span>
         </div>
       </div>
-      {(ferramenta.formatoResposta || ferramenta.objetivo) && (
+      {beneficio && (
         <p className="mt-4 text-sm text-slate-600 bg-slate-50 rounded-xl px-3.5 py-2.5">
-          <span className="font-medium text-slate-800">Você recebe: </span>
-          {ferramenta.formatoResposta || ferramenta.objetivo.replace(/^Você recebe:\s*/i, "")}
+          <span className="font-medium text-slate-800">O que você vai receber da IA: </span>{beneficio}
         </p>
       )}
-      {ferramenta.comoUsar && (
-        <div className="mt-2">
-          <button onClick={() => setVerComoUsar(v => !v)} aria-expanded={verComoUsar} className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-800">
-            <Lightbulb size={14} /> {verComoUsar ? "Esconder dicas de uso" : "Como usar esta ferramenta"}
-          </button>
-          {verComoUsar && <p className="mt-2 text-sm text-slate-600 bg-indigo-50/60 rounded-xl px-3.5 py-2.5">{ferramenta.comoUsar}</p>}
-        </div>
-      )}
+      {/* Como usar: o fluxo é sempre o mesmo; a dica é da ferramenta */}
+      <div className="mt-3 rounded-xl border border-indigo-100 bg-indigo-50/50 px-3.5 py-3 text-sm text-slate-600 space-y-2">
+        <p className="font-medium text-slate-800">Como usar</p>
+        <ol className="space-y-1 list-decimal pl-5 marker:text-indigo-500">
+          <li>Preencha as informações abaixo e clique em <strong className="text-slate-800">Preparar meu prompt</strong>.</li>
+          <li>Copie o prompt pronto.</li>
+          <li>Abra o ChatGPT ou o Claude, cole e envie.</li>
+        </ol>
+        {ferramenta.comoUsar && <p className="flex items-start gap-1.5 pt-1"><Lightbulb size={14} className="mt-0.5 flex-shrink-0 text-indigo-500" /> {ferramenta.comoUsar}</p>}
+      </div>
     </div>
   );
 
   const formulario = (
-    <section className={`${cartao} p-5 space-y-3.5`}>
+    <section id={`form-${modo}`} className={`${cartao} p-5 space-y-3.5 scroll-mt-4`}>
       <h2 className="font-semibold text-slate-900">Suas informações</h2>
       <Link
         href="/central/perfil"
@@ -315,186 +243,119 @@ export function FerramentaClient({
         {perfilOk ? <Building2 size={14} className="flex-shrink-0" /> : <AlertTriangle size={14} className="flex-shrink-0" />}
         <span className="min-w-0">
           {perfilOk
-            ? <>Usando o perfil de <strong className="font-medium text-slate-700">{nomeEmpresa || "sua empresa"}</strong> · editar</>
-            : "Complete o perfil da sua empresa para respostas mais certeiras →"}
+            ? <>O prompt inclui o perfil de <strong className="font-medium text-slate-700">{nomeEmpresa || "sua empresa"}</strong> · editar perfil</>
+            : "Complete o perfil da sua empresa: ele entra no prompt e deixa a resposta da IA muito mais certeira →"}
         </span>
       </Link>
 
-      {ferramenta.campos.map(c => (
-        <div key={c.key} className="space-y-1.5">
-          <label htmlFor={`${modo}-campo-${c.key}`} className="text-sm text-slate-700">
-            {c.label}{!c.obrigatorio && <span className="text-slate-400"> (opcional)</span>}
-            {c.perfil && (valores[c.key] ?? "") === (dados.perfilValores[c.perfil] ?? "") && valores[c.key] && (
-              <span className="ml-1.5 text-[11px] font-medium text-indigo-600 bg-indigo-50 rounded px-1.5 py-0.5">do seu perfil</span>
+      {ferramenta.campos.map(c => {
+        const id = `${modo}-campo-${c.key}`;
+        const e = errosCampo[c.key];
+        const doPerfil = c.perfil && valores[c.key] && (valores[c.key] ?? "") === (dados.perfilValores[c.perfil] ?? "");
+        const mudar = (v: string) => {
+          setValores(prev => ({ ...prev, [c.key]: v }));
+          if (e) setErrosCampo(prev => { const n = { ...prev }; delete n[c.key]; return n; });
+        };
+        return (
+          <div key={c.key} className="space-y-1.5">
+            <label htmlFor={id} className="text-sm text-slate-700">
+              {c.label}{c.obrigatorio ? <span className="text-red-500"> *</span> : <span className="text-slate-400"> (opcional)</span>}
+              {doPerfil && <span className="ml-1.5 text-[11px] font-medium text-indigo-600 bg-indigo-50 rounded px-1.5 py-0.5">do seu perfil</span>}
+            </label>
+            {c.tipo === "textarea" ? (
+              <textarea id={id} value={valores[c.key] ?? ""} onChange={ev => mudar(ev.target.value)} rows={3} maxLength={c.maxCaracteres ?? 3000}
+                placeholder={c.placeholder} disabled={preparando} aria-invalid={Boolean(e)} className={`${inputCls(e)} resize-y`} />
+            ) : c.tipo === "select" ? (
+              <select id={id} value={valores[c.key] ?? ""} onChange={ev => mudar(ev.target.value)} disabled={preparando} aria-invalid={Boolean(e)} className={inputCls(e)}>
+                <option value="">Selecione...</option>
+                {(c.opcoes ?? []).map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            ) : (
+              <input id={id} type={c.tipo === "numero" ? "number" : "text"} min={c.min} max={c.max} value={valores[c.key] ?? ""}
+                onChange={ev => mudar(ev.target.value)} maxLength={c.maxCaracteres ?? 3000} placeholder={c.placeholder}
+                disabled={preparando} aria-invalid={Boolean(e)} className={inputCls(e)} />
             )}
-          </label>
-          {c.tipo === "textarea" ? (
-            <textarea
-              id={`${modo}-campo-${c.key}`} value={valores[c.key] ?? ""} onChange={e => setValores(v => ({ ...v, [c.key]: e.target.value }))}
-              rows={3} maxLength={c.maxCaracteres ?? 3000} placeholder={c.placeholder} disabled={gerando} className={`${inputCls} resize-y`}
-            />
-          ) : c.tipo === "select" ? (
-            <select
-              id={`${modo}-campo-${c.key}`} value={valores[c.key] ?? ""} onChange={e => setValores(v => ({ ...v, [c.key]: e.target.value }))}
-              disabled={gerando} className={inputCls}
-            >
-              <option value="">Selecione...</option>
-              {(c.opcoes ?? []).map(o => <option key={o} value={o}>{o}</option>)}
-            </select>
-          ) : (
-            <input
-              id={`${modo}-campo-${c.key}`} type={c.tipo === "numero" ? "number" : "text"} min={c.min} max={c.max} value={valores[c.key] ?? ""}
-              onChange={e => setValores(v => ({ ...v, [c.key]: e.target.value }))}
-              maxLength={c.maxCaracteres ?? 3000} placeholder={c.placeholder} disabled={gerando} className={inputCls}
-            />
-          )}
-          {c.ajuda && <p className="text-xs text-slate-400">{c.ajuda}</p>}
-        </div>
-      ))}
+            {e ? <p className="text-xs text-red-600">{e}</p> : c.ajuda && <p className="text-xs text-slate-400">{c.ajuda}</p>}
+          </div>
+        );
+      })}
 
       {erro && <p className="text-sm text-red-600">{erro}</p>}
-
       {bloqueada && uso.motivo && (
         <p className="flex items-start gap-2 text-sm text-amber-800 bg-amber-50 rounded-xl px-3.5 py-2.5"><Lock size={15} className="mt-0.5 flex-shrink-0" /> {uso.motivo}</p>
       )}
       <button
-        onClick={gerar}
-        disabled={gerando || bloqueada}
+        onClick={preparar}
+        disabled={preparando || bloqueada}
         className="w-full inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-5 py-3 text-sm font-semibold shadow-sm shadow-indigo-600/20 disabled:opacity-60"
       >
-        {gerando ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-        {gerando ? ETAPAS[etapa] : atual ? "Gerar outra versão" : "Gerar com IA"}
+        {preparando ? <Loader2 size={16} className="animate-spin" /> : <Wand2 size={16} />}
+        {preparando ? "Preparando..." : atual ? "Preparar de novo com estes dados" : "Preparar meu prompt"}
       </button>
-      {uso.limite != null && (
-        <p className="text-center text-xs text-slate-400 tabular-nums">{uso.usosHoje} de {uso.limite} usos hoje</p>
-      )}
-      {ferramenta.permitirCopiarPrompt && (
-        <div className="space-y-2">
-          <button
-            onClick={copiarPrompt}
-            disabled={gerando}
-            className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-700 disabled:opacity-60"
-            title="Copia o prompt completo, já preenchido com os seus dados, para colar no seu ChatGPT ou Claude"
-          >
-            {copiado === "prompt" ? <Check size={15} className="text-emerald-600" /> : <ClipboardCopy size={15} />}
-            {copiado === "prompt" ? "Prompt copiado!" : "Copiar prompt para o ChatGPT ou Claude"}
-          </button>
-          {promptCopiado && (
-            <div className="rounded-xl bg-slate-50 border border-slate-200 px-3.5 py-3 text-sm text-slate-600 space-y-2">
-              <p>O prompt completo (com os dados da sua empresa) está copiado. Abra a sua IA e cole com <strong className="text-slate-800">Ctrl+V</strong>:</p>
-              <div className="flex gap-2">
-                <a href="https://chatgpt.com/" target="_blank" rel="noreferrer" className="flex-1 text-center rounded-lg bg-white border border-slate-200 hover:border-slate-300 px-3 py-2 font-medium text-slate-800">Abrir ChatGPT</a>
-                <a href="https://claude.ai/new" target="_blank" rel="noreferrer" className="flex-1 text-center rounded-lg bg-white border border-slate-200 hover:border-slate-300 px-3 py-2 font-medium text-slate-800">Abrir Claude</a>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      {uso.limite != null && <p className="text-center text-xs text-slate-400 tabular-nums">{uso.usosHoje} de {uso.limite} prompts hoje</p>}
     </section>
   );
 
-  const acaoCls = "flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3 py-2.5 text-sm text-slate-700 disabled:opacity-50";
+  const botaoExterno = "flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-700";
   const resultado = atual && (
-    <section id={`resultado-${modo}`} className={`${cartao} p-5 scroll-mt-4`}>
-      <div className="flex items-center justify-between gap-2 mb-3">
-        <h2 className="font-semibold text-slate-900">Resultado gerado pela IA</h2>
-        <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
-          <span className="w-2 h-2 rounded-full bg-emerald-500" aria-hidden /> {quando(atual.createdAt)}
-        </span>
+    <section ref={resultadoRef} className={`${cartao} p-5 scroll-mt-4`}>
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <h2 className="font-semibold text-slate-900 flex items-center gap-2"><ClipboardList size={17} className="text-indigo-600" /> Seu prompt está pronto</h2>
+        <span className="text-xs text-slate-400">{quando(atual.createdAt)}</span>
       </div>
-      {versoes.length > 1 && (
-        <div className="flex border-b border-slate-200 mb-3" role="tablist">
-          {versoes.map((v, i) => (
-            <button
-              key={v.id} role="tab" aria-selected={v.id === atual.id} onClick={() => { setAtualId(v.id); setEditando(false); }}
-              title={v.pedidoAjuste ? `Ajuste: ${v.pedidoAjuste}` : v.editado ? "Editada por você" : undefined}
-              className={`flex-1 -mb-px border-b-2 px-2 py-2 text-sm ${v.id === atual.id ? "border-indigo-600 text-indigo-700 font-medium" : "border-transparent text-slate-500 hover:text-slate-800"}`}
-            >
-              Versão {i + 1}{v.pedidoAjuste ? " · ajustada" : v.editado ? " · editada" : ""}
-            </button>
-          ))}
-        </div>
+      <p className="text-sm text-slate-500 mb-3">Copie, abra a sua IA e cole com <strong className="text-slate-700">Ctrl+V</strong> (no celular: toque e segure → Colar). A Vendas IA não envia o prompt sozinha.</p>
+      {desatualizado && (
+        <p className="mb-3 flex items-start gap-2 text-xs text-amber-800 bg-amber-50 rounded-lg px-3 py-2">
+          <AlertTriangle size={13} className="mt-0.5 flex-shrink-0" /> Você mudou as informações depois de preparar. Clique em &quot;Preparar de novo&quot; para atualizar o prompt.
+        </p>
       )}
-      {atual.pedidoAjuste && !editando && (
-        <p className="mb-2.5 text-xs text-indigo-700 bg-indigo-50 rounded-lg px-3 py-2"><span className="font-medium">Ajuste pedido:</span> {atual.pedidoAjuste}</p>
-      )}
-      {editando ? (
-        <div className="space-y-2">
-          <textarea
-            value={textoEdit} onChange={e => setTextoEdit(e.target.value)} rows={18} maxLength={50000}
-            aria-label="Editar o resultado"
-            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-800 font-mono leading-relaxed focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
-          />
-          <p className="text-xs text-slate-400">Os títulos começam com ## e o negrito fica entre **asteriscos** — mantenha assim para a formatação continuar.</p>
-          <div className="flex gap-2">
-            <button onClick={salvarEdicao} disabled={salvandoEdit || !textoEdit.trim()} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
-              {salvandoEdit ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} Salvar edição
-            </button>
-            <button onClick={() => setEditando(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
-          </div>
-        </div>
-      ) : blocos.length >= 2 ? (
-        <div className={`space-y-2.5 rounded-xl bg-slate-50 p-2.5 ${painel ? "max-h-[520px] overflow-y-auto" : ""}`}>
-          {blocos.map((b, i) => b.titulo
-            ? <BlocoResultado key={`${atual.id}-${i}`} titulo={b.titulo} corpo={b.corpo} />
-            : <div key={`${atual.id}-${i}`} className="px-2 py-1"><Markdown texto={b.corpo} /></div>)}
-        </div>
-      ) : (
-        <div className={`rounded-xl bg-slate-50 p-4 ${painel ? "max-h-[420px] overflow-y-auto" : ""}`}>
-          <Markdown texto={atual.resultado} />
-        </div>
-      )}
-      <div className="flex gap-2 mt-4 flex-wrap">
-        <button onClick={copiarResultado} className={acaoCls}>
-          {copiado === "resultado" ? <Check size={15} className="text-emerald-600" /> : <Copy size={15} />} {copiado === "resultado" ? "Copiado" : "Copiar texto"}
-        </button>
-        <button onClick={gerar} disabled={gerando || bloqueada} className={acaoCls}>
-          <RotateCcw size={15} /> Gerar novamente
-        </button>
-        <button onClick={() => alternarSalvo(atual)} className={acaoCls}>
-          {atual.salvo ? <BookmarkCheck size={15} className="text-indigo-600" /> : <Bookmark size={15} />} {atual.salvo ? "Salvo" : "Salvar"}
+      <pre
+        tabIndex={0}
+        aria-label="Prompt pronto para copiar"
+        className={`whitespace-pre-wrap break-words rounded-xl bg-slate-50 border border-slate-200 p-4 text-[13px] leading-relaxed text-slate-700 font-mono overflow-y-auto ${painel ? "max-h-[360px]" : "max-h-[520px]"}`}
+      >
+        {atual.resultado}
+      </pre>
+      <button
+        onClick={() => copiar(atual)}
+        className="mt-3 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-indigo-600/20"
+      >
+        {copiado === atual.id ? <Check size={16} /> : <Copy size={16} />} {copiado === atual.id ? "Prompt copiado!" : "Copiar prompt"}
+      </button>
+      <div className="mt-2 flex gap-2 flex-wrap">
+        <a href={CHATGPT_URL} target="_blank" rel="noopener noreferrer" className={botaoExterno}>Abrir ChatGPT <ExternalLink size={14} className="text-slate-400" /></a>
+        <a href={CLAUDE_URL} target="_blank" rel="noopener noreferrer" className={botaoExterno}>Abrir Claude <ExternalLink size={14} className="text-slate-400" /></a>
+        <button onClick={() => alternarSalvo(atual)} aria-pressed={atual.salvo} className={botaoExterno}>
+          <Star size={15} className={atual.salvo ? "fill-amber-400 text-amber-400" : "text-slate-400"} /> {atual.salvo ? "Nos favoritos" : "Favoritar prompt"}
         </button>
       </div>
-
-      {/* Ajustes: corrigir informação ou mudar o tom sem gerar tudo do zero */}
-      {!editando && (
-        <div className="mt-5 rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 space-y-3">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <p className="font-semibold text-slate-900 flex items-center gap-1.5"><Wand2 size={15} className="text-indigo-600" /> Ajustar resultado</p>
-            <button onClick={comecarEdicao} className="inline-flex items-center gap-1.5 text-sm text-slate-600 hover:text-slate-900">
-              <Pencil size={14} /> Editar o texto à mão
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {AJUSTES_RAPIDOS.map(a => (
-              <button
-                key={a} onClick={() => ajustar(a)} disabled={ajustando || bloqueada}
-                className="rounded-full border border-slate-200 bg-white hover:border-indigo-300 hover:text-indigo-700 px-3 py-1 text-xs text-slate-600 disabled:opacity-50"
-              >
-                {a}
-              </button>
-            ))}
-          </div>
-          <textarea
-            value={pedido} onChange={e => setPedido(e.target.value)} rows={2} maxLength={2000} disabled={ajustando}
-            onKeyDown={e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) ajustar(pedido); }}
-            aria-label="O que você quer corrigir ou ajustar"
-            placeholder="O que você quer corrigir? Ex: o preço certo é R$ 200 · não ofereça desconto · troque o nome da loja para Studio Bella · deixe a resposta 3 mais curta"
-            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 disabled:opacity-60"
-          />
-          {erroAjuste && <p className="text-sm text-red-600">{erroAjuste}</p>}
-          <div className="flex items-center gap-3 flex-wrap">
-            <button
-              onClick={() => ajustar(pedido)} disabled={ajustando || bloqueada || pedido.trim().length < 3}
-              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-            >
-              {ajustando ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />} {ajustando ? "Ajustando..." : "Ajustar com IA"}
-            </button>
-            <span className="text-xs text-slate-500">A IA muda só o que você pedir e cria uma nova versão — a anterior fica nas abas.</span>
-          </div>
-        </div>
-      )}
     </section>
+  );
+
+  const listaHistorico = (limite: number) => historico.length === 0 ? (
+    <p className="text-sm text-slate-400 rounded-xl border border-dashed border-slate-300 p-4">Os prompts que você preparar ficam aqui para copiar ou reutilizar depois.</p>
+  ) : (
+    <ul className="space-y-2">
+      {historico.slice(0, limite).map(h => (
+        <li key={h.id} className={`rounded-xl border px-3 py-2.5 ${h.id === atualId ? "border-indigo-300 bg-indigo-50/60" : "border-slate-200 bg-white"}`}>
+          <p className="text-xs text-slate-400 flex items-center gap-1.5">
+            {quando(h.createdAt)} {h.salvo && <Star size={11} className="fill-amber-400 text-amber-400" aria-label="Favorito" />}
+          </p>
+          <p className="text-sm text-slate-600 line-clamp-2 mt-0.5">{resumoEntradas(h.entradas)}</p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+            <button onClick={() => ver(h)} className="inline-flex items-center gap-1 text-slate-500 hover:text-slate-900"><Eye size={12} /> Ver</button>
+            <button onClick={() => copiar(h)} className="inline-flex items-center gap-1 text-slate-500 hover:text-slate-900">
+              {copiado === h.id ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />} {copiado === h.id ? "Copiado" : "Copiar"}
+            </button>
+            <button onClick={() => reutilizar(h)} className="inline-flex items-center gap-1 text-slate-500 hover:text-slate-900"><RotateCcw size={12} /> Reutilizar</button>
+            <button onClick={() => alternarSalvo(h)} className="inline-flex items-center gap-1 text-slate-500 hover:text-slate-900">
+              <Star size={12} className={h.salvo ? "fill-amber-400 text-amber-400" : ""} /> {h.salvo ? "Favorito" : "Favoritar"}
+            </button>
+            <button onClick={() => excluir(h)} className="inline-flex items-center gap-1 text-slate-400 hover:text-red-500 ml-auto" aria-label="Excluir do histórico"><Trash2 size={12} /></button>
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 
   const relacionadas = dados.relacionadas.length > 0 && (
@@ -532,13 +393,19 @@ export function FerramentaClient({
         {cabecalho}
         {formulario}
         {resultado}
+        {historico.length > 0 && (
+          <section className={`${cartao} p-5`}>
+            <h2 className="text-sm font-medium text-slate-500 flex items-center gap-1.5 mb-2.5"><History size={14} /> Seus prompts nesta ferramenta</h2>
+            {listaHistorico(5)}
+          </section>
+        )}
         {relacionadas}
       </div>
     );
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
       <div className="space-y-5 min-w-0">
         {cabecalho}
         {formulario}
@@ -546,30 +413,8 @@ export function FerramentaClient({
         {relacionadas}
       </div>
       <aside className="space-y-3 lg:sticky lg:top-4 self-start">
-        <h2 className="text-sm font-medium text-slate-500 flex items-center gap-1.5"><History size={14} /> Seu histórico nesta ferramenta</h2>
-        {historico.length === 0 ? (
-          <p className="text-sm text-slate-400 rounded-xl border border-dashed border-slate-300 p-4">Os resultados que você gerar ficam aqui para consultar depois.</p>
-        ) : (
-          <ul className="space-y-2">
-            {historico.map(h => (
-              <li key={h.id}>
-                <div className={`rounded-xl border px-3 py-2.5 transition-colors ${h.id === atualId ? "border-indigo-300 bg-indigo-50/60" : "border-slate-200 bg-white hover:border-slate-300"}`}>
-                  <button onClick={() => abrirDoHistorico(h)} className="block w-full text-left">
-                    <p className="text-xs text-slate-400 flex items-center gap-1.5">
-                      {quando(h.createdAt)} {h.salvo && <BookmarkCheck size={12} className="text-indigo-600" />}
-                    </p>
-                    <p className="text-sm text-slate-600 line-clamp-2 mt-0.5">{h.resultado.replace(/[#*]/g, "").slice(0, 160)}</p>
-                  </button>
-                  <div className="flex justify-end">
-                    <button onClick={() => apagar(h)} aria-label="Apagar do histórico" className="text-slate-300 hover:text-red-500 p-1 -mb-1">
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+        <h2 className="text-sm font-medium text-slate-500 flex items-center gap-1.5"><History size={14} /> Seus prompts nesta ferramenta</h2>
+        {listaHistorico(15)}
       </aside>
     </div>
   );

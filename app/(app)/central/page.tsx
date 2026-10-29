@@ -36,8 +36,8 @@ async function CentralConteudo({ userId }: { userId: string }) {
     prisma.centralFavorito.findMany({ where: { profileId: userId }, select: { ferramenta: { select: { slug: true } } } }),
     carregarPerfil(userId),
     prisma.profile.findUnique({ where: { id: userId }, select: { name: true } }),
-    prisma.centralGeracao.count({ where: { profileId: userId, createdAt: { gte: inicioMes } } }),
-    prisma.centralGeracao.count({ where: { profileId: userId, salvo: true } }),
+    prisma.centralGeracao.count({ where: { profileId: userId, tipo: "prompt", createdAt: { gte: inicioMes } } }),
+    prisma.centralGeracao.count({ where: { profileId: userId, tipo: "prompt", salvo: true } }),
   ]);
 
   return (

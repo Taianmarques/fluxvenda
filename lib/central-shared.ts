@@ -43,6 +43,7 @@ export const PERFIL_CAMPOS = [
   { key: "canais", label: "Canais de venda", placeholder: "Ex: WhatsApp, Instagram, loja física", tipo: "texto" },
   { key: "tomDeVoz", label: "Tom de voz", placeholder: "Ex: próximo e descontraído, sem gírias", tipo: "texto" },
   { key: "concorrentes", label: "Principais concorrentes", placeholder: "Opcional", tipo: "texto" },
+  { key: "objetivos", label: "Objetivos comerciais", placeholder: "Ex: vender mais higienizações e fechar 10 contratos com frotas até dezembro", tipo: "textarea" },
   { key: "observacoes", label: "Outras informações", placeholder: "Promoções, garantias, horários, o que mais a IA deve saber", tipo: "textarea" },
 ] as const;
 
@@ -72,17 +73,23 @@ export function perfilComoTexto(p: Partial<PerfilEmpresaDados> | null | undefine
     .join("\n");
 }
 
-// Substitui as marcações do prompt. Campo vazio vira um aviso pra IA assumir uma hipótese explícita
-// (em vez de inventar dado como se fosse real ou responder genérico).
+// Substitui as marcações do prompt. Campo vazio vira "(não informado — ...)" (o montador do prompt
+// final encurta pra "(não informado)").
+// Um campo do formulário tem prioridade sobre as marcações do perfil: várias ferramentas têm um
+// campo chamado "empresa" (o nome da empresa), que não pode virar o bloco inteiro de {{empresa}}.
 export function montarPrompt(prompt: string, entradas: Record<string, string>, perfil: Partial<PerfilEmpresaDados> | null, campos: CampoFerramenta[] = []) {
   return prompt.replace(/\{\{\s*([a-zA-Z0-9_.]+)\s*\}\}/g, (_m, chave: string) => {
+    const campo = campos.find(c => c.key === chave);
+    if (campo) {
+      const v = (entradas[chave] ?? "").trim() || (campo.perfil ? (perfil?.[campo.perfil] ?? "").trim() : "");
+      return v || "(não informado — assuma o mais provável para este negócio e diga que é hipótese)";
+    }
     if (chave === "empresa") return perfilComoTexto(perfil) || "(perfil da empresa não preenchido)";
     if (chave.startsWith("empresa.")) {
       const v = (perfil?.[chave.slice(8) as PerfilKey] ?? "").trim();
       return v || "(não informado — assuma o mais provável para este negócio e diga que é hipótese)";
     }
-    const campo = campos.find(c => c.key === chave);
-    const v = (entradas[chave] ?? "").trim() || (campo?.perfil ? (perfil?.[campo.perfil] ?? "").trim() : "");
+    const v = (entradas[chave] ?? "").trim();
     return v || "(não informado — assuma o mais provável para este negócio e diga que é hipótese)";
   });
 }
@@ -90,9 +97,9 @@ export function montarPrompt(prompt: string, entradas: Record<string, string>, p
 // Marcações {{chave}} do prompt que não são do perfil — usadas no admin pra avisar de campo faltando
 export function marcacoesDoPrompt(prompt: string) {
   const set = new Set<string>();
-  for (const m of prompt.matchAll(/\{\{\s*([a-zA-Z0-9_.]+)\s*\}\}/g)) {
-    if (m[1] !== "empresa" && !m[1].startsWith("empresa.")) set.add(m[1]);
-  }
+  // Inclui {{empresa}} e {{empresa.xxx}}: um campo chamado "empresa" é usado por elas — quem chama
+  // decide quais são marcações do perfil (sem campo correspondente)
+  for (const m of prompt.matchAll(/\{\{\s*([a-zA-Z0-9_.]+)\s*\}\}/g)) set.add(m[1]);
   return [...set];
 }
 

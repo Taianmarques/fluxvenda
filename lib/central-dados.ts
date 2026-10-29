@@ -25,6 +25,7 @@ export type FerramentaTelaDados = {
   historico: GeracaoTela[];
   relacionadas: FerramentaRelacionada[];
   uso: { permitido: boolean; motivo: string | null; usosHoje: number; limite: number | null };
+  reusarEntradas: Record<string, string> | null;
 };
 
 const SELECT_RELACIONADA = { slug: true, nome: true, descricao: true, icone: true, moduloId: true } as const;
@@ -48,24 +49,28 @@ async function carregarRelacionadas(f: { id: string; moduloId: string; ordem: nu
     .map(({ ordem: _ordem, ...r }) => r);
 }
 
-export async function carregarFerramentaTela(userId: string, slug: string): Promise<FerramentaTelaDados | null> {
+// reusarId: prompt antigo do próprio usuário cujos dados voltam pro formulário ("Reutilizar")
+export async function carregarFerramentaTela(userId: string, slug: string, reusarId?: string): Promise<FerramentaTelaDados | null> {
   const f = await prisma.centralFerramenta.findUnique({
     where: { slug },
     include: { modulo: { select: { id: true, nome: true, numero: true } } },
   });
   if (!f || !f.publicada) return null;
 
-  const [favorito, perfil, historico, relacionadas, uso] = await Promise.all([
+  const [favorito, perfil, historico, relacionadas, uso, reusar] = await Promise.all([
     prisma.centralFavorito.findUnique({ where: { profileId_ferramentaId: { profileId: userId, ferramentaId: f.id } } }),
     carregarPerfil(userId),
     prisma.centralGeracao.findMany({
-      where: { profileId: userId, ferramentaId: f.id },
+      where: { profileId: userId, ferramentaId: f.id, tipo: "prompt" },
       orderBy: { createdAt: "desc" },
       take: 15,
       select: { id: true, resultado: true, salvo: true, createdAt: true, entradas: true, pedidoAjuste: true, editado: true },
     }),
     carregarRelacionadas(f),
     verificarUsoFerramenta(userId, f),
+    reusarId
+      ? prisma.centralGeracao.findFirst({ where: { id: reusarId, profileId: userId, ferramentaId: f.id, tipo: "prompt" }, select: { entradas: true } })
+      : null,
   ]);
 
   const campos = lerCampos(f.campos);
@@ -88,5 +93,6 @@ export async function carregarFerramentaTela(userId: string, slug: string): Prom
     })),
     relacionadas,
     uso,
+    reusarEntradas: reusar ? (reusar.entradas ?? {}) as Record<string, string> : null,
   };
 }

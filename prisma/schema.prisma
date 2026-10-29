@@ -2334,8 +2334,11 @@ model CentralGeracao {
   ferramentaId String
   ferramenta   CentralFerramenta @relation(fields: [ferramentaId], references: [id], onDelete: Cascade)
 
+  // "prompt" = prompt preparado pro ChatGPT/Claude (padrão atual). "resposta" = resposta de IA
+  // gerada dentro da plataforma na versão antiga — guardada, mas não aparece mais nas telas.
+  tipo      String  @default("prompt")
   entradas  Json // valores do formulário usados nessa geração
-  resultado String  @db.Text
+  resultado String  @db.Text // o prompt montado (ou, nas antigas, a resposta da IA)
   salvo     Boolean @default(false) // "Salvar" — aparece em /central/salvos
   titulo    String?
 
@@ -2372,5 +2375,6 @@ model PerfilEmpresa {
   canais       String @default("")
   tomDeVoz     String @default("")
   concorrentes String @default("")
+  objetivos    String @default("") // objetivos comerciais (ex: fechar 10 contratos de frota até dezembro)
   observacoes  String @default("")
 }

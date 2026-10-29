@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  Search, Star, Building2, ArrowRight, Bookmark, X, ChevronRight, Sparkles, Wrench, LayoutGrid, Zap, Loader2, MousePointerClick,
+  Search, Star, Building2, ArrowRight, X, ChevronRight, Wand2, Wrench, LayoutGrid, Zap, Loader2, MousePointerClick,
 } from "lucide-react";
 import { CentralIcone, corDoModulo } from "@/lib/central-icons";
 import type { FerramentaTelaDados } from "@/lib/central-dados";
@@ -103,8 +103,8 @@ export function CentralClient({
   const stats = [
     { valor: total, rotulo: "Ferramentas de IA", icone: <Wrench size={19} />, cor: "bg-indigo-50 text-indigo-600" },
     { valor: comFerramentas.length || modulos.length, rotulo: "Módulos comerciais", icone: <LayoutGrid size={19} />, cor: "bg-amber-50 text-amber-600" },
-    { valor: geracoesMes, rotulo: "Gerações este mês", icone: <Zap size={19} />, cor: "bg-sky-50 text-sky-600" },
-    { valor: salvos, rotulo: "Resultados salvos", icone: <Bookmark size={19} />, cor: "bg-violet-50 text-violet-600", href: "/central/salvos" },
+    { valor: geracoesMes, rotulo: "Prompts preparados no mês", icone: <Zap size={19} />, cor: "bg-sky-50 text-sky-600" },
+    { valor: salvos, rotulo: "Prompts favoritos", icone: <Star size={19} />, cor: "bg-violet-50 text-violet-600", href: "/central/salvos" },
   ];
 
   return (
@@ -130,7 +130,7 @@ export function CentralClient({
             <Building2 size={15} /> Meu negócio
           </Link>
           <Link href="/central/salvos" className="hidden sm:inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700">
-            <Bookmark size={15} /> Meus resultados
+            <Star size={15} /> Prompts favoritos
           </Link>
         </div>
 
@@ -141,10 +141,10 @@ export function CentralClient({
               Bem-vindo(a){primeiroNome ? `, ${primeiroNome}` : ""}!
             </span>
             <h1 className="mt-3 text-2xl md:text-[32px] font-bold leading-tight tracking-tight text-slate-900">
-              Mais clientes, mais vendas, com o poder da inteligência artificial.
+              100 prompts inteligentes e personalizados para transformar o ChatGPT ou Claude em seu assistente de vendas.
             </h1>
             <p className="mt-3 text-slate-600">
-              Acesse {total > 0 ? `${total} ferramentas prontas` : "ferramentas prontas"} para atrair clientes, criar campanhas, melhorar o atendimento e vender mais.
+              Escolha o que deseja fazer, responda algumas perguntas e receba um comando profissional pronto para utilizar na sua IA favorita.
             </p>
             <button
               onClick={() => listaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
@@ -337,7 +337,7 @@ export function CentralClient({
               <div className={`${cartao} p-6 text-center`}>
                 <div className="w-12 h-12 mx-auto rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center"><MousePointerClick size={22} /></div>
                 <p className="mt-3 font-semibold">Escolha uma ferramenta</p>
-                <p className="mt-1 text-sm text-slate-500">Ela abre aqui ao lado: você preenche, clica em <span className="inline-flex items-center gap-1 font-medium text-slate-700"><Sparkles size={13} />Gerar com IA</span> e recebe o resultado na hora.</p>
+                <p className="mt-1 text-sm text-slate-500">Ela abre aqui ao lado: você preenche, clica em <span className="inline-flex items-center gap-1 font-medium text-slate-700"><Wand2 size={13} />Preparar meu prompt</span> e leva o comando pronto para o ChatGPT ou o Claude.</p>
               </div>
             )}
           </aside>
