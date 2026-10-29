@@ -8,6 +8,12 @@ const UAZAPI_ADMIN_TOKEN = process.env.UAZAPI_ADMIN_TOKEN ?? "";
 // Reduzido pra falhar mais rápido; segue dando folga de sobra pro tempo normal de resposta.
 const UAZAPI_TIMEOUT_MS = 6000;
 
+// Envio/download de mídia é mais lento que texto de verdade — a UazAPI processa o arquivo do
+// lado dela (ex: converter áudio pra OGG) antes de responder, e isso passa fácil de 6s mesmo
+// sem nenhuma instabilidade. 6s nessas chamadas específicas causava timeout em envio/recebimento
+// de mídia normal, sem nenhum problema real na UazAPI por trás.
+const UAZAPI_MEDIA_TIMEOUT_MS = 20000;
+
 // Grupo (isGroup) não é número de telefone — usa o id do grupo direto, com o sufixo "@g.us"
 // (mesma convenção que a UazAPI já usa pra chatId em getChatProfilePicture abaixo). Formatar
 // como telefone brasileiro (dígitos + prefixo 55) corromperia o id do grupo.
@@ -86,7 +92,7 @@ export async function sendMediaAsTeam(
       ...(options?.fileName && { docName: options.fileName }),
       ...(options?.replyId && { replyid: options.replyId }),
     }),
-    signal: AbortSignal.timeout(UAZAPI_TIMEOUT_MS),
+    signal: AbortSignal.timeout(UAZAPI_MEDIA_TIMEOUT_MS),
   });
 
   if (!res.ok) {
@@ -148,7 +154,7 @@ export async function downloadMessageMedia(token: string, messageId: string): Pr
     method: "POST",
     headers: { "Content-Type": "application/json", token },
     body: JSON.stringify({ id: messageId }),
-    signal: AbortSignal.timeout(UAZAPI_TIMEOUT_MS),
+    signal: AbortSignal.timeout(UAZAPI_MEDIA_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`Erro ao baixar mídia: ${res.status}`);
   return res.json();

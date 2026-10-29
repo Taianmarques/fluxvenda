@@ -117,7 +117,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           isGroup: conversation.isGroup,
         });
       } catch (err) {
-        console.error("[mensagem] erro ao enviar mídia:", err);
+        // type/tamanho aproximado do base64 ajudam a diagnosticar "Invalid payload" da UazAPI
+        // (ex: arquivo grande demais, formato não suportado pro type enviado) sem precisar logar
+        // o conteúdo da mídia em si.
+        console.error(`[mensagem] erro ao enviar mídia (type=${type}, ~${Math.round(base64.length * 0.75 / 1024)}KB):`, err);
         return NextResponse.json({ error: "Não foi possível enviar a mídia" }, { status: 502 });
       }
       waMessageId = sent.messageid ?? null;
