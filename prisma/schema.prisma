@@ -2338,6 +2338,8 @@ model Oferta {
   slug   String  @unique // URL do checkout: /comprar/<slug>
   nome   String
   ativa  Boolean @default(false)
+  // Modo teste: cobra na conta SANDBOX do Asaas (ASAAS_PLATFORM_SANDBOX_API_KEY), sem dinheiro real
+  sandbox Boolean @default(false)
 
   itens   OfertaItem[]
   compras Compra[]
@@ -2377,6 +2379,7 @@ model Compra {
   cpfCnpj   String  @default("")
   telefone  String  @default("")
 
+  sandbox        Boolean @default(false) // cobrada na conta sandbox (oferta em modo teste)
   status         String  @default("PENDENTE") // PENDENTE | PAGO | CANCELADO | REEMBOLSADO | ESTORNADO
   valorCentavos  Int
   formaPagamento String // PIX | CARTAO

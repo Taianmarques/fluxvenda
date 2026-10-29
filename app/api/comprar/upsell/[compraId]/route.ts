@@ -26,14 +26,14 @@ const schema = z.object({
 // POST: comprador aceitou o upsell. Cobra no mesmo cartão (token do Asaas) ou gera um Pix novo;
 // o acesso sai pelo mesmo caminho das outras compras (status real do Asaas).
 export async function POST(req: NextRequest, { params }: { params: Promise<{ compraId: string }> }) {
-  const conta = contaAsaasPlataforma();
-  if (!conta) return NextResponse.json({ error: "Pagamentos temporariamente indisponíveis." }, { status: 503 });
   const body = schema.safeParse(await req.json().catch(() => null));
   if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
 
   const { compraId } = await params;
   const u = await carregarUpsell(compraId, body.data.t);
   if (!u) return NextResponse.json({ error: "Esta oferta não está mais disponível." }, { status: 410 });
+  const conta = contaAsaasPlataforma(u.origem.sandbox);
+  if (!conta) return NextResponse.json({ error: "Pagamentos temporariamente indisponíveis." }, { status: 503 });
   if (body.data.forma === "CARTAO_SALVO" && !u.cartaoFinal) return NextResponse.json({ error: "Pague com Pix." }, { status: 400 });
   if (!u.origem.asaasCustomerId) return NextResponse.json({ error: "Não foi possível identificar o comprador." }, { status: 400 });
 

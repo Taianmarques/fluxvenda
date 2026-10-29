@@ -130,8 +130,9 @@ function UpsellOferta({ compraId, token }: { compraId: string; token: string }) 
 
 // Checkout dos infoprodutos: principal + order bumps opcionais, dados do comprador e Pix/cartão.
 // Os valores mostrados aqui são só pra pessoa conferir — o servidor recalcula tudo pela oferta.
-export function CheckoutClient({ ofertaSlug, principais, bumps, logado }: {
+export function CheckoutClient({ ofertaSlug, modoTeste, principais, bumps, logado }: {
   ofertaSlug: string;
+  modoTeste: boolean; // oferta em sandbox — nenhuma cobrança real
   principais: (ProdutoOferta & { jaTem: boolean })[];
   bumps: (ProdutoOferta & { chamada: string })[];
   logado: { nome: string; email: string; telefone: string } | null;
@@ -266,6 +267,9 @@ export function CheckoutClient({ ofertaSlug, principais, bumps, logado }: {
 
   return (
     <main className="min-h-dvh bg-[#f4f6fb] text-slate-900">
+      {modoTeste && (
+        <div className="bg-amber-400 text-amber-950 text-center text-sm font-semibold px-4 py-2">AMBIENTE DE TESTE — pagamentos no sandbox do Asaas, nenhuma cobrança real</div>
+      )}
       <div className="max-w-5xl mx-auto p-4 md:p-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <form onSubmit={finalizar} className="space-y-5 min-w-0" id="checkout">
           {/* Produto principal */}

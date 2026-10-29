@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 export default async function CentralAdminPage() {
   const [modulos, ferramentas, usos] = await Promise.all([
-    prisma.centralModulo.findMany({ orderBy: { numero: "asc" } }),
+    prisma.centralModulo.findMany({ orderBy: { numero: "asc" }, include: { produto: { select: { nome: true } } } }),
     prisma.centralFerramenta.findMany({
       orderBy: [{ ordem: "asc" }, { nome: "asc" }],
       select: { id: true, slug: true, nome: true, descricao: true, icone: true, moduloId: true, publicada: true, ordem: true, updatedAt: true },
@@ -16,7 +16,7 @@ export default async function CentralAdminPage() {
 
   return (
     <CentralAdminClient
-      modulos={modulos.map(m => ({ id: m.id, numero: m.numero, nome: m.nome, icone: m.icone }))}
+      modulos={modulos.map(m => ({ id: m.id, numero: m.numero, nome: m.nome, icone: m.icone, produto: m.produto.nome }))}
       ferramentasIniciais={ferramentas.map(f => ({ ...f, updatedAt: f.updatedAt.toISOString(), usos: usoPor.get(f.id) ?? 0 }))}
     />
   );

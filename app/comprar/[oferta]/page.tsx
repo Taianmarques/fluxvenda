@@ -20,6 +20,7 @@ export default async function ComprarPage({ params }: { params: Promise<{ oferta
   return (
     <CheckoutClient
       ofertaSlug={oferta.slug}
+      modoTeste={oferta.sandbox}
       principais={oferta.principais.map(i => ({ produtoId: i.produtoId, precoCentavos: i.precoCentavos, jaTem: i.jaTem, ...i.produto }))}
       bumps={oferta.bumps.map(i => ({ produtoId: i.produtoId, precoCentavos: i.precoCentavos, chamada: i.chamada, ...i.produto }))}
       logado={perfil ? { nome: perfil.name, email: perfil.email, telefone: perfil.phone ?? "" } : null}

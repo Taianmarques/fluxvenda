@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function FerramentaEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const [modulos, todas] = await Promise.all([
-    prisma.centralModulo.findMany({ orderBy: { numero: "asc" }, select: { id: true, numero: true, nome: true } }),
+    prisma.centralModulo.findMany({ orderBy: { numero: "asc" }, select: { id: true, numero: true, nome: true, produto: { select: { nome: true } } } }).then(ms => ms.map(m => ({ id: m.id, numero: m.numero, nome: `${m.produto.nome} › ${m.nome}` }))),
     prisma.centralFerramenta.findMany({ orderBy: [{ moduloId: "asc" }, { ordem: "asc" }], select: { id: true, slug: true, nome: true, moduloId: true } }),
   ]);
 

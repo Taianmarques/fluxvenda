@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Wrench, Plus, Upload, Download, Pencil, Trash2, ExternalLink, Loader2, X } from "lucide-react";
 import { CentralIcone } from "@/lib/central-icons";
 
-type Modulo = { id: string; numero: number; nome: string; icone: string };
+type Modulo = { id: string; numero: number; nome: string; icone: string; produto: string };
 type Linha = { id: string; slug: string; nome: string; descricao: string; icone: string; moduloId: string; publicada: boolean; ordem: number; updatedAt: string; usos: number };
 
 // Meta de ferramentas por módulo (total 100), pela especificação da Central
@@ -111,7 +111,7 @@ export function CentralAdminClient({ modulos, ferramentasIniciais }: { modulos: 
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2"><Wrench size={22} /> Central de Ferramentas</h1>
           <p className="text-gray-400 text-sm mt-1">
-            {ferramentas.length} de 100 ferramentas cadastradas · {publicadas} publicada(s). Prompts e formulários ficam aqui — sem precisar de deploy.
+            {ferramentas.length} ferramentas cadastradas em todos os produtos · {publicadas} publicada(s). Prompts e formulários ficam aqui — sem precisar de deploy.
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -169,7 +169,7 @@ export function CentralAdminClient({ modulos, ferramentasIniciais }: { modulos: 
             <section key={m.id} className="bg-gray-900 border border-gray-800 rounded-2xl">
               <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-800">
                 <div className="w-8 h-8 rounded-lg bg-blue-600/15 text-blue-400 flex items-center justify-center"><CentralIcone nome={m.icone} size={16} /></div>
-                <p className="font-semibold flex-1"><span className="text-gray-500 mr-1.5 tabular-nums">{String(m.numero).padStart(2, "0")}</span>{m.nome}</p>
+                <p className="font-semibold flex-1"><span className="text-gray-500 mr-1.5 tabular-nums">{String(m.numero).padStart(2, "0")}</span>{m.nome} <span className="text-xs font-normal text-gray-500 ml-1">· {m.produto}</span></p>
                 <span className={`text-xs tabular-nums rounded-full px-2.5 py-1 ${doModulo.length >= meta ? "bg-green-500/15 text-green-400" : "bg-gray-800 text-gray-400"}`}>
                   {meta ? `${doModulo.length}/${meta}` : doModulo.length}
                 </span>

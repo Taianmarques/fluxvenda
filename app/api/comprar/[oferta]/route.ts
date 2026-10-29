@@ -27,9 +27,6 @@ const schema = z.object({
 // quais order bumps marcou; itens e total saem da oferta cadastrada. O acesso só é liberado
 // quando o Asaas confirma (aqui mesmo, se o cartão aprovar na hora, ou pelo webhook/consulta).
 export async function POST(req: NextRequest, { params }: { params: Promise<{ oferta: string }> }) {
-  const conta = contaAsaasPlataforma();
-  if (!conta) return NextResponse.json({ error: "Pagamentos temporariamente indisponíveis. Tente de novo em breve." }, { status: 503 });
-
   const body = schema.safeParse(await req.json().catch(() => null));
   if (!body.success) return NextResponse.json({ error: body.error.issues[0]?.message ?? "Confira os dados" }, { status: 400 });
   const d = body.data;
@@ -40,6 +37,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ofe
   const { oferta: slug } = await params;
   const oferta = await carregarOfertaCheckout(slug, userId);
   if (!oferta) return NextResponse.json({ error: "Esta oferta não está disponível" }, { status: 404 });
+  const conta = contaAsaasPlataforma(oferta.sandbox);
+  if (!conta) return NextResponse.json({ error: "Pagamentos temporariamente indisponíveis. Tente de novo em breve." }, { status: 503 });
 
   const { itens, totalCentavos } = calcularCompra(oferta, d.bumps);
   if (itens.length === 0) return NextResponse.json({ error: "Você já tem estes produtos — eles estão na sua Minha Biblioteca." }, { status: 400 });
@@ -48,7 +47,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ofe
   const compra = await prisma.compra.create({
     data: {
       ofertaId: oferta.id, profileId: userId ?? null, email: d.email, nome: d.nome, cpfCnpj: d.cpfCnpj, telefone: d.telefone,
-      valorCentavos: totalCentavos, formaPagamento: d.formaPagamento,
+      valorCentavos: totalCentavos, formaPagamento: d.formaPagamento, sandbox: oferta.sandbox,
       itens: { create: itens.map(i => ({ produtoId: i.produtoId, papel: i.papel, precoCentavos: i.precoCentavos })) },
     },
   });

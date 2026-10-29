@@ -15,7 +15,12 @@ import { produtosLiberados } from "@/lib/infoprodutos";
 //   - liberação e revogação são idempotentes: rodar de novo não duplica acesso nem e-mail, e a
 //     ordem em que os eventos chegam não importa (vale sempre o status atual da cobrança).
 
-export function contaAsaasPlataforma() {
+// Conta Asaas da plataforma. Oferta em modo teste usa a conta SANDBOX (sem dinheiro real).
+export function contaAsaasPlataforma(modoTeste = false) {
+  if (modoTeste) {
+    const apiKey = process.env.ASAAS_PLATFORM_SANDBOX_API_KEY;
+    return apiKey ? { apiKey, sandbox: true } : null;
+  }
   const apiKey = process.env.ASAAS_PLATFORM_API_KEY;
   if (!apiKey) return null;
   return { apiKey, sandbox: process.env.ASAAS_PLATFORM_SANDBOX !== "false" };
@@ -45,7 +50,7 @@ export async function carregarOfertaCheckout(slug: string, profileId?: string | 
 
   const jaTem = profileId ? await produtosLiberados(profileId) : new Set<string>();
   return {
-    id: oferta.id, slug: oferta.slug, nome: oferta.nome,
+    id: oferta.id, slug: oferta.slug, nome: oferta.nome, sandbox: oferta.sandbox,
     principais: principais.map(i => ({ ...i, jaTem: jaTem.has(i.produtoId) })),
     bumps: itens.filter(i => i.papel === "ORDER_BUMP" && !jaTem.has(i.produtoId)),
   };
@@ -66,9 +71,9 @@ export function calcularCompra(oferta: OfertaCheckout, bumpsMarcados: string[]) 
 // Consulta o Asaas e aplica o status real na compra. Chamado pelo webhook e pela tela de
 // pagamento (Pix). Devolve o status final da compra.
 export async function sincronizarCompra(compraId: string): Promise<string | null> {
-  const compra = await prisma.compra.findUnique({ where: { id: compraId }, select: { id: true, status: true, asaasPaymentId: true } });
+  const compra = await prisma.compra.findUnique({ where: { id: compraId }, select: { id: true, status: true, asaasPaymentId: true, sandbox: true } });
   if (!compra?.asaasPaymentId) return compra?.status ?? null;
-  const conta = contaAsaasPlataforma();
+  const conta = contaAsaasPlataforma(compra.sandbox);
   if (!conta) return compra.status;
 
   let statusAsaas: string;
@@ -193,7 +198,7 @@ export async function criarCompraUpsell(u: UpsellDisponivel, formaPagamento: "PI
     data: {
       ofertaId: u.origem.ofertaId, compraOrigemId: u.origem.id, profileId: u.origem.profileId,
       email: u.origem.email, nome: u.origem.nome, cpfCnpj: u.origem.cpfCnpj, telefone: u.origem.telefone,
-      valorCentavos: u.item.precoCentavos, formaPagamento, asaasCustomerId: u.origem.asaasCustomerId,
+      valorCentavos: u.item.precoCentavos, formaPagamento, asaasCustomerId: u.origem.asaasCustomerId, sandbox: u.origem.sandbox,
       itens: { create: [{ produtoId: u.item.produtoId, papel: "UPSELL", precoCentavos: u.item.precoCentavos }] },
     },
   });

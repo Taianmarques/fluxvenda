@@ -11,6 +11,7 @@ async function assertAdmin(userId: string) {
 const schema = z.object({
   nome: z.string().trim().min(1).max(120).optional(),
   ativa: z.boolean().optional(),
+  sandbox: z.boolean().optional(), // modo teste (conta sandbox do Asaas)
   // Lista completa de itens (substitui a atual): papel e preço de cada produto NESTA oferta
   itens: z.array(z.object({
     produtoId: z.string().min(1),

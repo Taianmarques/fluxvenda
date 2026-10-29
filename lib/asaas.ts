@@ -104,6 +104,11 @@ export async function getAsaasPayment(apiKey: string, sandbox: boolean, paymentI
   return asaasFetch(apiKey, sandbox, `/payments/${paymentId}`);
 }
 
+// Estorna (reembolsa) uma cobrança paga — valor total. O webhook/consulta depois revoga o acesso.
+export async function refundAsaasPayment(apiKey: string, sandbox: boolean, paymentId: string): Promise<{ id: string; status: string }> {
+  return asaasFetch(apiKey, sandbox, `/payments/${paymentId}/refund`, { method: "POST", body: JSON.stringify({}) });
+}
+
 // Cancela uma cobrança no Asaas (necessário antes de reemitir boleto com nova data)
 export async function cancelAsaasCharge(apiKey: string, sandbox: boolean, paymentId: string): Promise<void> {
   await asaasFetch(apiKey, sandbox, `/payments/${paymentId}`, { method: "DELETE" });
