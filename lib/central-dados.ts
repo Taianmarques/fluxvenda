@@ -7,7 +7,7 @@ import { perfilTemEssenciais, type CampoFerramenta, type PerfilKey } from "@/lib
 // O prompt interno NÃO entra aqui — nunca vai pro navegador.
 export type FerramentaTela = {
   slug: string; nome: string; descricao: string; objetivo: string; icone: string;
-  comoUsar: string; formatoResposta: string;
+  comoUsar: string; formatoResposta: string; continuacao: string;
   campos: CampoFerramenta[]; permitirCopiarPrompt: boolean;
   modulo: { id: string; nome: string; numero: number };
   produto: { id: string; slug: string; nome: string; anexoNecessario: string | null };
@@ -83,7 +83,7 @@ export async function carregarFerramentaTela(userId: string, slug: string, reusa
   return {
     ferramenta: {
       slug: f.slug, nome: f.nome, descricao: f.descricao, objetivo: f.objetivo, icone: f.icone,
-      comoUsar: f.comoUsar, formatoResposta: f.formatoResposta,
+      comoUsar: f.comoUsar, formatoResposta: f.formatoResposta, continuacao: f.continuacao,
       campos, permitirCopiarPrompt: f.permitirCopiarPrompt,
       modulo: { id: f.modulo.id, nome: f.modulo.nome, numero: f.modulo.numero }, produto: f.modulo.produto,
     },

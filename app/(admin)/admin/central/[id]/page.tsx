@@ -25,7 +25,7 @@ export default async function FerramentaEditorPage({ params }: { params: Promise
         id: f.id, slug: f.slug, moduloId: f.moduloId, nome: f.nome, descricao: f.descricao, objetivo: f.objetivo,
         campos: lerCampos(f.campos), prompt: f.prompt, instrucoes: f.instrucoes, icone: f.icone,
         publicada: f.publicada, permitirCopiarPrompt: f.permitirCopiarPrompt, ordem: f.ordem,
-        comoUsar: f.comoUsar, formatoResposta: f.formatoResposta, relacionadas: f.relacionadas,
+        comoUsar: f.comoUsar, formatoResposta: f.formatoResposta, continuacao: f.continuacao, relacionadas: f.relacionadas,
         acesso: f.acesso === "gestores" ? "gestores" : "todos", limiteDiario: f.limiteDiario,
       }}
     />

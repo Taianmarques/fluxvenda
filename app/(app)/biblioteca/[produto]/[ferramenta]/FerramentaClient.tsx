@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, Star, Loader2, Copy, Check, Building2, History, Trash2, AlertTriangle, Maximize2,
-  Lock, ChevronRight, Wand2, ExternalLink, RotateCcw, Eye, ClipboardList, Lightbulb, Paperclip,
+  Lock, ChevronRight, Wand2, ExternalLink, RotateCcw, Eye, ClipboardList, Lightbulb, Paperclip, CornerDownRight,
 } from "lucide-react";
 import { CentralIcone, corDoModulo } from "@/lib/central-icons";
 import type { FerramentaTelaDados, GeracaoTela } from "@/lib/central-dados";
@@ -337,6 +337,21 @@ export function FerramentaClient({
           <Star size={15} className={atual.salvo ? "fill-amber-400 text-amber-400" : "text-slate-400"} /> {atual.salvo ? "Nos favoritos" : "Favoritar prompt"}
         </button>
       </div>
+
+      {/* Prompt de continuação: colar depois da 1ª resposta, na mesma conversa */}
+      {ferramenta.continuacao && (
+        <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-2.5">
+          <p className="text-sm font-semibold text-slate-900 flex items-center gap-2"><CornerDownRight size={15} className="text-indigo-600" /> Depois da resposta, continue com:</p>
+          <p className="text-xs text-slate-500">Cole este prompt na <strong className="text-slate-700">mesma conversa</strong>, depois que a IA responder ao primeiro.</p>
+          <pre className="whitespace-pre-wrap break-words rounded-lg bg-white border border-slate-200 p-3 text-[13px] leading-relaxed text-slate-700 font-mono">{ferramenta.continuacao}</pre>
+          <button
+            onClick={async () => { if (await copiarTexto(ferramenta.continuacao)) { setCopiado("continuacao"); setTimeout(() => setCopiado(c => (c === "continuacao" ? null : c)), 2500); } }}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700"
+          >
+            {copiado === "continuacao" ? <Check size={15} className="text-emerald-600" /> : <Copy size={15} />} {copiado === "continuacao" ? "Copiado!" : "Copiar continuação"}
+          </button>
+        </div>
+      )}
     </section>
   );
 

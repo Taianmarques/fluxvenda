@@ -34,6 +34,7 @@ export const ferramentaSchema = z.object({
   permitirCopiarPrompt: z.boolean().default(false),
   ordem: z.number().int().min(0).max(1000).default(0),
   comoUsar: z.string().trim().max(2000).default(""),
+  continuacao: z.string().trim().max(5000).default(""),
   formatoResposta: z.string().trim().max(2000).default(""),
   relacionadas: z.array(z.string().trim().min(1).max(80)).max(8).default([]),
   acesso: z.enum(ACESSOS).default("todos"),

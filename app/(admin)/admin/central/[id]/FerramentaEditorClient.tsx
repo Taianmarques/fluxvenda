@@ -11,7 +11,7 @@ type Dados = {
   id?: string; slug: string; moduloId: string; nome: string; descricao: string; objetivo: string;
   campos: CampoFerramenta[]; prompt: string; instrucoes: string; icone: string;
   publicada: boolean; permitirCopiarPrompt: boolean; ordem: number;
-  comoUsar: string; formatoResposta: string; relacionadas: string[];
+  comoUsar: string; formatoResposta: string; continuacao: string; relacionadas: string[];
   acesso: AcessoFerramenta; limiteDiario: number | null;
 };
 
@@ -26,7 +26,7 @@ export function FerramentaEditorClient({ modulos, todas, inicial }: {
   const [d, setD] = useState<Dados>(inicial ?? {
     slug: "", moduloId: modulos[0]?.id ?? "", nome: "", descricao: "", objetivo: "", campos: [],
     prompt: "", instrucoes: "", icone: "sparkles", publicada: false, permitirCopiarPrompt: true, ordem: 0,
-    comoUsar: "", formatoResposta: "", relacionadas: [], acesso: "todos", limiteDiario: null,
+    comoUsar: "", formatoResposta: "", continuacao: "", relacionadas: [], acesso: "todos", limiteDiario: null,
   });
   const [addRelacionada, setAddRelacionada] = useState("");
   const [slugManual, setSlugManual] = useState(Boolean(inicial));
@@ -197,6 +197,10 @@ export function FerramentaEditorClient({ modulos, todas, inicial }: {
             <div>
               <label className={labelCls}>Formato esperado da resposta (&quot;Você recebe&quot; — também orienta a IA)</label>
               <textarea value={d.formatoResposta} maxLength={2000} rows={2} onChange={e => set({ formatoResposta: e.target.value })} placeholder="Ex: Cinco respostas naturais e pergunta de diagnóstico." className={`${inputCls} mt-1`} />
+            </div>
+            <div>
+              <label className={labelCls}>Prompt de continuação (opcional — colar na mesma conversa depois da 1ª resposta)</label>
+              <textarea value={d.continuacao} maxLength={5000} rows={3} onChange={e => set({ continuacao: e.target.value })} placeholder="Ex: Com base no material que você acabou de produzir, crie duas variações..." className={`${inputCls} mt-1`} />
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
