@@ -65,6 +65,41 @@ const SISTEMA_BASE = [
   "- Markdown simples: títulos com ##, listas com -, **negrito** para destaques e tabelas markdown (| col | col |) quando a tarefa pedir tabela, matriz, quadro ou planilha.",
 ].join("\n");
 
+// Regras de qualidade pro prompt copiado (ChatGPT/Claude do próprio usuário) — as mesmas da
+// geração na plataforma, menos o "não pergunte de volta": lá existe conversa, então perguntar é ok
+const REGRAS_COPIA = [
+  "- Use os dados concretos da minha empresa em todo o texto (nome, produto, preço, região, público, diferenciais). Uma resposta que serviria para qualquer empresa não me ajuda.",
+  "- Escreva o material completo, pronto para copiar e usar: mensagens inteiras, roteiros com as falas, tabelas preenchidas. Nada de \"algo como...\" ou lacunas para eu completar.",
+  "- Entregue exatamente as quantidades pedidas, cada item diferente dos outros.",
+  "- Troque conselho genérico por ações concretas: o que fazer, onde, com que texto e como medir.",
+  "- Para cada item entregue, diga em uma linha quando usar.",
+  "- Feche com uma ação que eu consiga fazer em 15 minutos, com o passo a passo.",
+  "- Português do Brasil, linguagem simples, sem introdução nem conclusão motivacional.",
+].join("\n");
+
+// Na plataforma a regra das perguntas foi trocada por "assuma hipóteses"; no prompt copiado volta a original
+const REGRA_PERGUNTAS_PLATAFORMA = /Se alguma informação essencial estiver ausente, não pergunte de volta:[^.]*\./;
+const REGRA_PERGUNTAS_ORIGINAL = "Se alguma informação essencial estiver ausente, faça no máximo três perguntas objetivas antes de entregar.";
+
+export function montarPromptParaCopiar(params: {
+  prompt: string;
+  instrucoes: string;
+  entradas: Record<string, string>;
+  perfil: PerfilEmpresaDados;
+  campos: CampoFerramenta[];
+}) {
+  const contexto = perfilComoTexto(params.perfil);
+  const regras = params.instrucoes.trim().replace(REGRA_PERGUNTAS_PLATAFORMA, REGRA_PERGUNTAS_ORIGINAL);
+  // No ChatGPT a IA pode perguntar o que faltar — campo vazio fica só "(não informado)"
+  const prompt = montarPrompt(params.prompt, params.entradas, params.perfil, params.campos).replace(/\(não informado — [^)]*\)/g, "(não informado)");
+  return [
+    prompt,
+    contexto ? `SOBRE A MINHA EMPRESA:\n${contexto}` : "",
+    regras ? `REGRAS: ${regras}` : "",
+    `COMO QUERO A RESPOSTA:\n${REGRAS_COPIA}`,
+  ].filter(Boolean).join("\n\n");
+}
+
 export async function gerarComFerramenta(params: {
   prompt: string;
   instrucoes: string;

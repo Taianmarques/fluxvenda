@@ -47,6 +47,7 @@ export function FerramentaClient({
   const [historico, setHistorico] = useState<GeracaoTela[]>(dados.historico);
   const [atualId, setAtualId] = useState<string | null>(null);
   const [copiado, setCopiado] = useState<"resultado" | "prompt" | null>(null);
+  const [promptCopiado, setPromptCopiado] = useState(false); // mostra os atalhos pro ChatGPT/Claude
 
   const atual = historico.find(h => h.id === atualId) ?? null;
   // Abas de versões: as 3 gerações mais recentes (a 1ª aba é a mais antiga das três)
@@ -106,6 +107,7 @@ export function FerramentaClient({
     const data = await res?.json().catch(() => ({}));
     if (!res?.ok || !data?.prompt) { setErro(data?.error ?? "Não foi possível copiar o prompt."); return; }
     await navigator.clipboard.writeText(data.prompt);
+    setPromptCopiado(true);
     setCopiado("prompt");
     setTimeout(() => setCopiado(null), 2500);
   }
@@ -241,15 +243,26 @@ export function FerramentaClient({
         {gerando ? ETAPAS[etapa] : atual ? "Gerar outra versão" : "Gerar com IA"}
       </button>
       {ferramenta.permitirCopiarPrompt && (
-        <button
-          onClick={copiarPrompt}
-          disabled={gerando}
-          className="w-full inline-flex items-center justify-center gap-2 text-sm text-slate-500 hover:text-slate-900 py-1"
-          title="Copia o prompt já preenchido para usar no seu ChatGPT ou Claude"
-        >
-          {copiado === "prompt" ? <Check size={15} className="text-emerald-600" /> : <ClipboardCopy size={15} />}
-          {copiado === "prompt" ? "Prompt copiado" : "Prefere usar no seu ChatGPT? Copiar prompt"}
-        </button>
+        <div className="space-y-2">
+          <button
+            onClick={copiarPrompt}
+            disabled={gerando}
+            className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-700 disabled:opacity-60"
+            title="Copia o prompt completo, já preenchido com os seus dados, para colar no seu ChatGPT ou Claude"
+          >
+            {copiado === "prompt" ? <Check size={15} className="text-emerald-600" /> : <ClipboardCopy size={15} />}
+            {copiado === "prompt" ? "Prompt copiado!" : "Copiar prompt para o ChatGPT ou Claude"}
+          </button>
+          {promptCopiado && (
+            <div className="rounded-xl bg-slate-50 border border-slate-200 px-3.5 py-3 text-sm text-slate-600 space-y-2">
+              <p>O prompt completo (com os dados da sua empresa) está copiado. Abra a sua IA e cole com <strong className="text-slate-800">Ctrl+V</strong>:</p>
+              <div className="flex gap-2">
+                <a href="https://chatgpt.com/" target="_blank" rel="noreferrer" className="flex-1 text-center rounded-lg bg-white border border-slate-200 hover:border-slate-300 px-3 py-2 font-medium text-slate-800">Abrir ChatGPT</a>
+                <a href="https://claude.ai/new" target="_blank" rel="noreferrer" className="flex-1 text-center rounded-lg bg-white border border-slate-200 hover:border-slate-300 px-3 py-2 font-medium text-slate-800">Abrir Claude</a>
+              </div>
+            </div>
+          )}
+        </div>
       )}
     </section>
   );

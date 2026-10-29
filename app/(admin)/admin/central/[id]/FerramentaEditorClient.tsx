@@ -20,7 +20,7 @@ export function FerramentaEditorClient({ modulos, inicial }: { modulos: { id: st
   const router = useRouter();
   const [d, setD] = useState<Dados>(inicial ?? {
     slug: "", moduloId: modulos[0]?.id ?? "", nome: "", descricao: "", objetivo: "", campos: [],
-    prompt: "", instrucoes: "", icone: "sparkles", publicada: false, permitirCopiarPrompt: false, ordem: 0,
+    prompt: "", instrucoes: "", icone: "sparkles", publicada: false, permitirCopiarPrompt: true, ordem: 0,
   });
   const [slugManual, setSlugManual] = useState(Boolean(inicial));
   const [salvando, setSalvando] = useState(false);
