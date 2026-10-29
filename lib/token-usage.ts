@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 
 const COSTS_PER_TOKEN: Record<string, { input: number; output: number }> = {
   "gpt-4o-mini":       { input: 0.00000015, output: 0.0000006  },
+  "gpt-4.1-mini":      { input: 0.0000004,  output: 0.0000016  },
   "claude-sonnet-4-6": { input: 0.000003,   output: 0.000015   },
 };
 

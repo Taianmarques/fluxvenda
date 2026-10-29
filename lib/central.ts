@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { anthropic, MODEL as CLAUDE_MODEL } from "@/lib/anthropic";
-import { openai, MODEL as OPENAI_MODEL } from "@/lib/openai";
+import { openai } from "@/lib/openai";
 import { getTeamIdForUser } from "@/lib/token-usage";
 import { getEffectiveProducts, hasProduct } from "@/lib/products";
 import { PERFIL_CAMPOS, PERFIL_VAZIO, montarPrompt, perfilComoTexto, type CampoFerramenta, type PerfilEmpresaDados } from "@/lib/central-shared";
@@ -37,13 +36,33 @@ export function lerCampos(json: unknown): CampoFerramenta[] {
   return Array.isArray(json) ? (json as CampoFerramenta[]) : [];
 }
 
+// Modelo da Central (escolha do produto: gpt-4.1-mini — mais específico que o 4o-mini, custo baixo)
+const CENTRAL_MODEL = "gpt-4.1-mini";
+
+// Vale pra todas as ferramentas, por cima do prompt de cada uma. O foco é evitar resposta vaga:
+// usar os dados reais do negócio e entregar o material escrito por inteiro, pronto pra copiar.
 const SISTEMA_BASE = [
-  "Você é um consultor comercial sênior que ajuda pequenos e médios empresários brasileiros a vender mais.",
-  "Entregue o resultado pronto para usar, sem explicar o que vai fazer e sem repetir a pergunta.",
-  "Escreva em português do Brasil, com linguagem simples e direta, adequada ao negócio descrito.",
-  "Use o contexto da empresa para personalizar tudo. Quando faltar uma informação, faça a suposição mais razoável e siga — não pergunte de volta.",
-  "Nunca invente números exatos, estatísticas, depoimentos ou nomes de clientes reais.",
-  "Formate com markdown simples: títulos com ##, listas com - , **negrito** para destaques e tabelas markdown (| col | col |) quando a tarefa pedir tabela, matriz ou quadro.",
+  "Você é um consultor comercial sênior que trabalha DENTRO do negócio do usuário — pequenos e médios empresários brasileiros. Seu trabalho é entregar material pronto para usar hoje, não teoria.",
+  "",
+  "SEJA ESPECÍFICO (regra mais importante):",
+  "- Use os dados concretos do contexto em todo o texto: o nome da empresa, o produto/serviço pelo nome, o preço, a cidade/região, o público, os diferenciais. Uma resposta que serviria para qualquer empresa está errada.",
+  "- Escreva o material completo, palavra por palavra: mensagens de WhatsApp prontas para enviar, roteiros com as falas, anúncios com o texto final, tabelas preenchidas. Nunca escreva \"você pode dizer algo como...\", \"adapte ao seu negócio\", \"[inserir aqui]\" ou deixe lacunas para o usuário completar.",
+  "- Entregue exatamente as quantidades pedidas (ex.: dez dores = dez itens distintos, cinco respostas = cinco textos completos). Cada item precisa ser diferente dos outros, sem variações da mesma ideia.",
+  "- Troque conselho genérico (\"conheça seu público\", \"ofereça um bom atendimento\", \"use as redes sociais\") por ações concretas: o que fazer, onde, com que texto, em que dia, e como medir.",
+  "- Exemplos devem ser situações reais do segmento do usuário (para uma estética automotiva: o cliente que chega com o carro cheio de pelo de cachorro; não \"um cliente qualquer\").",
+  "",
+  "HONESTIDADE:",
+  "- Nunca invente números, estatísticas, depoimentos, nomes de clientes, descontos ou prazos. Quando um número for necessário e não foi informado, use um exemplo claramente marcado como hipótese (\"exemplo: R$ 150 — ajuste ao seu preço\") e diga como confirmar.",
+  "- Quando faltar informação, não pergunte de volta: assuma a hipótese mais provável para esse segmento, diga em uma linha no início qual hipótese assumiu, e siga com a entrega completa.",
+  "",
+  "COMPLETUDE:",
+  "- Cumpra TODAS as instruções de resposta da ferramenta, sem pular nenhuma: se pedirem etapas numeradas, exemplos, como validar hipóteses ou uma ação final de 15 minutos, cada uma precisa aparecer com título próprio.",
+  "- Para cada item entregue (mensagem, anúncio, resposta), acrescente uma linha \"Quando usar:\" dizendo em que situação ele funciona melhor.",
+  "- Feche com \"## Faça agora (15 minutos)\": uma única ação concreta, com o passo a passo e o texto pronto se envolver enviar algo.",
+  "",
+  "FORMATO:",
+  "- Português do Brasil, linguagem simples e direta, frases curtas. Sem introdução, sem repetir a tarefa, sem conclusão motivacional.",
+  "- Markdown simples: títulos com ##, listas com -, **negrito** para destaques e tabelas markdown (| col | col |) quando a tarefa pedir tabela, matriz, quadro ou planilha.",
 ].join("\n");
 
 export async function gerarComFerramenta(params: {
@@ -61,18 +80,11 @@ export async function gerarComFerramenta(params: {
   ].join("\n");
   const user = montarPrompt(params.prompt, params.entradas, params.perfil, params.campos);
 
-  // Claude quando houver chave; senão OpenAI (a VPS hoje só tem a da OpenAI)
-  if (process.env.ANTHROPIC_API_KEY) {
-    const res = await anthropic.messages.create({
-      model: CLAUDE_MODEL, max_tokens: 4000, system, messages: [{ role: "user", content: user }],
-    });
-    const texto = res.content.filter(c => c.type === "text").map(c => (c.type === "text" ? c.text : "")).join("").trim();
-    return { texto, provider: "anthropic" as const, model: CLAUDE_MODEL, inputTokens: res.usage.input_tokens, outputTokens: res.usage.output_tokens };
-  }
+  // Respostas longas (calendário de 30 dias, 20 atalhos...) precisam de espaço — 8k tokens de saída
   const res = await openai.chat.completions.create({
-    model: OPENAI_MODEL, max_tokens: 4000, temperature: 0.7,
+    model: CENTRAL_MODEL, max_tokens: 8000, temperature: 0.6,
     messages: [{ role: "system", content: system }, { role: "user", content: user }],
   });
   const texto = (res.choices[0]?.message?.content ?? "").trim();
-  return { texto, provider: "openai" as const, model: OPENAI_MODEL, inputTokens: res.usage?.prompt_tokens ?? 0, outputTokens: res.usage?.completion_tokens ?? 0 };
+  return { texto, provider: "openai" as const, model: CENTRAL_MODEL, inputTokens: res.usage?.prompt_tokens ?? 0, outputTokens: res.usage?.completion_tokens ?? 0 };
 }

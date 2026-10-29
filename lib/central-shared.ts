@@ -61,17 +61,18 @@ export function perfilComoTexto(p: Partial<PerfilEmpresaDados> | null | undefine
     .join("\n");
 }
 
-// Substitui as marcações do prompt. Campo vazio vira "(não informado)" pra IA não inventar.
+// Substitui as marcações do prompt. Campo vazio vira um aviso pra IA assumir uma hipótese explícita
+// (em vez de inventar dado como se fosse real ou responder genérico).
 export function montarPrompt(prompt: string, entradas: Record<string, string>, perfil: Partial<PerfilEmpresaDados> | null, campos: CampoFerramenta[] = []) {
   return prompt.replace(/\{\{\s*([a-zA-Z0-9_.]+)\s*\}\}/g, (_m, chave: string) => {
     if (chave === "empresa") return perfilComoTexto(perfil) || "(perfil da empresa não preenchido)";
     if (chave.startsWith("empresa.")) {
       const v = (perfil?.[chave.slice(8) as PerfilKey] ?? "").trim();
-      return v || "(não informado)";
+      return v || "(não informado — assuma o mais provável para este negócio e diga que é hipótese)";
     }
     const campo = campos.find(c => c.key === chave);
     const v = (entradas[chave] ?? "").trim() || (campo?.perfil ? (perfil?.[campo.perfil] ?? "").trim() : "");
-    return v || "(não informado)";
+    return v || "(não informado — assuma o mais provável para este negócio e diga que é hipótese)";
   });
 }
 
