@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
-import { podeUsarCentral } from "@/lib/central";
+import { temAcessoAFerramenta } from "@/lib/infoprodutos";
 
 // Liga/desliga o favorito da ferramenta pro usuário logado
 export async function POST(_req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!(await podeUsarCentral(userId))) return NextResponse.json({ error: "Plataforma não contratada" }, { status: 403 });
 
   const { slug } = await params;
-  const ferramenta = await prisma.centralFerramenta.findUnique({ where: { slug }, select: { id: true } });
+  const ferramenta = await prisma.centralFerramenta.findUnique({ where: { slug }, select: { id: true, modulo: { select: { produtoId: true } } } });
   if (!ferramenta) return NextResponse.json({ error: "Ferramenta não encontrada" }, { status: 404 });
+  if (!(await temAcessoAFerramenta(userId, ferramenta))) return NextResponse.json({ error: "Você ainda não tem acesso a este produto" }, { status: 403 });
 
   const where = { profileId_ferramentaId: { profileId: userId, ferramentaId: ferramenta.id } };
   const existente = await prisma.centralFavorito.findUnique({ where });

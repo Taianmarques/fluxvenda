@@ -39,7 +39,7 @@ export function PerfilEmpresaClient({ inicial }: { inicial: PerfilEmpresaDados }
 
   return (
     <div className="min-h-full bg-[#f4f6fb] text-slate-900"><div className="p-4 md:p-8 max-w-3xl mx-auto space-y-6">
-      <Link href="/central" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900">
+      <Link href="/biblioteca" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900">
         <ArrowLeft size={15} /> Central de Ferramentas
       </Link>
 

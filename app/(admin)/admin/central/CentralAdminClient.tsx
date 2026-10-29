@@ -114,7 +114,7 @@ export function CentralAdminClient({ modulos, ferramentasIniciais }: { modulos: 
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Link href="/central" target="_blank" className="flex items-center gap-2 border border-gray-700 hover:border-blue-600 text-gray-300 rounded-xl px-3.5 py-2.5 text-sm">
+          <Link href="/biblioteca" target="_blank" className="flex items-center gap-2 border border-gray-700 hover:border-blue-600 text-gray-300 rounded-xl px-3.5 py-2.5 text-sm">
             <ExternalLink size={15} /> Ver como usuário
           </Link>
           <button onClick={exportar} disabled={exportando || ferramentas.length === 0} className="flex items-center gap-2 border border-gray-700 hover:border-blue-600 text-gray-300 rounded-xl px-3.5 py-2.5 text-sm disabled:opacity-50">

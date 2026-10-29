@@ -2274,12 +2274,164 @@ model PlatformSettings {
 
 model CentralModulo {
   id        String @id // slug estável (ex: "conheca-seu-cliente")
-  numero    Int    @unique // 1..10 — ordem de exibição
+  numero    Int    @unique // ordem de exibição (única na plataforma toda)
   nome      String
   descricao String @default("")
   icone     String @default("folder") // nome do ícone (ver lib/central-icons.tsx)
 
+  // Infoproduto ao qual o módulo pertence (módulo é organização INTERNA de um produto)
+  produtoId String
+  produto   InfoProduto @relation(fields: [produtoId], references: [id])
+
   ferramentas CentralFerramenta[]
+
+  @@index([produtoId, numero])
+}
+
+// ─── Infoprodutos (Minha Biblioteca) ─────────────────────────────────────────────────────
+// Cada infoproduto é um kit de ferramentas que usa a mesma estrutura (módulos → ferramentas →
+// prompt). O papel comercial (principal, order bump, upsell) NÃO fica aqui — fica na oferta.
+
+model InfoProduto {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  slug       String  @unique // URL: /biblioteca/<slug>
+  nome       String
+  descricao  String  @default("") @db.Text
+  beneficio  String  @default("") // 1 frase do que a pessoa ganha (vitrine)
+  capaUrl    String? // imagem de capa (upload do admin)
+  categoria  String  @default("Vendas")
+  icone      String  @default("sparkles")
+  publicado  Boolean @default(false)
+  ordem      Int     @default(0)
+
+  // Preço de referência só pra vitrine quando o produto não está em nenhuma oferta ativa —
+  // o preço cobrado vem sempre da oferta (OfertaItem.precoCentavos)
+  precoReferenciaCentavos Int?
+  // Quem tem a Plataforma B2B (SoldProduct PLATAFORMA) já tem acesso — preserva quem usa os
+  // 100 prompts desde antes dos infoprodutos
+  inclusoNaPlataforma Boolean @default(false)
+  // Código do produto no checkout/provedor (referência solta — ex: SKU usado em relatórios)
+  checkoutRef String?
+
+  modulos    CentralModulo[]
+  ofertaItens OfertaItem[]
+  compraItens CompraItem[]
+  acessos    AcessoProduto[]
+}
+
+// Oferta = como um conjunto de produtos é vendido (página de checkout). O mesmo produto pode
+// estar em várias ofertas, com papéis e preços diferentes.
+model Oferta {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  slug   String  @unique // URL do checkout: /comprar/<slug>
+  nome   String
+  ativa  Boolean @default(false)
+
+  itens   OfertaItem[]
+  compras Compra[]
+}
+
+model OfertaItem {
+  id       String @id @default(cuid())
+  ofertaId String
+  oferta   Oferta @relation(fields: [ofertaId], references: [id], onDelete: Cascade)
+  produtoId String
+  produto   InfoProduto @relation(fields: [produtoId], references: [id])
+
+  papel         String // PRINCIPAL | ORDER_BUMP | UPSELL
+  precoCentavos Int // preço cobrado nesta oferta (fonte da cobrança)
+  chamada       String @default("") // texto do order bump/upsell ("Adicione o Analisador por apenas...")
+  ordem         Int    @default(0)
+
+  @@unique([ofertaId, produtoId])
+  @@index([produtoId])
+}
+
+// Compra = pedido. Total e itens são calculados no servidor a partir da oferta; o navegador só
+// diz quais order bumps marcou. Status vem do provedor (Asaas), nunca da página de obrigado.
+model Compra {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ofertaId String?
+  oferta   Oferta? @relation(fields: [ofertaId], references: [id], onDelete: SetNull)
+  // Upsell é uma compra nova, ligada à compra que o originou
+  compraOrigemId String?
+
+  profileId String? // dono do acesso (preenchido na confirmação se a conta for criada depois)
+  email     String
+  nome      String  @default("")
+  cpfCnpj   String  @default("")
+  telefone  String  @default("")
+
+  status         String  @default("PENDENTE") // PENDENTE | PAGO | CANCELADO | REEMBOLSADO | ESTORNADO
+  valorCentavos  Int
+  formaPagamento String // PIX | CARTAO
+  asaasPaymentId     String? @unique
+  asaasInstallmentId String?
+  asaasCustomerId    String?
+  pagoEm      DateTime?
+  encerradaEm DateTime? // cancelamento/reembolso/estorno
+
+  itens   CompraItem[]
+  acessos AcessoProduto[]
+
+  @@index([email])
+  @@index([profileId, createdAt])
+  @@index([asaasInstallmentId])
+}
+
+model CompraItem {
+  id        String      @id @default(cuid())
+  compraId  String
+  compra    Compra      @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  produtoId String
+  produto   InfoProduto @relation(fields: [produtoId], references: [id])
+  papel         String // papel na oferta no momento da compra
+  precoCentavos Int
+
+  @@unique([compraId, produtoId])
+}
+
+// Direito de acesso de um usuário a um produto. Uma linha por fonte (cada compra paga, ou uma
+// liberação manual do admin) — revogar uma compra não derruba acesso vindo de outra fonte.
+model AcessoProduto {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  profileId String
+  produtoId String
+  produto   InfoProduto @relation(fields: [produtoId], references: [id])
+
+  origem    String  // COMPRA | ADMIN
+  compraId  String?
+  compra    Compra? @relation(fields: [compraId], references: [id], onDelete: SetNull)
+  ativo     Boolean @default(true)
+  revogadoEm DateTime?
+  motivo     String? // reembolso, estorno, cancelamento, revogado pelo admin
+  concedidoPor String? // admin que liberou manualmente
+
+  @@unique([compraId, produtoId])
+  @@index([profileId, produtoId])
+}
+
+// Eventos de pagamento já processados (idempotência do webhook)
+model PagamentoEvento {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now())
+  provedor   String   // ASAAS
+  eventoId   String   // id do evento no provedor
+  tipo       String
+  paymentId  String?
+
+  @@unique([provedor, eventoId])
 }
 
 model CentralFerramenta {

@@ -7,7 +7,7 @@ import { CentralIcone, corDoModulo } from "@/lib/central-icons";
 
 type Salvo = {
   id: string; prompt: string; createdAt: string; entradas: Record<string, string>;
-  ferramenta: { slug: string; nome: string; icone: string; moduloId: string; publicada: boolean };
+  ferramenta: { slug: string; nome: string; icone: string; moduloId: string; produtoSlug: string; publicada: boolean };
 };
 
 function resumo(e: Record<string, string>) {
@@ -50,8 +50,8 @@ export function SalvosClient({ inicial }: { inicial: Salvo[] }) {
   return (
     <div className="min-h-full bg-[#f4f6fb] text-slate-900">
       <div className="p-4 md:p-8 max-w-3xl mx-auto space-y-6">
-        <Link href="/central" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900">
-          <ArrowLeft size={15} /> Voltar para a biblioteca
+        <Link href="/biblioteca" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900">
+          <ArrowLeft size={15} /> Minha Biblioteca
         </Link>
         <header>
           <h1 className="text-2xl font-bold flex items-center gap-2"><Star size={22} className="fill-amber-400 text-amber-400" /> Prompts favoritos</h1>
@@ -96,7 +96,7 @@ export function SalvosClient({ inicial }: { inicial: Salvo[] }) {
                         <a href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer" className={acao}>Abrir ChatGPT <ExternalLink size={13} /></a>
                         <a href="https://claude.ai/" target="_blank" rel="noopener noreferrer" className={acao}>Abrir Claude <ExternalLink size={13} /></a>
                         {s.ferramenta.publicada && (
-                          <Link href={`/central/${s.ferramenta.slug}?usar=${s.id}`} className={acao}><RotateCcw size={14} /> Reutilizar</Link>
+                          <Link href={`/biblioteca/${s.ferramenta.produtoSlug}/${s.ferramenta.slug}?usar=${s.id}`} className={acao}><RotateCcw size={14} /> Reutilizar</Link>
                         )}
                         <button onClick={() => desfavoritar(s)} className={acao}><Star size={14} /> Tirar dos favoritos</button>
                         <button onClick={() => excluir(s)} className="ml-auto inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-red-500 rounded-lg px-2.5 py-1.5"><Trash2 size={14} /> Excluir</button>

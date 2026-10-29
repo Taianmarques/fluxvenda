@@ -1,14 +1,16 @@
 import { prisma } from "@/lib/prisma";
 import { getTeamIdForUser } from "@/lib/token-usage";
-import { getEffectiveProducts, hasProduct } from "@/lib/products";
+import { produtosLiberados } from "@/lib/infoprodutos";
 import { PERFIL_CAMPOS, PERFIL_VAZIO, type CampoFerramenta, type PerfilEmpresaDados } from "@/lib/central-shared";
 
 // Central de Ferramentas Comerciais — acesso, perfil da empresa e regras de uso (servidor).
 // A Central não executa IA: monta prompts pro usuário rodar no ChatGPT/Claude dele
 // (ver lib/central-prompt.ts).
 
+// Recursos compartilhados entre os produtos (perfil da empresa) — basta ter algum produto liberado.
+// O acesso a cada ferramenta é checado pelo produto dela (lib/infoprodutos.ts).
 export async function podeUsarCentral(userId: string) {
-  return hasProduct(await getEffectiveProducts(userId), "PLATAFORMA");
+  return (await produtosLiberados(userId)).size > 0;
 }
 
 // Perfil da empresa é da equipe; quem não tem equipe tem um perfil próprio

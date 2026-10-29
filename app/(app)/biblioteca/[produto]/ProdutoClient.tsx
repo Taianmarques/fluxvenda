@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  Search, Star, Building2, ArrowRight, X, ChevronRight, Wand2, Wrench, LayoutGrid, Zap, Loader2, MousePointerClick,
+  Search, Star, ArrowLeft, Building2, ArrowRight, X, ChevronRight, Wand2, Wrench, LayoutGrid, Zap, Loader2, MousePointerClick,
 } from "lucide-react";
 import { CentralIcone, corDoModulo } from "@/lib/central-icons";
 import type { FerramentaTelaDados } from "@/lib/central-dados";
-import { FerramentaClient } from "./[slug]/FerramentaClient";
+import { FerramentaClient } from "./[ferramenta]/FerramentaClient";
 
 type FerramentaCard = { slug: string; nome: string; descricao: string; icone: string; ordem: number; criadaEm: string };
 type Modulo = { id: string; numero: number; nome: string; descricao: string; icone: string; ferramentas: FerramentaCard[] };
@@ -20,9 +20,12 @@ function normalizar(v: string) {
 // Painel lateral (ferramenta aberta ao lado da lista) só em tela larga; abaixo disso abre a página
 const MQ_PAINEL = "(min-width: 1280px)";
 
+// Página de um infoproduto da biblioteca — a mesma pra todos os produtos (os 100 prompts, o
+// Analisador de Vendas, o WhatsApp Vendedor...): o conteúdo vem dos módulos do produto.
 export function CentralClient({
-  modulos, favoritosIniciais, perfilPct, perfilOk, primeiroNome, geracoesMes, salvos,
+  produto, modulos, favoritosIniciais, perfilPct, perfilOk, primeiroNome, geracoesMes, salvos,
 }: {
+  produto: { slug: string; nome: string; beneficio: string; descricao: string };
   modulos: Modulo[];
   favoritosIniciais: string[];
   perfilPct: number;
@@ -31,6 +34,7 @@ export function CentralClient({
   geracoesMes: number;
   salvos: number;
 }) {
+  const base = `/biblioteca/${produto.slug}`;
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<string>("todos"); // "todos" | "favoritos" | moduloId
   const [ordem, setOrdem] = useState<"padrao" | "az" | "recentes">("padrao");
@@ -104,12 +108,15 @@ export function CentralClient({
     { valor: total, rotulo: "Ferramentas de IA", icone: <Wrench size={19} />, cor: "bg-indigo-50 text-indigo-600" },
     { valor: comFerramentas.length || modulos.length, rotulo: "Módulos comerciais", icone: <LayoutGrid size={19} />, cor: "bg-amber-50 text-amber-600" },
     { valor: geracoesMes, rotulo: "Prompts preparados no mês", icone: <Zap size={19} />, cor: "bg-sky-50 text-sky-600" },
-    { valor: salvos, rotulo: "Prompts favoritos", icone: <Star size={19} />, cor: "bg-violet-50 text-violet-600", href: "/central/salvos" },
+    { valor: salvos, rotulo: "Prompts favoritos", icone: <Star size={19} />, cor: "bg-violet-50 text-violet-600", href: "/biblioteca/favoritos" },
   ];
 
   return (
     <div className="min-h-full bg-[#f4f6fb] text-slate-900">
       <div className="max-w-[1500px] mx-auto p-4 md:p-6 space-y-6">
+        <Link href="/biblioteca" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900">
+          <ArrowLeft size={15} /> Minha Biblioteca
+        </Link>
         {/* Busca + atalhos */}
         <div className="flex items-center gap-3">
           <div className="relative flex-1 max-w-2xl">
@@ -126,10 +133,10 @@ export function CentralClient({
               </button>
             )}
           </div>
-          <Link href="/central/perfil" className="hidden sm:inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700">
+          <Link href="/biblioteca/meu-negocio" className="hidden sm:inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700">
             <Building2 size={15} /> Meu negócio
           </Link>
-          <Link href="/central/salvos" className="hidden sm:inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700">
+          <Link href="/biblioteca/favoritos" className="hidden sm:inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700">
             <Star size={15} /> Prompts favoritos
           </Link>
         </div>
@@ -138,14 +145,12 @@ export function CentralClient({
         <section className="relative overflow-hidden rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-violet-100 p-6 md:p-8">
           <div className="relative z-10 max-w-xl">
             <span className="inline-block rounded-md bg-indigo-100 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-indigo-700">
-              Bem-vindo(a){primeiroNome ? `, ${primeiroNome}` : ""}!
+              {produto.nome}
             </span>
             <h1 className="mt-3 text-2xl md:text-[32px] font-bold leading-tight tracking-tight text-slate-900">
-              100 prompts inteligentes e personalizados para transformar o ChatGPT ou Claude em seu assistente de vendas.
+              {produto.beneficio || `Bem-vindo(a)${primeiroNome ? `, ${primeiroNome}` : ""}!`}
             </h1>
-            <p className="mt-3 text-slate-600">
-              Escolha o que deseja fazer, responda algumas perguntas e receba um comando profissional pronto para utilizar na sua IA favorita.
-            </p>
+            {produto.descricao && <p className="mt-3 text-slate-600">{produto.descricao}</p>}
             <button
               onClick={() => listaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
               className="mt-5 inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-indigo-600/25"
@@ -196,7 +201,7 @@ export function CentralClient({
         </div>
 
         {!perfilOk && (
-          <Link href="/central/perfil" className="flex items-center gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 hover:border-amber-300">
+          <Link href="/biblioteca/meu-negocio" className="flex items-center gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 hover:border-amber-300">
             <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0"><Building2 size={19} /></div>
             <div className="min-w-0 flex-1">
               <p className="font-medium text-slate-900">Complete o perfil da sua empresa</p>
@@ -300,7 +305,7 @@ export function CentralClient({
                   return (
                     <li key={f.slug} className={`group relative flex items-center rounded-xl border transition-colors ${selecionada ? "border-indigo-400 bg-indigo-50/40 ring-2 ring-indigo-500/10" : "border-slate-200 hover:border-slate-300 hover:bg-slate-50/60"}`}>
                       <Link
-                        href={`/central/${f.slug}`}
+                        href={`${base}/${f.slug}`}
                         onClick={e => {
                           if (window.matchMedia(MQ_PAINEL).matches) { e.preventDefault(); abrirNoPainel(f.slug); }
                         }}

@@ -10,12 +10,13 @@ export type FerramentaTela = {
   comoUsar: string; formatoResposta: string;
   campos: CampoFerramenta[]; permitirCopiarPrompt: boolean;
   modulo: { id: string; nome: string; numero: number };
+  produto: { id: string; slug: string; nome: string };
 };
 export type GeracaoTela = {
   id: string; resultado: string; salvo: boolean; createdAt: string; entradas: Record<string, string>;
   pedidoAjuste?: string | null; editado?: boolean; // versão ajustada pela IA / corrigida à mão
 };
-export type FerramentaRelacionada = { slug: string; nome: string; descricao: string; icone: string; moduloId: string };
+export type FerramentaRelacionada = { slug: string; nome: string; descricao: string; icone: string; moduloId: string; produtoSlug: string };
 export type FerramentaTelaDados = {
   ferramenta: FerramentaTela;
   favorito: boolean;
@@ -28,7 +29,10 @@ export type FerramentaTelaDados = {
   reusarEntradas: Record<string, string> | null;
 };
 
-const SELECT_RELACIONADA = { slug: true, nome: true, descricao: true, icone: true, moduloId: true } as const;
+const SELECT_RELACIONADA = { slug: true, nome: true, descricao: true, icone: true, moduloId: true, modulo: { select: { produto: { select: { slug: true } } } } } as const;
+
+type RelacionadaBruta = { slug: string; nome: string; descricao: string; icone: string; moduloId: string; modulo: { produto: { slug: string } } };
+const paraTela = ({ modulo, ...r }: RelacionadaBruta): FerramentaRelacionada => ({ ...r, produtoSlug: modulo.produto.slug });
 
 // Relacionadas escolhidas no admin (na ordem escolhida); sem escolha, as vizinhas do mesmo módulo
 async function carregarRelacionadas(f: { id: string; moduloId: string; ordem: number; relacionadas: string[] }) {
@@ -37,7 +41,7 @@ async function carregarRelacionadas(f: { id: string; moduloId: string; ordem: nu
       where: { slug: { in: f.relacionadas }, publicada: true, id: { not: f.id } },
       select: SELECT_RELACIONADA,
     });
-    return f.relacionadas.map(s => lista.find(l => l.slug === s)).filter((x): x is FerramentaRelacionada => Boolean(x));
+    return f.relacionadas.map(s => lista.find(l => l.slug === s)).filter((x): x is RelacionadaBruta => Boolean(x)).map(paraTela);
   }
   const doModulo = await prisma.centralFerramenta.findMany({
     where: { moduloId: f.moduloId, publicada: true, id: { not: f.id } },
@@ -46,14 +50,14 @@ async function carregarRelacionadas(f: { id: string; moduloId: string; ordem: nu
   return doModulo
     .sort((a, b) => Math.abs(a.ordem - f.ordem) - Math.abs(b.ordem - f.ordem) || a.ordem - b.ordem)
     .slice(0, 3)
-    .map(({ ordem: _ordem, ...r }) => r);
+    .map(({ ordem: _ordem, ...r }) => paraTela(r));
 }
 
 // reusarId: prompt antigo do próprio usuário cujos dados voltam pro formulário ("Reutilizar")
 export async function carregarFerramentaTela(userId: string, slug: string, reusarId?: string): Promise<FerramentaTelaDados | null> {
   const f = await prisma.centralFerramenta.findUnique({
     where: { slug },
-    include: { modulo: { select: { id: true, nome: true, numero: true } } },
+    include: { modulo: { select: { id: true, nome: true, numero: true, produto: { select: { id: true, slug: true, nome: true } } } } },
   });
   if (!f || !f.publicada) return null;
 
@@ -80,7 +84,8 @@ export async function carregarFerramentaTela(userId: string, slug: string, reusa
     ferramenta: {
       slug: f.slug, nome: f.nome, descricao: f.descricao, objetivo: f.objetivo, icone: f.icone,
       comoUsar: f.comoUsar, formatoResposta: f.formatoResposta,
-      campos, permitirCopiarPrompt: f.permitirCopiarPrompt, modulo: f.modulo,
+      campos, permitirCopiarPrompt: f.permitirCopiarPrompt,
+      modulo: { id: f.modulo.id, nome: f.modulo.nome, numero: f.modulo.numero }, produto: f.modulo.produto,
     },
     favorito: Boolean(favorito),
     perfilOk: perfilTemEssenciais(perfil),

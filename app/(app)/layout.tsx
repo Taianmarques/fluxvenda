@@ -36,8 +36,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // colapsa tudo num único link de upsell (último do menu) que leva direto pra landing do produto.
   const NAV = [
     { href: "/dashboard",  label: "Dashboard",  icon: "dashboard" as const, show: true, locked: false },
+    // Infoprodutos (100 prompts e kits complementares) — todo usuário vê; o acesso é por produto
+    { href: "/biblioteca", label: "Minha Biblioteca", icon: "biblioteca" as const, show: true, locked: false },
     ...(hasPlataforma ? [
-      { href: "/central",    label: "Central de Ferramentas", icon: "central" as const, show: true, locked: false },
       { href: "/scanner",    label: "Scanner",    icon: "scanner" as const, show: true, locked: false },
       { href: "/missoes",    label: "Plano de Ação", icon: "missoes" as const, show: true, locked: false },
       { href: "/simulacao",  label: "Simulação",  icon: "simulacao" as const, show: true, locked: false },

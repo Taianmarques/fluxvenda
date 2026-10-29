@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
-import { carregarPerfil, lerCampos, podeUsarCentral, verificarUsoFerramenta } from "@/lib/central";
+import { carregarPerfil, lerCampos, verificarUsoFerramenta } from "@/lib/central";
+import { temAcessoAFerramenta } from "@/lib/infoprodutos";
 import { montarPromptFinal } from "@/lib/central-prompt";
 import { validarEntradas } from "@/lib/central-entradas";
 
@@ -11,11 +12,11 @@ import { validarEntradas } from "@/lib/central-entradas";
 export async function POST(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!(await podeUsarCentral(userId))) return NextResponse.json({ error: "Plataforma não contratada" }, { status: 403 });
 
   const { slug } = await params;
-  const ferramenta = await prisma.centralFerramenta.findUnique({ where: { slug } });
+  const ferramenta = await prisma.centralFerramenta.findUnique({ where: { slug }, include: { modulo: { select: { produtoId: true } } } });
   if (!ferramenta || !ferramenta.publicada) return NextResponse.json({ error: "Ferramenta não encontrada" }, { status: 404 });
+  if (!(await temAcessoAFerramenta(userId, ferramenta))) return NextResponse.json({ error: "Você ainda não tem acesso a este produto" }, { status: 403 });
 
   const uso = await verificarUsoFerramenta(userId, ferramenta);
   if (!uso.permitido) return NextResponse.json({ error: uso.motivo }, { status: 429 });

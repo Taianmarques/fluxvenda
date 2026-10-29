@@ -11,7 +11,7 @@ import type { FerramentaTelaDados, GeracaoTela } from "@/lib/central-dados";
 
 // Uma ferramenta da Central: o usuário preenche o formulário, clica em "Preparar meu prompt" e
 // recebe o prompt completo (template oficial + dados dele) pra colar no ChatGPT ou no Claude.
-// A plataforma não executa IA nenhuma. modo "pagina" = /central/<slug>, com histórico ao lado;
+// A plataforma não executa IA nenhuma. modo "pagina" = /biblioteca/<produto>/<ferramenta>, com histórico ao lado;
 // modo "painel" = coluna direita da biblioteca, mais compacta.
 
 const CHATGPT_URL = "https://chatgpt.com/";
@@ -190,13 +190,13 @@ export function FerramentaClient({
             <ArrowLeft size={15} /> Voltar para a biblioteca
           </button>
         ) : (
-          <Link href="/central" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900">
+          <Link href={`/biblioteca/${ferramenta.produto.slug}`} className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900">
             <ArrowLeft size={15} /> Voltar para a biblioteca
           </Link>
         )}
         <div className="flex items-center gap-1">
           {painel && (
-            <Link href={`/central/${ferramenta.slug}`} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100" title="Abrir em tela cheia" aria-label="Abrir em tela cheia">
+            <Link href={`/biblioteca/${ferramenta.produto.slug}/${ferramenta.slug}`} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100" title="Abrir em tela cheia" aria-label="Abrir em tela cheia">
               <Maximize2 size={15} />
             </Link>
           )}
@@ -237,7 +237,7 @@ export function FerramentaClient({
     <section id={`form-${modo}`} className={`${cartao} p-5 space-y-3.5 scroll-mt-4`}>
       <h2 className="font-semibold text-slate-900">Suas informações</h2>
       <Link
-        href="/central/perfil"
+        href="/biblioteca/meu-negocio"
         className={`flex items-center gap-2 text-xs rounded-lg px-3 py-2 ${perfilOk ? "bg-slate-50 text-slate-500 hover:text-slate-800" : "bg-amber-50 text-amber-800 hover:text-amber-900"}`}
       >
         {perfilOk ? <Building2 size={14} className="flex-shrink-0" /> : <AlertTriangle size={14} className="flex-shrink-0" />}
@@ -379,7 +379,7 @@ export function FerramentaClient({
             <li key={r.slug}>
               {onAbrirRelacionada
                 ? <button onClick={() => onAbrirRelacionada(r.slug)} className={cls}>{conteudo}</button>
-                : <Link href={`/central/${r.slug}`} className={cls}>{conteudo}</Link>}
+                : <Link href={`/biblioteca/${r.produtoSlug}/${r.slug}`} className={cls}>{conteudo}</Link>}
             </li>
           );
         })}
