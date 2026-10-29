@@ -29,6 +29,8 @@ const PUBLIC_ROUTES: RegExp[] = [
   /^\/agendar(\/.*)?$/,            // página pública de auto-agendamento (PWA)
   /^\/api\/agendar(\/.*)?$/,       // horários livres + criação de agendamento da página pública
   /^\/api\/branding\/icon(\/.*)?$/, // ícones do manifest do PWA — busca sem sessão
+  /^\/comprar(\/.*)?$/,            // checkout dos infoprodutos — comprador ainda pode não ter conta
+  /^\/api\/comprar(\/.*)?$/,       // cria a cobrança e consulta o status (total sempre calculado no servidor)
 ];
 
 const GESTOR_ROUTES: RegExp[] = [/^\/gestor(\/.*)?$/, /^\/ferramentas(\/.*)?$/];

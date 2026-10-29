@@ -3,7 +3,7 @@ import { currentUser } from "@/lib/auth/server";
 import { UserMenu } from "@/app/(app)/UserMenu";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { BarChart3, Building2, Search, Cpu, Palette, CalendarClock, CreditCard, MessageSquare, Rocket, Bot, FlaskConical, FileText, Wand2, type LucideIcon } from "lucide-react";
+import { BarChart3, Building2, Search, Cpu, Palette, CalendarClock, CreditCard, MessageSquare, Rocket, Bot, FlaskConical, FileText, Wand2, ShoppingCart, type LucideIcon } from "lucide-react";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await currentUser();
@@ -25,6 +25,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: "/admin/funil-trial",  label: "Funil Trial",  icon: Rocket },
     { href: "/admin/formularios",  label: "Formulários",  icon: FileText },
     { href: "/admin/central",      label: "Central IA",   icon: Wand2 },
+    { href: "/admin/ofertas",      label: "Infoprodutos", icon: ShoppingCart },
     { href: "/admin/multi-agente", label: "Multi-agente", icon: Bot },
     { href: "/admin/contas-exemplo", label: "Contas de exemplo", icon: FlaskConical },
     { href: "/admin/tokens",       label: "Tokens",       icon: Cpu       },

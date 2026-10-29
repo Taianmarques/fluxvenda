@@ -1,6 +1,7 @@
 import { currentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getEffectiveProducts, hasProduct } from "@/lib/products";
 import { listMyAgentConfigs } from "@/lib/team";
 import { CrmWelcome } from "./CrmWelcome";
@@ -13,6 +14,8 @@ export default async function DashboardPage() {
   // isso não faz sentido pra quem só contratou o CRM. Mostra uma home orientada a criar
   // o primeiro agente de IA em vez disso.
   const products = await getEffectiveProducts(user!.id);
+  // Conta só de infoprodutos (criada na compra, sem Plataforma nem CRM): a casa dela é a biblioteca
+  if (!hasProduct(products, "PLATAFORMA") && !hasProduct(products, "CRM")) redirect("/biblioteca");
   if (!hasProduct(products, "PLATAFORMA")) {
     const result = await listMyAgentConfigs(user!.id);
     const name = (await prisma.profile.findUnique({ where: { id: user!.id }, select: { name: true } }))?.name ?? "";

@@ -105,3 +105,23 @@ export async function sendPasswordResetEmail(to: string, name: string, token: st
      <p>Esse link expira em 1 hora. Se não foi você, pode ignorar este e-mail.</p>`
   );
 }
+
+// Compra de infoproduto confirmada. Conta criada na compra (sem senha) recebe o link pra criar a
+// senha (válido por 7 dias); quem já tinha conta recebe só o aviso com o link da biblioteca.
+export async function sendAcessoProdutosEmail(to: string, name: string, produtos: string[], tokenSenha: string | null): Promise<boolean> {
+  const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
+  const lista = produtos.map(p => `<li>${esc(p)}</li>`).join("");
+  const acesso = tokenSenha
+    ? `<p>Para entrar, crie a sua senha neste link (válido por 7 dias):</p>
+       <p><a href="${APP_URL}/redefinir-senha?token=${tokenSenha}">Criar minha senha</a></p>
+       <p>Depois é só acessar a <strong>Minha Biblioteca</strong>.</p>`
+    : `<p>Os produtos já estão na sua <a href="${APP_URL}/biblioteca">Minha Biblioteca</a>.</p>`;
+  return send(
+    to,
+    "Sua compra foi confirmada — acesso liberado",
+    `<p>Olá, ${esc(name)}!</p>
+     <p>Pagamento confirmado. Você já tem acesso a:</p>
+     <ul>${lista}</ul>
+     ${acesso}`
+  );
+}

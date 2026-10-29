@@ -5,6 +5,10 @@ import { AppSidebar } from "./AppSidebar";
 import { OneSignalInit } from "./OneSignalInit";
 import { getEffectiveProducts, hasProduct } from "@/lib/products";
 
+// Itens de treinamento (Plano de Ação, Simulação, Trilhas, Objeções, Scripts, Playbook, Ranking,
+// Equipe) fora do menu por enquanto — as rotas seguem no ar
+const MENU_TREINAMENTO_VISIVEL = false;
+
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await currentUser();
   if (!user) redirect("/sign-in");
@@ -40,14 +44,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/biblioteca", label: "Minha Biblioteca", icon: "biblioteca" as const, show: true, locked: false },
     ...(hasPlataforma ? [
       { href: "/scanner",    label: "Scanner",    icon: "scanner" as const, show: true, locked: false },
-      { href: "/missoes",    label: "Plano de Ação", icon: "missoes" as const, show: true, locked: false },
-      { href: "/simulacao",  label: "Simulação",  icon: "simulacao" as const, show: true, locked: false },
-      { href: "/trilhas",    label: "Trilhas",    icon: "trilhas" as const, show: true, locked: false },
-      { href: "/objecoes",   label: "Objeções",   icon: "objecoes" as const, show: true, locked: false },
-      { href: "/scripts",    label: "Scripts",    icon: "scripts" as const, show: true, locked: false },
-      { href: "/playbook",   label: "Playbook",   icon: "playbook" as const, show: true, locked: false },
-      { href: "/ranking",    label: "Ranking",    icon: "ranking" as const, show: true, locked: false },
-      { href: "/gestor",     label: "Equipe",     icon: "equipe" as const, show: isGestor, locked: false },
+      // Ocultos do menu por enquanto (decisão de produto) — as páginas continuam existindo;
+      // pra voltar, troque MENU_TREINAMENTO_VISIVEL pra true
+      { href: "/missoes",    label: "Plano de Ação", icon: "missoes" as const, show: MENU_TREINAMENTO_VISIVEL, locked: false },
+      { href: "/simulacao",  label: "Simulação",  icon: "simulacao" as const, show: MENU_TREINAMENTO_VISIVEL, locked: false },
+      { href: "/trilhas",    label: "Trilhas",    icon: "trilhas" as const, show: MENU_TREINAMENTO_VISIVEL, locked: false },
+      { href: "/objecoes",   label: "Objeções",   icon: "objecoes" as const, show: MENU_TREINAMENTO_VISIVEL, locked: false },
+      { href: "/scripts",    label: "Scripts",    icon: "scripts" as const, show: MENU_TREINAMENTO_VISIVEL, locked: false },
+      { href: "/playbook",   label: "Playbook",   icon: "playbook" as const, show: MENU_TREINAMENTO_VISIVEL, locked: false },
+      { href: "/ranking",    label: "Ranking",    icon: "ranking" as const, show: MENU_TREINAMENTO_VISIVEL, locked: false },
+      { href: "/gestor",     label: "Equipe",     icon: "equipe" as const, show: MENU_TREINAMENTO_VISIVEL && isGestor, locked: false },
     ] : []),
     { href: "/crm",         label: "CRM",         icon: "crm" as const, show: isTeamMember, locked: !hasCrm },
     { href: "/creditos",    label: "Créditos de IA", icon: "creditos" as const, show: isGestor, locked: false },

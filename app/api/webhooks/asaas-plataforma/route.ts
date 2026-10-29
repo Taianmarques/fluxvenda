@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { markLeadFormPaid } from "@/lib/lead-form-checkout";
+import { processarEventoAsaas } from "@/lib/compras";
 
 // Webhook da conta Asaas DA PRÓPRIA PLATAFORMA (créditos de IA) — diferente do webhook por
 // agente em /api/webhooks/asaas/[agentId], que é da conta de cada cliente. Autenticidade
@@ -16,6 +17,15 @@ export async function POST(req: NextRequest) {
   const event = body?.event as string | undefined;
   const paymentId = body?.payment?.id as string | undefined;
   if (!paymentId) return NextResponse.json({ ok: true });
+
+  // Compras de infoprodutos (Minha Biblioteca): qualquer evento da cobrança (pago, reembolsado,
+  // estornado, removido...) sincroniza com o status real no Asaas — ver lib/compras.ts
+  try {
+    if (await processarEventoAsaas(body)) return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("[webhook-asaas-plataforma] compra de infoproduto:", err);
+    return NextResponse.json({ error: "Falha ao processar" }, { status: 500 }); // Asaas reenvia
+  }
 
   if (event === "PAYMENT_RECEIVED" || event === "PAYMENT_CONFIRMED") {
     const compra = await prisma.creditoCompra.findUnique({ where: { asaasPaymentId: paymentId } });
