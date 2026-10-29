@@ -2266,3 +2266,100 @@ model PlatformSettings {
   // (app/(app)/crm/hub/AgendarDemoModal.tsx) — configurável em /admin/demonstracoes.
   demoAvailableTimes String[] @default(["09:00", "11:00", "14:00", "16:00"])
 }
+
+// ─── Central de Ferramentas Comerciais (Plataforma B2B) ─────────────────────────────────
+// Ferramentas de IA prontas pra tarefas comerciais: o empresário escolhe a ferramenta, preenche
+// um formulário curto e recebe o resultado gerado na própria plataforma. Prompt, campos e
+// instruções ficam no banco e são editados pelo super admin (/admin/central), sem deploy.
+
+model CentralModulo {
+  id        String @id // slug estável (ex: "conheca-seu-cliente")
+  numero    Int    @unique // 1..10 — ordem de exibição
+  nome      String
+  descricao String @default("")
+  icone     String @default("folder") // nome do ícone (ver lib/central-icons.tsx)
+
+  ferramentas CentralFerramenta[]
+}
+
+model CentralFerramenta {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  slug     String        @unique // identificador único, usado na URL (/central/<slug>)
+  moduloId String
+  modulo   CentralModulo @relation(fields: [moduloId], references: [id])
+
+  nome                 String
+  descricao            String  @default("") // 1 frase pro card
+  objetivo             String  @default("") // o que a pessoa ganha usando
+  campos               Json    @default("[]") // [{ key, label, tipo, placeholder?, ajuda?, opcoes?, obrigatorio }] — ver lib/central-shared.ts
+  prompt               String  @db.Text // prompt interno com {{campo}} e {{empresa.xxx}}
+  instrucoes           String  @default("") @db.Text // formato/tom da resposta (vai como instrução de sistema)
+  icone                String  @default("sparkles")
+  publicada            Boolean @default(false)
+  permitirCopiarPrompt Boolean @default(false) // mostra "Copiar prompt" pro usuário usar no ChatGPT dele
+  ordem                Int     @default(0)
+
+  favoritos CentralFavorito[]
+  geracoes  CentralGeracao[]
+
+  @@index([moduloId, ordem])
+}
+
+model CentralFavorito {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  profileId    String
+  ferramentaId String
+  ferramenta   CentralFerramenta @relation(fields: [ferramentaId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, ferramentaId])
+}
+
+model CentralGeracao {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  profileId    String
+  teamId       String?
+  ferramentaId String
+  ferramenta   CentralFerramenta @relation(fields: [ferramentaId], references: [id], onDelete: Cascade)
+
+  entradas  Json // valores do formulário usados nessa geração
+  resultado String  @db.Text
+  salvo     Boolean @default(false) // "Salvar" — aparece em /central/salvos
+  titulo    String?
+
+  provider     String
+  model        String
+  inputTokens  Int @default(0)
+  outputTokens Int @default(0)
+
+  @@index([profileId, createdAt])
+  @@index([profileId, ferramentaId, createdAt])
+}
+
+// Contexto do negócio usado por todas as ferramentas da Central — preenchido uma vez.
+// Da equipe (teamId) quando o usuário tem equipe; senão, do próprio perfil (profileId).
+model PerfilEmpresa {
+  id        String   @id @default(cuid())
+  updatedAt DateTime @updatedAt
+
+  teamId    String? @unique
+  profileId String? @unique
+
+  nomeEmpresa  String @default("")
+  segmento     String @default("")
+  produtos     String @default("")
+  publico      String @default("")
+  ticketMedio  String @default("")
+  diferenciais String @default("")
+  regiao       String @default("")
+  canais       String @default("")
+  tomDeVoz     String @default("")
+  concorrentes String @default("")
+  observacoes  String @default("")
+}

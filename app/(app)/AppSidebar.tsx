@@ -6,7 +6,7 @@ import { useState } from "react";
 import { UserMenu } from "./UserMenu";
 import {
   LayoutDashboard, ScanSearch, Target, Gamepad2, BookOpen, MessageSquare,
-  PenTool, BookText, Trophy, Users, Headset, ShieldCheck, Menu, X, Coins, Lock, GraduationCap,
+  PenTool, BookText, Trophy, Users, Headset, ShieldCheck, Menu, X, Coins, Lock, GraduationCap, Wand2,
 } from "lucide-react";
 
 const ICONS = {
@@ -24,6 +24,7 @@ const ICONS = {
   admin: ShieldCheck,
   creditos: Coins,
   plataforma: GraduationCap,
+  central: Wand2,
 };
 
 type NavItem = { href: string; label: string; icon: keyof typeof ICONS; show: boolean; locked: boolean };

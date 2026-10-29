@@ -37,6 +37,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const NAV = [
     { href: "/dashboard",  label: "Dashboard",  icon: "dashboard" as const, show: true, locked: false },
     ...(hasPlataforma ? [
+      { href: "/central",    label: "Central de Ferramentas", icon: "central" as const, show: true, locked: false },
       { href: "/scanner",    label: "Scanner",    icon: "scanner" as const, show: true, locked: false },
       { href: "/missoes",    label: "Plano de Ação", icon: "missoes" as const, show: true, locked: false },
       { href: "/simulacao",  label: "Simulação",  icon: "simulacao" as const, show: true, locked: false },
