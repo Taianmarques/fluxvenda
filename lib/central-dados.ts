@@ -11,7 +11,10 @@ export type FerramentaTela = {
   campos: CampoFerramenta[]; permitirCopiarPrompt: boolean;
   modulo: { id: string; nome: string; numero: number };
 };
-export type GeracaoTela = { id: string; resultado: string; salvo: boolean; createdAt: string; entradas: Record<string, string> };
+export type GeracaoTela = {
+  id: string; resultado: string; salvo: boolean; createdAt: string; entradas: Record<string, string>;
+  pedidoAjuste?: string | null; editado?: boolean; // versão ajustada pela IA / corrigida à mão
+};
 export type FerramentaRelacionada = { slug: string; nome: string; descricao: string; icone: string; moduloId: string };
 export type FerramentaTelaDados = {
   ferramenta: FerramentaTela;
@@ -59,7 +62,7 @@ export async function carregarFerramentaTela(userId: string, slug: string): Prom
       where: { profileId: userId, ferramentaId: f.id },
       orderBy: { createdAt: "desc" },
       take: 15,
-      select: { id: true, resultado: true, salvo: true, createdAt: true, entradas: true },
+      select: { id: true, resultado: true, salvo: true, createdAt: true, entradas: true, pedidoAjuste: true, editado: true },
     }),
     carregarRelacionadas(f),
     verificarUsoFerramenta(userId, f),
@@ -81,6 +84,7 @@ export async function carregarFerramentaTela(userId: string, slug: string): Prom
     historico: historico.map(h => ({
       id: h.id, resultado: h.resultado, salvo: h.salvo, createdAt: h.createdAt.toISOString(),
       entradas: (h.entradas ?? {}) as Record<string, string>,
+      pedidoAjuste: h.pedidoAjuste, editado: h.editado,
     })),
     relacionadas,
     uso,

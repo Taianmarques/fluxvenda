@@ -4,8 +4,11 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, Star, Sparkles, Loader2, Copy, Check, Bookmark, BookmarkCheck, RotateCcw, Building2, History, Trash2,
-  ClipboardCopy, AlertTriangle, Maximize2, Lightbulb, Lock, ChevronRight,
+  ClipboardCopy, AlertTriangle, Maximize2, Lightbulb, Lock, ChevronRight, Wand2, Pencil,
 } from "lucide-react";
+
+// Atalhos da área "Ajustar resultado" — o texto vai como pedido de ajuste pra IA
+const AJUSTES_RAPIDOS = ["Mais curto", "Mais detalhado", "Tom mais formal", "Tom mais descontraído", "Mais persuasivo", "Sem emojis", "Mais simples de entender"];
 import { CentralIcone, corDoModulo } from "@/lib/central-icons";
 import type { FerramentaTelaDados, GeracaoTela } from "@/lib/central-dados";
 import { Markdown, paraTextoPuro } from "../Markdown";
@@ -81,6 +84,13 @@ export function FerramentaClient({
   const [copiado, setCopiado] = useState<"resultado" | "prompt" | null>(null);
   const [promptCopiado, setPromptCopiado] = useState(false); // mostra os atalhos pro ChatGPT/Claude
   const [uso, setUso] = useState(dados.uso);
+  // Área de ajuste: pedir à IA (gera nova versão) ou editar o texto à mão
+  const [pedido, setPedido] = useState("");
+  const [ajustando, setAjustando] = useState(false);
+  const [erroAjuste, setErroAjuste] = useState<string | null>(null);
+  const [editando, setEditando] = useState(false);
+  const [textoEdit, setTextoEdit] = useState("");
+  const [salvandoEdit, setSalvandoEdit] = useState(false);
   const [verComoUsar, setVerComoUsar] = useState(false);
   const bloqueada = !uso.permitido;
 
@@ -132,6 +142,62 @@ export function FerramentaClient({
     } finally {
       setGerando(false);
     }
+  }
+
+  async function ajustar(texto: string) {
+    if (!atual || ajustando) return;
+    const p = texto.trim();
+    if (p.length < 3) { setErroAjuste("Escreva o que você quer mudar."); return; }
+    setErroAjuste(null);
+    setAjustando(true);
+    try {
+      const res = await fetch(`/api/central/geracoes/${atual.id}/ajustar`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pedido: p }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.geracao) {
+        setErroAjuste(data.error ?? "Não foi possível ajustar agora. Tente de novo.");
+        if (res.status === 429) setUso(u => ({ ...u, permitido: false, motivo: data.error ?? u.motivo }));
+        return;
+      }
+      if (typeof data.usosHoje === "number" && uso.limite) {
+        setUso(u => ({ ...u, usosHoje: data.usosHoje, permitido: data.usosHoje < (u.limite ?? Infinity), motivo: data.usosHoje >= (u.limite ?? Infinity) ? "Você atingiu o limite diário desta ferramenta. Volte amanhã!" : null }));
+      }
+      const g: GeracaoTela = { ...data.geracao, createdAt: new Date(data.geracao.createdAt).toISOString() };
+      setHistorico(prev => [g, ...prev].slice(0, 30));
+      setAtualId(g.id);
+      setPedido("");
+      rolarProResultado();
+    } catch {
+      setErroAjuste("Falha de conexão. Tente de novo.");
+    } finally {
+      setAjustando(false);
+    }
+  }
+
+  function comecarEdicao() {
+    if (!atual) return;
+    setTextoEdit(atual.resultado);
+    setEditando(true);
+  }
+
+  async function salvarEdicao() {
+    if (!atual || salvandoEdit) return;
+    const texto = textoEdit.trim();
+    if (!texto) return;
+    setSalvandoEdit(true);
+    const anterior = atual.resultado;
+    setHistorico(prev => prev.map(h => h.id === atual.id ? { ...h, resultado: texto, editado: true } : h));
+    const res = await fetch(`/api/central/geracoes/${atual.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ resultado: texto }),
+    }).catch(() => null);
+    setSalvandoEdit(false);
+    if (!res?.ok) {
+      setHistorico(prev => prev.map(h => h.id === atual.id ? { ...h, resultado: anterior } : h));
+      setErroAjuste("Não foi possível salvar a edição. Tente de novo.");
+      return;
+    }
+    setEditando(false);
   }
 
   async function copiarResultado() {
@@ -340,15 +406,34 @@ export function FerramentaClient({
         <div className="flex border-b border-slate-200 mb-3" role="tablist">
           {versoes.map((v, i) => (
             <button
-              key={v.id} role="tab" aria-selected={v.id === atual.id} onClick={() => setAtualId(v.id)}
+              key={v.id} role="tab" aria-selected={v.id === atual.id} onClick={() => { setAtualId(v.id); setEditando(false); }}
+              title={v.pedidoAjuste ? `Ajuste: ${v.pedidoAjuste}` : v.editado ? "Editada por você" : undefined}
               className={`flex-1 -mb-px border-b-2 px-2 py-2 text-sm ${v.id === atual.id ? "border-indigo-600 text-indigo-700 font-medium" : "border-transparent text-slate-500 hover:text-slate-800"}`}
             >
-              Versão {i + 1}
+              Versão {i + 1}{v.pedidoAjuste ? " · ajustada" : v.editado ? " · editada" : ""}
             </button>
           ))}
         </div>
       )}
-      {blocos.length >= 2 ? (
+      {atual.pedidoAjuste && !editando && (
+        <p className="mb-2.5 text-xs text-indigo-700 bg-indigo-50 rounded-lg px-3 py-2"><span className="font-medium">Ajuste pedido:</span> {atual.pedidoAjuste}</p>
+      )}
+      {editando ? (
+        <div className="space-y-2">
+          <textarea
+            value={textoEdit} onChange={e => setTextoEdit(e.target.value)} rows={18} maxLength={50000}
+            aria-label="Editar o resultado"
+            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-800 font-mono leading-relaxed focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
+          />
+          <p className="text-xs text-slate-400">Os títulos começam com ## e o negrito fica entre **asteriscos** — mantenha assim para a formatação continuar.</p>
+          <div className="flex gap-2">
+            <button onClick={salvarEdicao} disabled={salvandoEdit || !textoEdit.trim()} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+              {salvandoEdit ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} Salvar edição
+            </button>
+            <button onClick={() => setEditando(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
+          </div>
+        </div>
+      ) : blocos.length >= 2 ? (
         <div className={`space-y-2.5 rounded-xl bg-slate-50 p-2.5 ${painel ? "max-h-[520px] overflow-y-auto" : ""}`}>
           {blocos.map((b, i) => b.titulo
             ? <BlocoResultado key={`${atual.id}-${i}`} titulo={b.titulo} corpo={b.corpo} />
@@ -370,6 +455,45 @@ export function FerramentaClient({
           {atual.salvo ? <BookmarkCheck size={15} className="text-indigo-600" /> : <Bookmark size={15} />} {atual.salvo ? "Salvo" : "Salvar"}
         </button>
       </div>
+
+      {/* Ajustes: corrigir informação ou mudar o tom sem gerar tudo do zero */}
+      {!editando && (
+        <div className="mt-5 rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 space-y-3">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <p className="font-semibold text-slate-900 flex items-center gap-1.5"><Wand2 size={15} className="text-indigo-600" /> Ajustar resultado</p>
+            <button onClick={comecarEdicao} className="inline-flex items-center gap-1.5 text-sm text-slate-600 hover:text-slate-900">
+              <Pencil size={14} /> Editar o texto à mão
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {AJUSTES_RAPIDOS.map(a => (
+              <button
+                key={a} onClick={() => ajustar(a)} disabled={ajustando || bloqueada}
+                className="rounded-full border border-slate-200 bg-white hover:border-indigo-300 hover:text-indigo-700 px-3 py-1 text-xs text-slate-600 disabled:opacity-50"
+              >
+                {a}
+              </button>
+            ))}
+          </div>
+          <textarea
+            value={pedido} onChange={e => setPedido(e.target.value)} rows={2} maxLength={2000} disabled={ajustando}
+            onKeyDown={e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) ajustar(pedido); }}
+            aria-label="O que você quer corrigir ou ajustar"
+            placeholder="O que você quer corrigir? Ex: o preço certo é R$ 200 · não ofereça desconto · troque o nome da loja para Studio Bella · deixe a resposta 3 mais curta"
+            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 disabled:opacity-60"
+          />
+          {erroAjuste && <p className="text-sm text-red-600">{erroAjuste}</p>}
+          <div className="flex items-center gap-3 flex-wrap">
+            <button
+              onClick={() => ajustar(pedido)} disabled={ajustando || bloqueada || pedido.trim().length < 3}
+              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              {ajustando ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />} {ajustando ? "Ajustando..." : "Ajustar com IA"}
+            </button>
+            <span className="text-xs text-slate-500">A IA muda só o que você pedir e cria uma nova versão — a anterior fica nas abas.</span>
+          </div>
+        </div>
+      )}
     </section>
   );
 

@@ -2339,6 +2339,11 @@ model CentralGeracao {
   salvo     Boolean @default(false) // "Salvar" — aparece em /central/salvos
   titulo    String?
 
+  // Versão criada a partir de um ajuste pedido à IA ("deixe mais curto", "o preço certo é R$ 200")
+  ajusteDeId   String?
+  pedidoAjuste String?
+  editado      Boolean @default(false) // texto corrigido à mão pelo usuário
+
   provider     String
   model        String
   inputTokens  Int @default(0)

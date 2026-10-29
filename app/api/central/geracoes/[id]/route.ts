@@ -18,7 +18,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const body = patchSchema.safeParse(await req.json().catch(() => null));
   if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
 
-  const r = await prisma.centralGeracao.updateMany({ where: { id, profileId: userId }, data: body.data });
+  // Texto corrigido à mão fica marcado como editado
+  const data = { ...body.data, ...(body.data.resultado !== undefined && { editado: true }) };
+  const r = await prisma.centralGeracao.updateMany({ where: { id, profileId: userId }, data });
   if (r.count === 0) return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
   return NextResponse.json({ ok: true });
 }

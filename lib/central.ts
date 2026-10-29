@@ -82,6 +82,42 @@ const REGRAS_COPIA = [
 const REGRA_PERGUNTAS_PLATAFORMA = /Se alguma informação essencial estiver ausente, não pergunte de volta:[^.]*\./;
 const REGRA_PERGUNTAS_ORIGINAL = "Se alguma informação essencial estiver ausente, faça no máximo três perguntas objetivas antes de entregar.";
 
+// Ajuste de um resultado já gerado: a IA recebe a tarefa original, o material atual e o pedido do
+// usuário, e devolve o material inteiro com SÓ aquilo alterado — o resto (estrutura, títulos ##,
+// textos que não foram citados) fica igual, pra pessoa não perder o que já estava bom.
+export async function ajustarResultado(params: {
+  prompt: string;
+  entradas: Record<string, string>;
+  perfil: PerfilEmpresaDados;
+  campos: CampoFerramenta[];
+  resultadoAtual: string;
+  pedido: string;
+}) {
+  const contexto = perfilComoTexto(params.perfil);
+  const system = [
+    SISTEMA_BASE,
+    contexto ? `\nContexto da empresa do usuário:\n${contexto}` : "",
+    "\nVOCÊ ESTÁ AJUSTANDO UM MATERIAL QUE JÁ FOI ENTREGUE:",
+    "- Aplique exatamente o ajuste pedido, em todos os pontos do material onde ele se aplica (ex.: se o preço mudou, troque o preço em todas as mensagens).",
+    "- Se o pedido tiver mais de uma correção (ex.: \"o preço é R$ 200 e só parcelamos em 3x\"), aplique CADA uma delas — confira item por item antes de devolver. Informação nova do usuário (condição de pagamento, prazo, garantia) deve aparecer nos itens onde faz sentido mencioná-la.",
+    "- Mantenha todo o resto como está: mesma estrutura, mesmos títulos ##, mesma quantidade de itens e os textos que o ajuste não afeta.",
+    "- Correções de informação feitas pelo usuário (preço, nome, prazo, condição) passam a valer como fato — use exatamente como ele escreveu.",
+    "- Devolva o material completo já ajustado, sem comentar o que mudou e sem introdução.",
+  ].join("\n");
+  const user = [
+    `TAREFA ORIGINAL:\n${montarPrompt(params.prompt, params.entradas, params.perfil, params.campos)}`,
+    `MATERIAL ATUAL:\n${params.resultadoAtual}`,
+    `AJUSTE PEDIDO:\n${params.pedido}`,
+  ].join("\n\n");
+
+  const res = await openai.chat.completions.create({
+    model: CENTRAL_MODEL, max_tokens: 8000, temperature: 0.4,
+    messages: [{ role: "system", content: system }, { role: "user", content: user }],
+  });
+  const texto = (res.choices[0]?.message?.content ?? "").trim();
+  return { texto, provider: "openai" as const, model: CENTRAL_MODEL, inputTokens: res.usage?.prompt_tokens ?? 0, outputTokens: res.usage?.completion_tokens ?? 0 };
+}
+
 // O formato esperado só entra à parte quando o prompt ainda não traz o mesmo texto (as 100 ferramentas
 // do material já têm o "ENTREGUE" dentro do prompt — não precisa repetir)
 function formatoExtra(prompt: string, formato?: string) {
