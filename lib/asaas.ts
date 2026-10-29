@@ -62,7 +62,7 @@ export async function createAsaasCardCharge(
   apiKey: string, sandbox: boolean, customerId: string, value: number, description: string,
   creditCard: CreditCardData, creditCardHolderInfo: CreditCardHolderInfo, remoteIp: string,
   installmentCount?: number, // > 1: `value` é o total, dividido pelo Asaas em N parcelas
-): Promise<{ id: string; status: string; installment?: string }> {
+): Promise<{ id: string; status: string; installment?: string; creditCard?: { creditCardNumber?: string; creditCardToken?: string } }> {
   const dueDate = new Date().toISOString().slice(0, 10);
   return asaasFetch(apiKey, sandbox, "/payments", {
     method: "POST",
@@ -75,6 +75,21 @@ export async function createAsaasCardCharge(
       creditCard,
       creditCardHolderInfo,
       remoteIp,
+    }),
+  });
+}
+
+// Cobrança no cartão já tokenizado numa compra anterior (o Asaas devolve `creditCard.creditCardToken`
+// na primeira cobrança). Usado no upsell de um clique — só chamar com confirmação explícita do comprador.
+export async function createAsaasTokenCardCharge(
+  apiKey: string, sandbox: boolean, customerId: string, value: number, description: string,
+  creditCardToken: string, remoteIp: string,
+): Promise<{ id: string; status: string }> {
+  return asaasFetch(apiKey, sandbox, "/payments", {
+    method: "POST",
+    body: JSON.stringify({
+      customer: customerId, billingType: "CREDIT_CARD", value, dueDate: new Date().toISOString().slice(0, 10),
+      description, creditCardToken, remoteIp,
     }),
   });
 }

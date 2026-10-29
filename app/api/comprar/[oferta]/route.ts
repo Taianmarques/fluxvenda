@@ -3,7 +3,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { createAsaasCardCharge, createAsaasCharge, createAsaasCustomer, getAsaasPixQrCode } from "@/lib/asaas";
-import { calcularCompra, carregarOfertaCheckout, contaAsaasPlataforma, sincronizarCompra } from "@/lib/compras";
+import { assinarUpsell, calcularCompra, carregarOfertaCheckout, contaAsaasPlataforma, sincronizarCompra } from "@/lib/compras";
 
 const schema = z.object({
   nome: z.string().trim().min(3, "Informe seu nome completo").max(120),
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ofe
       const cobranca = await createAsaasCharge(conta.apiKey, conta.sandbox, customer.id, valor, descricao, "PIX");
       await prisma.compra.update({ where: { id: compra.id }, data: { asaasPaymentId: cobranca.id, asaasCustomerId: customer.id } });
       const qr = await getAsaasPixQrCode(conta.apiKey, conta.sandbox, cobranca.id);
-      return NextResponse.json({ compraId: compra.id, status: "PENDENTE", totalCentavos, pix: { payload: qr.payload, imagem: qr.encodedImage } });
+      return NextResponse.json({ compraId: compra.id, status: "PENDENTE", totalCentavos, pix: { payload: qr.payload, imagem: qr.encodedImage }, upsellToken: assinarUpsell(compra.id) });
     }
 
     const c = d.cartao!;
@@ -73,10 +73,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ofe
       { name: d.nome, email: d.email, cpfCnpj: d.cpfCnpj, postalCode: c.postalCode, addressNumber: c.addressNumber, phone: d.telefone },
       remoteIp,
     );
-    await prisma.compra.update({ where: { id: compra.id }, data: { asaasPaymentId: cobranca.id, asaasCustomerId: customer.id, asaasInstallmentId: cobranca.installment ?? null } });
+    await prisma.compra.update({
+      where: { id: compra.id },
+      data: {
+        asaasPaymentId: cobranca.id, asaasCustomerId: customer.id, asaasInstallmentId: cobranca.installment ?? null,
+        // Token (não o cartão) pro upsell de um clique, se a conta Asaas tiver tokenização
+        asaasCardToken: cobranca.creditCard?.creditCardToken ?? null,
+        cartaoFinal: cobranca.creditCard?.creditCardNumber?.slice(-4) ?? null,
+      },
+    });
     // Cartão responde na hora — confirma consultando o Asaas (mesmo caminho do webhook)
     const status = await sincronizarCompra(compra.id);
-    return NextResponse.json({ compraId: compra.id, status, totalCentavos });
+    return NextResponse.json({ compraId: compra.id, status, totalCentavos, upsellToken: assinarUpsell(compra.id) });
   } catch (err) {
     await prisma.compra.update({ where: { id: compra.id }, data: { status: "CANCELADO", encerradaEm: new Date() } }).catch(() => {});
     console.error("[comprar]", slug, compra.id, err);

@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { getAsaasPayment } from "@/lib/asaas";
 import { generateToken } from "@/lib/auth/tokens";
@@ -140,6 +141,62 @@ async function encerrarCompra(compraId: string, status: "REEMBOLSADO" | "ESTORNA
   const r = await prisma.compra.updateMany({ where: { id: compraId, status: { not: status } }, data: { status, encerradaEm: new Date() } });
   if (r.count === 0) return;
   await prisma.acessoProduto.updateMany({ where: { compraId, ativo: true }, data: { ativo: false, revogadoEm: new Date(), motivo } });
+}
+
+// ─── Upsell ───────────────────────────────────────────────────────────────────────────────
+// Depois da compra paga, a tela de confirmação oferece o produto UPSELL da oferta. Só quem fez a
+// compra tem a assinatura (devolvida na resposta do checkout); a oferta vale por 2 horas depois
+// do pagamento e nunca oferece produto que o comprador já tem. Aceitar cria uma Compra NOVA,
+// ligada à original — a cobrança só acontece com a confirmação do comprador.
+
+const JANELA_UPSELL_MS = 2 * 60 * 60 * 1000;
+
+export function assinarUpsell(compraId: string) {
+  const segredo = process.env.SESSION_SECRET ?? "";
+  return createHmac("sha256", segredo).update(`upsell:${compraId}`).digest("base64url");
+}
+
+function upsellValido(compraId: string, token: string | null | undefined) {
+  if (!token) return false;
+  const esperado = Buffer.from(assinarUpsell(compraId));
+  const recebido = Buffer.from(token);
+  return esperado.length === recebido.length && timingSafeEqual(esperado, recebido);
+}
+
+// Upsell disponível pra uma compra (ou null). Confere assinatura, pagamento, janela e se o
+// comprador já não tem o produto (inclusive por já ter aceitado este upsell).
+export async function carregarUpsell(compraId: string, token: string | null | undefined) {
+  if (!upsellValido(compraId, token)) return null;
+  const origem = await prisma.compra.findUnique({ where: { id: compraId } });
+  if (!origem || origem.status !== "PAGO" || !origem.ofertaId || !origem.profileId || origem.compraOrigemId) return null;
+  if (!origem.pagoEm || Date.now() - origem.pagoEm.getTime() > JANELA_UPSELL_MS) return null;
+
+  const item = await prisma.ofertaItem.findFirst({
+    where: { ofertaId: origem.ofertaId, papel: "UPSELL", oferta: { ativa: true }, produto: { publicado: true } },
+    orderBy: { ordem: "asc" },
+    include: { produto: { select: { id: true, nome: true, beneficio: true, descricao: true, capaUrl: true, icone: true } } },
+  });
+  if (!item) return null;
+  if ((await produtosLiberados(origem.profileId)).has(item.produtoId)) return null;
+  // Já há uma compra deste upsell em andamento/paga a partir desta compra → não oferece de novo
+  const jaPedido = await prisma.compra.findFirst({ where: { compraOrigemId: origem.id, status: { in: ["PENDENTE", "PAGO"] } }, select: { id: true } });
+  if (jaPedido) return null;
+
+  return { origem, item, cartaoFinal: origem.formaPagamento === "CARTAO" && origem.asaasCardToken ? origem.cartaoFinal : null };
+}
+
+export type UpsellDisponivel = NonNullable<Awaited<ReturnType<typeof carregarUpsell>>>;
+
+// Cria a compra do upsell aceito (dados do comprador vêm da compra original)
+export async function criarCompraUpsell(u: UpsellDisponivel, formaPagamento: "PIX" | "CARTAO") {
+  return prisma.compra.create({
+    data: {
+      ofertaId: u.origem.ofertaId, compraOrigemId: u.origem.id, profileId: u.origem.profileId,
+      email: u.origem.email, nome: u.origem.nome, cpfCnpj: u.origem.cpfCnpj, telefone: u.origem.telefone,
+      valorCentavos: u.item.precoCentavos, formaPagamento, asaasCustomerId: u.origem.asaasCustomerId,
+      itens: { create: [{ produtoId: u.item.produtoId, papel: "UPSELL", precoCentavos: u.item.precoCentavos }] },
+    },
+  });
 }
 
 // Webhook: registra o evento (idempotência) e sincroniza a compra correspondente, se houver

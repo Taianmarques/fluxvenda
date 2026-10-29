@@ -106,7 +106,7 @@ function OfertaEditor({ oferta, produtos }: { oferta: Oferta; produtos: Produto[
         </button>
         {msg && <span className={`text-sm ${msg.ok ? "text-green-400" : "text-red-400"}`}>{msg.texto}</span>}
       </div>
-      <p className="text-xs text-gray-500">Os preços daqui são os cobrados no checkout (Asaas). Upsell ainda não aparece no checkout — vem na próxima etapa.</p>
+      <p className="text-xs text-gray-500">Os preços daqui são os cobrados no checkout (Asaas). O upsell aparece depois da compra confirmada, por até 2 horas, e só cobra com a confirmação do comprador.</p>
     </section>
   );
 }
