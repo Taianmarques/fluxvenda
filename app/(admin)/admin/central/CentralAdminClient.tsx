@@ -10,6 +10,7 @@ type Modulo = { id: string; numero: number; nome: string; icone: string };
 type Linha = { id: string; slug: string; nome: string; descricao: string; icone: string; moduloId: string; publicada: boolean; ordem: number; updatedAt: string; usos: number };
 
 // Meta de ferramentas por módulo (total 100), pela especificação da Central
+// Metas só do produto 01 (módulos 1–10); outros produtos mostram só a contagem
 const META: Record<number, number> = { 1: 10, 2: 10, 3: 15, 4: 15, 5: 10, 6: 10, 7: 10, 8: 10, 9: 5, 10: 5 };
 
 const EXEMPLO_JSON = `[
@@ -170,7 +171,7 @@ export function CentralAdminClient({ modulos, ferramentasIniciais }: { modulos: 
                 <div className="w-8 h-8 rounded-lg bg-blue-600/15 text-blue-400 flex items-center justify-center"><CentralIcone nome={m.icone} size={16} /></div>
                 <p className="font-semibold flex-1"><span className="text-gray-500 mr-1.5 tabular-nums">{String(m.numero).padStart(2, "0")}</span>{m.nome}</p>
                 <span className={`text-xs tabular-nums rounded-full px-2.5 py-1 ${doModulo.length >= meta ? "bg-green-500/15 text-green-400" : "bg-gray-800 text-gray-400"}`}>
-                  {doModulo.length}/{meta}
+                  {meta ? `${doModulo.length}/${meta}` : doModulo.length}
                 </span>
               </div>
               {doModulo.length === 0 ? (

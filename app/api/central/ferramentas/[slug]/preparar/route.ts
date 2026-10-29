@@ -14,7 +14,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { slug } = await params;
-  const ferramenta = await prisma.centralFerramenta.findUnique({ where: { slug }, include: { modulo: { select: { produtoId: true } } } });
+  const ferramenta = await prisma.centralFerramenta.findUnique({ where: { slug }, include: { modulo: { select: { produtoId: true, produto: { select: { regrasQualidade: true } } } } } });
   if (!ferramenta || !ferramenta.publicada) return NextResponse.json({ error: "Ferramenta não encontrada" }, { status: 404 });
   if (!(await temAcessoAFerramenta(userId, ferramenta))) return NextResponse.json({ error: "Você ainda não tem acesso a este produto" }, { status: 403 });
 
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
 
   const prompt = montarPromptFinal({
     prompt: ferramenta.prompt, instrucoes: ferramenta.instrucoes, formatoResposta: ferramenta.formatoResposta,
-    entradas: v.entradas, perfil: await carregarPerfil(userId), campos,
+    entradas: v.entradas, perfil: await carregarPerfil(userId), campos, regrasQualidade: ferramenta.modulo.produto.regrasQualidade,
   });
 
   const geracao = await prisma.centralGeracao.create({

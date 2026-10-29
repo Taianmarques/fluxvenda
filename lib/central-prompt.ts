@@ -41,6 +41,7 @@ export function montarPromptFinal(params: {
   entradas: Record<string, string>;
   perfil: Partial<PerfilEmpresaDados> | null;
   campos: CampoFerramenta[];
+  regrasQualidade?: boolean; // false: o prompt já traz regras próprias completas (ex: Analisador)
 }) {
   const contexto = perfilComoTexto(params.perfil);
   const regras = params.instrucoes.trim().replace(REGRA_PERGUNTAS_ADAPTADA, REGRA_PERGUNTAS_ORIGINAL);
@@ -52,7 +53,7 @@ export function montarPromptFinal(params: {
     contexto ? `SOBRE A MINHA EMPRESA:\n${contexto}` : "",
     formato ? `ENTREGUE:\n${formato}` : "",
     regras ? `REGRAS: ${regras}` : "",
-    `COMO QUERO A RESPOSTA:\n${REGRAS_QUALIDADE}`,
+    params.regrasQualidade === false ? "" : `COMO QUERO A RESPOSTA:\n${REGRAS_QUALIDADE}`,
   ].filter(Boolean).join("\n\n").trim();
 }
 

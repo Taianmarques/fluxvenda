@@ -10,7 +10,7 @@ export type FerramentaTela = {
   comoUsar: string; formatoResposta: string;
   campos: CampoFerramenta[]; permitirCopiarPrompt: boolean;
   modulo: { id: string; nome: string; numero: number };
-  produto: { id: string; slug: string; nome: string };
+  produto: { id: string; slug: string; nome: string; anexoNecessario: string | null };
 };
 export type GeracaoTela = {
   id: string; resultado: string; salvo: boolean; createdAt: string; entradas: Record<string, string>;
@@ -57,7 +57,7 @@ async function carregarRelacionadas(f: { id: string; moduloId: string; ordem: nu
 export async function carregarFerramentaTela(userId: string, slug: string, reusarId?: string): Promise<FerramentaTelaDados | null> {
   const f = await prisma.centralFerramenta.findUnique({
     where: { slug },
-    include: { modulo: { select: { id: true, nome: true, numero: true, produto: { select: { id: true, slug: true, nome: true } } } } },
+    include: { modulo: { select: { id: true, nome: true, numero: true, produto: { select: { id: true, slug: true, nome: true, anexoNecessario: true } } } } },
   });
   if (!f || !f.publicada) return null;
 

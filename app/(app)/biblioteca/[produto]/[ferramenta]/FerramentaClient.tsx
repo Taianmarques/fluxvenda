@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, Star, Loader2, Copy, Check, Building2, History, Trash2, AlertTriangle, Maximize2,
-  Lock, ChevronRight, Wand2, ExternalLink, RotateCcw, Eye, ClipboardList, Lightbulb,
+  Lock, ChevronRight, Wand2, ExternalLink, RotateCcw, Eye, ClipboardList, Lightbulb, Paperclip,
 } from "lucide-react";
 import { CentralIcone, corDoModulo } from "@/lib/central-icons";
 import type { FerramentaTelaDados, GeracaoTela } from "@/lib/central-dados";
@@ -62,6 +62,7 @@ export function FerramentaClient({
   const { ferramenta, perfilOk, nomeEmpresa } = dados;
   const cor = corDoModulo(ferramenta.modulo.id);
   const painel = modo === "painel";
+  const anexo = ferramenta.produto.anexoNecessario; // ex: "o relatório de vendas (planilha ou PDF)"
 
   // Valores iniciais: prompt reutilizado > último prompt preparado > perfil da empresa
   const [valores, setValores] = useState<Record<string, string>>(() => {
@@ -226,7 +227,9 @@ export function FerramentaClient({
         <ol className="space-y-1 list-decimal pl-5 marker:text-indigo-500">
           <li>Preencha as informações abaixo e clique em <strong className="text-slate-800">Preparar meu prompt</strong>.</li>
           <li>Copie o prompt pronto.</li>
-          <li>Abra o ChatGPT ou o Claude, cole e envie.</li>
+          {anexo
+            ? <li>Abra o ChatGPT ou o Claude, <strong className="text-slate-800">anexe {anexo}</strong>, cole o prompt na mesma mensagem e envie.</li>
+            : <li>Abra o ChatGPT ou o Claude, cole e envie.</li>}
         </ol>
         {ferramenta.comoUsar && <p className="flex items-start gap-1.5 pt-1"><Lightbulb size={14} className="mt-0.5 flex-shrink-0 text-indigo-500" /> {ferramenta.comoUsar}</p>}
       </div>
@@ -304,6 +307,11 @@ export function FerramentaClient({
         <span className="text-xs text-slate-400">{quando(atual.createdAt)}</span>
       </div>
       <p className="text-sm text-slate-500 mb-3">Copie, abra a sua IA e cole com <strong className="text-slate-700">Ctrl+V</strong> (no celular: toque e segure → Colar). A Vendas IA não envia o prompt sozinha.</p>
+      {anexo && (
+        <p className="mb-3 flex items-start gap-2 text-sm text-indigo-800 bg-indigo-50 rounded-lg px-3 py-2">
+          <Paperclip size={15} className="mt-0.5 flex-shrink-0" /> Não esqueça: anexe {anexo} na conversa do ChatGPT ou do Claude junto com este prompt. A análise é feita lá, com o seu arquivo.
+        </p>
+      )}
       {desatualizado && (
         <p className="mb-3 flex items-start gap-2 text-xs text-amber-800 bg-amber-50 rounded-lg px-3 py-2">
           <AlertTriangle size={13} className="mt-0.5 flex-shrink-0" /> Você mudou as informações depois de preparar. Clique em &quot;Preparar de novo&quot; para atualizar o prompt.

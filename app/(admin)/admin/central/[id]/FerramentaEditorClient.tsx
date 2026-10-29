@@ -107,7 +107,7 @@ export function FerramentaEditorClient({ modulos, todas, inicial }: {
     try {
       const res = await fetch("/api/admin/central/previa", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: d.prompt, instrucoes: d.instrucoes, formatoResposta: d.formatoResposta, campos: limparCampos(), entradas: teste }),
+        body: JSON.stringify({ prompt: d.prompt, instrucoes: d.instrucoes, formatoResposta: d.formatoResposta, campos: limparCampos(), entradas: teste, moduloId: d.moduloId }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setErroTeste(data.error ?? "Falhou."); return; }

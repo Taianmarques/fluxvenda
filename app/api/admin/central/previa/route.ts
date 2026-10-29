@@ -18,6 +18,7 @@ const schema = z.object({
   formatoResposta: z.string().max(2000).default(""),
   campos: camposSchema,
   entradas: z.record(z.string(), z.unknown()).default({}),
+  moduloId: z.string().optional(), // pra aplicar as regras do produto da ferramenta
 });
 
 // Pré-visualização no editor: monta o prompt que o cliente vai copiar, com o que está no editor
@@ -31,9 +32,13 @@ export async function POST(req: NextRequest) {
   const v = validarEntradas(body.data.campos, body.data.entradas);
   if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
 
+  const modulo = body.data.moduloId
+    ? await prisma.centralModulo.findUnique({ where: { id: body.data.moduloId }, select: { produto: { select: { regrasQualidade: true } } } })
+    : null;
   const prompt = montarPromptFinal({
     prompt: body.data.prompt, instrucoes: body.data.instrucoes, formatoResposta: body.data.formatoResposta,
     entradas: v.entradas, perfil: await carregarPerfil(userId), campos: body.data.campos,
+    regrasQualidade: modulo?.produto.regrasQualidade ?? true,
   });
   return NextResponse.json({ prompt, sobrando: marcacoesSobrando(prompt) });
 }

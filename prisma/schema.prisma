@@ -2315,6 +2315,12 @@ model InfoProduto {
   inclusoNaPlataforma Boolean @default(false)
   // Código do produto no checkout/provedor (referência solta — ex: SKU usado em relatórios)
   checkoutRef String?
+  // Acrescenta as regras gerais de qualidade ("Como quero a resposta") no fim de cada prompt.
+  // Produtos cujos prompts já trazem regras próprias completas (ex: Analisador) desligam.
+  regrasQualidade Boolean @default(true)
+  // O que a pessoa precisa anexar na IA junto com o prompt (ex: "o relatório de vendas") —
+  // aparece no passo a passo e na tela do prompt pronto. Vazio = nada a anexar.
+  anexoNecessario String?
 
   modulos    CentralModulo[]
   ofertaItens OfertaItem[]
