@@ -16,6 +16,7 @@ async function assertAdmin(userId: string) {
 const schema = z.object({
   prompt: z.string().min(1).max(20000),
   instrucoes: z.string().max(5000).default(""),
+  formatoResposta: z.string().max(2000).default(""),
   campos: camposSchema,
   entradas: z.record(z.string(), z.unknown()).default({}),
 });
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
   if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
 
   try {
-    const r = await gerarComFerramenta({ prompt: body.data.prompt, instrucoes: body.data.instrucoes, entradas: v.entradas, perfil: await carregarPerfil(userId), campos: body.data.campos });
+    const r = await gerarComFerramenta({ prompt: body.data.prompt, instrucoes: body.data.instrucoes, formatoResposta: body.data.formatoResposta, entradas: v.entradas, perfil: await carregarPerfil(userId), campos: body.data.campos });
     logTokenUsage({ teamId: FLUXVENDA_TEAM_ID, provider: r.provider, model: r.model, feature: "central-teste", inputTokens: r.inputTokens, outputTokens: r.outputTokens }).catch(() => {});
     return NextResponse.json({ resultado: r.texto, modelo: r.model });
   } catch (err) {

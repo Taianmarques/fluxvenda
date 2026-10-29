@@ -332,7 +332,7 @@ export function CentralClient({
             {carregandoPainel && !painel ? (
               <div className={`${cartao} p-10 flex items-center justify-center text-slate-400`}><Loader2 className="animate-spin" /></div>
             ) : painel ? (
-              <FerramentaClient key={painel.ferramenta.slug} dados={painel} modo="painel" onFechar={fecharPainel} onFavoritoChange={marcarFavorito} />
+              <FerramentaClient key={painel.ferramenta.slug} dados={painel} modo="painel" onFechar={fecharPainel} onFavoritoChange={marcarFavorito} onAbrirRelacionada={abrirNoPainel} />
             ) : (
               <div className={`${cartao} p-6 text-center`}>
                 <div className="w-12 h-12 mx-auto rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center"><MousePointerClick size={22} /></div>

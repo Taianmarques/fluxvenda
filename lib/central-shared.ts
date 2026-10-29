@@ -19,6 +19,17 @@ export type CampoFerramenta = {
   // Campo do perfil da empresa que já preenche este (ex: "produtos") — o formulário chega
   // pré-preenchido e, se a pessoa apagar, o prompt usa o valor do perfil
   perfil?: PerfilKey;
+  // Validações: texto (máximo de caracteres) e número (faixa)
+  maxCaracteres?: number;
+  min?: number;
+  max?: number;
+};
+
+export const ACESSOS = ["todos", "gestores"] as const;
+export type AcessoFerramenta = (typeof ACESSOS)[number];
+export const ACESSO_LABEL: Record<AcessoFerramenta, string> = {
+  todos: "Todos que têm a Plataforma",
+  gestores: "Só gestores",
 };
 
 export const PERFIL_CAMPOS = [

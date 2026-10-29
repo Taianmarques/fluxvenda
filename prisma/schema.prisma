@@ -2302,6 +2302,12 @@ model CentralFerramenta {
   permitirCopiarPrompt Boolean @default(false) // mostra "Copiar prompt" pro usuário usar no ChatGPT dele
   ordem                Int     @default(0)
 
+  comoUsar        String   @default("") @db.Text // instruções de uso mostradas ao usuário
+  formatoResposta String   @default("") @db.Text // o que a IA deve entregar (vai no prompt e aparece como "Você recebe")
+  relacionadas    String[] @default([]) // slugs; vazio = automáticas (mesmo módulo)
+  acesso          String   @default("todos") // "todos" | "gestores" (só GESTOR/ADMIN)
+  limiteDiario    Int? // usos por usuário por dia; null = sem limite
+
   favoritos CentralFavorito[]
   geracoes  CentralGeracao[]
 

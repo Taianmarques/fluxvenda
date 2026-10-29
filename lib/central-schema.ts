@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CAMPO_TIPOS, PERFIL_CAMPOS, type PerfilKey } from "@/lib/central-shared";
+import { ACESSOS, CAMPO_TIPOS, PERFIL_CAMPOS, type PerfilKey } from "@/lib/central-shared";
 
 export const campoSchema = z.object({
   key: z.string().trim().min(1).max(40).regex(/^[a-zA-Z0-9_]+$/, "A chave do campo só pode ter letras, números e _"),
@@ -10,6 +10,9 @@ export const campoSchema = z.object({
   opcoes: z.array(z.string().trim().min(1).max(120)).max(30).optional(),
   obrigatorio: z.boolean().default(false),
   perfil: z.enum(PERFIL_CAMPOS.map(c => c.key) as [PerfilKey, ...PerfilKey[]]).optional(),
+  maxCaracteres: z.number().int().min(1).max(3000).optional(),
+  min: z.number().optional(),
+  max: z.number().optional(),
 });
 
 export const camposSchema = z.array(campoSchema).max(15)
@@ -30,6 +33,11 @@ export const ferramentaSchema = z.object({
   publicada: z.boolean().default(false),
   permitirCopiarPrompt: z.boolean().default(false),
   ordem: z.number().int().min(0).max(1000).default(0),
+  comoUsar: z.string().trim().max(2000).default(""),
+  formatoResposta: z.string().trim().max(2000).default(""),
+  relacionadas: z.array(z.string().trim().min(1).max(80)).max(8).default([]),
+  acesso: z.enum(ACESSOS).default("todos"),
+  limiteDiario: z.number().int().min(1).max(1000).nullable().default(null),
 });
 
 export type FerramentaInput = z.infer<typeof ferramentaSchema>;

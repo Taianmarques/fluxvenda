@@ -90,7 +90,8 @@ export function CentralAdminClient({ modulos, ferramentasIniciais }: { modulos: 
       const lista = (data.ferramentas ?? []).map((f: Record<string, unknown>) => ({
         slug: f.slug, moduloId: f.moduloId, nome: f.nome, descricao: f.descricao, objetivo: f.objetivo, icone: f.icone,
         campos: f.campos, prompt: f.prompt, instrucoes: f.instrucoes, publicada: f.publicada,
-        permitirCopiarPrompt: f.permitirCopiarPrompt, ordem: f.ordem,
+        permitirCopiarPrompt: f.permitirCopiarPrompt, ordem: f.ordem, comoUsar: f.comoUsar, formatoResposta: f.formatoResposta,
+        relacionadas: f.relacionadas, acesso: f.acesso, limiteDiario: f.limiteDiario,
       }));
       const blob = new Blob([JSON.stringify(lista, null, 2)], { type: "application/json" });
       const a = document.createElement("a");

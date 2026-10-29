@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, Star, Sparkles, Loader2, Copy, Check, Bookmark, BookmarkCheck, RotateCcw, Building2, History, Trash2,
-  ClipboardCopy, AlertTriangle, Maximize2,
+  ClipboardCopy, AlertTriangle, Maximize2, Lightbulb, Lock, ChevronRight,
 } from "lucide-react";
 import { CentralIcone, corDoModulo } from "@/lib/central-icons";
 import type { FerramentaTelaDados, GeracaoTela } from "@/lib/central-dados";
@@ -24,13 +24,45 @@ function quando(iso: string) {
 // Uma ferramenta da Central: formulário → "Gerar com IA" → resultado (versões em abas) com
 // Copiar / Gerar novamente / Salvar. modo "pagina" = /central/<slug>, com histórico ao lado;
 // modo "painel" = coluna direita da biblioteca, mais compacta.
+// Resultado dividido nos blocos "## ..." que a IA devolve (cada mensagem, anúncio, roteiro...),
+// cada um com o próprio Copiar — é o que a pessoa realmente leva pro WhatsApp/Instagram
+function separarBlocos(texto: string) {
+  const partes = texto.split(/\n(?=#{2,3}\s)/);
+  const blocos = partes.map(p => {
+    const m = p.match(/^#{2,3}\s+(.*)\n?([\s\S]*)$/);
+    return m ? { titulo: m[1].replace(/\*\*/g, "").trim(), corpo: m[2].trim() } : { titulo: "", corpo: p.trim() };
+  }).filter(b => b.titulo || b.corpo);
+  return blocos;
+}
+
+function BlocoResultado({ titulo, corpo }: { titulo: string; corpo: string }) {
+  const [copiado, setCopiado] = useState(false);
+  async function copiar() {
+    await navigator.clipboard.writeText(paraTextoPuro(corpo));
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 1800);
+  }
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white">
+      <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-100">
+        <p className="text-sm font-semibold text-slate-900 min-w-0">{titulo}</p>
+        <button onClick={copiar} className="flex-shrink-0 inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-900 rounded-md px-2 py-1 hover:bg-slate-50">
+          {copiado ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />} {copiado ? "Copiado" : "Copiar"}
+        </button>
+      </div>
+      <div className="px-4 py-3"><Markdown texto={corpo} /></div>
+    </div>
+  );
+}
+
 export function FerramentaClient({
-  dados, modo, onFechar, onFavoritoChange,
+  dados, modo, onFechar, onFavoritoChange, onAbrirRelacionada,
 }: {
   dados: FerramentaTelaDados;
   modo: "pagina" | "painel";
   onFechar?: () => void;
   onFavoritoChange?: (slug: string, favorito: boolean) => void;
+  onAbrirRelacionada?: (slug: string) => void; // no painel, relacionada abre no próprio painel
 }) {
   const { ferramenta, perfilOk, nomeEmpresa } = dados;
   const cor = corDoModulo(ferramenta.modulo.id);
@@ -48,8 +80,12 @@ export function FerramentaClient({
   const [atualId, setAtualId] = useState<string | null>(null);
   const [copiado, setCopiado] = useState<"resultado" | "prompt" | null>(null);
   const [promptCopiado, setPromptCopiado] = useState(false); // mostra os atalhos pro ChatGPT/Claude
+  const [uso, setUso] = useState(dados.uso);
+  const [verComoUsar, setVerComoUsar] = useState(false);
+  const bloqueada = !uso.permitido;
 
   const atual = historico.find(h => h.id === atualId) ?? null;
+  const blocos = atual ? separarBlocos(atual.resultado) : [];
   // Abas de versões: as 3 gerações mais recentes (a 1ª aba é a mais antiga das três)
   const versoes = historico.slice(0, 3).reverse();
 
@@ -79,7 +115,14 @@ export function FerramentaClient({
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ entradas: valores }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.geracao) { setErro(data.error ?? "Não foi possível gerar agora. Tente de novo."); return; }
+      if (!res.ok || !data.geracao) {
+        setErro(data.error ?? "Não foi possível gerar agora. Tente de novo.");
+        if (res.status === 429) setUso(u => ({ ...u, permitido: false, motivo: data.error ?? u.motivo }));
+        return;
+      }
+      if (typeof data.usosHoje === "number" && uso.limite) {
+        setUso(u => ({ ...u, usosHoje: data.usosHoje, permitido: data.usosHoje < (u.limite ?? Infinity), motivo: data.usosHoje >= (u.limite ?? Infinity) ? "Você atingiu o limite diário desta ferramenta. Volte amanhã!" : null }));
+      }
       const g: GeracaoTela = { ...data.geracao, createdAt: new Date(data.geracao.createdAt).toISOString() };
       setHistorico(prev => [g, ...prev].slice(0, 30));
       setAtualId(g.id);
@@ -179,8 +222,19 @@ export function FerramentaClient({
           <span className={`inline-block mt-2.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${cor.etiqueta}`}>{ferramenta.modulo.nome}</span>
         </div>
       </div>
-      {ferramenta.objetivo && !painel && (
-        <p className="mt-4 text-sm text-slate-600 bg-slate-50 rounded-xl px-3.5 py-2.5"><span className="font-medium text-slate-800">Para que serve: </span>{ferramenta.objetivo}</p>
+      {(ferramenta.formatoResposta || ferramenta.objetivo) && (
+        <p className="mt-4 text-sm text-slate-600 bg-slate-50 rounded-xl px-3.5 py-2.5">
+          <span className="font-medium text-slate-800">Você recebe: </span>
+          {ferramenta.formatoResposta || ferramenta.objetivo.replace(/^Você recebe:\s*/i, "")}
+        </p>
+      )}
+      {ferramenta.comoUsar && (
+        <div className="mt-2">
+          <button onClick={() => setVerComoUsar(v => !v)} aria-expanded={verComoUsar} className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-800">
+            <Lightbulb size={14} /> {verComoUsar ? "Esconder dicas de uso" : "Como usar esta ferramenta"}
+          </button>
+          {verComoUsar && <p className="mt-2 text-sm text-slate-600 bg-indigo-50/60 rounded-xl px-3.5 py-2.5">{ferramenta.comoUsar}</p>}
+        </div>
       )}
     </div>
   );
@@ -211,7 +265,7 @@ export function FerramentaClient({
           {c.tipo === "textarea" ? (
             <textarea
               id={`${modo}-campo-${c.key}`} value={valores[c.key] ?? ""} onChange={e => setValores(v => ({ ...v, [c.key]: e.target.value }))}
-              rows={3} maxLength={3000} placeholder={c.placeholder} disabled={gerando} className={`${inputCls} resize-y`}
+              rows={3} maxLength={c.maxCaracteres ?? 3000} placeholder={c.placeholder} disabled={gerando} className={`${inputCls} resize-y`}
             />
           ) : c.tipo === "select" ? (
             <select
@@ -223,9 +277,9 @@ export function FerramentaClient({
             </select>
           ) : (
             <input
-              id={`${modo}-campo-${c.key}`} type={c.tipo === "numero" ? "number" : "text"} value={valores[c.key] ?? ""}
+              id={`${modo}-campo-${c.key}`} type={c.tipo === "numero" ? "number" : "text"} min={c.min} max={c.max} value={valores[c.key] ?? ""}
               onChange={e => setValores(v => ({ ...v, [c.key]: e.target.value }))}
-              maxLength={3000} placeholder={c.placeholder} disabled={gerando} className={inputCls}
+              maxLength={c.maxCaracteres ?? 3000} placeholder={c.placeholder} disabled={gerando} className={inputCls}
             />
           )}
           {c.ajuda && <p className="text-xs text-slate-400">{c.ajuda}</p>}
@@ -234,14 +288,20 @@ export function FerramentaClient({
 
       {erro && <p className="text-sm text-red-600">{erro}</p>}
 
+      {bloqueada && uso.motivo && (
+        <p className="flex items-start gap-2 text-sm text-amber-800 bg-amber-50 rounded-xl px-3.5 py-2.5"><Lock size={15} className="mt-0.5 flex-shrink-0" /> {uso.motivo}</p>
+      )}
       <button
         onClick={gerar}
-        disabled={gerando}
-        className="w-full inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-5 py-3 text-sm font-semibold shadow-sm shadow-indigo-600/20 disabled:opacity-70"
+        disabled={gerando || bloqueada}
+        className="w-full inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-5 py-3 text-sm font-semibold shadow-sm shadow-indigo-600/20 disabled:opacity-60"
       >
         {gerando ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
         {gerando ? ETAPAS[etapa] : atual ? "Gerar outra versão" : "Gerar com IA"}
       </button>
+      {uso.limite != null && (
+        <p className="text-center text-xs text-slate-400 tabular-nums">{uso.usosHoje} de {uso.limite} usos hoje</p>
+      )}
       {ferramenta.permitirCopiarPrompt && (
         <div className="space-y-2">
           <button
@@ -288,14 +348,22 @@ export function FerramentaClient({
           ))}
         </div>
       )}
-      <div className={`rounded-xl bg-slate-50 p-4 ${painel ? "max-h-[420px] overflow-y-auto" : ""}`}>
-        <Markdown texto={atual.resultado} />
-      </div>
+      {blocos.length >= 2 ? (
+        <div className={`space-y-2.5 rounded-xl bg-slate-50 p-2.5 ${painel ? "max-h-[520px] overflow-y-auto" : ""}`}>
+          {blocos.map((b, i) => b.titulo
+            ? <BlocoResultado key={`${atual.id}-${i}`} titulo={b.titulo} corpo={b.corpo} />
+            : <div key={`${atual.id}-${i}`} className="px-2 py-1"><Markdown texto={b.corpo} /></div>)}
+        </div>
+      ) : (
+        <div className={`rounded-xl bg-slate-50 p-4 ${painel ? "max-h-[420px] overflow-y-auto" : ""}`}>
+          <Markdown texto={atual.resultado} />
+        </div>
+      )}
       <div className="flex gap-2 mt-4 flex-wrap">
         <button onClick={copiarResultado} className={acaoCls}>
           {copiado === "resultado" ? <Check size={15} className="text-emerald-600" /> : <Copy size={15} />} {copiado === "resultado" ? "Copiado" : "Copiar texto"}
         </button>
-        <button onClick={gerar} disabled={gerando} className={acaoCls}>
+        <button onClick={gerar} disabled={gerando || bloqueada} className={acaoCls}>
           <RotateCcw size={15} /> Gerar novamente
         </button>
         <button onClick={() => alternarSalvo(atual)} className={acaoCls}>
@@ -305,12 +373,42 @@ export function FerramentaClient({
     </section>
   );
 
+  const relacionadas = dados.relacionadas.length > 0 && (
+    <section className={`${cartao} p-5`}>
+      <h2 className="font-semibold text-slate-900 mb-3">Ferramentas relacionadas</h2>
+      <ul className="space-y-2">
+        {dados.relacionadas.map(r => {
+          const c = corDoModulo(r.moduloId);
+          const conteudo = (
+            <>
+              <span className={`w-9 h-9 rounded-lg ${c.fundo} ${c.icone} flex items-center justify-center flex-shrink-0`}><CentralIcone nome={r.icone} size={17} /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium text-slate-900">{r.nome}</span>
+                {r.descricao && <span className="block text-xs text-slate-500 line-clamp-1">{r.descricao}</span>}
+              </span>
+              <ChevronRight size={15} className="text-slate-300 flex-shrink-0" />
+            </>
+          );
+          const cls = "flex w-full items-center gap-3 rounded-xl border border-slate-200 hover:border-slate-300 hover:bg-slate-50 px-3 py-2.5 text-left";
+          return (
+            <li key={r.slug}>
+              {onAbrirRelacionada
+                ? <button onClick={() => onAbrirRelacionada(r.slug)} className={cls}>{conteudo}</button>
+                : <Link href={`/central/${r.slug}`} className={cls}>{conteudo}</Link>}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+
   if (painel) {
     return (
       <div className="space-y-4">
         {cabecalho}
         {formulario}
         {resultado}
+        {relacionadas}
       </div>
     );
   }
@@ -321,6 +419,7 @@ export function FerramentaClient({
         {cabecalho}
         {formulario}
         {resultado}
+        {relacionadas}
       </div>
       <aside className="space-y-3 lg:sticky lg:top-4 self-start">
         <h2 className="text-sm font-medium text-slate-500 flex items-center gap-1.5"><History size={14} /> Seu histórico nesta ferramenta</h2>

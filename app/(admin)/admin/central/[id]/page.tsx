@@ -8,19 +8,25 @@ export const dynamic = "force-dynamic";
 // /admin/central/nova cria; /admin/central/<id> edita
 export default async function FerramentaEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const modulos = await prisma.centralModulo.findMany({ orderBy: { numero: "asc" }, select: { id: true, numero: true, nome: true } });
+  const [modulos, todas] = await Promise.all([
+    prisma.centralModulo.findMany({ orderBy: { numero: "asc" }, select: { id: true, numero: true, nome: true } }),
+    prisma.centralFerramenta.findMany({ orderBy: [{ moduloId: "asc" }, { ordem: "asc" }], select: { id: true, slug: true, nome: true, moduloId: true } }),
+  ]);
 
-  if (id === "nova") return <FerramentaEditorClient modulos={modulos} inicial={null} />;
+  if (id === "nova") return <FerramentaEditorClient modulos={modulos} todas={todas} inicial={null} />;
 
   const f = await prisma.centralFerramenta.findUnique({ where: { id } });
   if (!f) notFound();
   return (
     <FerramentaEditorClient
       modulos={modulos}
+      todas={todas.filter(t => t.id !== f.id)}
       inicial={{
         id: f.id, slug: f.slug, moduloId: f.moduloId, nome: f.nome, descricao: f.descricao, objetivo: f.objetivo,
         campos: lerCampos(f.campos), prompt: f.prompt, instrucoes: f.instrucoes, icone: f.icone,
         publicada: f.publicada, permitirCopiarPrompt: f.permitirCopiarPrompt, ordem: f.ordem,
+        comoUsar: f.comoUsar, formatoResposta: f.formatoResposta, relacionadas: f.relacionadas,
+        acesso: f.acesso === "gestores" ? "gestores" : "todos", limiteDiario: f.limiteDiario,
       }}
     />
   );

@@ -5,23 +5,31 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Plus, Trash2, ChevronUp, ChevronDown, Loader2, Play, Save, AlertTriangle, ExternalLink } from "lucide-react";
 import { CENTRAL_ICONES, CentralIcone } from "@/lib/central-icons";
-import { CAMPO_TIPOS, PERFIL_CAMPOS, marcacoesDoPrompt, slugify, type CampoFerramenta, type PerfilKey } from "@/lib/central-shared";
+import { ACESSOS, ACESSO_LABEL, CAMPO_TIPOS, PERFIL_CAMPOS, marcacoesDoPrompt, slugify, type AcessoFerramenta, type CampoFerramenta, type PerfilKey } from "@/lib/central-shared";
 import { Markdown } from "@/app/(app)/central/Markdown";
 
 type Dados = {
   id?: string; slug: string; moduloId: string; nome: string; descricao: string; objetivo: string;
   campos: CampoFerramenta[]; prompt: string; instrucoes: string; icone: string;
   publicada: boolean; permitirCopiarPrompt: boolean; ordem: number;
+  comoUsar: string; formatoResposta: string; relacionadas: string[];
+  acesso: AcessoFerramenta; limiteDiario: number | null;
 };
 
 const TIPO_LABEL: Record<string, string> = { texto: "Texto curto", textarea: "Texto longo", select: "Seleção", numero: "Número" };
 
-export function FerramentaEditorClient({ modulos, inicial }: { modulos: { id: string; numero: number; nome: string }[]; inicial: Dados | null }) {
+export function FerramentaEditorClient({ modulos, todas, inicial }: {
+  modulos: { id: string; numero: number; nome: string }[];
+  todas: { id: string; slug: string; nome: string; moduloId: string }[];
+  inicial: Dados | null;
+}) {
   const router = useRouter();
   const [d, setD] = useState<Dados>(inicial ?? {
     slug: "", moduloId: modulos[0]?.id ?? "", nome: "", descricao: "", objetivo: "", campos: [],
     prompt: "", instrucoes: "", icone: "sparkles", publicada: false, permitirCopiarPrompt: true, ordem: 0,
+    comoUsar: "", formatoResposta: "", relacionadas: [], acesso: "todos", limiteDiario: null,
   });
+  const [addRelacionada, setAddRelacionada] = useState("");
   const [slugManual, setSlugManual] = useState(Boolean(inicial));
   const [salvando, setSalvando] = useState(false);
   const [msg, setMsg] = useState<{ tipo: "ok" | "erro"; texto: string } | null>(null);
@@ -67,6 +75,9 @@ export function FerramentaEditorClient({ modulos, inicial }: { modulos: { id: st
       ajuda: c.ajuda?.trim() || undefined,
       opcoes: c.tipo === "select" ? (c.opcoes ?? []).map(o => o.trim()).filter(Boolean) : undefined,
       perfil: c.perfil || undefined,
+      maxCaracteres: c.tipo === "texto" || c.tipo === "textarea" ? (c.maxCaracteres || undefined) : undefined,
+      min: c.tipo === "numero" && c.min != null && !Number.isNaN(c.min) ? c.min : undefined,
+      max: c.tipo === "numero" && c.max != null && !Number.isNaN(c.max) ? c.max : undefined,
     }));
   }
 
@@ -96,7 +107,7 @@ export function FerramentaEditorClient({ modulos, inicial }: { modulos: { id: st
     try {
       const res = await fetch("/api/admin/central/testar", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: d.prompt, instrucoes: d.instrucoes, campos: limparCampos(), entradas: teste }),
+        body: JSON.stringify({ prompt: d.prompt, instrucoes: d.instrucoes, formatoResposta: d.formatoResposta, campos: limparCampos(), entradas: teste }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setErroTeste(data.error ?? "Falhou."); return; }
@@ -177,6 +188,65 @@ export function FerramentaEditorClient({ modulos, inicial }: { modulos: { id: st
             </div>
           </section>
 
+          {/* Uso, resposta, acesso e relacionadas */}
+          <section className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-4">
+            <div>
+              <label className={labelCls}>Instruções de uso (o usuário vê em &quot;Como usar&quot;)</label>
+              <textarea value={d.comoUsar} maxLength={2000} rows={2} onChange={e => set({ comoUsar: e.target.value })} placeholder="Dicas para preencher bem — ex: cole a fala do cliente do jeito que ele disse" className={`${inputCls} mt-1`} />
+            </div>
+            <div>
+              <label className={labelCls}>Formato esperado da resposta (&quot;Você recebe&quot; — também orienta a IA)</label>
+              <textarea value={d.formatoResposta} maxLength={2000} rows={2} onChange={e => set({ formatoResposta: e.target.value })} placeholder="Ex: Cinco respostas naturais e pergunta de diagnóstico." className={`${inputCls} mt-1`} />
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label className={labelCls}>Quem pode usar</label>
+                <select value={d.acesso} onChange={e => set({ acesso: e.target.value as AcessoFerramenta })} className={`${inputCls} mt-1`}>
+                  {ACESSOS.map(a => <option key={a} value={a}>{ACESSO_LABEL[a]}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Limite de gerações por usuário/dia</label>
+                <input
+                  type="number" min={1} max={1000} value={d.limiteDiario ?? ""} placeholder="Sem limite"
+                  onChange={e => set({ limiteDiario: e.target.value ? Math.max(1, Number(e.target.value)) : null })}
+                  className={`${inputCls} mt-1`}
+                />
+              </div>
+            </div>
+            <div>
+              <label className={labelCls}>Ferramentas relacionadas</label>
+              <p className="text-xs text-gray-500 mt-0.5">Vazio = as 3 mais próximas do mesmo módulo, automaticamente.</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {d.relacionadas.map(s => (
+                  <span key={s} className="inline-flex items-center gap-1 rounded-full bg-gray-800 px-2.5 py-1 text-xs">
+                    {todas.find(t => t.slug === s)?.nome ?? s}
+                    <button onClick={() => set({ relacionadas: d.relacionadas.filter(x => x !== s) })} aria-label="Remover" className="text-gray-500 hover:text-red-400"><Trash2 size={12} /></button>
+                  </span>
+                ))}
+              </div>
+              {d.relacionadas.length < 8 && (
+                <div className="mt-2 flex gap-2">
+                  <select value={addRelacionada} onChange={e => setAddRelacionada(e.target.value)} className={inputCls}>
+                    <option value="">Escolher ferramenta...</option>
+                    {modulos.map(m => (
+                      <optgroup key={m.id} label={`${String(m.numero).padStart(2, "0")} — ${m.nome}`}>
+                        {todas.filter(t => t.moduloId === m.id && !d.relacionadas.includes(t.slug)).map(t => <option key={t.slug} value={t.slug}>{t.nome}</option>)}
+                      </optgroup>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => { if (addRelacionada) { set({ relacionadas: [...d.relacionadas, addRelacionada] }); setAddRelacionada(""); } }}
+                    disabled={!addRelacionada}
+                    className="inline-flex items-center gap-1 rounded-xl border border-gray-700 px-3 text-sm disabled:opacity-50"
+                  >
+                    <Plus size={14} /> Adicionar
+                  </button>
+                </div>
+              )}
+            </div>
+          </section>
+
           {/* Campos do formulário */}
           <section className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
             <div className="flex items-center justify-between">
@@ -213,6 +283,19 @@ export function FerramentaEditorClient({ modulos, inicial }: { modulos: { id: st
                 )}
                 <div className="flex flex-wrap items-center gap-4 text-sm">
                   <label className="flex items-center gap-2"><input type="checkbox" checked={c.obrigatorio} onChange={e => setCampo(i, { obrigatorio: e.target.checked })} /> Obrigatório</label>
+                  {(c.tipo === "texto" || c.tipo === "textarea") && (
+                    <label className="flex items-center gap-2 text-gray-400">
+                      Máx. caracteres
+                      <input type="number" min={1} max={3000} value={c.maxCaracteres ?? ""} onChange={e => setCampo(i, { maxCaracteres: e.target.value ? Number(e.target.value) : undefined })} placeholder="3000" className="w-20 bg-gray-950 border border-gray-800 rounded-lg px-2 py-1 text-sm" />
+                    </label>
+                  )}
+                  {c.tipo === "numero" && (
+                    <label className="flex items-center gap-2 text-gray-400">
+                      Faixa
+                      <input type="number" value={c.min ?? ""} onChange={e => setCampo(i, { min: e.target.value ? Number(e.target.value) : undefined })} placeholder="mín" className="w-20 bg-gray-950 border border-gray-800 rounded-lg px-2 py-1 text-sm" />
+                      <input type="number" value={c.max ?? ""} onChange={e => setCampo(i, { max: e.target.value ? Number(e.target.value) : undefined })} placeholder="máx" className="w-20 bg-gray-950 border border-gray-800 rounded-lg px-2 py-1 text-sm" />
+                    </label>
+                  )}
                   <label className="flex items-center gap-2 text-gray-400">
                     Preencher com o perfil:
                     <select value={c.perfil ?? ""} onChange={e => setCampo(i, { perfil: (e.target.value || undefined) as PerfilKey | undefined })} className="bg-gray-950 border border-gray-800 rounded-lg px-2 py-1 text-sm">

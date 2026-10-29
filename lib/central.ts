@@ -63,6 +63,7 @@ const SISTEMA_BASE = [
   "FORMATO:",
   "- Português do Brasil, linguagem simples e direta, frases curtas. Sem introdução, sem repetir a tarefa, sem conclusão motivacional.",
   "- Markdown simples: títulos com ##, listas com -, **negrito** para destaques e tabelas markdown (| col | col |) quando a tarefa pedir tabela, matriz, quadro ou planilha.",
+  "- Cada item entregue (cada mensagem, anúncio, roteiro, persona, etapa do plano) começa com o próprio título \"## \" (ex.: \"## Resposta 1 — quando ele compara com o posto\"), para a pessoa copiar um por um. A hipótese assumida, se houver, vem antes do primeiro título, em uma linha.",
 ].join("\n");
 
 // Regras de qualidade pro prompt copiado (ChatGPT/Claude do próprio usuário) — as mesmas da
@@ -81,9 +82,37 @@ const REGRAS_COPIA = [
 const REGRA_PERGUNTAS_PLATAFORMA = /Se alguma informação essencial estiver ausente, não pergunte de volta:[^.]*\./;
 const REGRA_PERGUNTAS_ORIGINAL = "Se alguma informação essencial estiver ausente, faça no máximo três perguntas objetivas antes de entregar.";
 
+// O formato esperado só entra à parte quando o prompt ainda não traz o mesmo texto (as 100 ferramentas
+// do material já têm o "ENTREGUE" dentro do prompt — não precisa repetir)
+function formatoExtra(prompt: string, formato?: string) {
+  const f = formato?.trim();
+  return Boolean(f) && !prompt.includes(f!);
+}
+
+// Quem pode usar a ferramenta e quanto ainda pode usar hoje (limite por usuário por dia)
+export async function verificarUsoFerramenta(userId: string, f: { id: string; acesso: string; limiteDiario: number | null }) {
+  if (f.acesso === "gestores") {
+    const p = await prisma.profile.findUnique({ where: { id: userId }, select: { role: true } });
+    if (p?.role !== "GESTOR" && p?.role !== "ADMIN") {
+      return { permitido: false as const, motivo: "Esta ferramenta é exclusiva para gestores.", usosHoje: 0, limite: f.limiteDiario };
+    }
+  }
+  let usosHoje = 0;
+  if (f.limiteDiario) {
+    const inicioDia = new Date();
+    inicioDia.setHours(0, 0, 0, 0);
+    usosHoje = await prisma.centralGeracao.count({ where: { profileId: userId, ferramentaId: f.id, createdAt: { gte: inicioDia } } });
+    if (usosHoje >= f.limiteDiario) {
+      return { permitido: false as const, motivo: `Você já usou esta ferramenta ${f.limiteDiario} ${f.limiteDiario === 1 ? "vez" : "vezes"} hoje, que é o limite diário. Volte amanhã!`, usosHoje, limite: f.limiteDiario };
+    }
+  }
+  return { permitido: true as const, motivo: null, usosHoje, limite: f.limiteDiario };
+}
+
 export function montarPromptParaCopiar(params: {
   prompt: string;
   instrucoes: string;
+  formatoResposta?: string;
   entradas: Record<string, string>;
   perfil: PerfilEmpresaDados;
   campos: CampoFerramenta[];
@@ -95,6 +124,7 @@ export function montarPromptParaCopiar(params: {
   return [
     prompt,
     contexto ? `SOBRE A MINHA EMPRESA:\n${contexto}` : "",
+    formatoExtra(params.prompt, params.formatoResposta) ? `ENTREGUE:\n${params.formatoResposta!.trim()}` : "",
     regras ? `REGRAS: ${regras}` : "",
     `COMO QUERO A RESPOSTA:\n${REGRAS_COPIA}`,
   ].filter(Boolean).join("\n\n");
@@ -103,6 +133,7 @@ export function montarPromptParaCopiar(params: {
 export async function gerarComFerramenta(params: {
   prompt: string;
   instrucoes: string;
+  formatoResposta?: string;
   entradas: Record<string, string>;
   perfil: PerfilEmpresaDados;
   campos: CampoFerramenta[];
@@ -112,6 +143,7 @@ export async function gerarComFerramenta(params: {
     SISTEMA_BASE,
     contexto ? `\nContexto da empresa do usuário:\n${contexto}` : "",
     params.instrucoes.trim() ? `\nInstruções de resposta desta ferramenta:\n${params.instrucoes.trim()}` : "",
+    formatoExtra(params.prompt, params.formatoResposta) ? `\nFormato esperado da resposta:\n${params.formatoResposta!.trim()}` : "",
   ].join("\n");
   const user = montarPrompt(params.prompt, params.entradas, params.perfil, params.campos);
 

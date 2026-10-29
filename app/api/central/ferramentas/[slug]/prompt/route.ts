@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
-import { carregarPerfil, lerCampos, montarPromptParaCopiar, podeUsarCentral } from "@/lib/central";
+import { carregarPerfil, lerCampos, montarPromptParaCopiar, podeUsarCentral, verificarUsoFerramenta } from "@/lib/central";
 import { validarEntradas } from "@/lib/central-entradas";
 
 // "Copiar prompt" — só nas ferramentas em que o admin liberou: devolve o prompt já preenchido
@@ -17,13 +17,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     return NextResponse.json({ error: "Essa ferramenta não permite copiar o prompt" }, { status: 404 });
   }
 
+  // Copiar não consome IA, então o limite diário não conta aqui — só a regra de quem pode usar
+  const uso = await verificarUsoFerramenta(userId, { ...ferramenta, limiteDiario: null });
+  if (!uso.permitido) return NextResponse.json({ error: uso.motivo }, { status: 403 });
+
   const body = await req.json().catch(() => null);
   const campos = lerCampos(ferramenta.campos);
   const v = validarEntradas(campos, body?.entradas);
   if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
 
   const prompt = montarPromptParaCopiar({
-    prompt: ferramenta.prompt, instrucoes: ferramenta.instrucoes, entradas: v.entradas, perfil: await carregarPerfil(userId), campos,
+    prompt: ferramenta.prompt, instrucoes: ferramenta.instrucoes, formatoResposta: ferramenta.formatoResposta, entradas: v.entradas, perfil: await carregarPerfil(userId), campos,
   });
   return NextResponse.json({ prompt });
 }

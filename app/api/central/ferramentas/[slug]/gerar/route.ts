@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
-import { carregarPerfil, gerarComFerramenta, lerCampos, podeUsarCentral } from "@/lib/central";
+import { carregarPerfil, gerarComFerramenta, lerCampos, podeUsarCentral, verificarUsoFerramenta } from "@/lib/central";
 import { validarEntradas } from "@/lib/central-entradas";
 import { getTeamIdForUser, isOverQuota, logTokenUsage } from "@/lib/token-usage";
 
@@ -21,6 +21,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   const v = validarEntradas(campos, body?.entradas);
   if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
 
+  const uso = await verificarUsoFerramenta(userId, ferramenta);
+  if (!uso.permitido) return NextResponse.json({ error: uso.motivo }, { status: 429 });
+
   const teamId = await getTeamIdForUser(userId);
   if (teamId && (await isOverQuota(teamId))) {
     return NextResponse.json({ error: "Os créditos de IA do mês acabaram. Peça ao gestor para comprar mais em Créditos de IA." }, { status: 402 });
@@ -28,7 +31,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
 
   try {
     const perfil = await carregarPerfil(userId);
-    const r = await gerarComFerramenta({ prompt: ferramenta.prompt, instrucoes: ferramenta.instrucoes, entradas: v.entradas, perfil, campos });
+    const r = await gerarComFerramenta({ prompt: ferramenta.prompt, instrucoes: ferramenta.instrucoes, formatoResposta: ferramenta.formatoResposta, entradas: v.entradas, perfil, campos });
     if (!r.texto) return NextResponse.json({ error: "A IA não devolveu resposta. Tente de novo." }, { status: 502 });
     if (teamId) logTokenUsage({ teamId, provider: r.provider, model: r.model, feature: "central", inputTokens: r.inputTokens, outputTokens: r.outputTokens }).catch(() => {});
 
@@ -38,7 +41,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
         provider: r.provider, model: r.model, inputTokens: r.inputTokens, outputTokens: r.outputTokens,
       },
     });
-    return NextResponse.json({ geracao: { id: geracao.id, resultado: geracao.resultado, salvo: false, createdAt: geracao.createdAt, entradas: v.entradas } });
+    return NextResponse.json({
+      geracao: { id: geracao.id, resultado: geracao.resultado, salvo: false, createdAt: geracao.createdAt, entradas: v.entradas },
+      usosHoje: uso.limite ? uso.usosHoje + 1 : null,
+    });
   } catch (err) {
     console.error("[central/gerar]", slug, err);
     return NextResponse.json({ error: "Não foi possível gerar agora. Tente de novo em instantes." }, { status: 502 });
