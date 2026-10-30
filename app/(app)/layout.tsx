@@ -42,13 +42,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const NAV = [
     { href: homeCrm ? "/dashboard" : "/inicio", label: "Início", icon: "inicio" as const, show: true, locked: false },
     // Infoprodutos (100 prompts e kits complementares) — todo usuário vê; o acesso é por produto
+    // Diagnóstico Comercial (Scanner) é gratuito pra todos — e indica por onde começar na biblioteca
+    { href: "/scanner", label: "Diagnóstico", icon: "scanner" as const, show: true, locked: false },
     { href: "/biblioteca", label: "Minha Biblioteca", icon: "biblioteca" as const, show: true, locked: false },
     { href: "/biblioteca/favoritos", label: "Meus Prompts", icon: "prompts" as const, show: temInfoproduto, locked: false },
     { href: "/biblioteca/explorar", label: "Explorar Kits", icon: "kits" as const, show: true, locked: false },
     { href: "/biblioteca/meu-negocio", label: "Minha Empresa", icon: "empresa" as const, show: temInfoproduto, locked: false },
     ...(hasPlataforma ? [
       { href: "/dashboard",  label: "Meu Progresso", icon: "dashboard" as const, show: MENU_TREINAMENTO_VISIVEL, locked: false },
-      { href: "/scanner",    label: "Scanner",    icon: "scanner" as const, show: true, locked: false },
       // Ocultos do menu por enquanto (decisão de produto) — as páginas continuam existindo;
       // pra voltar, troque MENU_TREINAMENTO_VISIVEL pra true
       { href: "/missoes",    label: "Plano de Ação", icon: "missoes" as const, show: MENU_TREINAMENTO_VISIVEL, locked: false },

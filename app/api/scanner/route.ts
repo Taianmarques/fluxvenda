@@ -17,6 +17,10 @@ const schema = z.object({
   diagnosticType: z.enum(["EMPRESA", "VENDEDOR"]).default("EMPRESA"),
 });
 
+// O Diagnóstico Comercial é gratuito pra qualquer conta — e cada um gasta uma chamada de IA.
+// Limite por conta em 24h (admin não tem limite).
+const LIMITE_DIARIO = 3;
+
 const CAT_KEYS = ["leads", "process", "team", "kpis", "tools", "value", "retention", "money"] as const;
 
 // Labels das áreas por tipo de diagnóstico
@@ -49,6 +53,14 @@ export async function POST(req: NextRequest) {
 
     const body = schema.safeParse(await req.json());
     if (!body.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
+
+    const [quem, recentes] = await Promise.all([
+      prisma.profile.findUnique({ where: { id: userId }, select: { role: true } }),
+      prisma.diagnostic.count({ where: { profileId: userId, createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } } }),
+    ]);
+    if (quem?.role !== "ADMIN" && recentes >= LIMITE_DIARIO) {
+      return NextResponse.json({ error: `Você já fez ${LIMITE_DIARIO} diagnósticos nas últimas 24 horas. Tente de novo amanhã.` }, { status: 429 });
+    }
 
     const { companyName, businessModel, segment, subsegment, teamSize, answers, diagnosticType } = body.data;
 

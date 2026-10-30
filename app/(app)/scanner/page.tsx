@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { currentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
-import { ProductGate } from "../ProductGate";
 
+// Diagnóstico Comercial — a única parte gratuita: qualquer conta acessa (sem ProductGate).
+// O resultado sugere por onde começar na biblioteca (lib/diagnostico-recomendacoes.ts).
 export default async function ScannerPage() {
   const user = await currentUser();
 
@@ -40,13 +41,12 @@ export default async function ScannerPage() {
   };
 
   return (
-    <ProductGate product="PLATAFORMA">
     <div className="p-8 max-w-5xl mx-auto space-y-10">
 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Scanner de Vendas</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2.5">Diagnóstico Comercial <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-700">Gratuito</span></h1>
           <p className="text-gray-400 mt-1">
             {isGestor ? "Diagnóstico de maturidade comercial da sua empresa" : "Diagnóstico individual da sua maturidade em vendas"}
           </p>
@@ -145,6 +145,5 @@ export default async function ScannerPage() {
       </div>
 
     </div>
-    </ProductGate>
   );
 }

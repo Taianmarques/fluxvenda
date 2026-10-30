@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
+import { recomendarFerramentas } from "@/lib/diagnostico-recomendacoes";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -56,6 +57,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       scoreTotal: diagnostic.scoreTotal,
       createdAt: diagnostic.createdAt,
       result,
+      // Por onde começar: ferramentas da biblioteca para as áreas mais fracas (acesso de quem está vendo)
+      recomendacoes: await recomendarFerramentas(userId, diagnostic),
     });
   } catch (err) {
     console.error("[scanner/get]", err);

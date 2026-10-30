@@ -7,6 +7,10 @@ import {
   ResponsiveContainer, Tooltip,
 } from "recharts";
 import Link from "next/link";
+import { ArrowRight, Lock } from "lucide-react";
+import { CentralIcone } from "@/lib/central-icons";
+import { MENU_TREINAMENTO_VISIVEL } from "@/lib/menu";
+import type { AreaRecomendada } from "@/lib/diagnostico-recomendacoes";
 
 type Action = { title: string; area: string; priority: "ALTA" | "MEDIA" | "BAIXA"; description: string; timeframe: string };
 type Classification = "CRITICO" | "ATENCAO" | "FORTE";
@@ -35,6 +39,7 @@ type DiagnosticData = {
     classification: Record<string, Classification>;
     insights: Record<string, string>;
   } | null;
+  recomendacoes?: AreaRecomendada[];
 };
 
 const AREAS_EMPRESA = [
@@ -300,6 +305,72 @@ export default function ResultadoPage() {
           </div>
         </div>
 
+        {/* Por onde começar — ferramentas da biblioteca para as áreas mais fracas */}
+        {(data.recomendacoes?.length ?? 0) > 0 && (() => {
+          const recs = data.recomendacoes!;
+          const primeira = recs[0].ferramentas[0];
+          return (
+            <div className="rounded-2xl border border-blue-700/60 bg-gradient-to-br from-blue-950/40 to-gray-900 p-6 space-y-5">
+              <div>
+                <h2 className="text-xl font-bold">🧭 Por onde começar</h2>
+                <p className="text-sm text-gray-400 mt-1">
+                  Pelas suas notas, estas são as áreas que mais travam suas vendas hoje — e as ferramentas para usar primeiro, nesta ordem.
+                </p>
+              </div>
+
+              {primeira && (
+                <Link
+                  href={`/biblioteca/${primeira.produtoSlug}${primeira.liberado ? `/${primeira.slug}` : ""}`}
+                  className="flex items-center gap-4 rounded-xl bg-blue-600 hover:bg-blue-500 p-4 transition-colors"
+                >
+                  <span className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0"><CentralIcone nome={primeira.icone} size={21} /></span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-xs font-semibold uppercase tracking-wide text-blue-100">Primeiro passo</span>
+                    <span className="block font-bold">{primeira.nome}</span>
+                    {primeira.descricao && <span className="block text-sm text-blue-100/90 line-clamp-1">{primeira.descricao}</span>}
+                  </span>
+                  <span className="hidden sm:inline-flex items-center gap-1 text-sm font-semibold">{primeira.liberado ? "Usar agora" : "Ver kit"} <ArrowRight size={16} /></span>
+                </Link>
+              )}
+
+              <div className="space-y-4">
+                {recs.map((area, i) => (
+                  <div key={area.key} className="rounded-xl border border-gray-800 bg-gray-900/70 p-4">
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                      <div>
+                        <p className="font-semibold"><span className="text-blue-400 mr-1.5">{i + 1}.</span>{area.label}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{area.porQue}</p>
+                      </div>
+                      <span className={`text-xs px-2 py-0.5 rounded-full border ${area.score < 40 ? CLASS_STYLE.CRITICO.badge : area.score < 70 ? CLASS_STYLE.ATENCAO.badge : CLASS_STYLE.FORTE.badge}`}>
+                        Nota {area.score}
+                      </span>
+                    </div>
+                    <div className="mt-3 grid gap-2 md:grid-cols-3">
+                      {area.ferramentas.map(f => (
+                        <Link
+                          key={f.slug}
+                          href={`/biblioteca/${f.produtoSlug}${f.liberado ? `/${f.slug}` : ""}`}
+                          className="group rounded-lg border border-gray-800 bg-gray-950/60 hover:border-blue-600 p-3 flex flex-col transition-colors"
+                        >
+                          <span className="flex items-start gap-2.5">
+                            <span className="w-8 h-8 rounded-lg bg-blue-500/15 text-blue-300 flex items-center justify-center flex-shrink-0"><CentralIcone nome={f.icone} size={16} /></span>
+                            <span className="text-sm font-medium leading-snug">{f.nome}</span>
+                          </span>
+                          <span className="mt-2.5 pt-2 border-t border-gray-800 text-xs flex items-center gap-1.5">
+                            {f.liberado
+                              ? <span className="text-blue-300 font-semibold inline-flex items-center gap-1">Usar ferramenta <ArrowRight size={13} /></span>
+                              : <span className="text-gray-400 inline-flex items-center gap-1.5"><Lock size={12} /> No kit {f.produtoNome}</span>}
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Radar + Barras */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
@@ -419,8 +490,8 @@ export default function ResultadoPage() {
           </div>
         </div>
 
-        {/* CTA principal — plano de evolução */}
-        <div className="bg-gradient-to-br from-blue-950/40 to-purple-950/40 border border-blue-700 rounded-2xl p-6 text-center space-y-4">
+        {/* CTA principal — plano de evolução (só com o menu de treinamento ligado) */}
+        {MENU_TREINAMENTO_VISIVEL && <div className="bg-gradient-to-br from-blue-950/40 to-purple-950/40 border border-blue-700 rounded-2xl p-6 text-center space-y-4">
           <div className="text-4xl">🎯</div>
           <p className="font-bold text-xl">Seu plano de evolução foi gerado!</p>
           <p className="text-gray-300 text-sm">
@@ -438,7 +509,7 @@ export default function ResultadoPage() {
               Treinar objeções
             </Link>
           </div>
-        </div>
+        </div>}
 
       </div>
     </div>

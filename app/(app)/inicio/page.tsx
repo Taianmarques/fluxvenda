@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { carregarPerfil } from "@/lib/central";
 import { perfilTemEssenciais } from "@/lib/central-shared";
 import { precosVigentes, produtosLiberados } from "@/lib/infoprodutos";
+import { recomendarFerramentas, ultimoDiagnostico } from "@/lib/diagnostico-recomendacoes";
 import { InicioClient, type FerramentaInicio, type ProdutoInicio, type PassoInicio } from "./InicioClient";
 
 export const dynamic = "force-dynamic";
@@ -19,10 +20,11 @@ export default async function InicioPage() {
   inicioMes.setDate(1);
   inicioMes.setHours(0, 0, 0, 0);
 
-  const [liberados, profile, perfil] = await Promise.all([
+  const [liberados, profile, perfil, diagnostico] = await Promise.all([
     produtosLiberados(userId),
     prisma.profile.findUnique({ where: { id: userId }, select: { name: true } }),
     carregarPerfil(userId),
+    ultimoDiagnostico(userId),
   ]);
   const idsLiberados = [...liberados];
 
@@ -59,17 +61,31 @@ export default async function InicioPage() {
     if (destaque.length === 6) break;
   }
 
-  // Próximos passos: completar o perfil (se faltar o essencial) e ferramentas que a pessoa ainda
-  // não usou, uma por módulo, pra variar
+  // Próximos passos: sem diagnóstico, o primeiro passo é fazê-lo (é gratuito); com diagnóstico, uma
+  // ferramenta recomendada por área fraca. Depois: completar o perfil (se faltar o essencial) e
+  // ferramentas que a pessoa ainda não usou, uma por módulo, pra variar
+  const jaUsou = new Set(usadas.map(u => u.ferramentaId));
+  const slugsUsados = new Set(lista.filter(f => jaUsou.has(f.id)).map(f => f.slug));
   const passos: PassoInicio[] = [];
+  if (!diagnostico) {
+    passos.push({ tipo: "diagnostico", titulo: "Faça seu diagnóstico comercial", descricao: "Gratuito: descubra o que trava suas vendas e por onde começar.", href: "/scanner/novo", icone: "compass", moduloId: "" });
+  } else {
+    for (const area of await recomendarFerramentas(userId, diagnostico)) {
+      const f = area.ferramentas.find(x => !slugsUsados.has(x.slug));
+      if (!f || passos.length === 2) continue;
+      passos.push({
+        tipo: "ferramenta", titulo: f.nome, descricao: `Para melhorar ${area.label} (nota ${area.score} no diagnóstico).`,
+        href: f.liberado ? `/biblioteca/${f.produtoSlug}/${f.slug}` : `/biblioteca/${f.produtoSlug}`, icone: f.icone, moduloId: f.moduloId,
+      });
+    }
+  }
   if (liberados.size > 0 && !perfilTemEssenciais(perfil)) {
     passos.push({ tipo: "perfil", titulo: "Complete o perfil da empresa", descricao: "Seus prompts saem prontos com os dados do seu negócio.", href: "/biblioteca/meu-negocio", icone: "store", moduloId: "" });
   }
-  const jaUsou = new Set(usadas.map(u => u.ferramentaId));
   const modulosVistos = new Set<string>();
   for (const f of lista) {
     if (passos.length === 3) break;
-    if (jaUsou.has(f.id) || modulosVistos.has(f.moduloId)) continue;
+    if (jaUsou.has(f.id) || modulosVistos.has(f.moduloId) || passos.some(p => p.href.endsWith(`/${f.slug}`))) continue;
     modulosVistos.add(f.moduloId);
     passos.push({ tipo: "ferramenta", titulo: f.nome, descricao: f.descricao, href: `/biblioteca/${f.produtoSlug}/${f.slug}`, icone: f.icone, moduloId: f.moduloId });
   }

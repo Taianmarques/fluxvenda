@@ -249,11 +249,11 @@ export function NovoScannerForm({
           diagnosticType: isVendedor ? "VENDEDOR" : "EMPRESA",
         }),
       });
-      if (!res.ok) throw new Error();
-      const { id } = await res.json();
-      router.push(`/scanner/resultado/${id}`);
-    } catch {
-      setError("Não foi possível salvar. Tente novamente.");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error);
+      router.push(`/scanner/resultado/${data.id}`);
+    } catch (e) {
+      setError((e instanceof Error && e.message) || "Não foi possível salvar. Tente novamente.");
       setStep("questions");
     }
   }
