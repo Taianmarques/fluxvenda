@@ -21,7 +21,7 @@ export function UserMenu({ name, openDirection = "up", align = "start" }: { name
     <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-sm font-bold flex-shrink-0"
+        className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold flex-shrink-0"
         aria-label="Menu do usuário"
       >
         {initial}

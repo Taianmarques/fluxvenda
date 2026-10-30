@@ -10,7 +10,7 @@ import { getEffectiveProducts, hasProduct } from "@/lib/products";
 //   - tem um AcessoProduto ativo (compra paga ou liberação manual do admin).
 
 // Slugs que não podem ser de produto (são páginas da própria biblioteca)
-export const SLUGS_RESERVADOS_BIBLIOTECA = ["meu-negocio", "favoritos", "comprar"];
+export const SLUGS_RESERVADOS_BIBLIOTECA = ["meu-negocio", "favoritos", "comprar", "explorar"];
 
 export async function produtosLiberados(userId: string): Promise<Set<string>> {
   const [profile, efetivos, acessos] = await Promise.all([

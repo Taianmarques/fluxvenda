@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Building2, CheckCircle2, Layers, Library, Search, Star, Wrench, X } from "lucide-react";
+import { ArrowRight, Box, Building2, CheckCircle2, Layers, Library, Search, Star, Wrench, X } from "lucide-react";
 import { CentralIcone } from "@/lib/central-icons";
 
 export type CardProduto = {
@@ -42,7 +42,9 @@ function Conteudo({ p }: { p: CardProduto }) {
   );
 }
 
-export function BibliotecaClient({ produtos }: { produtos: CardProduto[] }) {
+// modo "explorar" (/biblioteca/explorar): só a vitrine dos kits que a pessoa ainda não tem
+export function BibliotecaClient({ produtos, modo = "biblioteca" }: { produtos: CardProduto[]; modo?: "biblioteca" | "explorar" }) {
+  const explorar = modo === "explorar";
   const [busca, setBusca] = useState("");
   const [categoria, setCategoria] = useState("todas");
 
@@ -66,10 +68,12 @@ export function BibliotecaClient({ produtos }: { produtos: CardProduto[] }) {
       <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-8">
         <header className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2.5"><Library size={26} className="text-indigo-600" /> Minha Biblioteca</h1>
-            <p className="text-slate-500 mt-1.5">Seus kits de ferramentas para vender mais com o ChatGPT e o Claude.</p>
+            <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2.5">
+              {explorar ? <><Box size={26} className="text-indigo-600" /> Explorar Kits</> : <><Library size={26} className="text-indigo-600" /> Minha Biblioteca</>}
+            </h1>
+            <p className="text-slate-500 mt-1.5">{explorar ? "Novos kits de ferramentas e prompts para ampliar seus resultados." : "Seus kits de ferramentas para vender mais com o ChatGPT e o Claude."}</p>
           </div>
-          {temAlgum && (
+          {temAlgum && !explorar && (
             <div className="flex gap-2">
               <Link href="/biblioteca/meu-negocio" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700"><Building2 size={15} /> Meu negócio</Link>
               <Link href="/biblioteca/favoritos" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700"><Star size={15} /> Prompts favoritos</Link>
@@ -98,7 +102,7 @@ export function BibliotecaClient({ produtos }: { produtos: CardProduto[] }) {
           </div>
         )}
 
-        <section>
+        {!explorar && <section>
           <h2 className="text-lg font-bold mb-3">Meus produtos</h2>
           {meus.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500 text-sm">
@@ -126,12 +130,20 @@ export function BibliotecaClient({ produtos }: { produtos: CardProduto[] }) {
               ))}
             </div>
           )}
-        </section>
+        </section>}
+
+        {explorar && outros.length === 0 && (
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500 text-sm">
+            {busca || categoria !== "todas" ? "Nenhum kit corresponde à busca." : "Você já tem todos os kits disponíveis. Novos kits aparecerão aqui."}
+          </div>
+        )}
 
         {outros.length > 0 && (
           <section>
-            <h2 className="text-lg font-bold">Outros produtos disponíveis</h2>
-            <p className="text-sm text-slate-500 mt-0.5 mb-3">Kits que complementam o que você já tem.</p>
+            {!explorar && <>
+              <h2 className="text-lg font-bold">Outros produtos disponíveis</h2>
+              <p className="text-sm text-slate-500 mt-0.5 mb-3">Kits que complementam o que você já tem.</p>
+            </>}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {outros.map(p => (
                 <div key={p.slug} className={cartao}>

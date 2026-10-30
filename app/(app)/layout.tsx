@@ -4,10 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { AppSidebar } from "./AppSidebar";
 import { OneSignalInit } from "./OneSignalInit";
 import { getEffectiveProducts, hasProduct } from "@/lib/products";
-
-// Itens de treinamento (Plano de Ação, Simulação, Trilhas, Objeções, Scripts, Playbook, Ranking,
-// Equipe) fora do menu por enquanto — as rotas seguem no ar
-const MENU_TREINAMENTO_VISIVEL = false;
+import { produtosLiberados } from "@/lib/infoprodutos";
+import { MENU_TREINAMENTO_VISIVEL } from "@/lib/menu";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await currentUser();
@@ -35,14 +33,21 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const products = await getEffectiveProducts(user.id);
   const hasCrm = hasProduct(products, "CRM");
   const hasPlataforma = hasProduct(products, "PLATAFORMA");
+  const temInfoproduto = (await produtosLiberados(user.id)).size > 0;
+  // Só-CRM sem nenhum kit: a home continua sendo a de boas-vindas do CRM (/dashboard)
+  const homeCrm = hasCrm && !hasPlataforma && !temInfoproduto;
 
   // Quem não contratou a Plataforma não precisa ver os 9 itens individuais bloqueados —
   // colapsa tudo num único link de upsell (último do menu) que leva direto pra landing do produto.
   const NAV = [
-    { href: "/dashboard",  label: "Dashboard",  icon: "dashboard" as const, show: true, locked: false },
+    { href: homeCrm ? "/dashboard" : "/inicio", label: "Início", icon: "inicio" as const, show: true, locked: false },
     // Infoprodutos (100 prompts e kits complementares) — todo usuário vê; o acesso é por produto
     { href: "/biblioteca", label: "Minha Biblioteca", icon: "biblioteca" as const, show: true, locked: false },
+    { href: "/biblioteca/favoritos", label: "Meus Prompts", icon: "prompts" as const, show: temInfoproduto, locked: false },
+    { href: "/biblioteca/explorar", label: "Explorar Kits", icon: "kits" as const, show: true, locked: false },
+    { href: "/biblioteca/meu-negocio", label: "Minha Empresa", icon: "empresa" as const, show: temInfoproduto, locked: false },
     ...(hasPlataforma ? [
+      { href: "/dashboard",  label: "Meu Progresso", icon: "dashboard" as const, show: MENU_TREINAMENTO_VISIVEL, locked: false },
       { href: "/scanner",    label: "Scanner",    icon: "scanner" as const, show: true, locked: false },
       // Ocultos do menu por enquanto (decisão de produto) — as páginas continuam existindo;
       // pra voltar, troque MENU_TREINAMENTO_VISIVEL pra true
@@ -57,6 +62,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     ] : []),
     { href: "/crm",         label: "CRM",         icon: "crm" as const, show: isTeamMember, locked: !hasCrm },
     { href: "/creditos",    label: "Créditos de IA", icon: "creditos" as const, show: isGestor, locked: false },
+    { href: "/configuracoes", label: "Configurações", icon: "configuracoes" as const, show: true, locked: false },
     { href: "/admin",       label: "Super Admin", icon: "admin" as const, show: isAdmin, locked: false },
     ...(hasPlataforma ? [] : [
       { href: "/produtos/plataforma", label: "Plataforma B2B", icon: "plataforma" as const, show: true, locked: true },

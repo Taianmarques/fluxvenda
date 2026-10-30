@@ -6,6 +6,8 @@ import { getEffectiveProducts, hasProduct } from "@/lib/products";
 import { listMyAgentConfigs } from "@/lib/team";
 import { CrmWelcome } from "./CrmWelcome";
 import { TrialBanner } from "../TrialBanner";
+import { produtosLiberados } from "@/lib/infoprodutos";
+import { MENU_TREINAMENTO_VISIVEL } from "@/lib/menu";
 
 export default async function DashboardPage() {
   const user = await currentUser();
@@ -14,9 +16,12 @@ export default async function DashboardPage() {
   // isso não faz sentido pra quem só contratou o CRM. Mostra uma home orientada a criar
   // o primeiro agente de IA em vez disso.
   const products = await getEffectiveProducts(user!.id);
-  // Conta só de infoprodutos (criada na compra, sem Plataforma nem CRM): a casa dela é a biblioteca
-  if (!hasProduct(products, "PLATAFORMA") && !hasProduct(products, "CRM")) redirect("/biblioteca");
-  if (!hasProduct(products, "PLATAFORMA")) {
+  const hasPlataforma = hasProduct(products, "PLATAFORMA");
+  const hasCrm = hasProduct(products, "CRM");
+  // A home é o Início (/inicio). Ficam aqui só: quem tem só o CRM e nenhum kit (boas-vindas do CRM)
+  // e a Plataforma com o menu de treinamento ligado (dashboard de XP e missões).
+  if (hasPlataforma ? !MENU_TREINAMENTO_VISIVEL : !hasCrm || (await produtosLiberados(user!.id)).size > 0) redirect("/inicio");
+  if (!hasPlataforma) {
     const result = await listMyAgentConfigs(user!.id);
     const name = (await prisma.profile.findUnique({ where: { id: user!.id }, select: { name: true } }))?.name ?? "";
     return (
