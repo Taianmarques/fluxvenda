@@ -2476,8 +2476,8 @@ model CentralFerramenta {
   relacionadas    String[] @default([]) // slugs; vazio = automáticas (mesmo módulo)
   acesso          String   @default("todos") // "todos" | "gestores" (só GESTOR/ADMIN)
   limiteDiario    Int? // usos por usuário por dia; null = sem limite
-  // Ferramenta da demonstração gratuita da landing: liberada sem login pela API /api/demo
-  // (fica com publicada = false, fora da biblioteca)
+  // Ferramenta de exemplo das landings (ex: a animação da /vendas-ia/100-ferramentas monta o
+  // prompt dela). Fica com publicada = false, fora da biblioteca
   demoPublica     Boolean @default(false)
 
   favoritos CentralFavorito[]

@@ -1,15 +1,18 @@
 import type { Metadata } from "next";
-import { Check, ChevronRight, Copy, ExternalLink, Film, Search, ShieldCheck } from "lucide-react";
+import { Check, Copy, ExternalLink, Film, ShieldCheck } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { CentralIcone } from "@/lib/central-icons";
 import { lerCampos } from "@/lib/central";
 import { carregarPlano7Dias } from "@/lib/plano-7-dias";
 import { BotaoFixoCelular, cartao, Cta, Em, FaixaGarantia, Kicker, Pagina, reais, Rodape, Topo } from "../_ui";
-import { DemoInterativa, type FerramentaDemo } from "./DemoInterativa";
+import { montarPromptFinal } from "@/lib/central-prompt";
+import { MotionPlataforma } from "./MotionPlataforma";
+import { MotionComparacao } from "./MotionComparacao";
 
 // Landing "100 ferramentas" (tráfego de anúncios do Instagram/Facebook). Mesmo visual da /vendas-ia.
 // Tudo o que é número ou nome de ferramenta vem do banco: preço da oferta, módulos, ferramentas
-// citadas, ferramentas da demonstração gratuita (demoPublica) e o plano de 7 dias.
+// citadas e o plano de 7 dias. A animação do topo mostra o prompt REAL montado pela plataforma
+// (ferramenta demo-recuperar-orcamento, mesmo montador da biblioteca) com um exemplo preenchido.
 // A plataforma não executa IA: prepara o prompt, que a pessoa copia para o ChatGPT ou o Claude.
 
 export const dynamic = "force-dynamic";
@@ -35,11 +38,19 @@ const VITRINE = [
   { slug: "responda-ao-cliente-que-achou-caro", rotulo: "Responder objeções" },
   { slug: "monte-plano-de-vendas-para-30-dias", rotulo: "Planejar vendas" },
 ];
-const ROTULO_DEMO: Record<string, string> = {
-  "demo-recuperar-orcamento": "Recuperar orçamento",
-  "demo-criar-anuncio": "Criar anúncio",
-  "demo-criar-oferta": "Criar oferta",
+// Exemplo usado na animação do topo (ferramenta "Recuperar orçamento parado")
+const DEMO_SLUG = "demo-recuperar-orcamento";
+const DEMO_EXEMPLO: Record<string, string> = {
+  segmento: "Marcenaria de móveis planejados",
+  produto: "Armário de cozinha sob medida",
+  situacao: "Enviei o orçamento de R$ 8.900 há 5 dias. Ela ia ver com o marido e sumiu.",
+  objetivo: "Retomar a conversa",
 };
+// Respostas ilustrativas (a plataforma não executa IA; a animação deixa isso escrito)
+const DEMO_RESPOSTA = [
+  "Mensagem 1 — Oi, Carla! Conseguiu ver com o seu marido o projeto do armário da cozinha? Se quiser, ajusto alguma medida antes de vocês decidirem 😊",
+  "Quando enviar: hoje, no fim da tarde. Se ela responder, pergunte o que ficou em dúvida antes de falar de preço.",
+];
 
 // Link de vídeo → player incorporado (sem autoplay). YouTube e Vimeo viram iframe; .mp4/.webm, <video>
 function videoEmbed(url: string | null | undefined): { tipo: "iframe" | "video"; src: string } | null {
@@ -62,58 +73,9 @@ function Video({ v }: { v: NonNullable<ReturnType<typeof videoEmbed>> }) {
   );
 }
 
-// Reprodução da tela da biblioteca (mesmo layout e cores da área do comprador), com ferramentas reais
-function MockPlataforma({ cards, modulos, ferramentas }: { cards: { rotulo: string; nome: string; modulo: string; icone: string }[]; modulos: number; ferramentas: number }) {
-  return (
-    <div className="rounded-2xl border border-[var(--line-strong)] bg-white/[.03] p-2 shadow-[0_40px_120px_-30px_rgba(251,191,36,.25)]">
-      <div className="rounded-xl overflow-hidden bg-[#f4f6fb] text-slate-900">
-        <div className="flex items-center gap-1.5 px-3 py-2 bg-white border-b border-slate-200">
-          <span className="w-2.5 h-2.5 rounded-full bg-slate-200" /><span className="w-2.5 h-2.5 rounded-full bg-slate-200" /><span className="w-2.5 h-2.5 rounded-full bg-slate-200" />
-          <span className="ml-2 text-[10px] text-slate-400 font-[family-name:var(--f-mono)]">Minha Biblioteca · 100 Prompts de IA</span>
-        </div>
-        <div className="flex">
-          <div className="hidden sm:flex w-36 flex-shrink-0 flex-col gap-1 bg-gradient-to-b from-[#0d1735] to-[#0a1024] p-3 text-[11px]">
-            <p className="font-bold text-white text-sm mb-2">Vendas IA</p>
-            {["Início", "Minha Biblioteca", "Meus Prompts", "Minha Empresa"].map((m, i) => (
-              <span key={m} className={`rounded-lg px-2 py-1.5 ${i === 1 ? "bg-blue-600 text-white" : "text-slate-300"}`}>{m}</span>
-            ))}
-          </div>
-          <div className="flex-1 min-w-0 p-3 md:p-4 space-y-3">
-            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] text-slate-400">
-              <Search size={13} /> Buscar entre {ferramentas} ferramentas…
-            </div>
-            <div className="flex gap-1.5 overflow-hidden">
-              {["Todos", "Anúncios", "Atendimento", "Objeções", "Follow-up"].map((c, i) => (
-                <span key={c} className={`flex-shrink-0 rounded-full px-2.5 py-1 text-[10px] ${i === 0 ? "bg-indigo-600 text-white" : "bg-white border border-slate-200 text-slate-600"}`}>{c}</span>
-              ))}
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {cards.map((c, i) => (
-                <div key={c.nome} className={`rounded-xl border border-slate-200 bg-white p-2.5 ${i > 2 ? "hidden sm:block" : ""}`}>
-                  <div className="flex items-start gap-2">
-                    <span className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0"><CentralIcone nome={c.icone} size={14} /></span>
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-600">{c.rotulo}</p>
-                      <p className="text-[11px] font-semibold leading-snug">{c.nome}</p>
-                      <p className="text-[9px] text-slate-400 mt-0.5 truncate">{c.modulo}</p>
-                    </div>
-                  </div>
-                  <span className="mt-2 flex items-center justify-between rounded-md bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700">Usar ferramenta <ChevronRight size={11} /></span>
-                </div>
-              ))}
-              <div className="hidden sm:flex rounded-xl border border-dashed border-slate-300 items-center justify-center text-[11px] text-slate-500 p-2.5">
-                + {Math.max(ferramentas - cards.length, 0)} ferramentas em {modulos} módulos
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default async function CemFerramentasLanding() {
-  const [oferta, produto, demos, plano] = await Promise.all([
+  const [oferta, produto, demo, plano] = await Promise.all([
     prisma.oferta.findUnique({ where: { slug: OFERTA_SLUG }, include: { itens: { where: { papel: "PRINCIPAL" }, take: 1 } } }),
     prisma.infoProduto.findUnique({
       where: { slug: PRODUTO_SLUG },
@@ -124,10 +86,9 @@ export default async function CemFerramentasLanding() {
         },
       },
     }),
-    prisma.centralFerramenta.findMany({
-      where: { demoPublica: true },
-      orderBy: { ordem: "asc" },
-      select: { slug: true, nome: true, descricao: true, objetivo: true, campos: true },
+    prisma.centralFerramenta.findUnique({
+      where: { slug: DEMO_SLUG },
+      select: { nome: true, prompt: true, instrucoes: true, formatoResposta: true, campos: true, modulo: { select: { produto: { select: { regrasQualidade: true } } } } },
     }),
     carregarPlano7Dias(),
   ]);
@@ -146,10 +107,13 @@ export default async function CemFerramentasLanding() {
   });
   const nomeDe = (slug: string, reserva: string) => porSlug.get(slug)?.nome ?? reserva;
 
-  const ferramentasDemo: FerramentaDemo[] = demos.map(d => ({
-    slug: d.slug, rotulo: ROTULO_DEMO[d.slug] ?? d.nome.replace(/^\[Demo\]\s*/, ""), nome: d.nome.replace(/^\[Demo\]\s*/, ""),
-    descricao: d.descricao, objetivo: d.objetivo, campos: lerCampos(d.campos),
-  }));
+  // Prompt real da animação: a ferramenta de exemplo montada com os dados do exemplo
+  const demoCampos = demo ? lerCampos(demo.campos) : [];
+  const demoPrompt = demo ? montarPromptFinal({
+    prompt: demo.prompt, instrucoes: demo.instrucoes, formatoResposta: demo.formatoResposta, entradas: DEMO_EXEMPLO,
+    perfil: null, campos: demoCampos, regrasQualidade: demo.modulo.produto.regrasQualidade,
+  }) : "";
+  const alvo = Math.max(0, cards.findIndex(c => c.rotulo === "Recuperar orçamentos"));
 
   const ctaPrincipal = `Quero acessar minhas ${totalFerramentas} ferramentas`;
 
@@ -180,9 +144,13 @@ export default async function CemFerramentasLanding() {
             </ul>
           </div>
           <div>
-            {video
-              ? <Video v={video} />
-              : <MockPlataforma cards={cards} modulos={modulos.length} ferramentas={totalFerramentas} />}
+            {video ? <Video v={video} /> : demo && (
+              <MotionPlataforma
+                cards={cards} alvo={alvo} ferramenta={demo.nome.replace(/^\[Demo\]\s*/, "")}
+                campos={demoCampos.map(c => [c.label, DEMO_EXEMPLO[c.key] ?? ""] as [string, string])}
+                prompt={demoPrompt} resposta={DEMO_RESPOSTA}
+              />
+            )}
           </div>
         </div>
       </section>
@@ -253,27 +221,42 @@ export default async function CemFerramentasLanding() {
             <div className="mt-10 aspect-video w-full rounded-2xl border border-dashed border-[var(--line-strong)] bg-white/[.02] flex flex-col items-center justify-center text-center px-6">
               <Film size={36} className="text-[var(--acc)]" />
               <p className="mt-4 font-semibold">Vídeo demonstrativo em produção</p>
-              <p className="mt-1 text-sm text-[var(--muted)] max-w-md">Enquanto isso, teste logo abaixo uma ferramenta de verdade — de graça e sem cadastro.</p>
+              <p className="mt-1 text-sm text-[var(--muted)] max-w-md">Enquanto isso, veja logo abaixo a diferença que um prompt bem montado faz.</p>
             </div>
           </div>
         </section>
       )}
 
-      {/* Demonstração gratuita */}
-      {ferramentasDemo.length > 0 && (
-        <section id="demonstracao" className="border-t border-[var(--line)]">
-          <div className="max-w-6xl mx-auto px-4 md:px-6 py-20 md:py-28">
-            <div className="text-center">
-              <Kicker>Grátis · sem cadastro</Kicker>
-              <h2 className="mt-4 text-3xl md:text-5xl font-semibold tracking-[-0.025em]">Experimente <Em>antes de comprar.</Em></h2>
-              <p className="mt-4 text-lg text-[var(--body)]">Veja como uma ferramenta comercial é personalizada para o seu negócio.</p>
-            </div>
-            <div className="mt-10">
-              <DemoInterativa ferramentas={ferramentasDemo} checkoutHref={CHECKOUT} preco={preco} total={totalFerramentas} />
-            </div>
+      {/* O mesmo pedido, duas respostas (motion) */}
+      <section id="demonstracao" className="border-t border-[var(--line)]">
+        <div className="max-w-6xl mx-auto px-4 md:px-6 py-20 md:py-28">
+          <div className="text-center">
+            <Kicker>Veja na prática</Kicker>
+            <h2 className="mt-4 text-3xl md:text-5xl font-semibold tracking-[-0.025em]">O mesmo pedido. <Em>Duas respostas.</Em></h2>
+            <p className="mt-4 text-lg text-[var(--body)]">A diferença entre pedir qualquer coisa à IA e usar uma ferramenta pronta, com o contexto do seu cliente.</p>
           </div>
-        </section>
-      )}
+          <div className="mt-10">
+            <MotionComparacao
+              sem={{
+                titulo: "Pedido genérico",
+                pedido: "faz uma mensagem pra cobrar o cliente que não respondeu o orçamento",
+                resposta: "Olá, tudo bem? Gostaria de saber se você teve a oportunidade de analisar nossa proposta. Fico à disposição para esclarecer qualquer dúvida. Aguardo seu retorno!",
+                itens: ["Serviria para qualquer empresa", "Não usa nada da conversa com o cliente", "Fácil de ignorar"],
+              }}
+              com={{
+                titulo: "Com o prompt da Vendas IA",
+                pedido: "Prompt da ferramenta “Recuperar orçamento parado” · marcenaria · armário de R$ 8.900 · cliente sumiu há 5 dias · objetivo: retomar a conversa",
+                resposta: "Oi, Carla! Conseguiu ver com o seu marido o projeto do armário da cozinha? Se quiser, ajusto alguma medida antes de vocês decidirem 😊\n\nQuando enviar: hoje, no fim da tarde.",
+                itens: ["Usa o contexto real da conversa", "Uma pergunta só, fácil de responder", "Sem desconto e sem pressão"],
+              }}
+            />
+          </div>
+          <div className="mt-10 rounded-2xl border border-[rgba(251,191,36,.35)] bg-[var(--acc-dim)] p-5 md:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <p className="text-lg font-semibold">Gostou? Tenha acesso às {totalFerramentas} ferramentas por {preco}.</p>
+            <Cta href={CHECKOUT} texto={`Quero as ${totalFerramentas} ferramentas`} />
+          </div>
+        </div>
+      </section>
 
       {/* Benefícios */}
       <section className="border-t border-[var(--line)]">
@@ -382,7 +365,7 @@ export default async function CemFerramentasLanding() {
               ["Preciso saber criar prompts?", "Não. Você escolhe a ferramenta e responde perguntas simples sobre o seu negócio. A Vendas IA monta o prompt completo e estruturado para você copiar."],
               ["Preciso pagar o ChatGPT ou o Claude?", "Não é obrigatório: os prompts funcionam nas versões gratuitas das duas IAs. Algumas funções dessas plataformas, como limites maiores de uso ou análise de arquivos, podem exigir um plano pago delas — isso é cobrado pela OpenAI ou pela Anthropic, não pela Vendas IA."],
               ["A Vendas IA gera respostas automaticamente?", "Não. A Vendas IA prepara o comando com as suas informações. Você copia, cola no ChatGPT ou no Claude, e é lá que a resposta é gerada. Nada é enviado automaticamente para essas IAs."],
-              ["Funciona para qualquer segmento comercial?", "As ferramentas foram pensadas para pequenos e médios negócios que vendem produtos ou serviços — loja, prestação de serviço, saúde, indústria, venda para empresas. As respostas que você dá no formulário é que adaptam o prompt ao seu caso. Teste na demonstração gratuita acima antes de comprar."],
+              ["Funciona para qualquer segmento comercial?", "As ferramentas foram pensadas para pequenos e médios negócios que vendem produtos ou serviços — loja, prestação de serviço, saúde, indústria, venda para empresas. As respostas que você dá no formulário é que adaptam o prompt ao seu caso."],
               ["O acesso exige mensalidade?", `Não. É um pagamento único de ${preco}, sem mensalidade da Vendas IA.`],
               ["Os produtos complementares estão incluídos?", "Não. Esta oferta inclui os 100 prompts comerciais. Kits complementares, como o Analisador de Relatórios de Vendas e o WhatsApp Vendedor, são vendidos à parte e podem aparecer como opção no checkout."],
               ["Como recebo o acesso depois da compra?", "Assim que o pagamento é confirmado — no cartão, na hora; no Pix, logo após o pagamento — sua conta é criada e você recebe um e-mail para definir sua senha e entrar."],

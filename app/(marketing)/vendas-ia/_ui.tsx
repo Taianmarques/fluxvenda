@@ -41,6 +41,16 @@ export function Pagina({ children }: { children: React.ReactNode }) {
         @keyframes vlp-marquee { from { transform: translateX(0) } to { transform: translateX(-50%) } }
         .vlp-marquee { animation: vlp-marquee 28s linear infinite }
         @media (prefers-reduced-motion: reduce) { .vlp-marquee { animation: none } }
+        /* Motion das demonstrações: palavra que surge, cursor e status com brilho */
+        @keyframes vlp-tok { to { opacity: 1; filter: none } }
+        .vlp-tok { opacity: 0; filter: blur(4px); animation: vlp-tok .35s ease-out forwards }
+        @keyframes vlp-caret { 50% { opacity: 0 } }
+        .vlp-caret { display: inline-block; width: 2px; height: 1em; margin-left: 1px; vertical-align: -2px; background: currentColor; animation: vlp-caret 1.1s steps(2) infinite }
+        @keyframes vlp-shimmer { from { background-position: 100% 0 } to { background-position: 0 0 } }
+        .vlp-shimmer { background: linear-gradient(90deg, var(--sh-a) 0 35%, var(--sh-b) 50%, var(--sh-a) 65% 100%); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: vlp-shimmer 1.6s linear infinite }
+        @keyframes vlp-in { from { opacity: 0; transform: translateY(6px) } }
+        .vlp-in { animation: vlp-in .4s ease-out both }
+        @media (prefers-reduced-motion: reduce) { .vlp-tok, .vlp-in { animation: none; opacity: 1; filter: none } .vlp-caret, .vlp-shimmer { animation: none } }
       `}</style>
       {children}
     </div>
