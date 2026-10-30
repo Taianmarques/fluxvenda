@@ -1,8 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ArrowLeft, ArrowRight, Check, Loader2, Sparkles } from "lucide-react";
 import { SEGMENTS, SUBSEGMENTS } from "@/lib/segments";
+import { IconeArea } from "../areas";
 
 const TEAM_SIZES = ["1-5", "6-15", "16-50", "51-200", "200+"];
 
@@ -166,21 +169,26 @@ const QUESTIONS_VENDEDOR: { category: string; catKey: string; icon: string; ques
   },
 ];
 
+// Cor de cada resposta quando selecionada (da pior pra melhor)
 const SCALE = [
-  { value: 20, label: "Nunca",       color: "border-red-700 bg-red-950/40 text-red-300"       },
-  { value: 40, label: "Raramente",   color: "border-orange-700 bg-orange-950/40 text-orange-300" },
-  { value: 60, label: "Às vezes",    color: "border-yellow-700 bg-yellow-950/40 text-yellow-300" },
-  { value: 80, label: "Frequente",   color: "border-blue-700 bg-blue-950/40 text-blue-300"    },
-  { value: 100, label: "Sempre",     color: "border-green-700 bg-green-950/40 text-green-300" },
+  { value: 20, label: "Nunca",       color: "border-red-300 bg-red-50 text-red-700"          },
+  { value: 40, label: "Raramente",   color: "border-orange-300 bg-orange-50 text-orange-700" },
+  { value: 60, label: "Às vezes",    color: "border-amber-300 bg-amber-50 text-amber-700"    },
+  { value: 80, label: "Frequente",   color: "border-blue-300 bg-blue-50 text-blue-700"       },
+  { value: 100, label: "Sempre",     color: "border-emerald-300 bg-emerald-50 text-emerald-700" },
 ];
 
 const SCALE_EMPRESA = [
-  { value: 20, label: "Inexistente",       color: "border-red-700 bg-red-950/40 text-red-300"       },
-  { value: 40, label: "Inicial",           color: "border-orange-700 bg-orange-950/40 text-orange-300" },
-  { value: 60, label: "Em desenvolvimento",color: "border-yellow-700 bg-yellow-950/40 text-yellow-300" },
-  { value: 80, label: "Maduro",            color: "border-blue-700 bg-blue-950/40 text-blue-300"    },
-  { value: 100, label: "Referência",       color: "border-green-700 bg-green-950/40 text-green-300" },
+  { value: 20, label: "Inexistente",       color: "border-red-300 bg-red-50 text-red-700"          },
+  { value: 40, label: "Inicial",           color: "border-orange-300 bg-orange-50 text-orange-700" },
+  { value: 60, label: "Em desenvolvimento",color: "border-amber-300 bg-amber-50 text-amber-700"    },
+  { value: 80, label: "Maduro",            color: "border-blue-300 bg-blue-50 text-blue-700"       },
+  { value: 100, label: "Referência",       color: "border-emerald-300 bg-emerald-50 text-emerald-700" },
 ];
+
+const cartao = "rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]";
+const chip = (ativo: boolean) =>
+  `px-4 py-2 rounded-full text-sm border transition-colors ${ativo ? "border-blue-600 bg-blue-600 text-white" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"}`;
 
 interface Props {
   isVendedor: boolean;
@@ -233,6 +241,11 @@ export function NovoScannerForm({
     return QUESTIONS[currentCat].questions.every((q) => answers[q.id] !== undefined);
   }
 
+  function irPara(i: number) {
+    setCurrentCat(i);
+    document.querySelector("main")?.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function handleSubmit() {
     setStep("sending");
     try {
@@ -260,21 +273,16 @@ export function NovoScannerForm({
 
   if (step === "sending") {
     return (
-      <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
-        <div className="text-center space-y-6 max-w-sm">
-          <div className="text-7xl animate-bounce">{isVendedor ? "🎯" : "🤖"}</div>
+      <div className="min-h-full bg-[#f4f6fb] text-slate-900 flex items-center justify-center p-6">
+        <div className={`${cartao} text-center space-y-5 max-w-md p-8`}>
+          <span className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-violet-600 text-white flex items-center justify-center shadow-lg shadow-blue-600/25">
+            <Loader2 size={30} className="animate-spin" />
+          </span>
           <div>
-            <p className="text-2xl font-bold">
-              {isVendedor ? "Analisando seu perfil" : "Analisando sua empresa"}
+            <p className="text-2xl font-bold">{isVendedor ? "Analisando seu perfil" : "Analisando sua empresa"}</p>
+            <p className="text-slate-500 mt-2">
+              A IA está gerando seu diagnóstico com pontos de atenção, forças e por onde começar. Leva alguns segundos.
             </p>
-            <p className="text-gray-400 mt-2">
-              A IA está gerando seu diagnóstico personalizado com pontos de atenção, forças e um plano de desenvolvimento...
-            </p>
-          </div>
-          <div className="flex gap-1 justify-center">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.2}s` }} />
-            ))}
           </div>
         </div>
       </div>
@@ -289,55 +297,59 @@ export function NovoScannerForm({
       : (!!companyName.trim() && !!segment && !!subsegment && !!teamSize);
 
     return (
-      <div className="min-h-screen bg-gray-950 text-white p-8">
-        <div className="max-w-2xl mx-auto space-y-8">
-          <div className="text-center space-y-3">
-            <span className="text-5xl">{isVendedor ? "🎯" : "📊"}</span>
-            <h1 className="text-3xl font-bold">
-              {isVendedor ? "Auto-diagnóstico de Vendas" : "Scanner Empresarial"}
-            </h1>
-            <p className="text-gray-400">
-              {isVendedor
-                ? "35 perguntas sobre sua atuação individual. A IA identifica seus pontos fortes, onde você está deixando dinheiro na mesa, e gera um plano de evolução personalizado."
-                : "Diagnóstico completo em 35 perguntas. A IA analisa a maturidade comercial da sua empresa e gera um plano de ação personalizado."}
-            </p>
-          </div>
+      <div className="min-h-full bg-[#f4f6fb] text-slate-900">
+        <div className="max-w-3xl mx-auto p-4 md:p-8 space-y-6">
+          <Link href="/scanner" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900">
+            <ArrowLeft size={15} /> Diagnóstico Comercial
+          </Link>
 
-          <div className="grid grid-cols-2 gap-3">
+          <section className="relative overflow-hidden rounded-3xl border border-blue-100 bg-gradient-to-r from-white via-blue-50 to-violet-100 p-6 md:p-8">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">Gratuito</span>
+            <h1 className="mt-3 text-2xl md:text-3xl font-extrabold tracking-tight">
+              {isVendedor ? "Auto-diagnóstico de vendas" : "Diagnóstico comercial da empresa"}
+            </h1>
+            <p className="mt-2 text-slate-600">
+              {isVendedor
+                ? `${TOTAL_QUESTIONS} perguntas sobre a sua atuação. A IA mostra seus pontos fortes, onde você perde vendas e quais ferramentas usar primeiro.`
+                : `${TOTAL_QUESTIONS} perguntas sobre a maturidade comercial da sua empresa. A IA mostra o que trava suas vendas e quais ferramentas usar primeiro.`}
+            </p>
+          </section>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {QUESTIONS.map((cat) => (
-              <div key={cat.catKey} className="flex items-center gap-3 p-3 bg-gray-900 border border-gray-800 rounded-xl">
-                <span className="text-2xl">{cat.icon}</span>
-                <div>
-                  <p className="text-sm font-medium">{cat.category}</p>
-                  <p className="text-xs text-gray-500">5 perguntas</p>
+              <div key={cat.catKey} className={`${cartao} flex items-center gap-3 p-3`}>
+                <IconeArea chave={cat.catKey} vendedor={isVendedor} tamanho="sm" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium leading-snug">{cat.category}</p>
+                  <p className="text-xs text-slate-500">5 perguntas</p>
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="space-y-5">
+          <div className={`${cartao} p-5 md:p-6 space-y-6`}>
             {!isVendedor && (
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-300">Nome da empresa *</label>
+                <label className="text-sm font-medium text-slate-700">Nome da empresa *</label>
                 <input
                   type="text"
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
                   placeholder="Ex: Acme Vendas Ltda"
-                  className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
                 />
               </div>
             )}
 
             {!isVendedor && (
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-300">Modelo de negócio *</label>
+                <label className="text-sm font-medium text-slate-700">Modelo de negócio *</label>
                 <div className="grid grid-cols-2 gap-3">
                   {(["B2B", "B2C"] as const).map((bm) => (
                     <button key={bm} type="button" onClick={() => setBusinessModel(bm)}
-                      className={`p-4 rounded-xl border text-left transition-all ${businessModel === bm ? "border-blue-500 bg-blue-950/40" : "border-gray-700 hover:border-gray-600 bg-gray-900"}`}>
-                      <p className={`font-bold text-lg ${businessModel === bm ? "text-blue-300" : "text-white"}`}>{bm}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">
+                      className={`p-4 rounded-xl border text-left transition-colors ${businessModel === bm ? "border-blue-500 bg-blue-50 ring-2 ring-blue-500/15" : "border-slate-200 hover:border-slate-300 bg-white"}`}>
+                      <p className={`font-bold text-lg ${businessModel === bm ? "text-blue-700" : "text-slate-900"}`}>{bm}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">
                         {bm === "B2B" ? "Vende para outras empresas" : "Vende para consumidor final"}
                       </p>
                     </button>
@@ -348,24 +360,22 @@ export function NovoScannerForm({
 
             {/* Segmento: locked para vendedor com equipe, selecionável para os demais */}
             {isVendedor && hasTeam ? (
-              <div className="bg-green-950/20 border border-green-800/50 rounded-xl p-4 space-y-1">
-                <p className="text-xs font-semibold text-green-400 uppercase tracking-wider">Empresa da equipe</p>
-                <p className="text-sm text-gray-200 font-medium">{defaultCompanyName || "Sua empresa"}</p>
-                <p className="text-xs text-gray-400">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-1">
+                <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Empresa da equipe</p>
+                <p className="text-sm text-slate-900 font-medium">{defaultCompanyName || "Sua empresa"}</p>
+                <p className="text-xs text-slate-600">
                   {segment}{defaultSubsegment ? ` / ${defaultSubsegment}` : ""}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">O diagnóstico será contextualizado para o segmento da sua empresa.</p>
+                <p className="text-xs text-slate-500 mt-1">O diagnóstico será contextualizado para o segmento da sua empresa.</p>
               </div>
             ) : (
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-300">
+                <label className="text-sm font-medium text-slate-700">
                   {isVendedor ? "Seu segmento de atuação *" : "Segmento de mercado *"}
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {SEGMENTS.map((s) => (
-                    <button key={s} type="button"
-                      onClick={() => isVendedor ? setSegment(s) : handleSegmentChange(s)}
-                      className={`px-4 py-2 rounded-full text-sm border transition-all ${segment === s ? "border-blue-500 bg-blue-950/40 text-blue-300" : "border-gray-700 text-gray-400 hover:border-gray-500"}`}>
+                    <button key={s} type="button" onClick={() => isVendedor ? setSegment(s) : handleSegmentChange(s)} className={chip(segment === s)}>
                       {s}
                     </button>
                   ))}
@@ -375,13 +385,11 @@ export function NovoScannerForm({
 
             {!isVendedor && segment && subsegments.length > 0 && (
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-300">
-                  Categoria dentro de {segment} *
-                </label>
-                <div className="grid grid-cols-2 gap-2">
+                <label className="text-sm font-medium text-slate-700">Categoria dentro de {segment} *</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {subsegments.map((sub) => (
                     <button key={sub} type="button" onClick={() => setSubsegment(sub)}
-                      className={`px-3 py-2.5 rounded-xl text-sm border text-left transition-all ${subsegment === sub ? "border-blue-500 bg-blue-950/40 text-blue-300" : "border-gray-700 text-gray-400 hover:border-gray-500 bg-gray-900/50"}`}>
+                      className={`px-3.5 py-2.5 rounded-xl text-sm border text-left transition-colors ${subsegment === sub ? "border-blue-500 bg-blue-50 text-blue-700 font-medium" : "border-slate-200 text-slate-600 hover:border-slate-300 bg-white"}`}>
                       {sub}
                     </button>
                   ))}
@@ -391,11 +399,10 @@ export function NovoScannerForm({
 
             {!isVendedor && (
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-300">Tamanho da equipe de vendas *</label>
+                <label className="text-sm font-medium text-slate-700">Tamanho da equipe de vendas *</label>
                 <div className="flex flex-wrap gap-2">
                   {TEAM_SIZES.map((t) => (
-                    <button key={t} type="button" onClick={() => setTeamSize(t)}
-                      className={`px-4 py-2 rounded-full text-sm border transition-all ${teamSize === t ? "border-blue-500 bg-blue-950/40 text-blue-300" : "border-gray-700 text-gray-400 hover:border-gray-500"}`}>
+                    <button key={t} type="button" onClick={() => setTeamSize(t)} className={chip(teamSize === t)}>
                       {t} pessoas
                     </button>
                   ))}
@@ -404,21 +411,21 @@ export function NovoScannerForm({
             )}
 
             {!isVendedor && segment && subsegment && (
-              <div className="bg-blue-950/20 border border-blue-800/50 rounded-xl p-4 space-y-1">
-                <p className="text-xs font-semibold text-blue-400 uppercase tracking-wider">Perfil do diagnóstico</p>
-                <p className="text-sm text-gray-200">
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-1">
+                <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider">Perfil do diagnóstico</p>
+                <p className="text-sm text-slate-900">
                   <span className="font-semibold">{businessModel}</span> • {segment} / {subsegment}
                 </p>
-                <p className="text-xs text-gray-500">As perguntas e análise serão personalizadas para este perfil.</p>
+                <p className="text-xs text-slate-500">As perguntas e a análise serão personalizadas para este perfil.</p>
               </div>
             )}
 
             <button
               disabled={!canNext}
               onClick={() => setStep("questions")}
-              className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl font-bold text-lg transition-colors"
+              className="w-full inline-flex items-center justify-center gap-2 py-3.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl font-semibold text-white shadow-lg shadow-blue-600/20 transition-colors"
             >
-              {isVendedor ? "Iniciar auto-diagnóstico →" : "Iniciar diagnóstico →"}
+              {isVendedor ? "Iniciar auto-diagnóstico" : "Iniciar diagnóstico"} <ArrowRight size={18} />
             </button>
           </div>
         </div>
@@ -427,59 +434,59 @@ export function NovoScannerForm({
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
-      <div className="sticky top-0 z-10 bg-gray-950/95 backdrop-blur border-b border-gray-800 px-6 py-3">
-        <div className="max-w-2xl mx-auto flex items-center gap-4">
-          <div className="flex-1 h-2 bg-gray-800 rounded-full overflow-hidden">
-            <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+    <div className="min-h-full bg-[#f4f6fb] text-slate-900">
+      <div className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-slate-200/70 px-4 md:px-8 py-3">
+        <div className="max-w-3xl mx-auto flex items-center gap-4">
+          <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-blue-600 to-violet-600 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
           </div>
-          <span className="text-sm text-gray-400 whitespace-nowrap">{totalAnswered}/{TOTAL_QUESTIONS}</span>
+          <span className="text-sm text-slate-500 whitespace-nowrap tabular-nums">{totalAnswered}/{TOTAL_QUESTIONS}</span>
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto p-6 space-y-6">
-        <div className="grid grid-cols-4 gap-2">
+      <div className="max-w-3xl mx-auto p-4 md:p-8 space-y-6">
+        <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
           {QUESTIONS.map((cat, i) => {
             const done = catAnswered(i) === 5;
             const active = i === currentCat;
             return (
-              <button key={cat.catKey} onClick={() => setCurrentCat(i)}
-                className={`p-2 rounded-xl border text-center transition-all ${
-                  active ? "border-blue-500 bg-blue-950/40" :
-                  done ? "border-green-700 bg-green-950/30" :
-                  "border-gray-800 hover:border-gray-600"
+              <button key={cat.catKey} onClick={() => irPara(i)} title={cat.category}
+                className={`p-2 rounded-xl border flex flex-col items-center gap-1 transition-colors ${
+                  active ? "border-blue-500 bg-white ring-2 ring-blue-500/15" :
+                  done ? "border-emerald-200 bg-emerald-50" :
+                  "border-slate-200 bg-white hover:border-slate-300"
                 }`}>
-                <div className="text-xl">{cat.icon}</div>
-                <div className={`text-xs mt-1 ${active ? "text-blue-300" : done ? "text-green-400" : "text-gray-500"}`}>
-                  {done ? "✓" : `${catAnswered(i)}/5`}
-                </div>
+                <IconeArea chave={cat.catKey} vendedor={isVendedor} tamanho="sm" />
+                <span className={`text-xs font-medium ${active ? "text-blue-700" : done ? "text-emerald-700" : "text-slate-500"}`}>
+                  {done ? <Check size={13} className="inline" /> : `${catAnswered(i)}/5`}
+                </span>
               </button>
             );
           })}
         </div>
 
         <div className="flex items-center gap-3">
-          <span className="text-3xl">{currentCategory.icon}</span>
+          <IconeArea chave={currentCategory.catKey} vendedor={isVendedor} tamanho="lg" />
           <div>
             <h2 className="text-xl font-bold">{currentCategory.category}</h2>
-            <p className="text-sm text-gray-400">{catAnswered(currentCat)}/5 respondidas</p>
+            <p className="text-sm text-slate-500">{catAnswered(currentCat)}/5 respondidas</p>
           </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           {currentCategory.questions.map((q, qi) => (
-            <div key={q.id} className={`bg-gray-900 border rounded-2xl p-5 space-y-4 transition-all ${answers[q.id] ? "border-gray-700" : "border-gray-800"}`}>
+            <div key={q.id} className={`${cartao} p-5 space-y-4 ${answers[q.id] ? "border-slate-300/80" : ""}`}>
               <div className="flex gap-3">
-                <span className="flex-shrink-0 w-7 h-7 rounded-full bg-gray-800 flex items-center justify-center text-xs font-bold text-gray-400">
+                <span className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${answers[q.id] ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500"}`}>
                   {qi + 1}
                 </span>
-                <p className="text-sm text-gray-200 leading-relaxed pt-0.5">{q.text}</p>
+                <p className="text-[15px] text-slate-800 leading-relaxed pt-0.5">{q.text}</p>
               </div>
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                 {SCALE_LABELS.map((s) => (
                   <button key={s.value} onClick={() => setAnswers((prev) => ({ ...prev, [q.id]: s.value }))}
-                    className={`py-2.5 px-1 rounded-xl text-xs font-medium border transition-all text-center ${
-                      answers[q.id] === s.value ? s.color : "border-gray-700 text-gray-500 hover:border-gray-500 hover:text-gray-300"
+                    className={`py-2.5 px-1.5 rounded-xl text-xs font-medium border transition-colors text-center ${
+                      answers[q.id] === s.value ? s.color : "border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-800"
                     }`}>
                     {s.label}
                   </button>
@@ -491,25 +498,25 @@ export function NovoScannerForm({
 
         <div className="flex gap-3 pb-8">
           {currentCat > 0 && (
-            <button onClick={() => setCurrentCat(currentCat - 1)}
-              className="px-5 py-3 border border-gray-700 rounded-xl text-sm hover:border-gray-500 transition-colors">
-              ← Anterior
+            <button onClick={() => irPara(currentCat - 1)}
+              className="inline-flex items-center gap-1.5 px-5 py-3 border border-slate-200 bg-white rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+              <ArrowLeft size={16} /> Anterior
             </button>
           )}
           {currentCat < QUESTIONS.length - 1 ? (
-            <button onClick={() => setCurrentCat(currentCat + 1)} disabled={!catComplete()}
-              className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl font-semibold transition-colors">
-              Próxima: {QUESTIONS[currentCat + 1].category} →
+            <button onClick={() => irPara(currentCat + 1)} disabled={!catComplete()}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl font-semibold text-white transition-colors">
+              Próxima: {QUESTIONS[currentCat + 1].category} <ArrowRight size={17} />
             </button>
           ) : (
             <button onClick={handleSubmit} disabled={totalAnswered < TOTAL_QUESTIONS}
-              className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl font-bold transition-all">
-              {totalAnswered < TOTAL_QUESTIONS ? `Faltam ${TOTAL_QUESTIONS - totalAnswered} respostas` : "🤖 Gerar diagnóstico com IA"}
+              className="flex-1 inline-flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl font-semibold text-white shadow-lg shadow-blue-600/20 transition-colors">
+              {totalAnswered < TOTAL_QUESTIONS ? `Faltam ${TOTAL_QUESTIONS - totalAnswered} respostas` : <><Sparkles size={17} /> Gerar diagnóstico com IA</>}
             </button>
           )}
         </div>
 
-        {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+        {error && <p className="text-red-600 text-sm text-center">{error}</p>}
       </div>
     </div>
   );
