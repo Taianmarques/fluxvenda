@@ -40,7 +40,7 @@ const acessosDaCompra = id => q(`SELECT p.slug || ':' || a.ativo FROM "AcessoPro
 (async () => {
   if (!SANDBOX_KEY) { console.log("SEM ASAAS_PLATFORM_SANDBOX_API_KEY — abortando"); process.exit(1); }
   console.log(`webhook token configurado: ${WEBHOOK_TOKEN ? "sim" : "NÃO"}`);
-  const antes = q(`SELECT ativa || '|' || sandbox FROM "Oferta" WHERE slug='vendas-ia'`);
+  const antes = q(`SELECT ativa, sandbox FROM "Oferta" WHERE slug='vendas-ia'`); // "t|f" (colunas separadas pelo -F)
   console.log(`oferta antes do teste (ativa|sandbox): ${antes}`);
   q(`UPDATE "Oferta" SET ativa=true, sandbox=true WHERE slug='vendas-ia'`);
   const ts = Date.now().toString(36);
@@ -86,7 +86,7 @@ const acessosDaCompra = id => q(`SELECT p.slug || ':' || a.ativo FROM "AcessoPro
         await sleep(1500);
         await api(`/api/comprar/status/${cUp}`);
       }
-      const stUp = cUp ? q(`SELECT status || '|' || "valorCentavos" || '|' || ("compraOrigemId"='${c1}') FROM "Compra" WHERE id='${cUp}'`) : "";
+      const stUp = cUp ? q(`SELECT status || '|' || "valorCentavos" || '|' || CASE WHEN "compraOrigemId"='${c1}' THEN 't' ELSE 'f' END FROM "Compra" WHERE id='${cUp}'`) : "";
       check(stUp === "PAGO|3700|t", `upsell (${forma}) pago, R$ 37,00, ligado à compra original`, stUp || JSON.stringify(ac.body).slice(0, 160));
       check(cUp && acessosDaCompra(cUp).join(",") === "anuncios-ia:true", "Biblioteca de Anúncios liberada");
       const de_novo = await api(`/api/comprar/upsell/${c1}?t=${encodeURIComponent(tok)}`);
