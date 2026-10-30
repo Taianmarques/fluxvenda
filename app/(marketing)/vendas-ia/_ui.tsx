@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Instrument_Serif, Inter_Tight, JetBrains_Mono } from "next/font/google";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Plus } from "lucide-react";
 
 // Peças visuais das landings do Vendas IA: tema escuro, destaque âmbar e itálico serifado nos
 // títulos. Pasta com "_" não vira rota.
@@ -51,6 +51,12 @@ export function Pagina({ children }: { children: React.ReactNode }) {
         @keyframes vlp-in { from { opacity: 0; transform: translateY(6px) } }
         .vlp-in { animation: vlp-in .4s ease-out both }
         @media (prefers-reduced-motion: reduce) { .vlp-tok, .vlp-in { animation: none; opacity: 1; filter: none } .vlp-caret, .vlp-shimmer { animation: none } }
+        /* Acordeão das perguntas: abre deslizando nos navegadores que suportam (nos outros, abre direto) */
+        .vlp-faq { interpolate-size: allow-keywords }
+        .vlp-faq::details-content { block-size: 0; overflow: hidden; transition: block-size .3s ease, content-visibility .3s allow-discrete }
+        .vlp-faq[open]::details-content { block-size: auto }
+        .vlp-faq summary::-webkit-details-marker { display: none }
+        @media (prefers-reduced-motion: reduce) { .vlp-faq::details-content { transition: none } }
       `}</style>
       {children}
     </div>
@@ -98,6 +104,26 @@ export function FaixaGarantia() {
       <div className="vlp-marquee flex w-max gap-8 font-[family-name:var(--f-mono)] text-xs tracking-[0.2em] text-[var(--acc-bright)] whitespace-nowrap">
         {Array.from({ length: 16 }).map((_, i) => <span key={i}>7 DIAS PARA DESISTIR • REEMBOLSO INTEGRAL •</span>)}
       </div>
+    </div>
+  );
+}
+
+// Perguntas frequentes em acordeão: <details> nativo (funciona sem JavaScript e no teclado);
+// name igual faz abrir uma de cada vez
+export function Faq({ itens }: { itens: [string, string][] }) {
+  return (
+    <div className="mt-12 divide-y divide-[var(--line)] border-y border-[var(--line)]">
+      {itens.map(([q, a]) => (
+        <details key={q} name="faq" className="vlp-faq group">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 text-left text-lg font-semibold hover:text-[var(--acc-bright)] transition-colors">
+            {q}
+            <span className="w-8 h-8 rounded-full border border-[var(--line-strong)] flex items-center justify-center flex-shrink-0 text-[var(--acc)] transition-transform duration-300 group-open:rotate-45 group-open:border-[var(--acc)]">
+              <Plus size={16} />
+            </span>
+          </summary>
+          <p className="pb-6 pr-12 text-[var(--body)] leading-relaxed">{a}</p>
+        </details>
+      ))}
     </div>
   );
 }

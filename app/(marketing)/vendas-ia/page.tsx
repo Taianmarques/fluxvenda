@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Check, Copy, ExternalLink, ShieldCheck, X } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { CentralIcone } from "@/lib/central-icons";
-import { BotaoFixoCelular, cartao, Cta, Em, FaixaGarantia, Kicker, Pagina, reais, Rodape, Topo } from "./_ui";
+import { BotaoFixoCelular, cartao, Cta, Em, FaixaGarantia, Faq, Kicker, Pagina, reais, Rodape, Topo } from "./_ui";
 
 // Landing de vendas do Vendas IA (100 prompts). Carta de vendas longa, tema escuro com destaque
 // âmbar. Preço, módulos e quantidade de prompts vêm do banco — mudou no admin, mudou aqui.
@@ -297,21 +297,16 @@ export default async function VendasIaLanding() {
       <section className="border-t border-[var(--line)]">
         <div className="max-w-3xl mx-auto px-4 md:px-6 py-20 md:py-28">
           <h2 className="text-3xl md:text-5xl font-semibold tracking-[-0.025em] text-center">Perguntas <Em>frequentes.</Em></h2>
-          <div className="mt-12 divide-y divide-[var(--line)] border-y border-[var(--line)]">
-            {[
+          <Faq
+            itens={[
               ["Preciso pagar o ChatGPT ou o Claude?", "Não. Os prompts funcionam na versão gratuita das duas. A versão paga costuma dar respostas mais elaboradas, mas não é obrigatória."],
               ["Preciso saber escrever prompt ou entender de IA?", "Não. Você escolhe o que quer fazer e responde perguntas simples sobre o seu negócio. A plataforma monta o comando completo, com a técnica, e você só copia e cola."],
               ["Funciona para o meu tipo de negócio?", "Os prompts se adaptam ao que você vende: loja, prestação de serviço, consultório, indústria, venda para empresas. As respostas que você dá é que personalizam o resultado."],
               ["Tem mensalidade ou custo extra?", `Não. É um pagamento único de ${preco}. Você não paga nada por usar os prompts.`],
               ["Como recebo o acesso?", "Assim que o pagamento é confirmado (no cartão é na hora; no Pix, em instantes), sua conta é criada e você recebe um e-mail para definir sua senha e entrar."],
               ["E se eu não gostar?", "Você tem 7 dias para pedir o reembolso de 100% do valor."],
-            ].map(([q, a]) => (
-              <div key={q} className="py-6">
-                <h3 className="text-lg font-semibold">{q}</h3>
-                <p className="mt-2 text-[var(--body)] leading-relaxed">{a}</p>
-              </div>
-            ))}
-          </div>
+            ]}
+          />
         </div>
       </section>
 

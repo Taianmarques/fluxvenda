@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { CentralIcone } from "@/lib/central-icons";
 import { lerCampos } from "@/lib/central";
 import { carregarPlano7Dias } from "@/lib/plano-7-dias";
-import { BotaoFixoCelular, cartao, Cta, Em, FaixaGarantia, Kicker, Pagina, reais, Rodape, Topo } from "../_ui";
+import { BotaoFixoCelular, cartao, Cta, Em, FaixaGarantia, Faq, Kicker, Pagina, reais, Rodape, Topo } from "../_ui";
 import { montarPromptFinal } from "@/lib/central-prompt";
 import { MotionPlataforma } from "./MotionPlataforma";
 import { MotionComparacao } from "./MotionComparacao";
@@ -362,8 +362,8 @@ export async function LandingFerramentas({ topo }: { topo: TopoLanding }) {
       <section className="border-t border-[var(--line)]">
         <div className="max-w-3xl mx-auto px-4 md:px-6 py-20 md:py-28">
           <h2 className="text-3xl md:text-5xl font-semibold tracking-[-0.025em] text-center">Perguntas <Em>frequentes.</Em></h2>
-          <div className="mt-12 divide-y divide-[var(--line)] border-y border-[var(--line)]">
-            {[
+          <Faq
+            itens={[
               ["Preciso saber criar prompts?", "Não. Você escolhe a ferramenta e responde perguntas simples sobre o seu negócio. A Vendas IA monta o prompt completo e estruturado para você copiar."],
               ["Preciso pagar o ChatGPT ou o Claude?", "Não é obrigatório: os prompts funcionam nas versões gratuitas das duas IAs. Algumas funções dessas plataformas, como limites maiores de uso ou análise de arquivos, podem exigir um plano pago delas — isso é cobrado pela OpenAI ou pela Anthropic, não pela Vendas IA."],
               ["A Vendas IA gera respostas automaticamente?", "Não. A Vendas IA prepara o comando com as suas informações. Você copia, cola no ChatGPT ou no Claude, e é lá que a resposta é gerada. Nada é enviado automaticamente para essas IAs."],
@@ -373,13 +373,8 @@ export async function LandingFerramentas({ topo }: { topo: TopoLanding }) {
               ["Como recebo o acesso depois da compra?", "Assim que o pagamento é confirmado — no cartão, na hora; no Pix, logo após o pagamento — sua conta é criada e você recebe um e-mail para definir sua senha e entrar."],
               ["Existe política de reembolso?", "Sim. Você pode desistir da compra em até 7 dias após o pagamento e receber o valor integral, conforme o art. 49 do Código de Defesa do Consumidor."],
               ["O produto garante aumento de vendas?", "Não. A Vendas IA entrega ferramentas e um método para usar a inteligência artificial nas suas tarefas comerciais. O resultado depende do seu negócio, da sua oferta e de como você aplica o que for gerado."],
-            ].map(([q, a]) => (
-              <div key={q} className="py-6">
-                <h3 className="text-lg font-semibold">{q}</h3>
-                <p className="mt-2 text-[var(--body)] leading-relaxed">{a}</p>
-              </div>
-            ))}
-          </div>
+            ]}
+          />
           <div className="mt-12 flex flex-col items-center gap-3 text-center">
             <Cta href={CHECKOUT} texto={ctaPrincipal.toUpperCase()} grande />
             <p className="text-sm text-[var(--muted)]">{preco} — pagamento único</p>
