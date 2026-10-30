@@ -9,6 +9,7 @@ function matchesAny(pathname: string, patterns: RegExp[]) {
 const PUBLIC_ROUTES: RegExp[] = [
   /^\/$/,
   /^\/produtos(\/.*)?$/,          // landing pages de CRM e Plataforma — públicas, sem login
+  /^\/vendas-ia\/?$/,              // landing de vendas do Vendas IA (100 prompts)
   /^\/sign-in(\/.*)?$/,
   /^\/sign-up(\/.*)?$/,
   /^\/esqueci-senha(\/.*)?$/,
