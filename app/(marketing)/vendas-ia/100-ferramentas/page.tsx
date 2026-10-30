@@ -38,18 +38,21 @@ const VITRINE = [
   { slug: "responda-ao-cliente-que-achou-caro", rotulo: "Responder objeções" },
   { slug: "monte-plano-de-vendas-para-30-dias", rotulo: "Planejar vendas" },
 ];
-// Exemplo usado na animação do topo (ferramenta "Recuperar orçamento parado")
-const DEMO_SLUG = "demo-recuperar-orcamento";
+// Exemplo usado na animação do topo: o prompt é montado de verdade com a ferramenta de anúncio de
+// exemplo (demo-criar-anuncio) e estes dados
+const DEMO_SLUG = "demo-criar-anuncio";
+const DEMO_NOME = "Criador de Anúncios que Atraem Clientes";
 const DEMO_EXEMPLO: Record<string, string> = {
-  segmento: "Marcenaria de móveis planejados",
-  produto: "Armário de cozinha sob medida",
-  situacao: "Enviei o orçamento de R$ 8.900 há 5 dias. Ela ia ver com o marido e sumiu.",
-  objetivo: "Retomar a conversa",
+  segmento: "Estética automotiva",
+  produto: "Lavagem completa com higienização interna",
+  publico: "Donos de carro de 30 a 55 anos que usam o carro para trabalhar",
+  beneficio: "Carro com cheiro de novo em 3 horas, com busca e entrega",
+  objetivo: "Receber mensagens no WhatsApp",
 };
-// Respostas ilustrativas (a plataforma não executa IA; a animação deixa isso escrito)
+// Resposta ilustrativa (a plataforma não executa IA; a animação deixa isso escrito)
 const DEMO_RESPOSTA = [
-  "Mensagem 1 — Oi, Carla! Conseguiu ver com o seu marido o projeto do armário da cozinha? Se quiser, ajusto alguma medida antes de vocês decidirem 😊",
-  "Quando enviar: hoje, no fim da tarde. Se ela responder, pergunte o que ficou em dúvida antes de falar de preço.",
+  "Anúncio 1 · ângulo dor\nGancho: Entrar no carro e sentir cheiro de lanche de ontem?\nTexto: Lavagem completa com higienização interna. Em 3 horas, com busca e entrega onde você estiver.\nChamada: Chamar no WhatsApp",
+  "Anúncio 2 · ângulo benefício\nGancho: Cheiro de carro novo sem sair do trabalho.",
 ];
 
 // Link de vídeo → player incorporado (sem autoplay). YouTube e Vimeo viram iframe; .mp4/.webm, <video>
@@ -113,7 +116,9 @@ export default async function CemFerramentasLanding() {
     prompt: demo.prompt, instrucoes: demo.instrucoes, formatoResposta: demo.formatoResposta, entradas: DEMO_EXEMPLO,
     perfil: null, campos: demoCampos, regrasQualidade: demo.modulo.produto.regrasQualidade,
   }) : "";
-  const alvo = Math.max(0, cards.findIndex(c => c.rotulo === "Recuperar orçamentos"));
+  // Na animação, o card de anúncios é o da ferramenta de exemplo
+  const alvo = Math.max(0, cards.findIndex(c => c.rotulo === "Criar anúncios"));
+  const cardsMotion = cards.map((c, i) => (i === alvo ? { ...c, nome: DEMO_NOME } : c));
 
   const ctaPrincipal = `Quero acessar minhas ${totalFerramentas} ferramentas`;
 
@@ -146,7 +151,7 @@ export default async function CemFerramentasLanding() {
           <div>
             {video ? <Video v={video} /> : demo && (
               <MotionPlataforma
-                cards={cards} alvo={alvo} ferramenta={demo.nome.replace(/^\[Demo\]\s*/, "")}
+                cards={cardsMotion} alvo={alvo} ferramenta={DEMO_NOME}
                 campos={demoCampos.map(c => [c.label, DEMO_EXEMPLO[c.key] ?? ""] as [string, string])}
                 prompt={demoPrompt} resposta={DEMO_RESPOSTA}
               />
