@@ -29,7 +29,7 @@ export default async function OfertasAdminPage() {
         acessos: p._count.acessos, modulos: p._count.modulos, ferramentas: p.modulos.reduce((s, m) => s + m._count.ferramentas, 0),
       }))}
       ofertas={ofertas.map(o => ({
-        id: o.id, slug: o.slug, nome: o.nome, ativa: o.ativa, sandbox: o.sandbox,
+        id: o.id, slug: o.slug, nome: o.nome, ativa: o.ativa, sandbox: o.sandbox, videoDemoUrl: o.videoDemoUrl ?? "",
         itens: o.itens.map(i => ({ produtoId: i.produtoId, papel: i.papel as "PRINCIPAL" | "ORDER_BUMP" | "UPSELL", precoCentavos: i.precoCentavos, chamada: i.chamada, ordem: i.ordem })),
       }))}
       compras={compras.map(c => ({

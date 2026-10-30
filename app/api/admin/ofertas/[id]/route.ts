@@ -12,6 +12,8 @@ const schema = z.object({
   nome: z.string().trim().min(1).max(120).optional(),
   ativa: z.boolean().optional(),
   sandbox: z.boolean().optional(), // modo teste (conta sandbox do Asaas)
+  // Vídeo demonstrativo da landing (YouTube, Vimeo ou link .mp4); vazio remove
+  videoDemoUrl: z.union([z.literal(""), z.string().trim().url({ message: "Link do vídeo inválido" }).max(500)]).optional(),
   // Lista completa de itens (substitui a atual): papel e preço de cada produto NESTA oferta
   itens: z.array(z.object({
     produtoId: z.string().min(1),
@@ -30,7 +32,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const body = schema.safeParse(await req.json().catch(() => null));
   if (!body.success) return NextResponse.json({ error: body.error.issues[0]?.message ?? "Dados inválidos" }, { status: 400 });
-  const { itens, ...dados } = body.data;
+  const { itens, videoDemoUrl, ...resto } = body.data;
+  const dados = { ...resto, ...(videoDemoUrl !== undefined ? { videoDemoUrl: videoDemoUrl || null } : {}) };
 
   if (itens) {
     if (new Set(itens.map(i => i.produtoId)).size !== itens.length) return NextResponse.json({ error: "Um produto aparece duas vezes na oferta" }, { status: 400 });

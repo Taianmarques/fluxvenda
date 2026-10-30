@@ -5,6 +5,7 @@ import { carregarPerfil } from "@/lib/central";
 import { perfilTemEssenciais } from "@/lib/central-shared";
 import { precosVigentes, produtosLiberados } from "@/lib/infoprodutos";
 import { recomendarFerramentas, ultimoDiagnostico } from "@/lib/diagnostico-recomendacoes";
+import { carregarPlano7Dias, PRODUTO_PLANO_SLUG } from "@/lib/plano-7-dias";
 import { InicioClient, type FerramentaInicio, type ProdutoInicio, type PassoInicio } from "./InicioClient";
 
 export const dynamic = "force-dynamic";
@@ -79,6 +80,11 @@ export default async function InicioPage() {
       });
     }
   }
+  // Plano de 7 dias de quem tem os 100 prompts: o próximo dia ainda não concluído
+  if (produtos.some(p => p.slug === PRODUTO_PLANO_SLUG && liberados.has(p.id))) {
+    const proximo = (await carregarPlano7Dias(userId)).find(d => !d.concluido && d.ferramentas.length > 0);
+    if (proximo) passos.unshift({ tipo: "plano", titulo: `Plano de 7 dias · Dia ${proximo.dia}`, descricao: proximo.titulo, href: "/biblioteca/plano-7-dias", icone: "map", moduloId: "" });
+  }
   if (liberados.size > 0 && !perfilTemEssenciais(perfil)) {
     passos.push({ tipo: "perfil", titulo: "Complete o perfil da empresa", descricao: "Seus prompts saem prontos com os dados do seu negócio.", href: "/biblioteca/meu-negocio", icone: "store", moduloId: "" });
   }
@@ -106,7 +112,7 @@ export default async function InicioPage() {
       produtos={cards}
       ferramentas={lista}
       destaque={destaque}
-      passos={passos}
+      passos={passos.slice(0, 3)}
       numeros={{ produtos: liberados.size, ferramentas: lista.length, modulos: new Set(lista.map(f => f.moduloId)).size, salvos, preparados, preparadosMes }}
     />
   );

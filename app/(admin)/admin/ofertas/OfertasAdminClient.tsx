@@ -10,7 +10,7 @@ import { slugify } from "@/lib/central-shared";
 type Produto = { id: string; slug: string; nome: string; publicado: boolean; inclusoNaPlataforma: boolean; capaUrl: string | null; icone: string; acessos: number; modulos: number; ferramentas: number };
 type Papel = "PRINCIPAL" | "ORDER_BUMP" | "UPSELL";
 type Item = { produtoId: string; papel: Papel; precoCentavos: number; chamada: string; ordem: number };
-type Oferta = { id: string; slug: string; nome: string; ativa: boolean; sandbox: boolean; itens: Item[] };
+type Oferta = { id: string; slug: string; nome: string; ativa: boolean; sandbox: boolean; videoDemoUrl: string; itens: Item[] };
 type Compra = { id: string; createdAt: string; email: string; nome: string; status: string; sandbox: boolean; upsell: boolean; valorCentavos: number; formaPagamento: string; oferta: string; itens: string[] };
 
 const PAPEL_LABEL: Record<Papel, string> = { PRINCIPAL: "Principal", ORDER_BUMP: "Order bump", UPSELL: "Upsell" };
@@ -63,6 +63,7 @@ function OfertaEditor({ oferta, produtos }: { oferta: Oferta; produtos: Produto[
   const [ativa, setAtiva] = useState(oferta.ativa);
   const [sandbox, setSandbox] = useState(oferta.sandbox);
   const [itens, setItens] = useState(oferta.itens);
+  const [video, setVideo] = useState(oferta.videoDemoUrl);
   const [precos, setPrecos] = useState(() => Object.fromEntries(oferta.itens.map(i => [i.produtoId, (i.precoCentavos / 100).toFixed(2).replace(".", ",")])));
   const [salvando, setSalvando] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; texto: string } | null>(null);
@@ -75,7 +76,7 @@ function OfertaEditor({ oferta, produtos }: { oferta: Oferta; produtos: Produto[
     setSalvando(true);
     const payload = itens.map((i, idx) => ({ ...i, ordem: idx, precoCentavos: Math.round(Number((precos[i.produtoId] ?? "0").replace(/\./g, "").replace(",", ".")) * 100) || 0 }));
     const res = await fetch(`/api/admin/ofertas/${oferta.id}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ativa, sandbox, ...extra, itens: payload }),
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ativa, sandbox, videoDemoUrl: video.trim(), ...extra, itens: payload }),
     }).catch(() => null);
     const data = await res?.json().catch(() => ({}));
     setSalvando(false);
@@ -140,6 +141,11 @@ function OfertaEditor({ oferta, produtos }: { oferta: Oferta; produtos: Produto[
         })}
         {itens.length === 0 && <p className="text-sm text-gray-500">Nenhum produto na oferta ainda. Adicione um principal.</p>}
       </div>
+
+      <label className="block space-y-1">
+        <span className="text-xs text-gray-400">Vídeo demonstrativo da landing (YouTube, Vimeo ou link .mp4) — vazio mostra o aviso “vídeo em produção”</span>
+        <input value={video} onChange={e => setVideo(e.target.value)} placeholder="https://www.youtube.com/watch?v=..." className={`${input} w-full`} />
+      </label>
 
       <div className="flex items-center gap-3 flex-wrap">
         {fora.length > 0 && (

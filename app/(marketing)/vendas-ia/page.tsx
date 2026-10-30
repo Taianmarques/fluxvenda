@@ -1,19 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Instrument_Serif, Inter_Tight, JetBrains_Mono } from "next/font/google";
-import { ArrowRight, Check, Copy, ExternalLink, ShieldCheck, X } from "lucide-react";
+import { Check, Copy, ExternalLink, ShieldCheck, X } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { CentralIcone } from "@/lib/central-icons";
+import { BotaoFixoCelular, cartao, Cta, Em, FaixaGarantia, Kicker, Pagina, reais, Rodape, Topo } from "./_ui";
 
 // Landing de vendas do Vendas IA (100 prompts). Carta de vendas longa, tema escuro com destaque
 // âmbar. Preço, módulos e quantidade de prompts vêm do banco — mudou no admin, mudou aqui.
 // Todos os botões levam ao checkout /comprar/vendas-ia.
 
 export const dynamic = "force-dynamic";
-
-const ui = Inter_Tight({ subsets: ["latin"], variable: "--f-ui", display: "swap" });
-const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["normal", "italic"], variable: "--f-serif", display: "swap" });
-const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--f-mono", display: "swap" });
 
 const OFERTA_SLUG = "vendas-ia";
 const PRODUTO_SLUG = "100-prompts-vendas";
@@ -27,33 +23,6 @@ export const metadata: Metadata = {
     description: "Escolha o que deseja fazer, responda algumas perguntas e receba um comando profissional pronto para usar na sua IA favorita.",
   },
 };
-
-function reais(centavos: number) {
-  return (centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
-
-// Destaque em itálico serifado dentro dos títulos
-function Em({ children }: { children: React.ReactNode }) {
-  return <em className="font-[family-name:var(--f-serif)] italic font-normal text-[var(--acc-bright)]">{children}</em>;
-}
-
-function Kicker({ children }: { children: React.ReactNode }) {
-  return <p className="font-[family-name:var(--f-mono)] text-[11px] tracking-[0.18em] uppercase text-[var(--acc)]">{children}</p>;
-}
-
-function Cta({ preco, texto = "Quero meus prompts", grande = false }: { preco?: string; texto?: string; grande?: boolean }) {
-  return (
-    <Link
-      href={CHECKOUT}
-      className={`group inline-flex items-center justify-center gap-2.5 rounded-full bg-[linear-gradient(135deg,#fff1c2,#fbbf24_55%,#f59e0b)] text-[var(--on-acc)] font-semibold shadow-[0_10px_40px_-10px_rgba(251,191,36,.6)] transition-transform hover:-translate-y-0.5 ${grande ? "px-8 py-4 text-lg" : "px-6 py-3.5 text-base"}`}
-    >
-      {texto}{preco && <span className="opacity-70">· {preco}</span>}
-      <ArrowRight size={grande ? 20 : 18} className="transition-transform group-hover:translate-x-0.5" />
-    </Link>
-  );
-}
-
-const cartao = "rounded-2xl border border-[var(--line)] bg-[linear-gradient(160deg,rgba(255,255,255,.045),rgba(255,255,255,.012))] shadow-[inset_0_1px_0_rgba(255,255,255,.06)]";
 
 export default async function VendasIaLanding() {
   const [oferta, produto] = await Promise.all([
@@ -76,38 +45,9 @@ export default async function VendasIaLanding() {
   const porPrompt = reais(Math.round(precoCentavos / totalPrompts));
 
   return (
-    <div
-      className={`${ui.variable} ${serif.variable} ${mono.variable} min-h-screen bg-[var(--canvas)] text-[var(--text)] font-[family-name:var(--f-ui)] antialiased pb-24 md:pb-0`}
-      style={{
-        // Paleta da página (troque o âmbar pela cor da marca aqui, se quiser)
-        ["--canvas" as string]: "#070709",
-        ["--text" as string]: "#edebe6",
-        ["--body" as string]: "rgba(237,235,230,.74)",
-        ["--muted" as string]: "rgba(237,235,230,.52)",
-        ["--line" as string]: "rgba(255,255,255,.08)",
-        ["--line-strong" as string]: "rgba(255,255,255,.15)",
-        ["--acc" as string]: "#fbbf24",
-        ["--acc-bright" as string]: "#fcd34d",
-        ["--acc-dim" as string]: "rgba(251,191,36,.13)",
-        ["--on-acc" as string]: "#2b1b02",
-      }}
-    >
-      <style>{`
-        @keyframes vlp-marquee { from { transform: translateX(0) } to { transform: translateX(-50%) } }
-        .vlp-marquee { animation: vlp-marquee 28s linear infinite }
-        @media (prefers-reduced-motion: reduce) { .vlp-marquee { animation: none } }
-      `}</style>
+    <Pagina>
 
-      {/* Barra do topo */}
-      <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-[rgba(7,7,9,.78)] backdrop-blur-md">
-        <div className="max-w-6xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between gap-4">
-          <span className="font-semibold tracking-tight text-lg">Vendas <span className="text-[var(--acc)]">IA</span></span>
-          <div className="flex items-center gap-2 sm:gap-4">
-            <Link href="/sign-in" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">Já comprei · Entrar</Link>
-            <Link href={CHECKOUT} className="hidden sm:inline-flex rounded-full border border-[var(--line-strong)] hover:border-[var(--acc)] px-4 py-2 text-sm font-medium">Comprar · {preco}</Link>
-          </div>
-        </div>
-      </header>
+      <Topo href={CHECKOUT} preco={preco} />
 
       {/* Hero */}
       <section className="relative overflow-hidden">
@@ -121,7 +61,7 @@ export default async function VendasIaLanding() {
             Escolha o que deseja fazer, responda algumas perguntas e receba um comando profissional pronto para usar na sua IA favorita — com os dados do <strong className="text-[var(--text)] font-semibold">seu</strong> negócio.
           </p>
           <div className="mt-9 flex flex-col items-center gap-3">
-            <Cta preco={preco} grande />
+            <Cta href={CHECKOUT} texto="Quero meus prompts" preco={preco} grande />
             <p className="font-[family-name:var(--f-mono)] text-[11px] tracking-[0.14em] uppercase text-[var(--muted)]">Pagamento único · Acesso imediato · 7 dias de garantia</p>
           </div>
 
@@ -248,7 +188,7 @@ export default async function VendasIaLanding() {
               </div>
             ))}
           </div>
-          <div className="mt-10 flex justify-center"><Cta preco={preco} /></div>
+          <div className="mt-10 flex justify-center"><Cta href={CHECKOUT} texto="Quero meus prompts" preco={preco} /></div>
         </div>
       </section>
 
@@ -335,7 +275,7 @@ export default async function VendasIaLanding() {
               <p className="mt-1 text-6xl md:text-7xl font-semibold tracking-[-0.04em] tabular-nums">{preco}</p>
               <p className="mt-2 text-[var(--body)]">Dá <strong className="text-[var(--text)]">{porPrompt} por prompt</strong> — menos do que o tempo que você perde escrevendo uma única mensagem do zero.</p>
             </div>
-            <div className="mt-8 flex justify-center"><Cta texto="Quero meus prompts agora" grande /></div>
+            <div className="mt-8 flex justify-center"><Cta href={CHECKOUT} texto="Quero meus prompts agora" grande /></div>
             <p className="mt-4 font-[family-name:var(--f-mono)] text-[11px] tracking-[0.12em] uppercase text-[var(--muted)]">Pix ou cartão · Compra segura</p>
           </div>
         </div>
@@ -343,11 +283,7 @@ export default async function VendasIaLanding() {
 
       {/* Garantia */}
       <section className="border-t border-[var(--line)]">
-        <div className="overflow-hidden border-b border-[var(--line)] bg-[var(--acc-dim)] py-3" aria-hidden>
-          <div className="vlp-marquee flex w-max gap-8 font-[family-name:var(--f-mono)] text-xs tracking-[0.2em] text-[var(--acc-bright)] whitespace-nowrap">
-            {Array.from({ length: 16 }).map((_, i) => <span key={i}>7 DIAS DE GARANTIA • RISCO ZERO •</span>)}
-          </div>
-        </div>
+        <FaixaGarantia />
         <div className="max-w-3xl mx-auto px-4 md:px-6 py-20 md:py-24 text-center">
           <ShieldCheck size={40} className="mx-auto text-[var(--acc)]" />
           <h2 className="mt-5 text-3xl md:text-5xl font-semibold tracking-[-0.025em]">Você tem <Em>7 dias.</Em></h2>
@@ -389,28 +325,16 @@ export default async function VendasIaLanding() {
           <p className="mt-6 text-lg text-[var(--body)]">
             Pode continuar escrevendo cada mensagem do zero e torcendo pra IA acertar. Ou pode ter {totalPrompts} comandos prontos, feitos pra vender, por {preco} — uma vez só.
           </p>
-          <div className="mt-9 flex justify-center"><Cta preco={preco} grande /></div>
+          <div className="mt-9 flex justify-center"><Cta href={CHECKOUT} texto="Quero meus prompts" preco={preco} grande /></div>
           <p className="mt-8 text-sm text-[var(--muted)]">
             Ainda não sabe por onde começar? <Link href="/sign-up" className="underline underline-offset-4 hover:text-[var(--text)]">Faça o diagnóstico comercial gratuito</Link> e veja quais áreas travam suas vendas.
           </p>
         </div>
       </section>
 
-      <footer className="border-t border-[var(--line)]">
-        <div className="max-w-5xl mx-auto px-4 md:px-6 py-10 text-xs text-[var(--muted)] space-y-2 text-center">
-          <p>Vendas IA · FluxVenda</p>
-          <p>Direito de arrependimento: reembolso integral em até 7 dias após a compra (art. 49 do Código de Defesa do Consumidor).</p>
-          <p>Os resultados dependem do seu negócio, da sua oferta e de como você aplica os prompts. Não prometemos faturamento específico.</p>
-          <p>ChatGPT e Claude são marcas de seus respectivos donos. O Vendas IA não é afiliado à OpenAI nem à Anthropic.</p>
-        </div>
-      </footer>
+      <Rodape />
 
-      {/* Botão fixo no celular */}
-      <div className="md:hidden fixed inset-x-0 bottom-0 z-40 border-t border-[var(--line)] bg-[rgba(7,7,9,.92)] backdrop-blur-md p-3">
-        <Link href={CHECKOUT} className="flex items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,#fff1c2,#fbbf24_55%,#f59e0b)] text-[var(--on-acc)] font-semibold py-3.5">
-          Quero meus prompts · {preco} <ArrowRight size={18} />
-        </Link>
-      </div>
-    </div>
+      <BotaoFixoCelular href={CHECKOUT} texto={`Quero meus prompts · ${preco}`} />
+    </Pagina>
   );
 }

@@ -2,8 +2,11 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Box, Building2, CheckCircle2, Layers, Library, Search, Star, Wrench, X } from "lucide-react";
+import { ArrowRight, Box, Building2, Route, CheckCircle2, Layers, Library, Search, Star, Wrench, X } from "lucide-react";
 import { CentralIcone } from "@/lib/central-icons";
+
+// Mesmo valor de PRODUTO_PLANO_SLUG em lib/plano-7-dias.ts (aquele arquivo usa o banco e não vem pro cliente)
+const PRODUTO_PLANO_SLUG = "100-prompts-vendas";
 
 export type CardProduto = {
   slug: string; nome: string; descricao: string; beneficio: string; capaUrl: string | null;
@@ -74,7 +77,10 @@ export function BibliotecaClient({ produtos, modo = "biblioteca" }: { produtos: 
             <p className="text-slate-500 mt-1.5">{explorar ? "Novos kits de ferramentas e prompts para ampliar seus resultados." : "Seus kits de ferramentas para vender mais com o ChatGPT e o Claude."}</p>
           </div>
           {temAlgum && !explorar && (
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
+              {produtos.some(p => p.liberado && p.slug === PRODUTO_PLANO_SLUG) && (
+                <Link href="/biblioteca/plano-7-dias" className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 px-3.5 py-2.5 text-sm font-medium text-white"><Route size={15} /> Plano de 7 dias</Link>
+              )}
               <Link href="/biblioteca/meu-negocio" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700"><Building2 size={15} /> Meu negócio</Link>
               <Link href="/biblioteca/favoritos" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700"><Star size={15} /> Prompts favoritos</Link>
             </div>

@@ -16,7 +16,7 @@ export type ProdutoInicio = {
   slug: string; nome: string; descricao: string; capaUrl: string | null; icone: string;
   liberado: boolean; ferramentas: number; precoCentavos: number | null;
 };
-export type PassoInicio = { tipo: "diagnostico" | "perfil" | "ferramenta"; titulo: string; descricao: string; href: string; icone: string; moduloId: string };
+export type PassoInicio = { tipo: "diagnostico" | "plano" | "perfil" | "ferramenta"; titulo: string; descricao: string; href: string; icone: string; moduloId: string };
 type Numeros = { produtos: number; ferramentas: number; modulos: number; salvos: number; preparados: number; preparadosMes: number };
 
 function normalizar(v: string) {

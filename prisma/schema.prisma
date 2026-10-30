@@ -2340,6 +2340,8 @@ model Oferta {
   ativa  Boolean @default(false)
   // Modo teste: cobra na conta SANDBOX do Asaas (ASAAS_PLATFORM_SANDBOX_API_KEY), sem dinheiro real
   sandbox Boolean @default(false)
+  // Vídeo demonstrativo da landing desta oferta (YouTube, Vimeo ou .mp4); vazio = aviso de vídeo em produção
+  videoDemoUrl String?
 
   itens   OfertaItem[]
   compras Compra[]
@@ -2474,6 +2476,9 @@ model CentralFerramenta {
   relacionadas    String[] @default([]) // slugs; vazio = automáticas (mesmo módulo)
   acesso          String   @default("todos") // "todos" | "gestores" (só GESTOR/ADMIN)
   limiteDiario    Int? // usos por usuário por dia; null = sem limite
+  // Ferramenta da demonstração gratuita da landing: liberada sem login pela API /api/demo
+  // (fica com publicada = false, fora da biblioteca)
+  demoPublica     Boolean @default(false)
 
   favoritos CentralFavorito[]
   geracoes  CentralGeracao[]
