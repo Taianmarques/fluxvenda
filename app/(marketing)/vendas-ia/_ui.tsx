@@ -89,10 +89,7 @@ export function Topo({ href, preco }: { href: string; preco: string }) {
     <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-[rgba(7,7,9,.78)] backdrop-blur-md">
       <div className="max-w-6xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between gap-4">
         <span className="font-semibold tracking-tight text-lg">Vendas <span className="text-[var(--acc)]">IA</span></span>
-        <div className="flex items-center gap-2 sm:gap-4">
-          <Link href="/sign-in" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">Já comprei · Entrar</Link>
-          <Link href={href} className="hidden sm:inline-flex rounded-full border border-[var(--line-strong)] hover:border-[var(--acc)] px-4 py-2 text-sm font-medium">Comprar · {preco}</Link>
-        </div>
+        <Link href={href} className="hidden sm:inline-flex rounded-full border border-[var(--line-strong)] hover:border-[var(--acc)] px-4 py-2 text-sm font-medium">Comprar · {preco}</Link>
       </div>
     </header>
   );
