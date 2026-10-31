@@ -130,7 +130,7 @@ export function InicioClient({
         <section>
           {primeiroNome && <p className="text-slate-500">Olá, {primeiroNome}.</p>}
           <h1 className="mt-1 text-3xl md:text-5xl font-bold tracking-tight leading-tight">
-            O que vamos <span className="bg-gradient-to-r from-blue-600 to-violet-600 bg-clip-text text-transparent">vender hoje?</span>
+            Sua central de vendas <span className="bg-gradient-to-r from-blue-600 to-violet-600 bg-clip-text text-transparent">com IA.</span>
           </h1>
           <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3">
             <Link href={explorarHref} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 px-5 py-3 text-sm font-semibold text-white">
