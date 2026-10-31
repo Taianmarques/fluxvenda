@@ -2,10 +2,9 @@ import type { ReactNode } from "react";
 import { Check, Copy, ExternalLink, Film, ShieldCheck } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { CentralIcone } from "@/lib/central-icons";
-import { lerCampos } from "@/lib/central";
 import { carregarPlano7Dias } from "@/lib/plano-7-dias";
 import { BotaoFixoCelular, cartao, Cta, Em, FaixaGarantia, Faq, Kicker, Pagina, reais, Rodape, Topo } from "../_ui";
-import { montarPromptFinal } from "@/lib/central-prompt";
+import { carregarDemoAnuncio, DEMO_NOME, DEMO_RESPOSTA } from "./demo";
 import { MotionPlataforma } from "./MotionPlataforma";
 import { MotionComparacao } from "./MotionComparacao";
 
@@ -36,22 +35,6 @@ const VITRINE = [
   { slug: "recupere-orcamentos-antigos", rotulo: "Recuperar orçamentos" },
   { slug: "responda-ao-cliente-que-achou-caro", rotulo: "Responder objeções" },
   { slug: "monte-plano-de-vendas-para-30-dias", rotulo: "Planejar vendas" },
-];
-// Exemplo usado na animação do topo: o prompt é montado de verdade com a ferramenta de anúncio de
-// exemplo (demo-criar-anuncio) e estes dados
-const DEMO_SLUG = "demo-criar-anuncio";
-const DEMO_NOME = "Criador de Anúncios que Atraem Clientes";
-const DEMO_EXEMPLO: Record<string, string> = {
-  segmento: "Estética automotiva",
-  produto: "Lavagem completa com higienização interna",
-  publico: "Donos de carro de 30 a 55 anos que usam o carro para trabalhar",
-  beneficio: "Carro com cheiro de novo em 3 horas, com busca e entrega",
-  objetivo: "Receber mensagens no WhatsApp",
-};
-// Resposta ilustrativa (a plataforma não executa IA; a animação deixa isso escrito)
-const DEMO_RESPOSTA = [
-  "Anúncio 1 · ângulo dor\nGancho: Entrar no carro e sentir cheiro de lanche de ontem?\nTexto: Lavagem completa com higienização interna. Em 3 horas, com busca e entrega onde você estiver.\nChamada: Chamar no WhatsApp",
-  "Anúncio 2 · ângulo benefício\nGancho: Cheiro de carro novo sem sair do trabalho.",
 ];
 
 // Link de vídeo → player incorporado (sem autoplay). YouTube e Vimeo viram iframe; .mp4/.webm, <video>
@@ -88,10 +71,7 @@ export async function LandingFerramentas({ topo }: { topo: TopoLanding }) {
         },
       },
     }),
-    prisma.centralFerramenta.findUnique({
-      where: { slug: DEMO_SLUG },
-      select: { nome: true, prompt: true, instrucoes: true, formatoResposta: true, campos: true, modulo: { select: { produto: { select: { regrasQualidade: true } } } } },
-    }),
+    carregarDemoAnuncio(),
     carregarPlano7Dias(),
   ]);
 
@@ -109,12 +89,6 @@ export async function LandingFerramentas({ topo }: { topo: TopoLanding }) {
   });
   const nomeDe = (slug: string, reserva: string) => porSlug.get(slug)?.nome ?? reserva;
 
-  // Prompt real da animação: a ferramenta de exemplo montada com os dados do exemplo
-  const demoCampos = demo ? lerCampos(demo.campos) : [];
-  const demoPrompt = demo ? montarPromptFinal({
-    prompt: demo.prompt, instrucoes: demo.instrucoes, formatoResposta: demo.formatoResposta, entradas: DEMO_EXEMPLO,
-    perfil: null, campos: demoCampos, regrasQualidade: demo.modulo.produto.regrasQualidade,
-  }) : "";
   // Na animação, o card de anúncios é o da ferramenta de exemplo
   const alvo = Math.max(0, cards.findIndex(c => c.rotulo === "Criar anúncios"));
   const cardsMotion = cards.map((c, i) => (i === alvo ? { ...c, nome: DEMO_NOME } : c));
@@ -149,8 +123,7 @@ export async function LandingFerramentas({ topo }: { topo: TopoLanding }) {
             {video ? <Video v={video} /> : demo && (
               <MotionPlataforma
                 cards={cardsMotion} alvo={alvo} ferramenta={DEMO_NOME}
-                campos={demoCampos.map(c => [c.label, DEMO_EXEMPLO[c.key] ?? ""] as [string, string])}
-                prompt={demoPrompt} resposta={DEMO_RESPOSTA}
+                campos={demo.campos} prompt={demo.prompt} resposta={DEMO_RESPOSTA}
               />
             )}
           </div>
