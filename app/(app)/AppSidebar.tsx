@@ -7,7 +7,7 @@ import { UserMenu } from "./UserMenu";
 import {
   LayoutDashboard, ScanSearch, Target, Gamepad2, BookOpen, MessageSquare,
   PenTool, BookText, Trophy, Users, Headset, ShieldCheck, Menu, X, Coins, Lock, GraduationCap,
-  Home, MessageSquareText, Box, Building2, Settings, BarChart3, ArrowRight,
+  Home, MessageSquareText, Box, Building2, Settings, BarChart3,
 } from "lucide-react";
 
 const ICONS = {
@@ -88,26 +88,6 @@ function Itens({ nav, pathname, onNavigate }: { nav: NavItem[]; pathname: string
   );
 }
 
-// Cartão do rodapé do menu — leva pra vitrine de kits
-function CartaoKits({ onNavigate }: { onNavigate?: () => void }) {
-  return (
-    <Link
-      href="/biblioteca/explorar"
-      onClick={onNavigate}
-      className="group relative mx-3 mb-3 block overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-[#1b2a5c] to-[#141c3d] p-4 hover:border-white/20"
-    >
-      <p className="font-semibold text-white leading-snug">Venda mais<br />com o poder da IA</p>
-      <p className="mt-1.5 text-xs text-slate-300 leading-relaxed pr-12">Prompts, ferramentas e estratégias prontas para o seu negócio.</p>
-      <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-blue-300 group-hover:gap-1.5 transition-all">Explorar kits <ArrowRight size={13} /></span>
-      <span aria-hidden className="absolute right-3 bottom-3 flex items-end gap-1">
-        <span className="w-2.5 h-5 rounded-sm bg-blue-500/60" />
-        <span className="w-2.5 h-8 rounded-sm bg-blue-500/80" />
-        <span className="w-2.5 h-12 rounded-sm bg-gradient-to-t from-blue-500 to-violet-500" />
-      </span>
-    </Link>
-  );
-}
-
 function Usuario({ profileName, email }: { profileName: string; email: string }) {
   return (
     <div className="px-4 py-4 border-t border-white/10 flex items-center gap-3">
@@ -155,7 +135,6 @@ export function AppSidebar({
             <button onClick={fechar} className="p-1 text-slate-400" aria-label="Fechar menu"><X size={20} /></button>
           </div>
           <Itens nav={nav} pathname={pathname} onNavigate={fechar} />
-          <CartaoKits onNavigate={fechar} />
           <Usuario profileName={profileName} email={email} />
         </div>
       </div>
@@ -167,7 +146,6 @@ export function AppSidebar({
         <Marca />
       </div>
       <Itens nav={nav} pathname={pathname} />
-      <CartaoKits />
       <Usuario profileName={profileName} email={email} />
     </aside>
     </>
