@@ -82,7 +82,7 @@ export function BibliotecaClient({ produtos, modo = "biblioteca" }: { produtos: 
                 <Link href="/biblioteca/plano-7-dias" className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 px-3.5 py-2.5 text-sm font-medium text-white"><Route size={15} /> Plano de 7 dias</Link>
               )}
               <Link href="/biblioteca/meu-negocio" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700"><Building2 size={15} /> Meu negócio</Link>
-              <Link href="/biblioteca/favoritos" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700"><Star size={15} /> Prompts favoritos</Link>
+              <Link href="/favoritos?aba=prompts" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700"><Star size={15} /> Prompts favoritos</Link>
             </div>
           )}
         </header>

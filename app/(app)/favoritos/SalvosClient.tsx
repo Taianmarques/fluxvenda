@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Check, ChevronDown, Copy, ExternalLink, RotateCcw, Search, Star, Trash2 } from "lucide-react";
+import { Check, ChevronDown, Copy, ExternalLink, RotateCcw, Search, Star, Trash2 } from "lucide-react";
 import { CentralIcone, corDoModulo } from "@/lib/central-icons";
 
 type Salvo = {
@@ -48,20 +48,13 @@ export function SalvosClient({ inicial }: { inicial: Salvo[] }) {
   const acao = "inline-flex items-center gap-1.5 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg px-2.5 py-1.5";
 
   return (
-    <div className="min-h-full bg-[#f4f6fb] text-slate-900">
-      <div className="p-4 md:p-8 max-w-3xl mx-auto space-y-6">
-        <Link href="/biblioteca" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900">
-          <ArrowLeft size={15} /> Minha Biblioteca
-        </Link>
-        <header>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><Star size={22} className="fill-amber-400 text-amber-400" /> Prompts favoritos</h1>
-          <p className="text-slate-500 mt-1">Os prompts que você favoritou, prontos para copiar de novo ou reutilizar com outros dados.</p>
-        </header>
+    <div className="space-y-6">
+      <div className="space-y-6">
 
         {itens.length > 3 && (
           <div className="relative">
             <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar nos favoritos..." className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-3 py-2.5 text-sm placeholder:text-slate-400 focus:outline-none focus:border-indigo-500" />
+            <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar nos prompts..." aria-label="Buscar nos prompts" className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-3 py-2.5 text-sm placeholder:text-slate-400 focus:outline-none focus:border-indigo-500" />
           </div>
         )}
 

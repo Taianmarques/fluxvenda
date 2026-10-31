@@ -2,12 +2,12 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronRight, MessageSquareText, Search, Star } from "lucide-react";
+import { ChevronRight, Search, Star } from "lucide-react";
 import { CentralIcone, corDoModulo } from "@/lib/central-icons";
 
 type Favorita = {
   slug: string; nome: string; descricao: string; icone: string;
-  moduloId: string; moduloNome: string; produtoSlug: string; produtoNome: string;
+  moduloId: string; moduloNome: string; produtoSlug: string;
 };
 
 export function FavoritosClient({ inicial }: { inicial: Favorita[] }) {
@@ -29,23 +29,14 @@ export function FavoritosClient({ inicial }: { inicial: Favorita[] }) {
   }
 
   return (
-    <div className="min-h-full bg-[#f4f6fb] text-slate-900">
-      <div className="p-4 md:p-8 max-w-3xl mx-auto space-y-6">
-        <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2"><Star size={22} className="fill-amber-400 text-amber-400" /> Favoritos</h1>
-            <p className="text-slate-500 mt-1">As ferramentas que você marcou com a estrela, de todos os seus produtos.</p>
-          </div>
-          <Link href="/biblioteca/favoritos" className="inline-flex items-center gap-2 self-start rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700">
-            <MessageSquareText size={15} /> Prompts salvos
-          </Link>
-        </header>
+    <div className="space-y-6">
+      <div className="space-y-6">
 
         {itens.length > 0 && (
           <div className="relative">
             <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
-              value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar nos favoritos" aria-label="Buscar nos favoritos"
+              value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar nas ferramentas" aria-label="Buscar nas ferramentas"
               className="w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3.5 py-2.5 text-sm placeholder:text-slate-400 focus:outline-none focus:border-indigo-500"
             />
           </div>

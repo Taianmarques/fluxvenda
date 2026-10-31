@@ -48,7 +48,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/scanner", label: "Diagnóstico", icon: "scanner" as const, show: true, locked: false },
     { href: "/biblioteca", label: "Minha Biblioteca", icon: "biblioteca" as const, show: true, locked: false },
     { href: "/favoritos", label: "Favoritos", icon: "favoritos" as const, show: temInfoproduto, locked: false },
-    { href: "/biblioteca/favoritos", label: "Meus Prompts", icon: "prompts" as const, show: temInfoproduto, locked: false },
     { href: "/biblioteca/explorar", label: "Explorar Kits", icon: "kits" as const, show: true, locked: false },
     { href: "/biblioteca/meu-negocio", label: "Minha Empresa", icon: "empresa" as const, show: temInfoproduto, locked: false },
     ...(hasPlataforma ? [

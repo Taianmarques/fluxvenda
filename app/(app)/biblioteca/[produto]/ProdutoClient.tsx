@@ -108,7 +108,7 @@ export function CentralClient({
     { valor: total, rotulo: "Ferramentas de IA", icone: <Wrench size={19} />, cor: "bg-indigo-50 text-indigo-600" },
     { valor: comFerramentas.length || modulos.length, rotulo: "Módulos comerciais", icone: <LayoutGrid size={19} />, cor: "bg-amber-50 text-amber-600" },
     { valor: geracoesMes, rotulo: "Prompts preparados no mês", icone: <Zap size={19} />, cor: "bg-sky-50 text-sky-600" },
-    { valor: salvos, rotulo: "Prompts favoritos", icone: <Star size={19} />, cor: "bg-violet-50 text-violet-600", href: "/biblioteca/favoritos" },
+    { valor: salvos, rotulo: "Prompts favoritos", icone: <Star size={19} />, cor: "bg-violet-50 text-violet-600", href: "/favoritos?aba=prompts" },
   ];
 
   return (
@@ -136,7 +136,7 @@ export function CentralClient({
           <Link href="/biblioteca/meu-negocio" className="hidden sm:inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700">
             <Building2 size={15} /> Meu negócio
           </Link>
-          <Link href="/biblioteca/favoritos" className="hidden sm:inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700">
+          <Link href="/favoritos?aba=prompts" className="hidden sm:inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700">
             <Star size={15} /> Prompts favoritos
           </Link>
         </div>
