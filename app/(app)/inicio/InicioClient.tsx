@@ -128,7 +128,7 @@ export function InicioClient({
       <div className="max-w-4xl mx-auto px-4 md:px-8 py-8 md:py-12 space-y-12">
         {/* Saudação */}
         <section>
-          {primeiroNome && <p className="text-slate-500">Olá, {primeiroNome}.</p>}
+          {primeiroNome && <p className="text-xl md:text-2xl font-semibold text-slate-700">Olá, <span className="text-blue-600">{primeiroNome}</span>!</p>}
           <h1 className="mt-1 text-3xl md:text-5xl font-bold tracking-tight leading-tight">
             Escolha seu próximo passo para <span className="bg-gradient-to-r from-blue-600 to-violet-600 bg-clip-text text-transparent">vender mais.</span>
           </h1>
