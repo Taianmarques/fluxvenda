@@ -3,12 +3,12 @@ import { z } from "zod";
 import { auth } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { createAsaasCardCharge, createAsaasCharge, createAsaasCustomer, getAsaasPixQrCode } from "@/lib/asaas";
-import { assinarUpsell, calcularCompra, carregarOfertaCheckout, contaAsaasPlataforma, sincronizarCompra } from "@/lib/compras";
+import { assinarAcesso, assinarUpsell, calcularCompra, carregarOfertaCheckout, contaAsaasPlataforma, sincronizarCompra } from "@/lib/compras";
 
 const schema = z.object({
   nome: z.string().trim().min(3, "Informe seu nome completo").max(120),
   email: z.string().trim().toLowerCase().email("E-mail inválido").max(200),
-  telefone: z.string().trim().max(20).default(""),
+  telefone: z.string().trim().max(20).refine(v => v.replace(/\D/g, "").length >= 10, "Informe seu WhatsApp com DDD"),
   cpfCnpj: z.string().transform(v => v.replace(/\D/g, "")).refine(v => v.length === 11 || v.length === 14, "CPF ou CNPJ inválido"),
   formaPagamento: z.enum(["PIX", "CARTAO"]),
   bumps: z.array(z.string().max(60)).max(10).default([]), // ids dos produtos marcados como order bump
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ofe
       const cobranca = await createAsaasCharge(conta.apiKey, conta.sandbox, customer.id, valor, descricao, "PIX");
       await prisma.compra.update({ where: { id: compra.id }, data: { asaasPaymentId: cobranca.id, asaasCustomerId: customer.id } });
       const qr = await getAsaasPixQrCode(conta.apiKey, conta.sandbox, cobranca.id);
-      return NextResponse.json({ compraId: compra.id, status: "PENDENTE", totalCentavos, pix: { payload: qr.payload, imagem: qr.encodedImage }, upsellToken: assinarUpsell(compra.id) });
+      return NextResponse.json({ compraId: compra.id, status: "PENDENTE", totalCentavos, pix: { payload: qr.payload, imagem: qr.encodedImage }, upsellToken: assinarUpsell(compra.id), acessoToken: assinarAcesso(compra.id) });
     }
 
     const c = d.cartao!;
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ofe
     });
     // Cartão responde na hora — confirma consultando o Asaas (mesmo caminho do webhook)
     const status = await sincronizarCompra(compra.id);
-    return NextResponse.json({ compraId: compra.id, status, totalCentavos, upsellToken: assinarUpsell(compra.id) });
+    return NextResponse.json({ compraId: compra.id, status, totalCentavos, upsellToken: assinarUpsell(compra.id), acessoToken: assinarAcesso(compra.id) });
   } catch (err) {
     await prisma.compra.update({ where: { id: compra.id }, data: { status: "CANCELADO", encerradaEm: new Date() } }).catch(() => {});
     console.error("[comprar]", slug, compra.id, err);

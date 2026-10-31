@@ -108,14 +108,16 @@ export async function sendPasswordResetEmail(to: string, name: string, token: st
 
 // Compra de infoproduto confirmada. Conta criada na compra (sem senha) recebe o link pra criar a
 // senha (válido por 7 dias); quem já tinha conta recebe só o aviso com o link da biblioteca.
-export async function sendAcessoProdutosEmail(to: string, name: string, produtos: string[], tokenSenha: string | null): Promise<boolean> {
+// linkAcesso = página de acesso da compra (/comprar/acesso/...): conta nova cria a senha lá;
+// conta que já tem senha só entra
+export async function sendAcessoProdutosEmail(to: string, name: string, produtos: string[], linkAcesso: string, contaNova: boolean): Promise<boolean> {
   const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
   const lista = produtos.map(p => `<li>${esc(p)}</li>`).join("");
-  const acesso = tokenSenha
+  const acesso = contaNova
     ? `<p>Para entrar, crie a sua senha neste link (válido por 7 dias):</p>
-       <p><a href="${APP_URL}/redefinir-senha?token=${tokenSenha}">Criar minha senha</a></p>
-       <p>Depois é só acessar a <strong>Minha Biblioteca</strong>.</p>`
-    : `<p>Os produtos já estão na sua <a href="${APP_URL}/biblioteca">Minha Biblioteca</a>.</p>`;
+       <p><a href="${linkAcesso}">Criar minha senha e acessar</a></p>
+       <p>Seu login é este e-mail: <strong>${esc(to)}</strong>.</p>`
+    : `<p>Os produtos já estão na sua conta. <a href="${linkAcesso}">Acessar agora</a></p>`;
   return send(
     to,
     "Sua compra foi confirmada — acesso liberado",

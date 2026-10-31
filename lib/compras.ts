@@ -1,8 +1,8 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { getAsaasPayment } from "@/lib/asaas";
-import { generateToken } from "@/lib/auth/tokens";
 import { sendAcessoProdutosEmail } from "@/lib/email";
+import { sendWhatsAppText } from "@/lib/whatsapp";
 import { produtosLiberados } from "@/lib/infoprodutos";
 
 // Compras de infoprodutos pela conta Asaas da plataforma.
@@ -107,21 +107,16 @@ async function liberarCompra(compraId: string) {
   let profile = compra.profileId
     ? await prisma.profile.findUnique({ where: { id: compra.profileId } })
     : await prisma.profile.findFirst({ where: { email: { equals: email, mode: "insensitive" } } });
-  let tokenSenha: string | null = null;
   if (!profile) {
     // Conta nova só com a Minha Biblioteca: sem Plataforma/CRM (productsOwned vazio), já
-    // "onboarded" (não cai no onboarding do CRM) e sem senha — o e-mail traz o link pra criar
-    tokenSenha = generateToken();
+    // "onboarded" (não cai no onboarding do CRM) e sem senha — a senha é criada na página de
+    // acesso da compra (para onde o checkout redireciona; o link também vai por e-mail e WhatsApp)
     profile = await prisma.profile.create({
       data: {
         email, name: compra.nome || email.split("@")[0], phone: compra.telefone || null,
         onboarded: true, productsOwned: [], emailVerifiedAt: new Date(),
-        passwordResetToken: tokenSenha, passwordResetExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       },
-    }).catch(async () => {
-      tokenSenha = null; // criada por outra confirmação ao mesmo tempo
-      return prisma.profile.findFirst({ where: { email: { equals: email, mode: "insensitive" } } });
-    });
+    }).catch(() => prisma.profile.findFirst({ where: { email: { equals: email, mode: "insensitive" } } })); // criada por outra confirmação ao mesmo tempo
     if (!profile) return;
   }
 
@@ -136,8 +131,81 @@ async function liberarCompra(compraId: string) {
     skipDuplicates: true,
   });
 
-  sendAcessoProdutosEmail(profile.email, profile.name, compra.itens.map(i => i.produto.nome), tokenSenha)
+  // Confirmação com o link de acesso por e-mail e WhatsApp (o envio não trava a liberação)
+  // Upsell aponta para a página de acesso da compra original (é lá que a conta nova cria a senha).
+  // "Conta nova" segue a mesma regra da página: sem senha e criada por esta compra.
+  const base = compra.compraOrigemId
+    ? (await prisma.compra.findUnique({ where: { id: compra.compraOrigemId }, select: { id: true, createdAt: true } })) ?? compra
+    : compra;
+  const contaNova = !profile.passwordHash && profile.createdAt >= base.createdAt;
+  const link = linkAcessoCompra(base.id);
+  const produtos = compra.itens.map(i => i.produto.nome);
+  sendAcessoProdutosEmail(profile.email, profile.name, produtos, link, contaNova)
     .catch(err => console.error("[compras] e-mail de acesso", compra.id, err));
+  const telefone = compra.telefone || profile.phone || "";
+  if (telefone.replace(/\D/g, "").length >= 10) {
+    sendWhatsAppText(telefone, mensagemAcessoWhatsApp(profile.name, produtos, link, contaNova, profile.email))
+      .catch(err => console.error("[compras] WhatsApp de acesso", compra.id, err));
+  }
+}
+
+function mensagemAcessoWhatsApp(nome: string, produtos: string[], link: string, contaNova: boolean, email: string) {
+  const primeiro = nome.trim().split(/\s+/)[0] || "tudo bem";
+  return [
+    `Olá, ${primeiro}! ✅ Sua compra foi confirmada.`,
+    "",
+    "Você já tem acesso a:",
+    ...produtos.map(p => `• ${p}`),
+    "",
+    contaNova
+      ? `Crie sua senha e entre por aqui (link válido por 7 dias):\n${link}\n\nSeu login é o e-mail ${email}.`
+      : `Acesse por aqui com o seu e-mail e senha:\n${link}`,
+  ].join("\n");
+}
+
+// ─── Página de acesso da compra ───────────────────────────────────────────────────────────
+// Depois do pagamento o checkout leva o comprador para /comprar/acesso/<compra>?t=<assinatura>.
+// Lá, conta criada por esta compra (ainda sem senha) cria a senha e já entra; conta que já tinha
+// senha só faz login. A assinatura só existe no navegador de quem comprou e nos avisos enviados
+// ao e-mail/WhatsApp informados na compra, e vale por 7 dias depois do pagamento.
+
+const VALIDADE_ACESSO_MS = 7 * 24 * 60 * 60 * 1000;
+
+function assinar(proposito: string, compraId: string) {
+  return createHmac("sha256", process.env.SESSION_SECRET ?? "").update(`${proposito}:${compraId}`).digest("base64url");
+}
+
+function assinaturaValida(proposito: string, compraId: string, token: string | null | undefined) {
+  if (!token) return false;
+  const esperado = Buffer.from(assinar(proposito, compraId));
+  const recebido = Buffer.from(token);
+  return esperado.length === recebido.length && timingSafeEqual(esperado, recebido);
+}
+
+export const assinarAcesso = (compraId: string) => assinar("acesso", compraId);
+
+export function linkAcessoCompra(compraId: string) {
+  const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3002";
+  return `${base}/comprar/acesso/${compraId}?t=${assinarAcesso(compraId)}`;
+}
+
+// Compra + conta para a página de acesso (ou null se a assinatura não confere / venceu).
+// podeCriarSenha só para conta SEM senha criada por esta compra — uma conta que já existia
+// antes (ex: migrada sem senha) nunca recebe senha por aqui, senão bastaria comprar com o
+// e-mail de outra pessoa para tomar a conta dela.
+export async function carregarAcessoCompra(compraId: string, token: string | null | undefined) {
+  if (!assinaturaValida("acesso", compraId, token)) return null;
+  const compra = await prisma.compra.findUnique({
+    where: { id: compraId },
+    select: { id: true, status: true, email: true, createdAt: true, pagoEm: true, profileId: true, itens: { select: { produto: { select: { nome: true } } } } },
+  });
+  if (!compra) return null;
+  if (compra.pagoEm && Date.now() - compra.pagoEm.getTime() > VALIDADE_ACESSO_MS) return null;
+  const profile = compra.status === "PAGO" && compra.profileId
+    ? await prisma.profile.findUnique({ where: { id: compra.profileId }, select: { id: true, email: true, name: true, role: true, onboarded: true, passwordHash: true, createdAt: true } })
+    : null;
+  const podeCriarSenha = !!profile && !profile.passwordHash && profile.createdAt >= compra.createdAt;
+  return { compra, profile, podeCriarSenha };
 }
 
 // Reembolso/estorno: revoga só os acessos que vieram DESTA compra — acesso ao mesmo produto por
@@ -156,17 +224,8 @@ async function encerrarCompra(compraId: string, status: "REEMBOLSADO" | "ESTORNA
 
 const JANELA_UPSELL_MS = 2 * 60 * 60 * 1000;
 
-export function assinarUpsell(compraId: string) {
-  const segredo = process.env.SESSION_SECRET ?? "";
-  return createHmac("sha256", segredo).update(`upsell:${compraId}`).digest("base64url");
-}
-
-function upsellValido(compraId: string, token: string | null | undefined) {
-  if (!token) return false;
-  const esperado = Buffer.from(assinarUpsell(compraId));
-  const recebido = Buffer.from(token);
-  return esperado.length === recebido.length && timingSafeEqual(esperado, recebido);
-}
+export const assinarUpsell = (compraId: string) => assinar("upsell", compraId);
+const upsellValido = (compraId: string, token: string | null | undefined) => assinaturaValida("upsell", compraId, token);
 
 // Upsell disponível pra uma compra (ou null). Confere assinatura, pagamento, janela e se o
 // comprador já não tem o produto (inclusive por já ter aceitado este upsell).
