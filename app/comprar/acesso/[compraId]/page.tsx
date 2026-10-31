@@ -80,7 +80,8 @@ export default async function AcessoCompraPage({ params, searchParams }: {
               <h2 className="font-semibold">Crie sua senha para entrar</h2>
             </div>
             <p className="text-sm text-slate-600">Seu login é o e-mail <strong>{profile.email}</strong>.</p>
-            <CriarSenhaForm compraId={compra.id} token={t!} destino={DESTINO} />
+            {/* Conta nova: depois da senha, o perfil da empresa (uma pergunta por tela) */}
+            <CriarSenhaForm compraId={compra.id} token={t!} destino="/boas-vindas" />
           </div>
         ) : (
           <div className="border-t border-slate-100 pt-5 space-y-3 text-center">
