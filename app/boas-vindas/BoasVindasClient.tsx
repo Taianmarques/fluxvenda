@@ -88,10 +88,10 @@ export function BoasVindasClient({ inicial, nome }: { inicial: PerfilEmpresaDado
   const marcado = (s: string) => (p?.multipla ? valor.split(",").map(v => v.trim()).includes(s) : valor.trim() === s);
 
   const campoCls = "w-full rounded-2xl border border-white/15 bg-white/[.06] px-4 py-3.5 text-base text-white placeholder:text-white/35 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/25";
-  const botaoPrimario = "inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-400 hover:to-indigo-400 px-6 py-3.5 text-sm font-semibold text-white shadow-[0_10px_30px_-10px_rgba(79,70,229,.8)] disabled:opacity-60";
+  const botaoPrimario = "inline-flex items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,#fff1c2,#fbbf24_55%,#f59e0b)] px-6 py-3.5 text-sm font-semibold text-[#2b1b02] shadow-[0_10px_40px_-10px_rgba(251,191,36,.6)] transition-transform hover:-translate-y-0.5 disabled:opacity-60";
 
   return (
-    <main className="min-h-dvh bg-gradient-to-b from-[#0d1735] via-[#0b132c] to-[#0a1024] text-white">
+    <main className="min-h-dvh bg-[#070709] bg-[radial-gradient(70%_45%_at_85%_0%,rgba(251,191,36,.12),transparent)] text-[#edebe6]">
       <div className="max-w-2xl mx-auto px-5 md:px-8 py-8 md:py-12 min-h-dvh flex flex-col">
         {/* Cabeçalho: marca, contador e barra de progresso por pergunta */}
         <div className="flex items-center justify-between gap-4">

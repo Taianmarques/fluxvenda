@@ -1,13 +1,9 @@
 import Link from "next/link";
-import { Instrument_Serif, Inter_Tight, JetBrains_Mono } from "next/font/google";
 import { ArrowRight, Plus } from "lucide-react";
+import { fontesVendasIA } from "@/app/fontes";
 
 // Peças visuais das landings do Vendas IA: tema escuro, destaque âmbar e itálico serifado nos
 // títulos. Pasta com "_" não vira rota.
-
-const ui = Inter_Tight({ subsets: ["latin"], variable: "--f-ui", display: "swap" });
-const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["normal", "italic"], variable: "--f-serif", display: "swap" });
-const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--f-mono", display: "swap" });
 
 // Paleta (troque o âmbar pela cor da marca aqui, se quiser)
 const PALETA = {
@@ -34,7 +30,7 @@ export function reais(centavos: number) {
 export function Pagina({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className={`${ui.variable} ${serif.variable} ${mono.variable} min-h-screen bg-[var(--canvas)] text-[var(--text)] font-[family-name:var(--f-ui)] antialiased pb-24 md:pb-0`}
+      className={`${fontesVendasIA} min-h-screen bg-[var(--canvas)] text-[var(--text)] font-[family-name:var(--f-ui)] antialiased pb-24 md:pb-0`}
       style={PALETA}
     >
       <style>{`

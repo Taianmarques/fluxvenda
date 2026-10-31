@@ -47,12 +47,12 @@ function itemAtivo(nav: NavItem[], pathname: string) {
 function Marca() {
   return (
     <Link href="/inicio" className="flex items-center gap-3">
-      <span className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-lg shadow-blue-900/40 flex-shrink-0">
-        <BarChart3 size={21} className="text-white" />
+      <span className="w-10 h-10 rounded-xl bg-[linear-gradient(135deg,#fff1c2,#fbbf24_55%,#f59e0b)] flex items-center justify-center shadow-[0_8px_24px_-8px_rgba(251,191,36,.6)] flex-shrink-0">
+        <BarChart3 size={21} className="text-[#2b1b02]" />
       </span>
       <span className="min-w-0">
-        <span className="block font-bold text-lg leading-tight text-white">Vendas IA</span>
-        <span className="block text-xs text-slate-400 leading-tight">Sua central de crescimento</span>
+        <span className="block font-semibold tracking-tight text-lg leading-tight text-[#edebe6]">Vendas <span className="text-[#fbbf24]">IA</span></span>
+        <span className="block font-[family-name:var(--f-mono)] text-[10px] tracking-[0.14em] uppercase text-[rgba(237,235,230,.45)] leading-tight mt-0.5">Central de crescimento</span>
       </span>
     </Link>
   );
@@ -73,10 +73,10 @@ function Itens({ nav, pathname, onNavigate }: { nav: NavItem[]; pathname: string
             onClick={onNavigate}
             className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[15px] transition-colors ${
               active
-                ? "bg-blue-600 text-white font-medium shadow-lg shadow-blue-900/40"
+                ? "bg-[rgba(251,191,36,.13)] text-[#fcd34d] font-medium ring-1 ring-inset ring-[rgba(251,191,36,.25)]"
                 : item.locked
-                  ? "text-slate-500 hover:text-slate-300"
-                  : "text-slate-300 hover:text-white hover:bg-white/5"
+                  ? "text-[rgba(237,235,230,.4)] hover:text-[rgba(237,235,230,.7)]"
+                  : "text-[rgba(237,235,230,.72)] hover:text-[#edebe6] hover:bg-white/[.05]"
             }`}
           >
             <Icon size={19} />
@@ -91,17 +91,18 @@ function Itens({ nav, pathname, onNavigate }: { nav: NavItem[]; pathname: string
 
 function Usuario({ profileName, email }: { profileName: string; email: string }) {
   return (
-    <div className="px-4 py-4 border-t border-white/10 flex items-center gap-3">
+    <div className="px-4 py-4 border-t border-white/[.08] flex items-center gap-3">
       <UserMenu name={profileName} />
       <div className="min-w-0">
-        <p className="text-sm font-medium text-white truncate">{profileName}</p>
-        <p className="text-xs text-slate-400 truncate">{email}</p>
+        <p className="text-sm font-medium text-[#edebe6] truncate">{profileName}</p>
+        <p className="text-xs text-[rgba(237,235,230,.5)] truncate">{email}</p>
       </div>
     </div>
   );
 }
 
-const FUNDO = "bg-gradient-to-b from-[#0d1735] via-[#0b132c] to-[#0a1024]";
+// Mesmo fundo das landings, com um brilho âmbar discreto no topo
+const FUNDO = "bg-[#0a0a0d] bg-[radial-gradient(120%_40%_at_0%_0%,rgba(251,191,36,.07),transparent)] font-[family-name:var(--f-ui)]";
 
 export function AppSidebar({
   nav, profileName, email,
@@ -142,7 +143,7 @@ export function AppSidebar({
     )}
 
     {/* Sidebar — desktop */}
-    <aside className={`hidden md:flex w-64 flex-shrink-0 ${FUNDO} flex-col`}>
+    <aside className={`hidden md:flex w-64 flex-shrink-0 ${FUNDO} border-r border-white/[.06] flex-col`}>
       <div className="px-5 pt-6 pb-2">
         <Marca />
       </div>

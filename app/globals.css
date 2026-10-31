@@ -44,3 +44,289 @@ body {
 @supports (-moz-appearance: none) {
   * { scrollbar-width: thin; scrollbar-color: rgba(120, 130, 150, 0.45) transparent; }
 }
+
+/*
+ * Identidade Vendas IA na área logada (mesma das landings): fundo quase preto, destaque âmbar e
+ * as fontes da landing. Vale só dentro de .vi (o <main> das telas do Vendas IA, o checkout, a
+ * página de acesso e as boas-vindas) — CRM e Super Admin continuam no tema deles.
+ * As telas usam as cores do Tailwind (slate, indigo, blue…); como no Tailwind 4 cada cor é uma
+ * variável CSS, aqui elas são redefinidas: cinzas invertidos (fundo escuro, texto claro), azul,
+ * índigo e violeta viram o âmbar, e as cores de status (verde, vermelho…) ganham fundos
+ * translúcidos e texto claro. Classes que não passam por variável são ajustadas no fim do bloco.
+ */
+.vi {
+  --vi-canvas: #070709;
+  --vi-card: #0f0f12;
+  --vi-card-hover: #16161b;
+  --vi-on-acc: #2b1b02;
+  --color-slate-50: #111115;
+  --color-slate-100: #17171c;
+  --color-slate-200: #26262d;
+  --color-slate-300: #36363e;
+  --color-slate-400: #807d77;
+  --color-slate-500: #a29f98;
+  --color-slate-600: #bebbb4;
+  --color-slate-700: #d4d1ca;
+  --color-slate-800: #e3e0da;
+  --color-slate-900: #edebe6;
+  --color-slate-950: #f6f4ef;
+  --color-gray-50: #111115;
+  --color-gray-100: #17171c;
+  --color-gray-200: #26262d;
+  --color-gray-300: #36363e;
+  --color-gray-400: #807d77;
+  --color-gray-500: #a29f98;
+  --color-gray-600: #bebbb4;
+  --color-gray-700: #d4d1ca;
+  --color-gray-800: #e3e0da;
+  --color-gray-900: #edebe6;
+  --color-gray-950: #f6f4ef;
+  --color-zinc-50: #111115;
+  --color-zinc-100: #17171c;
+  --color-zinc-200: #26262d;
+  --color-zinc-300: #36363e;
+  --color-zinc-400: #807d77;
+  --color-zinc-500: #a29f98;
+  --color-zinc-600: #bebbb4;
+  --color-zinc-700: #d4d1ca;
+  --color-zinc-800: #e3e0da;
+  --color-zinc-900: #edebe6;
+  --color-zinc-950: #f6f4ef;
+  --color-neutral-50: #111115;
+  --color-neutral-100: #17171c;
+  --color-neutral-200: #26262d;
+  --color-neutral-300: #36363e;
+  --color-neutral-400: #807d77;
+  --color-neutral-500: #a29f98;
+  --color-neutral-600: #bebbb4;
+  --color-neutral-700: #d4d1ca;
+  --color-neutral-800: #e3e0da;
+  --color-neutral-900: #edebe6;
+  --color-neutral-950: #f6f4ef;
+  --color-stone-50: #111115;
+  --color-stone-100: #17171c;
+  --color-stone-200: #26262d;
+  --color-stone-300: #36363e;
+  --color-stone-400: #807d77;
+  --color-stone-500: #a29f98;
+  --color-stone-600: #bebbb4;
+  --color-stone-700: #d4d1ca;
+  --color-stone-800: #e3e0da;
+  --color-stone-900: #edebe6;
+  --color-stone-950: #f6f4ef;
+  --color-indigo-50: rgba(251,191,36,.08);
+  --color-indigo-100: rgba(251,191,36,.14);
+  --color-indigo-200: rgba(251,191,36,.28);
+  --color-indigo-300: #fde68a;
+  --color-indigo-400: #fcd34d;
+  --color-indigo-500: #fbbf24;
+  --color-indigo-600: #fbbf24;
+  --color-indigo-700: #fcd34d;
+  --color-indigo-800: #fde68a;
+  --color-indigo-900: #fef3c7;
+  --color-indigo-950: #fffbeb;
+  --color-blue-50: rgba(251,191,36,.08);
+  --color-blue-100: rgba(251,191,36,.14);
+  --color-blue-200: rgba(251,191,36,.28);
+  --color-blue-300: #fde68a;
+  --color-blue-400: #fcd34d;
+  --color-blue-500: #fbbf24;
+  --color-blue-600: #fbbf24;
+  --color-blue-700: #fcd34d;
+  --color-blue-800: #fde68a;
+  --color-blue-900: #fef3c7;
+  --color-blue-950: #fffbeb;
+  --color-violet-50: rgba(251,191,36,.08);
+  --color-violet-100: rgba(251,191,36,.14);
+  --color-violet-200: rgba(251,191,36,.28);
+  --color-violet-300: #fde68a;
+  --color-violet-400: #fcd34d;
+  --color-violet-500: #fbbf24;
+  --color-violet-600: #fbbf24;
+  --color-violet-700: #fcd34d;
+  --color-violet-800: #fde68a;
+  --color-violet-900: #fef3c7;
+  --color-violet-950: #fffbeb;
+  --color-purple-50: rgba(251,191,36,.08);
+  --color-purple-100: rgba(251,191,36,.14);
+  --color-purple-200: rgba(251,191,36,.28);
+  --color-purple-300: #fde68a;
+  --color-purple-400: #fcd34d;
+  --color-purple-500: #fbbf24;
+  --color-purple-600: #fbbf24;
+  --color-purple-700: #fcd34d;
+  --color-purple-800: #fde68a;
+  --color-purple-900: #fef3c7;
+  --color-purple-950: #fffbeb;
+  --color-emerald-50: color-mix(in srgb, #10b981 10%, transparent);
+  --color-emerald-100: color-mix(in srgb, #10b981 16%, transparent);
+  --color-emerald-200: color-mix(in srgb, #10b981 30%, transparent);
+  --color-emerald-300: #6ee7b7;
+  --color-emerald-400: #34d399;
+  --color-emerald-500: #10b981;
+  --color-emerald-600: #34d399;
+  --color-emerald-700: #6ee7b7;
+  --color-emerald-800: #a7f3d0;
+  --color-emerald-900: #d1fae5;
+  --color-emerald-950: #d1fae5;
+  --color-green-50: color-mix(in srgb, #22c55e 10%, transparent);
+  --color-green-100: color-mix(in srgb, #22c55e 16%, transparent);
+  --color-green-200: color-mix(in srgb, #22c55e 30%, transparent);
+  --color-green-300: #86efac;
+  --color-green-400: #4ade80;
+  --color-green-500: #22c55e;
+  --color-green-600: #4ade80;
+  --color-green-700: #86efac;
+  --color-green-800: #bbf7d0;
+  --color-green-900: #dcfce7;
+  --color-green-950: #dcfce7;
+  --color-red-50: color-mix(in srgb, #ef4444 10%, transparent);
+  --color-red-100: color-mix(in srgb, #ef4444 16%, transparent);
+  --color-red-200: color-mix(in srgb, #ef4444 30%, transparent);
+  --color-red-300: #fca5a5;
+  --color-red-400: #f87171;
+  --color-red-500: #ef4444;
+  --color-red-600: #f87171;
+  --color-red-700: #fca5a5;
+  --color-red-800: #fecaca;
+  --color-red-900: #fee2e2;
+  --color-red-950: #fee2e2;
+  --color-amber-50: color-mix(in srgb, #f59e0b 10%, transparent);
+  --color-amber-100: color-mix(in srgb, #f59e0b 16%, transparent);
+  --color-amber-200: color-mix(in srgb, #f59e0b 30%, transparent);
+  --color-amber-300: #fcd34d;
+  --color-amber-400: #fbbf24;
+  --color-amber-500: #f59e0b;
+  --color-amber-600: #fbbf24;
+  --color-amber-700: #fcd34d;
+  --color-amber-800: #fde68a;
+  --color-amber-900: #fef3c7;
+  --color-amber-950: #fef3c7;
+  --color-orange-50: color-mix(in srgb, #f97316 10%, transparent);
+  --color-orange-100: color-mix(in srgb, #f97316 16%, transparent);
+  --color-orange-200: color-mix(in srgb, #f97316 30%, transparent);
+  --color-orange-300: #fdba74;
+  --color-orange-400: #fb923c;
+  --color-orange-500: #f97316;
+  --color-orange-600: #fb923c;
+  --color-orange-700: #fdba74;
+  --color-orange-800: #fed7aa;
+  --color-orange-900: #ffedd5;
+  --color-orange-950: #ffedd5;
+  --color-rose-50: color-mix(in srgb, #f43f5e 10%, transparent);
+  --color-rose-100: color-mix(in srgb, #f43f5e 16%, transparent);
+  --color-rose-200: color-mix(in srgb, #f43f5e 30%, transparent);
+  --color-rose-300: #fda4af;
+  --color-rose-400: #fb7185;
+  --color-rose-500: #f43f5e;
+  --color-rose-600: #fb7185;
+  --color-rose-700: #fda4af;
+  --color-rose-800: #fecdd3;
+  --color-rose-900: #ffe4e6;
+  --color-rose-950: #ffe4e6;
+  --color-pink-50: color-mix(in srgb, #ec4899 10%, transparent);
+  --color-pink-100: color-mix(in srgb, #ec4899 16%, transparent);
+  --color-pink-200: color-mix(in srgb, #ec4899 30%, transparent);
+  --color-pink-300: #f9a8d4;
+  --color-pink-400: #f472b6;
+  --color-pink-500: #ec4899;
+  --color-pink-600: #f472b6;
+  --color-pink-700: #f9a8d4;
+  --color-pink-800: #fbcfe8;
+  --color-pink-900: #fce7f3;
+  --color-pink-950: #fce7f3;
+  --color-sky-50: color-mix(in srgb, #0ea5e9 10%, transparent);
+  --color-sky-100: color-mix(in srgb, #0ea5e9 16%, transparent);
+  --color-sky-200: color-mix(in srgb, #0ea5e9 30%, transparent);
+  --color-sky-300: #7dd3fc;
+  --color-sky-400: #38bdf8;
+  --color-sky-500: #0ea5e9;
+  --color-sky-600: #38bdf8;
+  --color-sky-700: #7dd3fc;
+  --color-sky-800: #bae6fd;
+  --color-sky-900: #e0f2fe;
+  --color-sky-950: #e0f2fe;
+  --color-cyan-50: color-mix(in srgb, #06b6d4 10%, transparent);
+  --color-cyan-100: color-mix(in srgb, #06b6d4 16%, transparent);
+  --color-cyan-200: color-mix(in srgb, #06b6d4 30%, transparent);
+  --color-cyan-300: #67e8f9;
+  --color-cyan-400: #22d3ee;
+  --color-cyan-500: #06b6d4;
+  --color-cyan-600: #22d3ee;
+  --color-cyan-700: #67e8f9;
+  --color-cyan-800: #a5f3fc;
+  --color-cyan-900: #cffafe;
+  --color-cyan-950: #cffafe;
+  --color-teal-50: color-mix(in srgb, #14b8a6 10%, transparent);
+  --color-teal-100: color-mix(in srgb, #14b8a6 16%, transparent);
+  --color-teal-200: color-mix(in srgb, #14b8a6 30%, transparent);
+  --color-teal-300: #5eead4;
+  --color-teal-400: #2dd4bf;
+  --color-teal-500: #14b8a6;
+  --color-teal-600: #2dd4bf;
+  --color-teal-700: #5eead4;
+  --color-teal-800: #99f6e4;
+  --color-teal-900: #ccfbf1;
+  --color-teal-950: #ccfbf1;
+  --color-yellow-50: color-mix(in srgb, #eab308 10%, transparent);
+  --color-yellow-100: color-mix(in srgb, #eab308 16%, transparent);
+  --color-yellow-200: color-mix(in srgb, #eab308 30%, transparent);
+  --color-yellow-300: #fde047;
+  --color-yellow-400: #facc15;
+  --color-yellow-500: #eab308;
+  --color-yellow-600: #facc15;
+  --color-yellow-700: #fde047;
+  --color-yellow-800: #fef08a;
+  --color-yellow-900: #fef9c3;
+  --color-yellow-950: #fef9c3;
+  --color-lime-50: color-mix(in srgb, #84cc16 10%, transparent);
+  --color-lime-100: color-mix(in srgb, #84cc16 16%, transparent);
+  --color-lime-200: color-mix(in srgb, #84cc16 30%, transparent);
+  --color-lime-300: #bef264;
+  --color-lime-400: #a3e635;
+  --color-lime-500: #84cc16;
+  --color-lime-600: #a3e635;
+  --color-lime-700: #bef264;
+  --color-lime-800: #d9f99d;
+  --color-lime-900: #ecfccb;
+  --color-lime-950: #ecfccb;
+  --color-fuchsia-50: color-mix(in srgb, #d946ef 10%, transparent);
+  --color-fuchsia-100: color-mix(in srgb, #d946ef 16%, transparent);
+  --color-fuchsia-200: color-mix(in srgb, #d946ef 30%, transparent);
+  --color-fuchsia-300: #f0abfc;
+  --color-fuchsia-400: #e879f9;
+  --color-fuchsia-500: #d946ef;
+  --color-fuchsia-600: #e879f9;
+  --color-fuchsia-700: #f0abfc;
+  --color-fuchsia-800: #f5d0fe;
+  --color-fuchsia-900: #fae8ff;
+  --color-fuchsia-950: #fae8ff;
+  background-color: var(--vi-canvas);
+  color: #edebe6;
+  font-family: var(--f-ui), var(--font-inter), Arial, sans-serif;
+}
+/* Fundos claros fixos das telas → fundo e cartões escuros */
+.vi .bg-white { background-color: var(--vi-card); }
+.vi .hover\:bg-white:hover { background-color: var(--vi-card-hover); }
+.vi .bg-\[\#f4f6fb\] { background-color: var(--vi-canvas); }
+.vi .from-white { --tw-gradient-from: var(--vi-card); }
+/* Elementos que eram escuros no tema claro (tooltips, botões pretos) continuam escuros */
+.vi :is(.bg-slate-900, .bg-slate-800, .bg-gray-900, .bg-gray-800, .bg-slate-950, .bg-gray-950) { background-color: #1c1c22; }
+/* Texto branco sobre botão colorido (agora âmbar/claro) → texto escuro, como na landing */
+.vi .text-white:is(.bg-indigo-500, .bg-indigo-600, .bg-indigo-700, .bg-blue-500, .bg-blue-600, .bg-blue-700, .bg-violet-500, .bg-violet-600,
+  .bg-purple-600, .bg-emerald-500, .bg-emerald-600, .bg-green-600, .bg-amber-500, .bg-orange-500, .bg-red-500, .bg-red-600, .bg-sky-600,
+  [class*="from-blue-"], [class*="from-indigo-"], [class*="from-violet-"]) { color: var(--vi-on-acc); }
+/* Sombras coloridas do tema claro → brilho âmbar discreto */
+.vi [class*="shadow-blue-"], .vi [class*="shadow-indigo-"] { --tw-shadow-color: rgba(251, 191, 36, .25); }
+/* Títulos: parte em gradiente vira o itálico serifado da landing */
+.vi :is(h1, h2) .bg-clip-text { font-family: var(--f-serif); font-style: italic; font-weight: 400; letter-spacing: 0; }
+.vi :is(h1, h2) { letter-spacing: -0.02em; }
+.vi ::placeholder { color: #6f6c66; }
+.vi input, .vi textarea, .vi select { color-scheme: dark; }
+/* Fundos brancos translúcidos (barras fixas com desfoque) → escuro translúcido */
+.vi [class*="bg-white/"]:not([class*="bg-white/["]) { background-color: rgba(10, 10, 13, .85); }
+.vi .to-white { --tw-gradient-to: var(--vi-card); }
+.vi .via-white { --tw-gradient-via: var(--vi-card); }
+/* Botões verdes sólidos (pagar/confirmar) mantêm o verde forte, com texto escuro */
+.vi :is(.bg-emerald-500, .bg-emerald-600) { background-color: #10b981; }
+.vi :is(.hover\:bg-emerald-500, .hover\:bg-emerald-600):hover { background-color: #34d399; }

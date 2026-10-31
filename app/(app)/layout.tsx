@@ -2,6 +2,8 @@ import { currentUser } from "@/lib/auth/server";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { AppSidebar } from "./AppSidebar";
+import { AreaConteudo } from "./AreaConteudo";
+import { fontesVendasIA } from "@/app/fontes";
 import { OneSignalInit } from "./OneSignalInit";
 import { getEffectiveProducts, hasProduct } from "@/lib/products";
 import { produtosLiberados } from "@/lib/infoprodutos";
@@ -72,10 +74,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   ];
 
   return (
-    <div className="flex flex-col md:flex-row h-dvh bg-gray-950 text-white overflow-hidden">
+    <div className={`${fontesVendasIA} flex flex-col md:flex-row h-dvh bg-gray-950 text-white overflow-hidden`}>
       <OneSignalInit userId={user.id} />
       <AppSidebar nav={NAV} profileName={profile.name} email={user.emailAddresses[0]?.emailAddress ?? ""} />
-      <main className="flex-1 overflow-y-auto">{children}</main>
+      <AreaConteudo>{children}</AreaConteudo>
     </div>
   );
 }
