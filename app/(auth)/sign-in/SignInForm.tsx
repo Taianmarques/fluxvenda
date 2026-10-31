@@ -4,7 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { AuthLogo } from "@/app/AuthLogo";
 
-export function SignInForm({ redirectUrl, initialNotice }: { redirectUrl: string; initialNotice?: string }) {
+// vendasIA: visual e marca do Vendas IA, sem os convites de teste grátis do CRM
+export function SignInForm({ redirectUrl, initialNotice, vendasIA = false }: { redirectUrl: string; initialNotice?: string; vendasIA?: boolean }) {
+  const esqueciHref = vendasIA ? "/esqueci-senha?tema=vi" : "/esqueci-senha";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [saving, setSaving] = useState(false);
@@ -41,13 +43,17 @@ export function SignInForm({ redirectUrl, initialNotice }: { redirectUrl: string
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 text-gray-900 flex items-center justify-center px-4">
       <form onSubmit={submit} className="w-full max-w-sm space-y-6">
         <div className="text-center space-y-2">
-          <AuthLogo />
-          <p className="text-gray-500 text-sm">
-            Acesse sua conta ou{" "}
-            <Link href="/sign-up?product=crm" className="text-blue-600 hover:text-blue-700 transition-colors">
-              experimente grátis por 7 dias
-            </Link>
-          </p>
+          <AuthLogo vendasIA={vendasIA} />
+          {vendasIA ? (
+            <p className="text-gray-500 text-sm">Entre com o e-mail usado na compra</p>
+          ) : (
+            <p className="text-gray-500 text-sm">
+              Acesse sua conta ou{" "}
+              <Link href="/sign-up?product=crm" className="text-blue-600 hover:text-blue-700 transition-colors">
+                experimente grátis por 7 dias
+              </Link>
+            </p>
+          )}
         </div>
 
         {notice && <p className="text-green-600 text-sm text-center">{notice}</p>}
@@ -83,7 +89,7 @@ export function SignInForm({ redirectUrl, initialNotice }: { redirectUrl: string
               {needsReset && (
                 <>
                   {" "}
-                  <Link href="/esqueci-senha" className="underline text-blue-600">
+                  <Link href={esqueciHref} className="underline text-blue-600">
                     Definir senha
                   </Link>
                 </>
@@ -100,12 +106,14 @@ export function SignInForm({ redirectUrl, initialNotice }: { redirectUrl: string
           </button>
 
           <div className="flex items-center justify-between text-sm">
-            <Link href="/esqueci-senha" className="text-gray-500 hover:text-gray-900 transition-colors">
+            <Link href={esqueciHref} className="text-gray-500 hover:text-gray-900 transition-colors">
               Esqueci minha senha
             </Link>
-            <Link href="/sign-up?product=crm" className="text-blue-600 hover:text-blue-700 transition-colors">
-              Criar conta
-            </Link>
+            {!vendasIA && (
+              <Link href="/sign-up?product=crm" className="text-blue-600 hover:text-blue-700 transition-colors">
+                Criar conta
+              </Link>
+            )}
           </div>
         </div>
       </form>

@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { AuthLogo } from "@/app/AuthLogo";
 
-export function RedefinirSenhaForm({ token }: { token: string }) {
+export function RedefinirSenhaForm({ token, vendasIA = false }: { token: string; vendasIA?: boolean }) {
   const [password, setPassword] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -25,7 +25,7 @@ export function RedefinirSenhaForm({ token }: { token: string }) {
         setSaving(false);
         return;
       }
-      window.location.href = data.onboarded === false ? "/onboarding" : "/dashboard";
+      window.location.href = data.onboarded === false ? "/onboarding" : vendasIA ? "/inicio" : "/dashboard";
     } catch {
       setError("Não foi possível redefinir a senha. Tente novamente.");
       setSaving(false);
@@ -37,7 +37,7 @@ export function RedefinirSenhaForm({ token }: { token: string }) {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 text-gray-900 flex items-center justify-center px-4">
         <div className="w-full max-w-sm text-center space-y-4">
           <p className="text-gray-600">Link inválido. Peça uma nova redefinição de senha.</p>
-          <Link href="/esqueci-senha" className="text-blue-600 hover:text-blue-700 transition-colors">
+          <Link href={vendasIA ? "/esqueci-senha?tema=vi" : "/esqueci-senha"} className="text-blue-600 hover:text-blue-700 transition-colors">
             Esqueci minha senha
           </Link>
         </div>
@@ -49,7 +49,7 @@ export function RedefinirSenhaForm({ token }: { token: string }) {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 text-gray-900 flex items-center justify-center px-4">
       <form onSubmit={submit} className="w-full max-w-sm space-y-6">
         <div className="text-center space-y-2">
-          <AuthLogo />
+          <AuthLogo vendasIA={vendasIA} />
           <p className="text-lg font-bold text-gray-900 pt-2">Definir nova senha</p>
         </div>
 

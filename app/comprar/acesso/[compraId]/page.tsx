@@ -33,7 +33,7 @@ export default async function AcessoCompraPage({ params, searchParams }: {
           <h1 className="text-xl font-bold">Link de acesso inválido ou vencido</h1>
           <p className="text-sm text-slate-600">Se você já comprou, entre com o e-mail usado na compra. Ainda não criou a senha? Use “Esqueci minha senha”.</p>
           <Link href={`/sign-in?redirect_url=${DESTINO}`} className={botao}>Entrar</Link>
-          <Link href="/esqueci-senha" className="block text-sm text-indigo-600 font-medium">Esqueci minha senha</Link>
+          <Link href="/esqueci-senha?tema=vi" className="block text-sm text-indigo-600 font-medium">Esqueci minha senha</Link>
         </div>
       </main>
     );
@@ -87,7 +87,7 @@ export default async function AcessoCompraPage({ params, searchParams }: {
           <div className="border-t border-slate-100 pt-5 space-y-3 text-center">
             <p className="text-sm text-slate-600">Os produtos foram liberados na conta <strong>{profile.email}</strong>. Entre com o seu e-mail e senha.</p>
             <Link href={`/sign-in?redirect_url=${DESTINO}`} className={botao}>Entrar</Link>
-            <Link href="/esqueci-senha" className="block text-sm text-indigo-600 font-medium">Ainda não tem senha? Crie aqui</Link>
+            <Link href="/esqueci-senha?tema=vi" className="block text-sm text-indigo-600 font-medium">Ainda não tem senha? Crie aqui</Link>
           </div>
         )}
         <p className="text-xs text-slate-400 text-center">Também enviamos a confirmação e o link de acesso para o seu e-mail e WhatsApp.</p>
