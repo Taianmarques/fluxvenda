@@ -17,6 +17,34 @@ function mascaraCpfCnpj(v: string) {
   return d.replace(/^(\d{2})(\d)/, "$1.$2").replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3").replace(/\.(\d{3})(\d)/, ".$1/$2").replace(/(\d{4})(\d)/, "$1-$2");
 }
 
+// Máscaras do cartão no padrão de compra: Amex (34/37) tem 15 dígitos em 4-6-5 e CVV de 4;
+// Hipercard (606282/3841) pode ter 19; os demais têm 16 dígitos em blocos de 4 e CVV de 3
+const soDigitos = (v: string) => v.replace(/\D/g, "");
+const ehAmex = (n: string) => /^3[47]/.test(soDigitos(n));
+const tamanhoCartao = (n: string) => (ehAmex(n) ? 15 : /^(606282|3841)/.test(soDigitos(n)) ? 19 : 16);
+const tamanhoCvv = (n: string) => (ehAmex(n) ? 4 : 3);
+
+function mascaraCartao(v: string) {
+  const d = soDigitos(v).slice(0, tamanhoCartao(v));
+  if (ehAmex(d)) return [d.slice(0, 4), d.slice(4, 10), d.slice(10)].filter(Boolean).join(" ");
+  return d.replace(/(\d{4})(?=\d)/g, "$1 ");
+}
+
+function mascaraValidade(v: string) {
+  let d = soDigitos(v).slice(0, 4);
+  if (/^[2-9]/.test(d)) d = `0${d}`.slice(0, 4); // "5" vira "05"
+  return d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d;
+}
+
+const mascaraCep = (v: string) => soDigitos(v).slice(0, 8).replace(/^(\d{5})(\d)/, "$1-$2");
+
+function mascaraTelefone(v: string) {
+  const d = soDigitos(v).slice(0, 11);
+  if (d.length <= 2) return d.length ? `(${d}` : "";
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, d.length - 4)}-${d.slice(-4)}`;
+}
+
 // Checkout dos infoprodutos: principal + order bumps opcionais, dados do comprador e Pix/cartão.
 // Os valores mostrados aqui são só pra pessoa conferir — o servidor recalcula tudo pela oferta.
 export function CheckoutClient({ ofertaSlug, modoTeste, principais, bumps, logado }: {
@@ -75,7 +103,12 @@ export function CheckoutClient({ ofertaSlug, modoTeste, principais, bumps, logad
     if (enviando) return;
     setErro(null);
     const [mes, ano] = cartao.expiry.split("/").map(s => s.trim());
-    if (forma === "CARTAO" && (!mes || !ano)) { setErro("Informe a validade do cartão no formato MM/AA."); return; }
+    if (forma === "CARTAO") {
+      if (soDigitos(cartao.number).length !== tamanhoCartao(cartao.number)) { setErro("Confira o número do cartão."); return; }
+      if (!mes || !ano || ano.length !== 2 || Number(mes) < 1 || Number(mes) > 12) { setErro("Informe a validade do cartão no formato MM/AA."); return; }
+      if (cartao.ccv.length !== tamanhoCvv(cartao.number)) { setErro(`O código de segurança tem ${tamanhoCvv(cartao.number)} dígitos.`); return; }
+      if (soDigitos(cartao.postalCode).length !== 8) { setErro("Informe o CEP com 8 dígitos."); return; }
+    }
     setEnviando(true);
     try {
       const res = await fetch(`/api/comprar/${ofertaSlug}`, {
@@ -83,7 +116,7 @@ export function CheckoutClient({ ofertaSlug, modoTeste, principais, bumps, logad
         body: JSON.stringify({
           nome, email, telefone, cpfCnpj: cpf, formaPagamento: forma, bumps: [...marcados],
           ...(forma === "CARTAO" && {
-            cartao: { holderName: cartao.holderName, number: cartao.number, expiryMonth: mes.padStart(2, "0"), expiryYear: ano, ccv: cartao.ccv, postalCode: cartao.postalCode, addressNumber: cartao.addressNumber },
+            cartao: { holderName: cartao.holderName, number: soDigitos(cartao.number), expiryMonth: mes.padStart(2, "0"), expiryYear: ano, ccv: cartao.ccv, postalCode: soDigitos(cartao.postalCode), addressNumber: cartao.addressNumber },
           }),
         }),
       });
@@ -199,12 +232,14 @@ export function CheckoutClient({ ofertaSlug, modoTeste, principais, bumps, logad
                 <input id="ck-nome" required value={nome} onChange={e => setNome(e.target.value)} autoComplete="name" className={`${input} mt-1`} />
               </div>
               <div>
-                <label htmlFor="ck-email" className="text-sm text-slate-700">E-mail (o acesso chega nele)</label>
-                <input id="ck-email" required type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" className={`${input} mt-1`} />
+                <label htmlFor="ck-email" className="text-sm text-slate-700">E-mail</label>
+                <input id="ck-email" required type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" aria-describedby="ck-email-dica" className={`${input} mt-1`} />
+                <p id="ck-email-dica" className="mt-1 text-xs text-slate-500">Será o seu login de acesso</p>
               </div>
               <div>
-                <label htmlFor="ck-tel" className="text-sm text-slate-700">WhatsApp <span className="text-slate-400">(enviamos o acesso por aqui)</span></label>
-                <input id="ck-tel" value={telefone} onChange={e => setTelefone(e.target.value)} required inputMode="tel" autoComplete="tel" placeholder="(11) 99999-9999" className={`${input} mt-1`} />
+                <label htmlFor="ck-tel" className="text-sm text-slate-700">WhatsApp</label>
+                <input id="ck-tel" value={telefone} onChange={e => setTelefone(mascaraTelefone(e.target.value))} required inputMode="tel" autoComplete="tel" placeholder="(11) 99999-9999" aria-describedby="ck-tel-dica" className={`${input} mt-1`} />
+                <p id="ck-tel-dica" className="mt-1 text-xs text-slate-500">Enviamos a confirmação e o acesso por aqui</p>
               </div>
               <div className="sm:col-span-2">
                 <label htmlFor="ck-cpf" className="text-sm text-slate-700">CPF ou CNPJ</label>
@@ -231,10 +266,10 @@ export function CheckoutClient({ ofertaSlug, modoTeste, principais, bumps, logad
             ) : (
               <div className="grid grid-cols-2 gap-3">
                 <input required aria-label="Nome impresso no cartão" placeholder="Nome impresso no cartão" value={cartao.holderName} onChange={e => setCartao(c => ({ ...c, holderName: e.target.value }))} autoComplete="cc-name" className={`${input} col-span-2`} />
-                <input required aria-label="Número do cartão" placeholder="Número do cartão" inputMode="numeric" value={cartao.number} onChange={e => setCartao(c => ({ ...c, number: e.target.value.replace(/[^\d ]/g, "").slice(0, 23) }))} autoComplete="cc-number" className={`${input} col-span-2`} />
-                <input required aria-label="Validade (MM/AA)" placeholder="Validade (MM/AA)" inputMode="numeric" value={cartao.expiry} onChange={e => setCartao(c => ({ ...c, expiry: e.target.value.replace(/[^\d/]/g, "").slice(0, 7) }))} autoComplete="cc-exp" className={input} />
-                <input required aria-label="CVV" placeholder="CVV" inputMode="numeric" value={cartao.ccv} onChange={e => setCartao(c => ({ ...c, ccv: e.target.value.replace(/\D/g, "").slice(0, 4) }))} autoComplete="cc-csc" className={input} />
-                <input required aria-label="CEP do titular" placeholder="CEP do titular" inputMode="numeric" value={cartao.postalCode} onChange={e => setCartao(c => ({ ...c, postalCode: e.target.value.replace(/\D/g, "").slice(0, 8) }))} autoComplete="postal-code" className={input} />
+                <input required aria-label="Número do cartão" placeholder="Número do cartão" inputMode="numeric" maxLength={23} value={cartao.number} onChange={e => setCartao(c => { const number = mascaraCartao(e.target.value); return { ...c, number, ccv: c.ccv.slice(0, tamanhoCvv(number)) }; })} autoComplete="cc-number" className={`${input} col-span-2`} />
+                <input required aria-label="Validade (MM/AA)" placeholder="Validade (MM/AA)" inputMode="numeric" maxLength={5} value={cartao.expiry} onChange={e => setCartao(c => ({ ...c, expiry: mascaraValidade(e.target.value) }))} autoComplete="cc-exp" className={input} />
+                <input required aria-label="Código de segurança (CVV)" placeholder={`CVV (${tamanhoCvv(cartao.number)} dígitos)`} inputMode="numeric" maxLength={4} value={cartao.ccv} onChange={e => setCartao(c => ({ ...c, ccv: soDigitos(e.target.value).slice(0, tamanhoCvv(c.number)) }))} autoComplete="cc-csc" className={input} />
+                <input required aria-label="CEP do titular" placeholder="CEP do titular" inputMode="numeric" maxLength={9} value={cartao.postalCode} onChange={e => setCartao(c => ({ ...c, postalCode: mascaraCep(e.target.value) }))} autoComplete="postal-code" className={input} />
                 <input required aria-label="Número do endereço" placeholder="Número do endereço" value={cartao.addressNumber} onChange={e => setCartao(c => ({ ...c, addressNumber: e.target.value.slice(0, 10) }))} className={input} />
               </div>
             )}
