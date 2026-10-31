@@ -7,7 +7,7 @@ import { UserMenu } from "./UserMenu";
 import {
   LayoutDashboard, ScanSearch, Target, Gamepad2, BookOpen, MessageSquare,
   PenTool, BookText, Trophy, Users, Headset, ShieldCheck, Menu, X, Coins, Lock, GraduationCap,
-  Home, MessageSquareText, Box, Building2, Settings, BarChart3,
+  Home, MessageSquareText, Box, Building2, Settings, BarChart3, Star,
 } from "lucide-react";
 
 const ICONS = {
@@ -27,6 +27,7 @@ const ICONS = {
   creditos: Coins,
   plataforma: GraduationCap,
   biblioteca: BookOpen,
+  favoritos: Star,
   prompts: MessageSquareText,
   kits: Box,
   empresa: Building2,
