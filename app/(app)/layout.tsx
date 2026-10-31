@@ -39,8 +39,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Só-CRM sem nenhum kit: a home continua sendo a de boas-vindas do CRM (/dashboard)
   const homeCrm = hasCrm && !hasPlataforma && !temInfoproduto;
 
-  // Quem não contratou a Plataforma não precisa ver os 9 itens individuais bloqueados —
-  // colapsa tudo num único link de upsell (último do menu) que leva direto pra landing do produto.
+  // Quem não contratou a Plataforma B2B não vê os itens dela (nem um link de upsell — o foco do
+  // menu é o Vendas IA; a landing /produtos/plataforma continua existindo).
   const NAV = [
     { href: homeCrm ? "/dashboard" : "/inicio", label: "Início", icon: "inicio" as const, show: true, locked: false },
     // Infoprodutos (100 prompts e kits complementares) — todo usuário vê; o acesso é por produto
@@ -67,9 +67,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/creditos",    label: "Créditos de IA", icon: "creditos" as const, show: isGestor, locked: false },
     { href: "/configuracoes", label: "Configurações", icon: "configuracoes" as const, show: true, locked: false },
     { href: "/admin",       label: "Super Admin", icon: "admin" as const, show: isAdmin, locked: false },
-    ...(hasPlataforma ? [] : [
-      { href: "/produtos/plataforma", label: "Plataforma B2B", icon: "plataforma" as const, show: true, locked: true },
-    ]),
   ];
 
   return (
