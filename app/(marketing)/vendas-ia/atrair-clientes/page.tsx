@@ -166,16 +166,14 @@ export default async function AtrairClientesLanding() {
 
   return (
     <Pagina>
-      {/* Faixa da oferta do dia + topo: ficam presos no alto enquanto a pessoa rola a página */}
-      <div className="sticky top-0 z-40">
-        <div className="bg-[linear-gradient(90deg,#fbbf24,#f59e0b)] text-[var(--on-acc)]">
-          <div className="max-w-6xl mx-auto px-4 md:px-6 py-2.5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center text-xs sm:text-sm font-semibold">
-            <span>OFERTA DE HOJE: de <s className="opacity-70">{precoDe}</s> por {preco}</span>
-            <span className="inline-flex items-center gap-1.5"><Clock size={14} /> Encerra hoje às 23h59 · <ContagemHoje /></span>
-          </div>
+      {/* Faixa da oferta do dia: só ela fica presa no alto enquanto a pessoa rola; o topo rola junto */}
+      <div className="sticky top-0 z-40 bg-[linear-gradient(90deg,#fbbf24,#f59e0b)] text-[var(--on-acc)]">
+        <div className="max-w-6xl mx-auto px-4 md:px-6 py-2.5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center text-xs sm:text-sm font-semibold">
+          <span>OFERTA DE HOJE: de <s className="opacity-70">{precoDe}</s> por {preco}</span>
+          <span className="inline-flex items-center gap-1.5"><Clock size={14} /> Encerra hoje às 23h59 · <ContagemHoje /></span>
         </div>
-        <Topo href={CHECKOUT} preco={preco} />
       </div>
+      <Topo href={CHECKOUT} preco={preco} fixo={false} />
 
       {/* 1ª dobra */}
       <section className="relative overflow-hidden">

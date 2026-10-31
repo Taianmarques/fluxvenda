@@ -84,9 +84,10 @@ export function Cta({ href, preco, texto, grande = false }: { href: string; prec
   );
 }
 
-export function Topo({ href, preco }: { href: string; preco: string }) {
+// fixo=false: o topo rola junto com a página (quando outra faixa é que fica presa no alto)
+export function Topo({ href, preco, fixo = true }: { href: string; preco: string; fixo?: boolean }) {
   return (
-    <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-[rgba(7,7,9,.78)] backdrop-blur-md">
+    <header className={`${fixo ? "sticky top-0 z-30" : "relative"} border-b border-[var(--line)] bg-[rgba(7,7,9,.78)] backdrop-blur-md`}>
       <div className="max-w-6xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between gap-4">
         <span className="font-semibold tracking-tight text-lg">Vendas <span className="text-[var(--acc)]">IA</span></span>
         <Link href={href} className="hidden sm:inline-flex rounded-full border border-[var(--line-strong)] hover:border-[var(--acc)] px-4 py-2 text-sm font-medium">Comprar · {preco}</Link>
