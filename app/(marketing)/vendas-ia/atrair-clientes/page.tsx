@@ -5,6 +5,7 @@ import { BotaoFixoCelular, cartao, Cta, Em, FaixaGarantia, Faq, Kicker, Pagina, 
 import { MotionPlataforma } from "../_ferramentas/MotionPlataforma";
 import { DemoAbas } from "../_ferramentas/DemoAbas";
 import { ContagemHoje } from "../_ferramentas/ContagemHoje";
+import { Cases } from "../_ferramentas/Cases";
 import { carregarDemoAnuncio, DEMO_NOME, DEMO_RESPOSTA } from "../_ferramentas/demo";
 
 // Landing "Atrair clientes": mesma oferta de R$ 67 das landings de 100 ferramentas, com o ângulo de
@@ -392,6 +393,8 @@ export default async function AtrairClientesLanding() {
           </p>
         </div>
       </section>
+
+      <Cases />
 
       {/* A oferta */}
       <section id="oferta" className="border-t border-[var(--line)] relative overflow-hidden">
