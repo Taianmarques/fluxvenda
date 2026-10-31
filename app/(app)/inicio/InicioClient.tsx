@@ -126,50 +126,43 @@ export function InicioClient({
       </div>
 
       <div className="max-w-4xl mx-auto px-4 md:px-8 py-8 md:py-12 space-y-12">
-        {/* Topo guiado: a saudação já apresenta o próximo passo, e o botão principal leva até ele.
-            Os outros passos ficam como "depois disso"; sem passos, vira um convite a explorar. */}
+        {/* Saudação */}
         <section>
           {primeiroNome && <p className="text-slate-500">Olá, {primeiroNome}.</p>}
           <h1 className="mt-1 text-3xl md:text-5xl font-bold tracking-tight leading-tight">
-            {principal
-              ? <>Seu próximo passo para <span className="bg-gradient-to-r from-blue-600 to-violet-600 bg-clip-text text-transparent">vender mais:</span></>
-              : <>Escolha uma ferramenta e <span className="bg-gradient-to-r from-blue-600 to-violet-600 bg-clip-text text-transparent">comece a vender mais.</span></>}
+            Escolha seu próximo passo para <span className="bg-gradient-to-r from-blue-600 to-violet-600 bg-clip-text text-transparent">vender mais.</span>
           </h1>
-
-          {principal ? (
-            <div className={`${cartao} mt-6 p-5 md:p-7 border-blue-200`}>
-              <div className="flex items-start gap-4">
-                <span className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0"><CentralIcone nome={principal.icone} size={22} /></span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xl font-semibold leading-snug">{principal.titulo}</p>
-                  {principal.descricao && <p className="mt-1 text-slate-500">{principal.descricao}</p>}
-                </div>
-              </div>
-              <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-3 sm:pl-16">
-                <Link href={principal.href} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 px-5 py-3 text-sm font-semibold text-white">
-                  Começar agora <ArrowRight size={16} />
-                </Link>
-                <Link href={explorarHref} className="text-sm text-slate-500 hover:text-slate-900">ou explorar todas as ferramentas</Link>
-              </div>
-            </div>
-          ) : (
-            <Link href={explorarHref} className="mt-6 inline-flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 px-5 py-3 text-sm font-semibold text-white">
+          <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3">
+            <Link href={explorarHref} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 px-5 py-3 text-sm font-semibold text-white">
               Explorar ferramentas <ArrowRight size={16} />
             </Link>
-          )}
-
-          {(outrosPassos.length > 0 || uso) && (
-            <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 px-1 text-sm">
-              {outrosPassos.length > 0 && <span className={rotulo}>Depois</span>}
-              {outrosPassos.map(p => (
-                <Link key={p.href} href={p.href} className="inline-flex items-center gap-1.5 text-slate-600 hover:text-slate-900">
-                  <ChevronRight size={15} className="text-blue-600" /> {p.titulo}
-                </Link>
-              ))}
-              {uso && <span className="text-slate-500 sm:ml-auto">{uso}</span>}
-            </div>
-          )}
+            {uso && <p className="text-sm text-slate-500">{uso}</p>}
+          </div>
         </section>
+
+        {/* Próximo passo: um em destaque, os outros discretos */}
+        {principal && (
+          <section>
+            <h2 className={`${rotulo} mb-3`}>Próximo passo</h2>
+            <Link href={principal.href} className={`group ${cartao} p-5 md:p-6 flex items-center gap-4 hover:border-blue-300 transition-colors`}>
+              <span className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0"><CentralIcone nome={principal.icone} size={22} /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-lg font-semibold leading-snug">{principal.titulo}</span>
+                {principal.descricao && <span className="block mt-0.5 text-sm text-slate-500">{principal.descricao}</span>}
+              </span>
+              <ArrowRight size={20} className="text-blue-600 group-hover:translate-x-1 transition-transform flex-shrink-0" />
+            </Link>
+            {outrosPassos.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 px-1">
+                {outrosPassos.map(p => (
+                  <Link key={p.href} href={p.href} className="inline-flex items-center gap-1.5 text-sm text-slate-600 hover:text-slate-900">
+                    <ChevronRight size={15} className="text-blue-600" /> {p.titulo}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Continue usando: favoritas e mais usadas */}
         {destaque.length > 0 && (
