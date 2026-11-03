@@ -3,11 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, CalendarCheck, Check, ExternalLink, MessageCircle } from "lucide-react";
 import {
-  buildWaLink, withTrackingParams, buildOfertaHref, parseRich, linkAgendamento, DEFAULT_ACCENT,
+  buildWaLink, withTrackingParams, buildOfertaHref, parseRich, DEFAULT_ACCENT,
   type QuizStep, type LeadFormQuestion, type LeadFormUtm, type DestaqueCor,
 } from "@/lib/lead-form-shared";
 import { trackPixel, readUtm, registerVisit, MetaPixel } from "./form-runtime";
 import { CheckoutTela } from "./CheckoutTela";
+import { AgendaInline } from "./AgendaInline";
 
 // Página pública do formulário no estilo "quiz em telas" (LeadForm.style = "TELAS"): uma etapa por
 // tela — pergunta, conteúdo, carregamento ou oferta — com barra de progresso e voltar. Usa a mesma
@@ -90,10 +91,10 @@ function Barra({ nome, pct, cor }: { nome: string; pct: number; cor: string }) {
 
 export function QuizTelasClient({
   slug, steps, pixelId, logoUrl, accentColor, doneMessage, ctaLabel, ctaUrl, waNumber, waButtonText, consentText, conversionUrl,
-  agendaHref = null, agendaLabel = null,
+  agenda = null,
 }: {
-  agendaHref?: string | null; // agenda online do agente (agendamento ao final) — null = desligado
-  agendaLabel?: string | null;
+  // Agendamento ao final (calendário na tela final) — null = desligado
+  agenda?: { titulo: string; subtitulo: string; empresa: string | null } | null;
   slug: string; steps: QuizStep[]; pixelId: string | null; logoUrl: string | null; accentColor: string | null;
   doneMessage: string; ctaLabel: string | null; ctaUrl: string | null; waNumber: string | null; waButtonText: string | null;
   consentText: string | null; conversionUrl: string | null;
@@ -111,6 +112,8 @@ export function QuizTelasClient({
   const [inviteSent, setInviteSent] = useState<boolean | undefined>();
   const [quiz, setQuiz] = useState<QuizInfo | null>(null);
   const [loadingPct, setLoadingPct] = useState(0);
+  const [agendado, setAgendado] = useState<string | null>(null); // "terça-feira, 04/11 às 14:00"
+  const [pulouAgenda, setPulouAgenda] = useState(false);
   // Lida uma vez no navegador (no servidor não há URL do lead; o estado não vai no HTML)
   const [utm] = useState<LeadFormUtm>(() => (typeof window === "undefined" ? {} : readUtm()));
   const topRef = useRef<HTMLDivElement>(null);
@@ -126,6 +129,9 @@ export function QuizTelasClient({
     steps.flatMap(s => (s.type === "pergunta" && s.question.type === tipo ? [answers[s.question.key]] : [])).find(Boolean);
   const leadEmail = respostaDoTipo("EMAIL");
   const leadTelefone = respostaDoTipo("WHATSAPP");
+  // Agendamento ao final: o calendário ocupa a tela final até o lead agendar ou pular (precisa do
+  // WhatsApp já respondido — a reunião é marcada pra esse número)
+  const agendaPendente = Boolean(finished && agenda && submissionId && leadTelefone && !agendado && !pulouAgenda);
 
   useEffect(() => {
     registerVisit(slug, utm.source);
@@ -214,10 +220,10 @@ export function QuizTelasClient({
   const destinoConversao = quiz?.conversionUrl || conversionUrl;
   const conversionHref = destinoConversao ? withTrackingParams(destinoConversao, typeof window === "undefined" ? "" : window.location.search) : null;
   useEffect(() => {
-    if (!finished || !conversionHref) return;
+    if (!finished || !conversionHref || agendaPendente) return;
     const t = setTimeout(() => { window.location.assign(conversionHref); }, pixelId ? 800 : 0);
     return () => clearTimeout(t);
-  }, [finished, conversionHref, pixelId]);
+  }, [finished, conversionHref, pixelId, agendaPendente]);
 
   const waLink = waNumber ? buildWaLink(waNumber, "Oi! Acabei de responder o quiz.") : null;
   const inviteFailed = inviteSent === false;
@@ -475,6 +481,21 @@ export function QuizTelasClient({
                 <Check size={28} className="text-white" />
               </div>
             )}
+            {agendaPendente && submissionId && agenda ? (
+              <AgendaInline
+                slug={slug} submissionId={submissionId} accent={accent}
+                titulo={agenda.titulo} subtitulo={agenda.subtitulo} empresa={agenda.empresa}
+                onAgendado={setAgendado} onPular={() => setPulouAgenda(true)}
+              />
+            ) : (<>
+            {agendado && (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-center">
+                <CalendarCheck size={28} className="mx-auto text-emerald-600" />
+                <p className="mt-2 font-semibold text-slate-900">Horário confirmado!</p>
+                <p className="text-slate-700 first-letter:uppercase">{agendado}</p>
+                <p className="mt-1 text-sm text-slate-500">Enviamos a confirmação no seu WhatsApp.</p>
+              </div>
+            )}
             <p className="text-center text-[17px] text-slate-700 leading-relaxed whitespace-pre-line">
               {inviteFailed && waLink
                 ? "Recebi suas respostas! Não consegui te chamar automaticamente no WhatsApp — toque no botão abaixo pra falar com a gente por lá."
@@ -483,11 +504,6 @@ export function QuizTelasClient({
                   : doneMessage}
             </p>
             <div className="flex flex-col gap-3">
-              {agendaHref && (
-                <a href={linkAgendamento(agendaHref, answers.nome ?? nome, leadTelefone)} className="flex items-center justify-center gap-2 rounded-xl py-4 text-lg font-semibold text-white" style={{ backgroundColor: accent }}>
-                  <CalendarCheck size={18} /> {agendaLabel || "Agendar meu horário"}
-                </a>
-              )}
               {conversionHref && (
                 <a href={conversionHref} className="flex items-center justify-center gap-2 rounded-xl py-4 text-lg font-semibold text-white" style={{ backgroundColor: accent }}>
                   Continuar <ExternalLink size={16} />
@@ -507,6 +523,7 @@ export function QuizTelasClient({
                 </a>
               )}
             </div>
+            </>)}
           </div>
         )}
       </main>

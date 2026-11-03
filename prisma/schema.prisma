@@ -1978,10 +1978,11 @@ model LeadForm {
   ctaLabel String?
   ctaUrl   String?
 
-  // Agendamento ao final: botão que leva o lead pra agenda online do agente do formulário
-  // (/agendar/...), já com nome e WhatsApp preenchidos. Só aparece se a agenda do agente estiver ativa.
+  // Agendamento ao final (estilo agenda de demonstração): o lead escolhe dia e horário na própria
+  // tela final e a reunião vira um Appointment na agenda do agente do formulário. bookingConfig =
+  // { titulo, subtitulo, duracao, horarios["HH:MM"], dias[0-6] } (ver lib/lead-form-agenda.ts)
   bookingEnabled Boolean @default(false)
-  bookingLabel   String?
+  bookingConfig  Json?
 
   // Plano B: botão "falar no WhatsApp" (wa.me) na tela final — aparece sempre que waNumber existe,
   // e é o único caminho do lead quando o envio automático do convite falha. Só dígitos com DDI.
@@ -2039,6 +2040,7 @@ model LeadFormSubmission {
   consentAt  DateTime? // quando marcou o consentimento (null = formulário sem consentimento)
   inviteError String?  // por que o convite não saiu (ex: número fora do WhatsApp), pra o gestor ver
   quizResult  String?  // key do resultado do quiz (LeadForm.quizResults) — null = formulário comum ou não terminou
+  appointmentId String? // reunião marcada no agendamento ao final (uma por resposta)
 
   // Checkout dentro do quiz em telas (etapa "checkout"), cobrado na conta Asaas do agente do
   // formulário. Uma compra por resposta — nova tentativa sobrescreve. Dados do cartão nunca são gravados.

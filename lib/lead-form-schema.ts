@@ -57,7 +57,14 @@ export const extrasShape = {
   conversionEvent: z.preprocess(emptyToNull, z.string().refine(isConversionEvent, "Evento do pixel inválido").nullable().optional()),
   consentText: z.preprocess(emptyToNull, z.string().trim().max(500).nullable().optional()),
   bookingEnabled: z.boolean().optional(),
-  bookingLabel: z.preprocess(emptyToNull, z.string().trim().max(40).nullable().optional()),
+  // Agenda ao final (lib/lead-form-agenda.ts) — normalizada de novo ao ler, aqui só o formato
+  bookingConfig: z.object({
+    titulo: z.string().trim().max(80),
+    subtitulo: z.string().trim().max(120),
+    duracao: z.number().int().min(5).max(240),
+    horarios: z.array(z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Horário inválido (use HH:MM)")).min(1, "Informe pelo menos um horário da agenda").max(24),
+    dias: z.array(z.number().int().min(0).max(6)).min(1, "Escolha pelo menos um dia da semana na agenda").max(7),
+  }).optional(),
 };
 
 // Quiz em telas: sequência de etapas. As perguntas são validadas de novo por questionsSchema

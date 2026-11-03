@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Check, Copy, ImagePlus, X, Palette, Gift, MessageCircle, ShieldCheck, Tags, BarChart3, Link2, Target, CalendarCheck } from "lucide-react";
 import type { FormStats } from "@/lib/lead-form-stats";
 import { DEFAULT_ACCENT, CONVERSION_EVENTS, buildPixelSnippet } from "@/lib/lead-form-shared";
+import { AGENDA_DURACOES, type AgendaFormulario } from "@/lib/lead-form-agenda";
 
 // Seções extras do editor de formulário (aparência, entrega da isca, plano B no WhatsApp,
 // consentimento, organização no CRM, links de rastreio e desempenho) — separadas de
@@ -22,7 +23,7 @@ export type FormExtras = {
   etiquetaId: string | null;
   pipelineStageId: string | null;
   bookingEnabled: boolean;
-  bookingLabel: string;
+  booking: AgendaFormulario;
 };
 
 export type CrmFormOptions = {
@@ -72,10 +73,9 @@ function Box({ icon, title, hint, children }: { icon: React.ReactNode; title: st
 }
 
 export function ExtrasPanel({
-  value, onChange, isCrm, crmOptions, onError, pixelId, agendaAtiva = null,
+  value, onChange, isCrm, crmOptions, onError, pixelId, temAgente = true,
 }: {
-  // Agenda online do agente do formulário: true = ativa; false = desligada; null = sem agente
-  agendaAtiva?: boolean | null;
+  temAgente?: boolean; // formulário ligado a um agente (a reunião é marcada na agenda dele)
   value: FormExtras;
   onChange: (patch: Partial<FormExtras>) => void;
   isCrm: boolean;
@@ -160,28 +160,18 @@ export function ExtrasPanel({
 
       <Box
         icon={<CalendarCheck size={12} />} title="Agendamento ao final"
-        hint="Botão na tela final que leva o lead direto pra agenda online, com nome e WhatsApp já preenchidos. Ele escolhe o serviço, o dia e o horário e confirma na hora."
+        hint="Na tela final, o lead escolhe o dia e o horário ali mesmo (calendário) e confirma — sem sair do formulário. A reunião entra na agenda do agente e o lead recebe a confirmação no WhatsApp."
       >
         <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
           <input type="checkbox" checked={value.bookingEnabled} onChange={e => onChange({ bookingEnabled: e.target.checked })} className="accent-blue-600 w-4 h-4" />
           Oferecer agendamento quando o lead terminar
         </label>
-        {value.bookingEnabled && (
-          <>
-            <div>
-              <label className="text-xs text-gray-500">Texto do botão</label>
-              <input value={value.bookingLabel} onChange={e => onChange({ bookingLabel: e.target.value })} maxLength={40} placeholder="Agendar meu horário" className={inputCls} />
-            </div>
-            {agendaAtiva === false && (
-              <p className="text-xs text-yellow-400">A agenda online deste agente está desligada — o botão só aparece para o lead depois que ela for ativada em Agendamentos.</p>
-            )}
-            {agendaAtiva === null && (
-              <p className="text-xs text-yellow-400">Escolha o agente do formulário — o agendamento usa a agenda online dele.</p>
-            )}
-            {value.conversionUrl.trim() && (
-              <p className="text-xs text-yellow-400">Com a página de conversão preenchida, o lead é levado para ela automaticamente ao terminar e pode não ver o botão de agendamento.</p>
-            )}
-          </>
+        {value.bookingEnabled && <AgendaEditor agenda={value.booking} onChange={booking => onChange({ booking })} />}
+        {value.bookingEnabled && !temAgente && (
+          <p className="text-xs text-yellow-400">Escolha o agente do formulário — a reunião é marcada na agenda dele.</p>
+        )}
+        {value.bookingEnabled && value.conversionUrl.trim() && (
+          <p className="text-xs text-yellow-400">Com a página de conversão preenchida, o lead só é levado para ela depois de agendar (ou de tocar em &quot;Prefiro não agendar agora&quot;).</p>
         )}
       </Box>
 
@@ -490,6 +480,78 @@ export function StatsPanel({ stats, exportHref }: { stats: FormStats; exportHref
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// Configuração da agenda do agendamento ao final: textos da etapa, duração, horários e dias
+const DIAS_CURTOS = ["D", "S", "T", "Q", "Q", "S", "S"];
+const DIAS_NOMES = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
+
+function AgendaEditor({ agenda, onChange }: { agenda: AgendaFormulario; onChange: (a: AgendaFormulario) => void }) {
+  const [novo, setNovo] = useState("");
+  const set = (patch: Partial<AgendaFormulario>) => onChange({ ...agenda, ...patch });
+  function adicionarHorario() {
+    if (!novo || agenda.horarios.includes(novo)) return;
+    set({ horarios: [...agenda.horarios, novo].sort() });
+    setNovo("");
+  }
+  function alternarDia(d: number) {
+    const dias = agenda.dias.includes(d) ? agenda.dias.filter(x => x !== d) : [...agenda.dias, d].sort();
+    if (dias.length) set({ dias });
+  }
+  return (
+    <div className="space-y-3">
+      <div className="grid sm:grid-cols-2 gap-2">
+        <div>
+          <label className="text-xs text-gray-500">Título da etapa</label>
+          <input value={agenda.titulo} onChange={e => set({ titulo: e.target.value })} maxLength={80} placeholder="Escolha o melhor horário" className={inputCls} />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500">Subtítulo</label>
+          <input value={agenda.subtitulo} onChange={e => set({ subtitulo: e.target.value })} maxLength={120} placeholder="Sua reunião gratuita" className={inputCls} />
+        </div>
+      </div>
+      <div className="grid sm:grid-cols-[140px_1fr] gap-2">
+        <div>
+          <label className="text-xs text-gray-500">Duração</label>
+          <select value={agenda.duracao} onChange={e => set({ duracao: Number(e.target.value) })} className={inputCls}>
+            {AGENDA_DURACOES.map(d => <option key={d} value={d}>{d} min</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs text-gray-500">Dias da semana</label>
+          <div className="mt-1 flex gap-1.5">
+            {DIAS_CURTOS.map((d, i) => {
+              const on = agenda.dias.includes(i);
+              return (
+                <button
+                  key={i} type="button" onClick={() => alternarDia(i)} title={DIAS_NOMES[i]} aria-label={DIAS_NOMES[i]} aria-pressed={on}
+                  className={`w-9 h-9 rounded-lg text-sm font-medium border ${on ? "border-blue-600 bg-blue-600/15 text-blue-300" : "border-gray-800 text-gray-500 hover:text-gray-300"}`}
+                >
+                  {d}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+      <div>
+        <label className="text-xs text-gray-500">Horários oferecidos</label>
+        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+          {agenda.horarios.map(h => (
+            <span key={h} className="inline-flex items-center gap-1 rounded-lg border border-gray-800 bg-gray-950 px-2.5 py-1 text-sm font-mono">
+              {h}
+              {agenda.horarios.length > 1 && (
+                <button type="button" onClick={() => set({ horarios: agenda.horarios.filter(x => x !== h) })} aria-label={`Remover ${h}`} className="text-gray-500 hover:text-red-400"><X size={12} /></button>
+              )}
+            </span>
+          ))}
+          <input type="time" value={novo} onChange={e => setNovo(e.target.value)} className="bg-gray-950 border border-gray-800 rounded-lg px-2 py-1 text-sm" />
+          <button type="button" onClick={adicionarHorario} disabled={!novo} className="text-xs px-3 py-1.5 rounded-lg border border-gray-700 text-gray-300 hover:border-blue-600 disabled:opacity-40">Adicionar</button>
+        </div>
+        <p className="mt-1.5 text-xs text-gray-500">Horários já ocupados na agenda do agente não aparecem para o lead. Mostramos os próximos 30 dias.</p>
+      </div>
     </div>
   );
 }

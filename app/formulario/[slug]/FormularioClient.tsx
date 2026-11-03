@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { ArrowUp, CalendarCheck, Check, ExternalLink, MessageCircle } from "lucide-react";
 import { trackPixel, readUtm, registerVisit, MetaPixel } from "./form-runtime";
-import { buildWaLink, withTrackingParams, linkAgendamento, DEFAULT_ACCENT, type LeadFormQuestion, type LeadFormUtm } from "@/lib/lead-form-shared";
+import { AgendaInline } from "./AgendaInline";
+import { buildWaLink, withTrackingParams, DEFAULT_ACCENT, type LeadFormQuestion, type LeadFormUtm } from "@/lib/lead-form-shared";
 
 export type { LeadFormQuestion };
 
@@ -31,10 +32,10 @@ const DEFAULT_DONE =
 
 export function FormularioClient({
   slug, headline, questions, pixelId, avatarUrl, doneMessage, agentOwned, accentColor, coverUrl,
-  ctaLabel, ctaUrl, waNumber, waButtonText, consentText, conversionUrl, agendaHref = null, agendaLabel = null,
+  ctaLabel, ctaUrl, waNumber, waButtonText, consentText, conversionUrl, agenda = null,
 }: {
-  agendaHref?: string | null; // agenda online do agente (agendamento ao final) — null = desligado
-  agendaLabel?: string | null;
+  // Agendamento ao final (calendário na tela final) — null = desligado
+  agenda?: { titulo: string; subtitulo: string; empresa: string | null } | null;
   slug: string; headline: string; questions: LeadFormQuestion[]; pixelId: string | null; avatarUrl: string | null;
   doneMessage: string | null; agentOwned: boolean; accentColor: string | null; coverUrl: string | null;
   ctaLabel: string | null; ctaUrl: string | null; waNumber: string | null; waButtonText: string | null; consentText: string | null;
@@ -52,6 +53,10 @@ export function FormularioClient({
   const [inviteSent, setInviteSent] = useState<boolean | undefined>(undefined);
   // Nome e WhatsApp respondidos — vão preenchidos pro agendamento ao final
   const [lead, setLead] = useState<{ nome?: string; whatsapp?: string }>({});
+  const [agendado, setAgendado] = useState<string | null>(null); // "terça-feira, 04/11 às 14:00"
+  const [pulouAgenda, setPulouAgenda] = useState(false);
+  // O calendário aparece no fim até o lead agendar ou pular (precisa do WhatsApp já respondido)
+  const agendaPendente = Boolean(done && agenda && submissionId && lead.whatsapp && !agendado && !pulouAgenda);
   const [quiz, setQuiz] = useState<{ titulo: string; descricao: string; conversionUrl: string | null } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -84,12 +89,12 @@ export function FormularioClient({
   const destinoConversao = quiz?.conversionUrl || conversionUrl;
   const conversionHref = destinoConversao ? withTrackingParams(destinoConversao, typeof window === "undefined" ? "" : window.location.search) : null;
   useEffect(() => {
-    if (!done || !conversionHref) return;
+    if (!done || !conversionHref || agendaPendente) return;
     // Com pixel, uma folga curta pro CompleteRegistration sair antes de trocar de página (o navegador
     // pode cancelar a requisição em andamento); sem pixel não há o que esperar.
     const t = setTimeout(() => { window.location.href = conversionHref; }, pixelId ? 800 : 0);
     return () => clearTimeout(t);
-  }, [done, conversionHref, pixelId]);
+  }, [done, conversionHref, pixelId, agendaPendente]);
 
   const needsConsent = current?.type === "WHATSAPP" && Boolean(consentText);
 
@@ -301,7 +306,27 @@ export function FormularioClient({
               </p>
             </div>
 
-            {conversionHref && (
+            {agendaPendente && submissionId && agenda && (
+              <div className="pl-0 sm:pl-12">
+                <AgendaInline
+                  slug={slug} submissionId={submissionId} accent={accent}
+                  titulo={agenda.titulo} subtitulo={agenda.subtitulo} empresa={agenda.empresa}
+                  onAgendado={setAgendado} onPular={() => setPulouAgenda(true)}
+                />
+              </div>
+            )}
+
+            {agendado && (
+              <div className="sm:ml-12 rounded-2xl border border-green-200 bg-green-50 p-4 flex items-center gap-3">
+                <CalendarCheck size={22} className="text-green-600 flex-shrink-0" />
+                <div>
+                  <p className="font-semibold text-gray-900">Horário confirmado!</p>
+                  <p className="text-sm text-gray-700 first-letter:uppercase">{agendado} · confirmação enviada no seu WhatsApp</p>
+                </div>
+              </div>
+            )}
+
+            {conversionHref && !agendaPendente && (
               <div className="pl-12">
                 <a
                   href={conversionHref}
@@ -314,19 +339,7 @@ export function FormularioClient({
               </div>
             )}
 
-            {agendaHref && (
-              <div className="pl-12">
-                <a
-                  href={linkAgendamento(agendaHref, lead.nome, lead.whatsapp)}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-[15px] font-semibold text-white"
-                  style={{ backgroundColor: accent }}
-                >
-                  <CalendarCheck size={16} /> {agendaLabel || "Agendar meu horário"}
-                </a>
-              </div>
-            )}
-
-            {(ctaUrl || waLink) && (
+            {(ctaUrl || waLink) && !agendaPendente && (
               <div className="flex flex-col sm:flex-row gap-2 pl-12">
                 {ctaUrl && (
                   <a

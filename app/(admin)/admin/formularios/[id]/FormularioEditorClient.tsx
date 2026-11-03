@@ -64,9 +64,9 @@ export function FormularioEditorClient({
   id, initialSlug, initialTitle, initialHeadline, initialActive, initialPixelId, initialAvatarUrl,
   initialAgentConfigId, initialAgentLabel, initialInviteMessage, initialDoneMessage, initialFunnelSteps, initialQuestions, submissions,
   crmAgentId, whatsappOk = true, initialExtras, crmOptions, stats, initialQuizResults, initialStyle, initialSteps, asaasOk = false, initialCheckoutSandbox = false, sandboxDisponivel = false,
-  agendaAtiva = null,
+  temAgente = true,
 }: {
-  agendaAtiva?: boolean | null; // agenda online do agente do formulário (pro aviso do agendamento ao final)
+  temAgente?: boolean; // formulário ligado a um agente (o agendamento ao final usa a agenda dele)
   initialQuizResults: QuizResult[];
   initialStyle: FormStyle;
   asaasOk?: boolean; // agente do formulário com conta Asaas (pro aviso do checkout)
@@ -285,7 +285,7 @@ export function FormularioEditorClient({
           accentColor: extras.accentColor, coverUrl: extras.coverUrl, ctaLabel: extras.ctaLabel, ctaUrl: extras.ctaUrl,
           waNumber: extras.waNumber, waButtonText: extras.waButtonText, consentText: extras.consentText,
           conversionUrl: extras.conversionUrl, conversionEvent: extras.conversionEvent,
-          bookingEnabled: extras.bookingEnabled, bookingLabel: extras.bookingLabel,
+          bookingEnabled: extras.bookingEnabled, bookingConfig: extras.booking,
           funnelSteps: funnelRows.filter(r => r.mensagem.trim()).map(rowToStep),
         }),
       });
@@ -405,7 +405,7 @@ export function FormularioEditorClient({
           </p>
         </div>
 
-        <ExtrasPanel value={extras} onChange={updateExtras} isCrm={isCrm} crmOptions={crmOptions} onError={setError} pixelId={pixelId} agendaAtiva={agendaAtiva} />
+        <ExtrasPanel value={extras} onChange={updateExtras} isCrm={isCrm} crmOptions={crmOptions} onError={setError} pixelId={pixelId} temAgente={temAgente} />
 
         <TrackingLinks slug={slug} />
 
