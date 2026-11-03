@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Check, ExternalLink, MessageCircle } from "lucide-react";
+import { ArrowLeft, CalendarCheck, Check, ExternalLink, MessageCircle } from "lucide-react";
 import {
-  buildWaLink, withTrackingParams, buildOfertaHref, parseRich, DEFAULT_ACCENT,
+  buildWaLink, withTrackingParams, buildOfertaHref, parseRich, linkAgendamento, DEFAULT_ACCENT,
   type QuizStep, type LeadFormQuestion, type LeadFormUtm, type DestaqueCor,
 } from "@/lib/lead-form-shared";
 import { trackPixel, readUtm, registerVisit, MetaPixel } from "./form-runtime";
@@ -90,7 +90,10 @@ function Barra({ nome, pct, cor }: { nome: string; pct: number; cor: string }) {
 
 export function QuizTelasClient({
   slug, steps, pixelId, logoUrl, accentColor, doneMessage, ctaLabel, ctaUrl, waNumber, waButtonText, consentText, conversionUrl,
+  agendaHref = null, agendaLabel = null,
 }: {
+  agendaHref?: string | null; // agenda online do agente (agendamento ao final) — null = desligado
+  agendaLabel?: string | null;
   slug: string; steps: QuizStep[]; pixelId: string | null; logoUrl: string | null; accentColor: string | null;
   doneMessage: string; ctaLabel: string | null; ctaUrl: string | null; waNumber: string | null; waButtonText: string | null;
   consentText: string | null; conversionUrl: string | null;
@@ -480,6 +483,11 @@ export function QuizTelasClient({
                   : doneMessage}
             </p>
             <div className="flex flex-col gap-3">
+              {agendaHref && (
+                <a href={linkAgendamento(agendaHref, answers.nome ?? nome, leadTelefone)} className="flex items-center justify-center gap-2 rounded-xl py-4 text-lg font-semibold text-white" style={{ backgroundColor: accent }}>
+                  <CalendarCheck size={18} /> {agendaLabel || "Agendar meu horário"}
+                </a>
+              )}
               {conversionHref && (
                 <a href={conversionHref} className="flex items-center justify-center gap-2 rounded-xl py-4 text-lg font-semibold text-white" style={{ backgroundColor: accent }}>
                   Continuar <ExternalLink size={16} />

@@ -63,6 +63,19 @@ export function AgendarClient({ agentId, businessName, whatsappNumber, logo, ser
   const [pixCopiado, setPixCopiado] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Vindo de um formulário/quiz (agendamento ao final): nome e WhatsApp chegam na URL e já
+  // preenchem os campos — lido no navegador pra página continuar em cache (revalidate)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const p = new URLSearchParams(window.location.search);
+      const n = p.get("nome")?.trim().slice(0, 80);
+      const w = p.get("whatsapp")?.replace(/\D/g, "").slice(0, 13);
+      if (n) setNome(atual => atual || n);
+      if (w) setWhatsapp(atual => atual || w);
+    }, 0);
+    return () => clearTimeout(t);
+  }, []);
+
   const carregarSlots = useCallback(async () => {
     setLoadingSlots(true);
     setDays(null);

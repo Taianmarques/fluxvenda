@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { ArrowUp, Check, ExternalLink, MessageCircle } from "lucide-react";
+import { ArrowUp, CalendarCheck, Check, ExternalLink, MessageCircle } from "lucide-react";
 import { trackPixel, readUtm, registerVisit, MetaPixel } from "./form-runtime";
-import { buildWaLink, withTrackingParams, DEFAULT_ACCENT, type LeadFormQuestion, type LeadFormUtm } from "@/lib/lead-form-shared";
+import { buildWaLink, withTrackingParams, linkAgendamento, DEFAULT_ACCENT, type LeadFormQuestion, type LeadFormUtm } from "@/lib/lead-form-shared";
 
 export type { LeadFormQuestion };
 
@@ -31,8 +31,10 @@ const DEFAULT_DONE =
 
 export function FormularioClient({
   slug, headline, questions, pixelId, avatarUrl, doneMessage, agentOwned, accentColor, coverUrl,
-  ctaLabel, ctaUrl, waNumber, waButtonText, consentText, conversionUrl,
+  ctaLabel, ctaUrl, waNumber, waButtonText, consentText, conversionUrl, agendaHref = null, agendaLabel = null,
 }: {
+  agendaHref?: string | null; // agenda online do agente (agendamento ao final) — null = desligado
+  agendaLabel?: string | null;
   slug: string; headline: string; questions: LeadFormQuestion[]; pixelId: string | null; avatarUrl: string | null;
   doneMessage: string | null; agentOwned: boolean; accentColor: string | null; coverUrl: string | null;
   ctaLabel: string | null; ctaUrl: string | null; waNumber: string | null; waButtonText: string | null; consentText: string | null;
@@ -48,6 +50,8 @@ export function FormularioClient({
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
   const [inviteSent, setInviteSent] = useState<boolean | undefined>(undefined);
+  // Nome e WhatsApp respondidos — vão preenchidos pro agendamento ao final
+  const [lead, setLead] = useState<{ nome?: string; whatsapp?: string }>({});
   const [quiz, setQuiz] = useState<{ titulo: string; descricao: string; conversionUrl: string | null } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -121,6 +125,8 @@ export function FormularioClient({
         return;
       }
       if (typeof data.submissionId === "string") setSubmissionId(data.submissionId);
+      if (current.key === "nome") setLead(l => ({ ...l, nome: answer }));
+      if (current.type === "WHATSAPP") setLead(l => ({ ...l, whatsapp: answer }));
       nextMessage = typeof data.nextMessage === "string" ? data.nextMessage : null;
       if (typeof data.inviteSent === "boolean") sent = data.inviteSent;
       if (data.quiz && typeof data.quiz === "object") setQuiz(data.quiz as { titulo: string; descricao: string; conversionUrl: string | null });
@@ -305,6 +311,18 @@ export function FormularioClient({
                   Continuar <ExternalLink size={15} />
                 </a>
                 <p className="text-xs text-gray-400 mt-2">Te levando para a próxima página...</p>
+              </div>
+            )}
+
+            {agendaHref && (
+              <div className="pl-12">
+                <a
+                  href={linkAgendamento(agendaHref, lead.nome, lead.whatsapp)}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-[15px] font-semibold text-white"
+                  style={{ backgroundColor: accent }}
+                >
+                  <CalendarCheck size={16} /> {agendaLabel || "Agendar meu horário"}
+                </a>
               </div>
             )}
 

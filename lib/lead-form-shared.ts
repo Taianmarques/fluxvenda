@@ -259,6 +259,7 @@ export type LeadFormExtrasDb = {
   waNumber: string | null; waButtonText: string | null; consentText: string | null;
   conversionUrl: string | null; conversionEvent: string | null;
   etiquetaId: string | null; pipelineStageId: string | null;
+  bookingEnabled: boolean; bookingLabel: string | null;
 };
 
 export function formToExtras(f: LeadFormExtrasDb) {
@@ -274,6 +275,8 @@ export function formToExtras(f: LeadFormExtrasDb) {
     consentText: f.consentText ?? "",
     etiquetaId: f.etiquetaId,
     pipelineStageId: f.pipelineStageId,
+    bookingEnabled: f.bookingEnabled,
+    bookingLabel: f.bookingLabel ?? "",
   };
 }
 
@@ -327,4 +330,13 @@ fbq('track', 'PageView');
 fbq('track', '${event}');
 </script>
 <!-- End Meta Pixel -->`;
+}
+// Agendamento ao final do formulário: link da agenda online do agente com nome e WhatsApp do lead
+// (a página /agendar preenche os campos com eles)
+export function linkAgendamento(base: string, nome?: string | null, whatsapp?: string | null): string {
+  const p = new URLSearchParams();
+  if (nome?.trim()) p.set("nome", nome.trim());
+  if (whatsapp?.replace(/\D/g, "")) p.set("whatsapp", whatsapp.replace(/\D/g, ""));
+  const q = p.toString();
+  return q ? `${base}?${q}` : base;
 }

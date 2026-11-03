@@ -56,6 +56,8 @@ export const extrasShape = {
   conversionUrl: z.preprocess(emptyToNull, z.string().trim().max(500).refine(isHttpUrl, "A página de conversão precisa começar com http:// ou https://").nullable().optional()),
   conversionEvent: z.preprocess(emptyToNull, z.string().refine(isConversionEvent, "Evento do pixel inválido").nullable().optional()),
   consentText: z.preprocess(emptyToNull, z.string().trim().max(500).nullable().optional()),
+  bookingEnabled: z.boolean().optional(),
+  bookingLabel: z.preprocess(emptyToNull, z.string().trim().max(40).nullable().optional()),
 };
 
 // Quiz em telas: sequência de etapas. As perguntas são validadas de novo por questionsSchema

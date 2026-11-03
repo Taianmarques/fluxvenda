@@ -51,6 +51,7 @@ export default async function FormularioEditorPage({ params }: { params: Promise
         crmAgentId={result.config.id}
         whatsappOk={Boolean(result.config.uazapiToken)}
         asaasOk={Boolean(result.config.asaasApiKey)}
+        agendaAtiva={result.config.schedulingEnabled}
         initialSlug={form.slug}
         initialTitle={form.title}
         initialHeadline={form.headline}

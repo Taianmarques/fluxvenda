@@ -12,7 +12,7 @@ export default async function AdminFormularioEditorPage({ params }: { params: Pr
     where: { id },
     include: {
       submissions: { orderBy: { createdAt: "desc" }, take: 200 },
-      agentConfig: { select: { id: true, nome: true, team: { select: { name: true } } } },
+      agentConfig: { select: { id: true, nome: true, schedulingEnabled: true, team: { select: { name: true } } } },
     },
   });
   if (!form) notFound();
@@ -32,6 +32,7 @@ export default async function AdminFormularioEditorPage({ params }: { params: Pr
       initialInviteMessage={form.inviteMessage ?? ""}
       initialDoneMessage={form.doneMessage ?? ""}
       initialExtras={formToExtras(form)}
+      agendaAtiva={form.agentConfig ? form.agentConfig.schedulingEnabled : null}
       stats={stats}
       initialFunnelSteps={normalizeFormFunnelSteps(form.funnelSteps)}
       initialQuestions={form.questions as LeadFormQuestion[]}

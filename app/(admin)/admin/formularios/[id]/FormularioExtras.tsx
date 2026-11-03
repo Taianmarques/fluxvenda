@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, ImagePlus, X, Palette, Gift, MessageCircle, ShieldCheck, Tags, BarChart3, Link2, Target } from "lucide-react";
+import { Check, Copy, ImagePlus, X, Palette, Gift, MessageCircle, ShieldCheck, Tags, BarChart3, Link2, Target, CalendarCheck } from "lucide-react";
 import type { FormStats } from "@/lib/lead-form-stats";
 import { DEFAULT_ACCENT, CONVERSION_EVENTS, buildPixelSnippet } from "@/lib/lead-form-shared";
 
@@ -21,6 +21,8 @@ export type FormExtras = {
   consentText: string;
   etiquetaId: string | null;
   pipelineStageId: string | null;
+  bookingEnabled: boolean;
+  bookingLabel: string;
 };
 
 export type CrmFormOptions = {
@@ -70,8 +72,10 @@ function Box({ icon, title, hint, children }: { icon: React.ReactNode; title: st
 }
 
 export function ExtrasPanel({
-  value, onChange, isCrm, crmOptions, onError, pixelId,
+  value, onChange, isCrm, crmOptions, onError, pixelId, agendaAtiva = null,
 }: {
+  // Agenda online do agente do formulário: true = ativa; false = desligada; null = sem agente
+  agendaAtiva?: boolean | null;
   value: FormExtras;
   onChange: (patch: Partial<FormExtras>) => void;
   isCrm: boolean;
@@ -152,6 +156,33 @@ export function ExtrasPanel({
             <input value={value.ctaUrl} onChange={e => onChange({ ctaUrl: e.target.value })} maxLength={500} placeholder="https://..." className={`${inputCls} font-mono`} />
           </div>
         </div>
+      </Box>
+
+      <Box
+        icon={<CalendarCheck size={12} />} title="Agendamento ao final"
+        hint="Botão na tela final que leva o lead direto pra agenda online, com nome e WhatsApp já preenchidos. Ele escolhe o serviço, o dia e o horário e confirma na hora."
+      >
+        <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+          <input type="checkbox" checked={value.bookingEnabled} onChange={e => onChange({ bookingEnabled: e.target.checked })} className="accent-blue-600 w-4 h-4" />
+          Oferecer agendamento quando o lead terminar
+        </label>
+        {value.bookingEnabled && (
+          <>
+            <div>
+              <label className="text-xs text-gray-500">Texto do botão</label>
+              <input value={value.bookingLabel} onChange={e => onChange({ bookingLabel: e.target.value })} maxLength={40} placeholder="Agendar meu horário" className={inputCls} />
+            </div>
+            {agendaAtiva === false && (
+              <p className="text-xs text-yellow-400">A agenda online deste agente está desligada — o botão só aparece para o lead depois que ela for ativada em Agendamentos.</p>
+            )}
+            {agendaAtiva === null && (
+              <p className="text-xs text-yellow-400">Escolha o agente do formulário — o agendamento usa a agenda online dele.</p>
+            )}
+            {value.conversionUrl.trim() && (
+              <p className="text-xs text-yellow-400">Com a página de conversão preenchida, o lead é levado para ela automaticamente ao terminar e pode não ver o botão de agendamento.</p>
+            )}
+          </>
+        )}
       </Box>
 
       <Box

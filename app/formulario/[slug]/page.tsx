@@ -14,10 +14,17 @@ export default async function FormularioPublicoPage({ params }: { params: Promis
     select: {
       headline: true, questions: true, pixelId: true, avatarUrl: true, active: true, agentOwned: true, doneMessage: true,
       accentColor: true, coverUrl: true, ctaLabel: true, ctaUrl: true, waNumber: true, waButtonText: true, consentText: true,
-      conversionUrl: true, style: true, steps: true,
+      conversionUrl: true, style: true, steps: true, bookingEnabled: true, bookingLabel: true,
+      agentConfig: { select: { id: true, storeSlug: true, schedulingEnabled: true } },
     },
   });
   if (!form || !form.active) notFound();
+
+  // Agendamento ao final: só com a agenda online do agente ativa (senão o botão levaria a uma página "indisponível")
+  const agendaHref = form.bookingEnabled && form.agentConfig?.schedulingEnabled
+    ? `/agendar/${form.agentConfig.storeSlug || form.agentConfig.id}`
+    : null;
+  const agendaLabel = form.bookingLabel?.trim() || null;
 
   const steps = normalizeSteps(form.steps);
   if (form.style === "TELAS" && steps.length > 0) {
@@ -35,6 +42,8 @@ export default async function FormularioPublicoPage({ params }: { params: Promis
         waButtonText={form.waButtonText}
         consentText={form.consentText?.trim() || null}
         conversionUrl={form.conversionUrl}
+        agendaHref={agendaHref}
+        agendaLabel={agendaLabel}
       />
     );
   }
@@ -56,6 +65,8 @@ export default async function FormularioPublicoPage({ params }: { params: Promis
       waButtonText={form.waButtonText}
       consentText={form.consentText?.trim() || null}
       conversionUrl={form.conversionUrl}
+      agendaHref={agendaHref}
+      agendaLabel={agendaLabel}
     />
   );
 }
