@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Check, Copy, ImagePlus, X, Palette, Gift, MessageCircle, ShieldCheck, Tags, BarChart3, Link2, Target, CalendarCheck } from "lucide-react";
 import type { FormStats } from "@/lib/lead-form-stats";
 import { DEFAULT_ACCENT, CONVERSION_EVENTS, buildPixelSnippet } from "@/lib/lead-form-shared";
-import { AGENDA_DURACOES, type AgendaFormulario } from "@/lib/lead-form-agenda";
+import { AGENDA_DURACOES, MENSAGEM_CONFIRMACAO_PADRAO, montarConfirmacao, type AgendaFormulario } from "@/lib/lead-form-agenda";
 
 // Seções extras do editor de formulário (aparência, entrega da isca, plano B no WhatsApp,
 // consentimento, organização no CRM, links de rastreio e desempenho) — separadas de
@@ -551,6 +551,35 @@ function AgendaEditor({ agenda, onChange }: { agenda: AgendaFormulario; onChange
           <button type="button" onClick={adicionarHorario} disabled={!novo} className="text-xs px-3 py-1.5 rounded-lg border border-gray-700 text-gray-300 hover:border-blue-600 disabled:opacity-40">Adicionar</button>
         </div>
         <p className="mt-1.5 text-xs text-gray-500">Horários já ocupados na agenda do agente não aparecem para o lead. Mostramos os próximos 30 dias.</p>
+      </div>
+      <div>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <label htmlFor="agenda-mensagem" className="text-xs text-gray-500">Mensagem de confirmação (WhatsApp)</label>
+          <div className="flex flex-wrap gap-1">
+            {(["nome", "data", "empresa"] as const).map(v => (
+              <button
+                key={v} type="button" title={`Inserir {{${v}}}`}
+                onClick={() => set({ mensagem: `${agenda.mensagem}{{${v}}}` })}
+                className="text-[11px] font-mono px-2 py-0.5 rounded border border-gray-700 text-gray-400 hover:border-blue-600 hover:text-blue-300"
+              >
+                {`{{${v}}}`}
+              </button>
+            ))}
+            {agenda.mensagem !== MENSAGEM_CONFIRMACAO_PADRAO && (
+              <button type="button" onClick={() => set({ mensagem: MENSAGEM_CONFIRMACAO_PADRAO })} className="text-[11px] px-2 py-0.5 text-gray-500 hover:text-gray-300">Restaurar padrão</button>
+            )}
+          </div>
+        </div>
+        <textarea
+          id="agenda-mensagem" rows={5} maxLength={1000} value={agenda.mensagem}
+          onChange={e => set({ mensagem: e.target.value })}
+          className={`${inputCls} resize-y`}
+        />
+        <p className="mt-1 text-xs text-gray-500">{"{{nome}}"} = primeiro nome do lead · {"{{data}}"} = dia e horário escolhidos · {"{{empresa}}"} = nome da empresa</p>
+        <div className="mt-2 rounded-xl border border-gray-800 bg-gray-950 p-3">
+          <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">Prévia</p>
+          <p className="text-sm text-gray-300 whitespace-pre-line">{montarConfirmacao(agenda.mensagem || MENSAGEM_CONFIRMACAO_PADRAO, { nome: "Maria", data: "quarta-feira, 04/11 às 14:00", empresa: "Sua empresa" })}</p>
+        </div>
       </div>
     </div>
   );

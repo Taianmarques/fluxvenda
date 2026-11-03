@@ -64,6 +64,7 @@ export const extrasShape = {
     duracao: z.number().int().min(5).max(240),
     horarios: z.array(z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Horário inválido (use HH:MM)")).min(1, "Informe pelo menos um horário da agenda").max(24),
     dias: z.array(z.number().int().min(0).max(6)).min(1, "Escolha pelo menos um dia da semana na agenda").max(7),
+    mensagem: z.string().trim().max(1000).optional(),
   }).optional(),
 };
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppTextAsTeam } from "@/lib/whatsapp";
-import { AGENDA_JANELA_DIAS, descreverHorario, horarioDisponivel, horariosLivres, normalizarAgenda } from "@/lib/lead-form-agenda";
+import { AGENDA_JANELA_DIAS, descreverHorario, horarioDisponivel, horariosLivres, montarConfirmacao, normalizarAgenda } from "@/lib/lead-form-agenda";
 
 // Agendamento ao final do formulário/quiz (público). GET lista os horários livres; POST marca a
 // reunião pra resposta (submission) que já tem WhatsApp — uma por resposta. A reunião vira um
@@ -84,9 +84,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   const quando = descreverHorario(inicio);
   const token = form.agentConfig?.uazapiToken;
   if (token) {
-    const primeiro = (submission.nome ?? "").trim().split(/\s+/)[0];
-    const empresa = form.agentConfig?.team?.name;
-    const texto = `${primeiro ? `Oi, ${primeiro}! ` : ""}Seu horário está confirmado ✅\n\n📅 ${quando}${empresa ? `\n📍 ${empresa}` : ""}\n\nSe precisar remarcar, é só responder esta mensagem.`;
+    // Mensagem do formulário (configurável no editor) com nome, data e empresa preenchidos
+    const texto = montarConfirmacao(agenda.mensagem, {
+      nome: (submission.nome ?? "").trim().split(/\s+/)[0] ?? "",
+      data: quando,
+      empresa: form.agentConfig?.team?.name ?? "",
+    });
     sendWhatsAppTextAsTeam(token, submission.whatsapp, texto).catch(err => console.error("[formulario/agenda] confirmação no WhatsApp", form.id, err));
   }
   return NextResponse.json({ ok: true, quando });

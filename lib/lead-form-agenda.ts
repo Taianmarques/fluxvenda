@@ -10,7 +10,11 @@ export type AgendaFormulario = {
   duracao: number;   // minutos
   horarios: string[]; // "HH:MM", em ordem
   dias: number[];    // dias da semana (0 = domingo … 6 = sábado)
+  mensagem: string;  // confirmação no WhatsApp — {{nome}}, {{data}} e {{empresa}} (ver montarConfirmacao)
 };
+
+export const MENSAGEM_CONFIRMACAO_PADRAO =
+  "Oi, {{nome}}! Seu horário está confirmado ✅\n\n📅 {{data}}\n📍 {{empresa}}\n\nSe precisar remarcar, é só responder esta mensagem.";
 
 export const AGENDA_PADRAO: AgendaFormulario = {
   titulo: "Escolha o melhor horário",
@@ -18,6 +22,7 @@ export const AGENDA_PADRAO: AgendaFormulario = {
   duracao: 30,
   horarios: ["09:00", "11:00", "14:00", "16:00"],
   dias: [1, 2, 3, 4, 5],
+  mensagem: MENSAGEM_CONFIRMACAO_PADRAO,
 };
 
 export const AGENDA_DURACOES = [15, 20, 30, 40, 45, 60, 90];
@@ -36,6 +41,7 @@ export function normalizarAgenda(v: unknown): AgendaFormulario {
     duracao: typeof o.duracao === "number" && AGENDA_DURACOES.includes(o.duracao) ? o.duracao : AGENDA_PADRAO.duracao,
     horarios: horarios.length ? horarios : AGENDA_PADRAO.horarios,
     dias: dias.length ? dias : AGENDA_PADRAO.dias,
+    mensagem: typeof o.mensagem === "string" && o.mensagem.trim() ? o.mensagem.trim().slice(0, 1000) : MENSAGEM_CONFIRMACAO_PADRAO,
   };
 }
 
@@ -79,4 +85,23 @@ export function horarioDisponivel(agenda: AgendaFormulario, ocupados: Ocupado[],
 
 export function descreverHorario(inicio: Date) {
   return `${DIAS_SEMANA[inicio.getDay()]}, ${pad(inicio.getDate())}/${pad(inicio.getMonth() + 1)} às ${pad(inicio.getHours())}:${pad(inicio.getMinutes())}`;
+}
+
+// Mensagem de confirmação com as variáveis preenchidas. Variável sem valor some junto com a linha
+// em que estava sozinha (ex: "📍 {{empresa}}" sem empresa) pra não sobrar texto pela metade.
+export function montarConfirmacao(modelo: string, v: { nome: string; data: string; empresa: string }) {
+  const VARIAVEL = /{{\s*(nome|data|empresa)\s*}}/g;
+  return modelo
+    .split("\n")
+    .map(linha => {
+      const temVazia = [...linha.matchAll(VARIAVEL)].some(m => !v[m[1] as keyof typeof v].trim());
+      const preenchida = linha.replace(VARIAVEL, (_, k: keyof typeof v) => v[k].trim());
+      // Linha que era só emoji/pontuação + variável vazia → sai; "Oi, !" (nome vazio) → "Oi!"
+      if (temVazia && !/[\p{L}\p{N}]/u.test(preenchida)) return null;
+      return preenchida.replace(/\s*,\s*([!?.])/g, "$1");
+    })
+    .filter((l): l is string => l !== null)
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
