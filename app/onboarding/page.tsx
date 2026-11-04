@@ -1,5 +1,11 @@
 import { OnboardingFlow } from "./OnboardingFlow";
+import { PixelCadastro } from "@/app/PixelCadastro";
 
 export default function OnboardingPage() {
-  return <OnboardingFlow variant="generic" />;
+  return (
+    <>
+      <PixelCadastro />
+      <OnboardingFlow variant="generic" />
+    </>
+  );
 }

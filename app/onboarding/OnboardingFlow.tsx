@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SEGMENTS, SUBSEGMENTS } from "@/lib/segments";
 import { AuthLogo } from "@/app/AuthLogo";
+import { trackPixel } from "@/app/formulario/[slug]/form-runtime";
 
 const TEAM_SIZES = ["1-5", "6-15", "16-50", "51-200", "200+"];
 const PAGE_BG = "min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 text-gray-900";
@@ -116,6 +117,12 @@ function OnboardingForm({ variant, teamName, memberDestino, memberRole }: { vari
       }
 
       await res.json();
+
+      // Gestor que contratou o CRM começa os 7 dias grátis aqui — conversão das campanhas
+      // do cadastro (pixel injetado por PixelCadastro; sem pixel, trackPixel não faz nada)
+      if (role === "GESTOR" && products.has("CRM")) {
+        trackPixel("StartTrial", { currency: "BRL", value: 0, content_name: "CRM" });
+      }
 
       if (variant === "membro") {
         // Convidado: já é membro da equipe — cai direto no produto dela (CRM ou dashboard)

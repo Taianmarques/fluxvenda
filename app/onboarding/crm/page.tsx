@@ -1,5 +1,11 @@
 import { OnboardingFlow } from "../OnboardingFlow";
+import { PixelCadastro } from "@/app/PixelCadastro";
 
 export default function OnboardingCrmPage() {
-  return <OnboardingFlow variant="crm" />;
+  return (
+    <>
+      <PixelCadastro />
+      <OnboardingFlow variant="crm" />
+    </>
+  );
 }

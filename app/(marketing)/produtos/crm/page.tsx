@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { PixelCadastro } from "@/app/PixelCadastro";
 
 export default function CrmLandingPage() {
   return (
     <main className="min-h-screen bg-gray-950 text-white flex flex-col">
+      <PixelCadastro />
       {/* Hero */}
       <section className="flex-1 flex flex-col items-center justify-center px-4 py-24 text-center">
         <div className="max-w-3xl mx-auto space-y-6">
