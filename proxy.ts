@@ -32,7 +32,6 @@ const PUBLIC_ROUTES: RegExp[] = [
   /^\/api\/branding\/icon(\/.*)?$/, // ícones do manifest do PWA — busca sem sessão
   /^\/comprar(\/.*)?$/,            // checkout dos infoprodutos — comprador ainda pode não ter conta
   /^\/api\/comprar(\/.*)?$/,       // cria a cobrança e consulta o status (total sempre calculado no servidor)
-  /^\/api\/mcp(\/.*)?$/,           // conector do Claude — token OAuth; as rotas de sessão checam o cookie
   /^\/\.well-known\/oauth-/,       // descoberta do OAuth do conector do Claude
 ];
 
@@ -62,7 +61,9 @@ export default async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
-    "/(api|trpc)(.*)",
+    // /api/mcp fica de fora: tem autenticação própria, e o proxy cortaria corpos acima de 10 MB
+    "/((?!_next|api/mcp|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    "/api/((?!mcp(?:/|$)).*)",
+    "/trpc(.*)",
   ],
 };
