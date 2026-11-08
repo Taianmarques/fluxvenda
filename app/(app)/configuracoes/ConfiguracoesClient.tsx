@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Building2, Check, KeyRound, Loader2, Settings, UserRound } from "lucide-react";
+import { ConexoesClaude, type ConexaoClaude } from "./ConexoesClaude";
 
 const inputCls = "w-full bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 disabled:bg-slate-50 disabled:text-slate-500";
 const cartao = "rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)]";
@@ -14,7 +15,7 @@ function Status({ erro, ok, textoOk }: { erro: string | null; ok: boolean; texto
   return null;
 }
 
-export function ConfiguracoesClient({ nome, email, telefone, temSenha }: { nome: string; email: string; telefone: string; temSenha: boolean }) {
+export function ConfiguracoesClient({ nome, email, telefone, temSenha, urlConector, conexoes }: { nome: string; email: string; telefone: string; temSenha: boolean; urlConector: string; conexoes: ConexaoClaude[] }) {
   const router = useRouter();
 
   const [novoNome, setNovoNome] = useState(nome);
@@ -122,6 +123,8 @@ export function ConfiguracoesClient({ nome, email, telefone, temSenha }: { nome:
             <Status erro={erroSenha} ok={okSenha} textoOk="Senha salva." />
           </div>
         </form>
+
+        <ConexoesClaude url={urlConector} conexoes={conexoes} cartao={cartao} />
 
         <Link href="/biblioteca/meu-negocio" className={`${cartao} flex items-center gap-4 hover:border-slate-300`}>
           <span className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0"><Building2 size={20} /></span>

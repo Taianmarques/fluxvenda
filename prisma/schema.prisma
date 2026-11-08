@@ -16,6 +16,8 @@ model Profile {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  mcpTokens McpToken[] // conexões com o Claude (lib/mcp)
+
   email     String   @unique
   name      String
   avatarUrl String?
@@ -2556,4 +2558,62 @@ model PerfilEmpresa {
   concorrentes String @default("")
   objetivos    String @default("") // objetivos comerciais (ex: fechar 10 contratos de frota até dezembro)
   observacoes  String @default("")
+}
+
+// ===================================
+// CONECTOR DO CLAUDE (servidor MCP em /api/mcp, ver lib/mcp/)
+// ===================================
+
+// Cliente OAuth registrado automaticamente pelo Claude a cada nova conexão
+model McpClient {
+  id           String   @id @default(cuid())
+  createdAt    DateTime @default(now())
+  nome         String   @default("Claude")
+  redirectUris String[]
+
+  tokens McpToken[]
+}
+
+// Código de autorização de uso único (vale 5 minutos) — só o hash fica no banco
+model McpAuthCode {
+  codeHash      String   @id
+  createdAt     DateTime @default(now())
+  expiresAt     DateTime
+  clientId      String
+  profileId     String
+  redirectUri   String
+  codeChallenge String
+}
+
+// Uma linha por conexão do usuário; refresh troca os dois tokens na mesma linha. Só hashes no banco.
+model McpToken {
+  id               String    @id @default(cuid())
+  createdAt        DateTime  @default(now())
+  clientId         String
+  client           McpClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  profileId        String
+  profile          Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  accessHash       String    @unique
+  accessExpiresAt  DateTime
+  refreshHash      String    @unique
+  refreshExpiresAt DateTime
+  lastUsedAt       DateTime?
+  revokedAt        DateTime?
+
+  @@index([profileId])
+}
+
+// Imagens, vídeos e outros arquivos que o superadmin cria pelo Claude e guarda na plataforma.
+// O arquivo fica no disco (MEDIA_DIR) como <id>.<ext> e é servido por /api/midia, com login.
+model BibliotecaMidia {
+  id        String   @id
+  createdAt DateTime @default(now())
+  profileId String
+  nome      String
+  descricao String   @default("")
+  mime      String
+  tamanho   Int
+  arquivo   String
+
+  @@index([createdAt])
 }
