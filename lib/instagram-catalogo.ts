@@ -42,7 +42,7 @@ function linhaItem(i: ItemCatalogo): string {
   return `- ${i.name}: ${textoPreco(i)}${detalhes.length ? ` (${detalhes.join(", ")})` : ""}`;
 }
 
-export function formatarCatalogoInstagram(itens: ItemCatalogo[], urlCatalogo: string, coletaWhatsapp: boolean): string {
+export function formatarCatalogoInstagram(itens: ItemCatalogo[], urlCatalogo: string): string {
   if (itens.length === 0) return "";
 
   const linhas: string[] = [];
@@ -54,9 +54,6 @@ export function formatarCatalogoInstagram(itens: ItemCatalogo[], urlCatalogo: st
     total += linha.length + 1;
   }
   const parcial = linhas.length < itens.length;
-  const foraDaLista = coletaWhatsapp
-    ? "peça o WhatsApp do cliente para a equipe confirmar a disponibilidade"
-    : "ofereça encaminhar para a equipe confirmar a disponibilidade";
 
   return `\n\nCATÁLOGO ATUAL DA EMPRESA (faz parte dos fatos da empresa; use estes dados quando perguntarem preço ou disponibilidade):
 ${linhas.join("\n")}${parcial ? "\n(lista parcial: o catálogo completo está no link abaixo)" : ""}
@@ -68,10 +65,10 @@ Como usar o catálogo:
 - Nunca invente item, preço ou característica que não esteja na lista.
 - Se o cliente disser só "esse" ou "desse" sem citar o modelo, pergunte qual modelo ele viu.
 - Se pedir fotos ou quiser ver as opções, envie o link do catálogo online puro, sem colchetes nem parênteses.
-- Se o item não estiver na lista, diga que ele não aparece no catálogo agora, sugira opções parecidas da lista e ${foraDaLista}.`;
+- Se o item não estiver na lista, diga que ele não aparece no catálogo agora, sugira opções parecidas da lista e ofereça encaminhar para a equipe confirmar a disponibilidade.`;
 }
 
-export async function buildCatalogoInstagramContext(config: { id: string; commerceEnabled: boolean; igColetaWhatsappEnabled: boolean }): Promise<string> {
+export async function buildCatalogoInstagramContext(config: { id: string; commerceEnabled: boolean }): Promise<string> {
   if (!config.commerceEnabled) return "";
 
   const itens = await prisma.product.findMany({
@@ -86,5 +83,5 @@ export async function buildCatalogoInstagramContext(config: { id: string; commer
   if (itens.length === 0) return "";
 
   const url = `${process.env.NEXT_PUBLIC_APP_URL}/loja/${await ensureStoreSlug(config.id)}`;
-  return formatarCatalogoInstagram(itens, url, config.igColetaWhatsappEnabled);
+  return formatarCatalogoInstagram(itens, url);
 }

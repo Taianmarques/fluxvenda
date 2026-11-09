@@ -11,15 +11,17 @@ import { extractBrazilianPhoneFromText } from "@/lib/phone-extract";
 import { buildConhecimentoContext, buildTreinoContext } from "@/lib/whatsapp-inbound";
 import { buildCatalogoInstagramContext } from "@/lib/instagram-catalogo";
 
-// Só entra no prompt quando o gestor ativa a coleta de WhatsApp — sem isso a IA não sabe que
-// esse comportamento existe e acaba recusando o número (ex: "não posso armazenar números").
-// O "nunca recuse" é sempre fixo (é a correção do bug); o "como/quando pedir" é configurável
-// pelo gestor — cai num texto padrão neutro quando ele não preenche nada.
+// Coleta de WhatsApp ligada: conseguir o número é o único objetivo da conversa no Instagram, e o
+// atendimento (preço, detalhes) acontece no WhatsApp. Vai por último no prompt para ter prioridade.
 function instrucaoColetaWhatsapp(config: { igColetaWhatsappEnabled: boolean; igColetaWhatsappInstrucoes: string }): string {
   if (!config.igColetaWhatsappEnabled) return "";
-  const comoPedir = config.igColetaWhatsappInstrucoes.trim()
-    || "Peça o número quando fizer sentido na conversa, com naturalidade — não precisa ser logo de cara.";
-  return `\n\nObjetivo de coleta de WhatsApp: seu objetivo é conseguir o número de WhatsApp do lead pra continuar o atendimento por lá. Como e quando pedir: ${comoPedir} Se o cliente mandar um número de telefone, mesmo sem você pedir, reaja com naturalidade confirmando que a equipe vai continuar o atendimento por WhatsApp em instantes — nunca diga que não pode 'salvar', 'armazenar' ou 'guardar' números, isso não se aplica aqui.`;
+  const orientacao = config.igColetaWhatsappInstrucoes.trim();
+  return `\n\nOBJETIVO ÚNICO DESTA CONVERSA (tem prioridade sobre todas as instruções acima): conseguir o número de WhatsApp do cliente para a equipe continuar o atendimento por lá.
+- Em toda resposta, peça o WhatsApp de forma curta e natural, até o cliente enviar o número.
+- Não passe preços, condições, financiamento, características ou disponibilidade, não sugira visita e não envie links. Se perguntarem, diga que no WhatsApp a equipe passa tudo na hora e peça o número.
+- Responda em no máximo 2 frases.${orientacao ? `\n- Forma de pedir, segundo a empresa: ${orientacao}` : ""}
+- Quando o cliente enviar o número, confirme que a equipe vai chamar no WhatsApp em instantes e não peça de novo. Se ele continuar falando depois disso, lembre que o atendimento segue por lá. Nunca diga que não pode salvar, armazenar ou guardar números.
+- Se o cliente recusar expressamente, não pressione: diga que, quando quiser, é só mandar o número.`;
 }
 
 // GET: verificação de webhook pela Meta (hub challenge)
@@ -348,7 +350,9 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
 
     const gancho = `Você está começando uma conversa pelo WhatsApp com uma pessoa que te procurou primeiro no Instagram Direct e passou esse número de WhatsApp lá. Veja o que ela disse até agora na conversa do Instagram:\n\n${historico}\n\nMande a primeira mensagem dessa conversa de WhatsApp retomando o assunto de onde ela parou, se apresentando e perguntando como pode ajudar — sem mencionar que isso é uma mensagem automática.`;
 
-    const handoffResult = await runAgent(config.systemPrompt! + emojiInstruction, [], gancho);
+    // Aqui o cliente já saiu da coleta: a primeira mensagem no WhatsApp pode responder o preço que ele pediu
+    const catalogoHandoff = await buildCatalogoInstagramContext(config);
+    const handoffResult = await runAgent(config.systemPrompt! + emojiInstruction + catalogoHandoff, [], gancho);
 
     // sendWhatsAppTextAsTeam nunca lança em erro de API (só loga e retorna null) — precisa
     // checar o retorno, senão a nota de "sucesso" e a mensagem de assistente ficam mentindo
@@ -396,9 +400,9 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
   // cadastra nessas telas não tinha nenhum efeito nas respostas via Instagram.
   const conhecimentoContext = await buildConhecimentoContext(config.id);
   const treinoContext = await buildTreinoContext(config, text);
-  const catalogoContext = await buildCatalogoInstagramContext(config);
+  const catalogoContext = config.igColetaWhatsappEnabled ? "" : await buildCatalogoInstagramContext(config);
 
-  const result = await runAgent(config.systemPrompt + emojiInstruction + igColetaInstruction + conhecimentoContext + catalogoContext + treinoContext, history, text);
+  const result = await runAgent(config.systemPrompt + emojiInstruction + conhecimentoContext + catalogoContext + treinoContext + igColetaInstruction, history, text);
 
   await prisma.message.create({ data: { conversationId: conversation.id, role: "assistant", content: result.reply } });
   emitChatEvent(config.id, conversation.id);
@@ -490,10 +494,10 @@ async function processComment(igBusinessAccountId: string, comment: {
 
     const conhecimentoContext = await buildConhecimentoContext(config.id);
     const treinoContext = await buildTreinoContext(config, text);
-    const catalogoContext = await buildCatalogoInstagramContext(config);
+    const catalogoContext = config.igColetaWhatsappEnabled ? "" : await buildCatalogoInstagramContext(config);
 
     const result = await runAgent(
-      config.systemPrompt + instrucaoColetaWhatsapp(config) + conhecimentoContext + catalogoContext + treinoContext,
+      config.systemPrompt + conhecimentoContext + catalogoContext + treinoContext + instrucaoColetaWhatsapp(config),
       [],
       `Alguém comentou no seu post: "${text}". Responda com uma mensagem direta e personalizada para continuar a conversa no privado.`
     );
