@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { AuthLogo } from "@/app/AuthLogo";
+import { CampoSenha } from "@/app/CampoSenha";
 
 export function RedefinirSenhaForm({ token, vendasIA = false }: { token: string; vendasIA?: boolean }) {
   const [password, setPassword] = useState("");
@@ -56,8 +57,7 @@ export function RedefinirSenhaForm({ token, vendasIA = false }: { token: string;
         <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-6 space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">Nova senha</label>
-            <input
-              type="password"
+            <CampoSenha
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}

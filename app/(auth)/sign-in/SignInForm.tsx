@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { AuthLogo } from "@/app/AuthLogo";
+import { CampoSenha } from "@/app/CampoSenha";
 
 // vendasIA: visual e marca do Vendas IA, sem os convites de teste grátis do CRM
 export function SignInForm({ redirectUrl, initialNotice, vendasIA = false }: { redirectUrl: string; initialNotice?: string; vendasIA?: boolean }) {
@@ -73,8 +74,7 @@ export function SignInForm({ redirectUrl, initialNotice, vendasIA = false }: { r
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">Senha</label>
-            <input
-              type="password"
+            <CampoSenha
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2 } from "lucide-react";
+import { CampoSenha } from "@/app/CampoSenha";
 
 function Card({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
@@ -215,7 +216,7 @@ export function PerfilClient({
             <input value={email} onChange={e => setEmail(e.target.value)} type="email" className={inputCls} />
           </Field>
           <Field label="Senha atual">
-            <input value={senhaParaEmail} onChange={e => setSenhaParaEmail(e.target.value)} type="password" placeholder="Confirme sua senha" className={inputCls} />
+            <CampoSenha value={senhaParaEmail} onChange={e => setSenhaParaEmail(e.target.value)} placeholder="Confirme sua senha" className={inputCls} />
           </Field>
           {erroEmail && <p className="text-xs text-red-400">{erroEmail}</p>}
           <SaveButton saving={savingEmail} saved={savedEmail} />
@@ -226,14 +227,14 @@ export function PerfilClient({
         <Card title="Senha" description={temSenha ? "Informe a senha atual pra definir uma nova." : "Sua conta ainda não tem senha — defina uma agora."}>
           {temSenha && (
             <Field label="Senha atual">
-              <input value={senhaAtual} onChange={e => setSenhaAtual(e.target.value)} type="password" className={inputCls} />
+              <CampoSenha value={senhaAtual} onChange={e => setSenhaAtual(e.target.value)} className={inputCls} />
             </Field>
           )}
           <Field label="Nova senha">
-            <input value={novaSenha} onChange={e => setNovaSenha(e.target.value)} type="password" placeholder="Mínimo 8 caracteres, com letra e número" className={inputCls} />
+            <CampoSenha value={novaSenha} onChange={e => setNovaSenha(e.target.value)} placeholder="Mínimo 8 caracteres, com letra e número" className={inputCls} />
           </Field>
           <Field label="Confirmar nova senha">
-            <input value={confirmarSenha} onChange={e => setConfirmarSenha(e.target.value)} type="password" className={inputCls} />
+            <CampoSenha value={confirmarSenha} onChange={e => setConfirmarSenha(e.target.value)} className={inputCls} />
           </Field>
           {erroSenha && <p className="text-xs text-red-400">{erroSenha}</p>}
           <SaveButton saving={savingSenha} saved={savedSenha}>{temSenha ? "Trocar senha" : "Definir senha"}</SaveButton>

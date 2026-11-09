@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Building2, Check, KeyRound, Loader2, Settings, UserRound } from "lucide-react";
 import { ConexoesClaude, type ConexaoClaude } from "./ConexoesClaude";
+import { CampoSenha } from "@/app/CampoSenha";
 
 const inputCls = "w-full bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 disabled:bg-slate-50 disabled:text-slate-500";
 const cartao = "rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)]";
@@ -102,17 +103,17 @@ export function ConfiguracoesClient({ nome, email, telefone, temSenha, urlConect
           {temSenha && (
             <label className="block">
               <span className="block text-sm font-medium text-slate-700 mb-1.5">Senha atual</span>
-              <input type="password" value={atual} onChange={e => setAtual(e.target.value)} autoComplete="current-password" className={inputCls} />
+              <CampoSenha value={atual} onChange={e => setAtual(e.target.value)} autoComplete="current-password" className={inputCls} />
             </label>
           )}
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block">
               <span className="block text-sm font-medium text-slate-700 mb-1.5">Nova senha</span>
-              <input type="password" value={nova} onChange={e => setNova(e.target.value)} autoComplete="new-password" className={inputCls} />
+              <CampoSenha value={nova} onChange={e => setNova(e.target.value)} autoComplete="new-password" className={inputCls} />
             </label>
             <label className="block">
               <span className="block text-sm font-medium text-slate-700 mb-1.5">Confirme a nova senha</span>
-              <input type="password" value={confirma} onChange={e => setConfirma(e.target.value)} autoComplete="new-password" className={inputCls} />
+              <CampoSenha value={confirma} onChange={e => setConfirma(e.target.value)} autoComplete="new-password" className={inputCls} />
             </label>
           </div>
           <p className="text-xs text-slate-500">Mínimo de 8 caracteres, com pelo menos uma letra e um número.</p>

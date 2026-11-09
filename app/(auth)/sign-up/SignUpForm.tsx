@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { AuthLogo } from "@/app/AuthLogo";
+import { CampoSenha } from "@/app/CampoSenha";
 
 type Step = "form" | "code";
 
@@ -139,8 +140,7 @@ export function SignUpForm({ redirectUrl }: { redirectUrl: string }) {
 
             <div className="space-y-2">
               <label className={labelClass}>Senha</label>
-              <input
-                type="password"
+              <CampoSenha
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
