@@ -4,6 +4,7 @@
 type ConfigColeta = { igColetaWhatsappEnabled: boolean; igColetaWhatsappInstrucoes: string };
 
 const PEDIDO_PADRAO = "Me passa seu WhatsApp com DDD que a equipe te chama lá agora com todas as informações!";
+const CONFIRMACAO_PADRAO = "Perfeito! A equipe vai te chamar no WhatsApp em instantes com todas as informações!";
 
 // O campo do gestor pode ser uma frase pronta ou uma orientação ("peça depois de cumprimentar")
 function fraseProntaDoGestor(instrucoes: string): string | null {
@@ -30,15 +31,21 @@ export function instrucaoColetaWhatsapp(config: ConfigColeta, jaEnviouNumero: bo
 - Se o cliente recusar expressamente, não pressione: diga que, quando quiser, é só mandar o número.`;
 }
 
-export function respostaDeColetaValida(resposta: string): boolean {
-  const pedeContato = /whats|zap|\bn[úu]mero\b/i.test(resposta);
-  const negaInformacao = /n[ãa]o\s+(consigo|tenho|posso|sei|disponho|temos)|desculp|infelizmente|sem\s+informa/i.test(resposta);
+function negaInformacaoOuPassaPreco(resposta: string): boolean {
+  const negaInformacao = /n[ãa]o\s+(consigo|conseguimos|tenho|temos|posso|podemos|sei|sabemos|disponho|dispomos|possuo|possu[íi]mos|informamos|passamos|[ée]\s+poss[íi]vel|seria\s+poss[íi]vel)|desculp|infelizmente|sem\s+informa/i.test(resposta);
   const passaPreco = /R\$\s?\d/i.test(resposta);
-  return pedeContato && !negaInformacao && !passaPreco;
+  return negaInformacao || passaPreco;
 }
 
-// Trava final: o modelo às vezes ignora o prompt, então resposta fora do objetivo é trocada pelo pedido
+export function respostaDeColetaValida(resposta: string): boolean {
+  return /whats|zap|\bn[úu]mero\b/i.test(resposta) && !negaInformacaoOuPassaPreco(resposta);
+}
+
+// Trava final: o modelo às vezes ignora o prompt. Antes do número, resposta fora do objetivo vira o
+// pedido; depois do número, resposta que nega informação ou passa preço vira a confirmação.
 export function ajustarRespostaColeta(config: ConfigColeta, jaEnviouNumero: boolean, resposta: string): string {
-  if (!config.igColetaWhatsappEnabled || jaEnviouNumero || respostaDeColetaValida(resposta)) return resposta;
+  if (!config.igColetaWhatsappEnabled) return resposta;
+  if (jaEnviouNumero) return negaInformacaoOuPassaPreco(resposta) ? CONFIRMACAO_PADRAO : resposta;
+  if (respostaDeColetaValida(resposta)) return resposta;
   return fraseProntaDoGestor(config.igColetaWhatsappInstrucoes) ?? PEDIDO_PADRAO;
 }
