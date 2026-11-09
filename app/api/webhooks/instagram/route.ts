@@ -10,19 +10,7 @@ import { sendWhatsAppTextAsTeam } from "@/lib/whatsapp";
 import { extractBrazilianPhoneFromText } from "@/lib/phone-extract";
 import { buildConhecimentoContext, buildTreinoContext } from "@/lib/whatsapp-inbound";
 import { buildCatalogoInstagramContext } from "@/lib/instagram-catalogo";
-
-// Coleta de WhatsApp ligada: conseguir o número é o único objetivo da conversa no Instagram, e o
-// atendimento (preço, detalhes) acontece no WhatsApp. Vai por último no prompt para ter prioridade.
-function instrucaoColetaWhatsapp(config: { igColetaWhatsappEnabled: boolean; igColetaWhatsappInstrucoes: string }): string {
-  if (!config.igColetaWhatsappEnabled) return "";
-  const orientacao = config.igColetaWhatsappInstrucoes.trim();
-  return `\n\nOBJETIVO ÚNICO DESTA CONVERSA (tem prioridade sobre todas as instruções acima): conseguir o número de WhatsApp do cliente para a equipe continuar o atendimento por lá.
-- Em toda resposta, peça o WhatsApp de forma curta e natural, até o cliente enviar o número.
-- Não passe preços, condições, financiamento, características ou disponibilidade, não sugira visita e não envie links. Se perguntarem, diga que no WhatsApp a equipe passa tudo na hora e peça o número.
-- Responda em no máximo 2 frases.${orientacao ? `\n- Forma de pedir, segundo a empresa: ${orientacao}` : ""}
-- Quando o cliente enviar o número, confirme que a equipe vai chamar no WhatsApp em instantes e não peça de novo. Se ele continuar falando depois disso, lembre que o atendimento segue por lá. Nunca diga que não pode salvar, armazenar ou guardar números.
-- Se o cliente recusar expressamente, não pressione: diga que, quando quiser, é só mandar o número.`;
-}
+import { instrucaoColetaWhatsapp, ajustarRespostaColeta } from "@/lib/instagram-coleta";
 
 // GET: verificação de webhook pela Meta (hub challenge)
 export async function GET(req: NextRequest) {
@@ -279,7 +267,16 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
     ? "\n\nEmojis: você PODE e DEVE usar emojis nas respostas."
     : "\n\nEmojis: NUNCA use emojis nas respostas.";
 
-  const igColetaInstruction = instrucaoColetaWhatsapp(config);
+  // O número pode ter vindo numa mensagem anterior da mesma rajada (ex: "84 99999-9999" e logo
+  // depois "esse é meu zap") — o debounce só deixa seguir a última, que nem sempre tem o número
+  const limiteRajada = Date.now() - 2 * 60_000;
+  const mensagensDaRajada = recentMessages
+    .filter((m) => m.role === "user" && m.createdAt.getTime() >= limiteRajada)
+    .map((m) => m.content)
+    .reverse();
+  const telefoneDetectado = [text, ...mensagensDaRajada].map(extractBrazilianPhoneFromText).find(Boolean) ?? null;
+  const jaEnviouNumero = Boolean(telefoneDetectado || conversation.extractedWhatsappNumber);
+  const igColetaInstruction = instrucaoColetaWhatsapp(config, jaEnviouNumero);
 
   // Contato automático no WhatsApp quando a pessoa manda o número dela na DM — efeito colateral,
   // não substitui a resposta normal da IA aqui no Instagram (que segue abaixo). Isolado em
@@ -292,14 +289,7 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
 
   async function handleInstagramWhatsappHandoff() {
     if (!config) return;
-    // O número pode ter vindo numa mensagem anterior da mesma rajada (ex: "84 99999-9999" e logo
-    // depois "esse é meu zap") — o debounce só deixa seguir a última, que nem sempre tem o número
-    const limiteRajada = Date.now() - 2 * 60_000;
-    const mensagensDaRajada = recentMessages
-      .filter((m) => m.role === "user" && m.createdAt.getTime() >= limiteRajada)
-      .map((m) => m.content)
-      .reverse();
-    const detectedPhone = [text, ...mensagensDaRajada].map(extractBrazilianPhoneFromText).find(Boolean);
+    const detectedPhone = telefoneDetectado;
     if (!detectedPhone) return;
     if (detectedPhone === conversation.extractedWhatsappNumber) return; // já contatamos esse número
 
@@ -402,9 +392,14 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
   const treinoContext = await buildTreinoContext(config, text);
   const catalogoContext = config.igColetaWhatsappEnabled ? "" : await buildCatalogoInstagramContext(config);
 
-  const result = await runAgent(config.systemPrompt + emojiInstruction + conhecimentoContext + catalogoContext + treinoContext + igColetaInstruction, history, text);
+  // Na coleta, respostas antigas do tipo "não consigo informar" no histórico puxam o modelo de volta
+  const historicoIA = config.igColetaWhatsappEnabled ? history.slice(-4) : history;
+  const result = await runAgent(config.systemPrompt + emojiInstruction + conhecimentoContext + catalogoContext + treinoContext + igColetaInstruction, historicoIA, text);
 
-  await prisma.message.create({ data: { conversationId: conversation.id, role: "assistant", content: result.reply } });
+  const resposta = ajustarRespostaColeta(config, jaEnviouNumero, result.reply);
+  if (resposta !== result.reply) console.log("[ig-msg] resposta da IA trocada pelo pedido de WhatsApp | agente:", agenteId);
+
+  await prisma.message.create({ data: { conversationId: conversation.id, role: "assistant", content: resposta } });
   emitChatEvent(config.id, conversation.id);
 
   logTokenUsage({
@@ -415,7 +410,7 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
     ...result.usage,
   });
 
-  await sendInstagramDM(igBusinessAccountId, connection.pageAccessToken, senderIgsid, result.reply);
+  await sendInstagramDM(igBusinessAccountId, connection.pageAccessToken, senderIgsid, resposta);
 }
 
 async function processComment(igBusinessAccountId: string, comment: {
@@ -497,11 +492,11 @@ async function processComment(igBusinessAccountId: string, comment: {
     const catalogoContext = config.igColetaWhatsappEnabled ? "" : await buildCatalogoInstagramContext(config);
 
     const result = await runAgent(
-      config.systemPrompt + conhecimentoContext + catalogoContext + treinoContext + instrucaoColetaWhatsapp(config),
+      config.systemPrompt + conhecimentoContext + catalogoContext + treinoContext + instrucaoColetaWhatsapp(config, false),
       [],
       `Alguém comentou no seu post: "${text}". Responda com uma mensagem direta e personalizada para continuar a conversa no privado.`
     );
-    dmMessage = result.reply;
+    dmMessage = ajustarRespostaColeta(config, false, result.reply);
 
     logTokenUsage({
       teamId: config.teamId,
