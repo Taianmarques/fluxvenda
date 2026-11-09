@@ -1678,7 +1678,14 @@ export async function processIncomingMessage(config: AgentConfigFull, msg: Incom
   // um erro sério, então esse critério não é configurável por agente. A mensagem já foi salva
   // acima (escuta ativa), isso só impede a IA de gerar uma resposta agora.
   if (conversation.isGroup) return;
-  // Canal pausado só pra IA (independente de "active", que desliga o canal inteiro) — a
+  // Agente desligado: a mensagem já foi salva e a equipe é avisada, mas nada automático responde.
+  // A Cloud API fica de fora porque conectá-la não liga "active" (só a UazAPI faz isso) — agente
+  // só com Cloud API pode estar com active=false e atendendo normalmente.
+  if (!config.active && config.whatsappProvider !== "CLOUD_API") {
+    notifyHumanTakeoverMessage(config, conversation.id, conversation.assignedToId, conversation.contactName ?? contactNumber, text).catch(() => {});
+    return;
+  }
+  // Canal pausado só pra IA (independente de "active", que desliga o agente inteiro) — a
   // mensagem já foi salva acima, só não gera resposta automática. Exceção: números liberados
   // pra teste (ver AgentConfig.learningModeTestNumbers) continuam recebendo resposta de verdade
   // enquanto a IA está pausada (modo aprendizado ou pausa manual), pro gestor conversar com a

@@ -35,7 +35,7 @@ function mediaCaption(message: any): string {
 // "Assumir atendimento" no CRM. Eco do que a própria plataforma enviou não chega aqui
 // (wasSentByApi), e o waMessageId repetido é ignorado por garantia.
 async function handleMensagemDoCelular(token: string, message: any, body: any) {
-  const config = await prisma.agentConfig.findFirst({ where: { uazapiToken: token, active: true }, select: { id: true } });
+  const config = await prisma.agentConfig.findFirst({ where: { uazapiToken: token }, orderBy: { active: "desc" }, select: { id: true } });
   if (!config) return;
 
   // Em mensagem nossa, chatid é o contato; quando vier como @lid, tenta o telefone do chat
@@ -124,8 +124,9 @@ export async function POST(req: NextRequest) {
 
   // Conectar o canal não exige ter configurado o agente antes (systemPrompt pode estar
   // vazio) — a mensagem entra na caixa do CRM normalmente, só a IA não responde sozinha
-  // sem prompt (ver o gate em processIncomingMessage, lib/whatsapp-inbound.ts).
-  const config = await prisma.agentConfig.findFirst({ where: { uazapiToken: token, active: true } });
+  // sem prompt (ver o gate em processIncomingMessage, lib/whatsapp-inbound.ts). O mesmo vale
+  // para agente desligado: a mensagem é salva e só a resposta automática não acontece.
+  const config = await prisma.agentConfig.findFirst({ where: { uazapiToken: token }, orderBy: { active: "desc" } });
   if (!config || !config.uazapiToken) {
     return NextResponse.json({ ok: true });
   }

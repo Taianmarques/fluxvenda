@@ -136,14 +136,15 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
 
   const config = await prisma.agentConfig.findUnique({ where: { id: connection.agentConfigId } });
   console.log("[ig-msg] config found:", !!config, "active:", config?.active);
-  if (!config || !config.active) { console.log("[ig-msg] config missing or inactive, dropping"); return; }
+  if (!config) { console.log("[ig-msg] config missing, dropping"); return; }
 
   // Toda saída sem resposta da IA deixa o motivo no log
   const agenteId = config.id;
   const semRespostaIA = (motivo: string) => console.log("[ig-msg] sem resposta da IA:", motivo, "| agente:", agenteId, "| contato:", senderIgsid);
 
-  // Se o contato está em um funil aguardando resposta, o funil assume o controle
-  const handledByFunnel = await handleFunnelReply({
+  // Se o contato está em um funil aguardando resposta, o funil assume o controle. Com o agente
+  // desligado nenhum funil envia nada: a mensagem só é salva, mais abaixo.
+  const handledByFunnel = config.active && await handleFunnelReply({
     agentConfigId: connection.agentConfigId,
     contactIgsid: senderIgsid,
     text,
@@ -154,7 +155,7 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
 
   // Verifica se algum funil tem gatilho de DM que bate com essa mensagem. Funil sem blocos não
   // conta: ele não enviaria nada e a mensagem ficaria sem resposta e fora do CRM.
-  const dmFunnels = await prisma.instagramFunnel.findMany({
+  const dmFunnels = !config.active ? [] : await prisma.instagramFunnel.findMany({
     where: { agentConfigId: connection.agentConfigId, active: true, dmTriggerEnabled: true, blocks: { some: {} } },
     orderBy: { createdAt: "asc" },
   });
@@ -220,8 +221,9 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
   });
   emitChatEvent(config.id, conversation.id); // push em tempo real pro CRM
 
-  // Atendente assumiu a conversa OU o canal está pausado só pra IA — em ambos os casos a
-  // mensagem já foi salva acima (aparece no chat normalmente), só não gera resposta automática
+  // Agente desligado, atendente assumiu a conversa OU canal pausado só pra IA — em todos os casos
+  // a mensagem já foi salva acima (aparece no chat normalmente), só não gera resposta automática
+  if (!config.active) { semRespostaIA("agente desligado"); return; }
   if (conversation.humanTakeover) { semRespostaIA("atendente assumiu a conversa"); return; }
   if (config.instagramAiPaused) { semRespostaIA("IA pausada no Instagram"); return; }
   // Agente ainda não configurado (sem systemPrompt) — conectar o canal não exige configurar

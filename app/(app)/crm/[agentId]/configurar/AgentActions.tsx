@@ -24,6 +24,11 @@ export function AgentActions({ agentId, active }: { agentId: string; active: boo
     }
   }
 
+  function handleDesligar() {
+    if (!confirm("Desligar o agente no WhatsApp e no Instagram?\n\nA IA, os funis e o Auto DM param. As mensagens continuam chegando no CRM, sem resposta automática.\n\nPara parar só um canal, use \"Pausar IA\" na página Canais.")) return;
+    call("pausar");
+  }
+
   function handleDesconectar() {
     if (!confirm("Desconectar o WhatsApp? O número vai sair do app e você vai precisar escanear o QR code de novo para reconectar.")) return;
     call("desconectar");
@@ -34,11 +39,11 @@ export function AgentActions({ agentId, active }: { agentId: string; active: boo
       <div className="flex items-center gap-2">
         {active ? (
           <button
-            onClick={() => call("pausar")}
+            onClick={handleDesligar}
             disabled={loading !== null}
             className="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 disabled:opacity-50 flex items-center gap-1.5"
           >
-            {loading === "pausar" ? "Pausando..." : <><Pause size={13} /> Pausar agente</>}
+            {loading === "pausar" ? "Desligando..." : <><Pause size={13} /> Desligar agente</>}
           </button>
         ) : (
           <button

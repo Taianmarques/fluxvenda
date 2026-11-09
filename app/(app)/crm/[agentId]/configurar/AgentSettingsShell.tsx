@@ -178,7 +178,7 @@ export function AgentSettingsShell({
             <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 flex items-center justify-between gap-4 flex-wrap">
               <div>
                 <p className="font-semibold">Ações do agente</p>
-                <p className="text-sm text-gray-400 mt-1">Pausar temporariamente ou desconectar o WhatsApp.</p>
+                <p className="text-sm text-gray-400 mt-1">Desligar o agente no WhatsApp e no Instagram, ou desconectar o WhatsApp.</p>
               </div>
               <AgentActions agentId={agentId} active={active} />
             </div>

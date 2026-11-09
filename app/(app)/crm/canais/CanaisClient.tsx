@@ -44,7 +44,7 @@ function toImageSrc(qrcode: string) {
 function WaBadge({ ch }: { ch: Channel }) {
   if (!ch.uazapiToken) return <span className="text-xs px-2 py-0.5 rounded-full bg-gray-800 text-gray-500 border border-gray-700">Sem instância</span>;
   if (!ch.whatsapp) return <span className="text-xs px-2 py-0.5 rounded-full bg-gray-800 text-gray-500 border border-gray-700 animate-pulse">Verificando...</span>;
-  if (!ch.active) return <span className="text-xs px-2 py-0.5 rounded-full bg-gray-800 text-gray-400 border border-gray-700">Pausado</span>;
+  if (!ch.active) return <span className="text-xs px-2 py-0.5 rounded-full bg-gray-800 text-gray-400 border border-gray-700">Agente desligado</span>;
   if (ch.whatsapp.connected) return <span className="text-xs px-2 py-0.5 rounded-full bg-green-900/40 text-green-400 border border-green-800/50">Ativo</span>;
   return <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-900/40 text-yellow-400 border border-yellow-800/50">Desconectado</span>;
 }
@@ -160,7 +160,8 @@ export function CanaisClient({
 
   function closeModal() { stopPoll(); setConnectingId(null); setQrStatus(null); }
 
-  async function handlePause(channelId: string) {
+  async function handlePause(channelId: string, nome: string) {
+    if (!confirm(`Desligar o agente "${nome}" no WhatsApp e no Instagram?\n\nA IA, os funis e o Auto DM param. As mensagens continuam chegando no CRM, sem resposta automática.\n\nPara parar só um canal, use "Pausar IA" na linha dele.`)) return;
     setLoadingId(channelId + ":pause");
     try {
       await fetch(`/api/agentes/${channelId}/pausar`, { method: "POST" });
@@ -453,15 +454,43 @@ export function CanaisClient({
                     )}
                   </div>
                   {isManager && (
-                    <button
-                      onClick={() => setConfirmDeleteId(ch.id)}
-                      className="flex-shrink-0 text-gray-600 hover:text-red-400 transition-colors p-1"
-                      title="Excluir canal"
-                    >
-                      <Trash2 size={15} />
-                    </button>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {ch.active ? (
+                        <button
+                          onClick={() => handlePause(ch.id, ch.nome)}
+                          disabled={loadingId === ch.id + ":pause"}
+                          title="Desliga a IA, os funis e o Auto DM no WhatsApp e no Instagram"
+                          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-red-300 border border-gray-700 hover:border-red-800/60 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
+                        >
+                          <Pause size={12} />
+                          {loadingId === ch.id + ":pause" ? "..." : "Desligar agente"}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleActivate(ch.id)}
+                          disabled={loadingId === ch.id + ":activate"}
+                          className="flex items-center gap-1.5 text-xs text-green-400 hover:text-green-300 border border-green-800/50 hover:border-green-600/50 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
+                        >
+                          <Play size={12} />
+                          {loadingId === ch.id + ":activate" ? "..." : "Reativar agente"}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setConfirmDeleteId(ch.id)}
+                        className="text-gray-600 hover:text-red-400 transition-colors p-1"
+                        title="Excluir canal"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   )}
                 </div>
+
+                {!ch.active && (
+                  <p className="px-5 py-2.5 text-xs text-amber-300 bg-amber-900/20 border-b border-amber-800/30">
+                    Agente desligado em todos os canais. As mensagens continuam chegando no CRM, mas nada é respondido automaticamente.
+                  </p>
+                )}
 
                 {/* Modo aprendizado: estado inicial, IA não responde em nenhum canal ainda */}
                 {ch.learningMode && (
@@ -510,25 +539,6 @@ export function CanaisClient({
 
                   {isManager && (
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      {ch.active ? (
-                        <button
-                          onClick={() => handlePause(ch.id)}
-                          disabled={loadingId === ch.id + ":pause"}
-                          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-200 border border-gray-700 hover:border-gray-500 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
-                        >
-                          <Pause size={12} />
-                          {loadingId === ch.id + ":pause" ? "..." : "Pausar"}
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleActivate(ch.id)}
-                          disabled={loadingId === ch.id + ":activate"}
-                          className="flex items-center gap-1.5 text-xs text-green-400 hover:text-green-300 border border-green-800/50 hover:border-green-600/50 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
-                        >
-                          <Play size={12} />
-                          {loadingId === ch.id + ":activate" ? "..." : "Reativar"}
-                        </button>
-                      )}
                       <button
                         onClick={() => startConnect(ch.id)}
                         disabled={connectingId === ch.id}

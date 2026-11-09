@@ -3,7 +3,8 @@ import { auth } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { getAgentConfigAsManager } from "@/lib/team";
 
-// Pausa o agente: a IA para de responder, mas o WhatsApp continua conectado (sem precisar reconectar depois)
+// Desliga o agente em todos os canais: nada automático responde, mas os canais continuam conectados
+// e as mensagens continuam entrando no CRM. Para pausar um canal só, ver pausar-ia.
 export async function POST(_req: Request, { params }: { params: Promise<{ agentId: string }> }) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
