@@ -9,6 +9,18 @@ import { verifyMetaHandshake, verifyMetaSignature } from "@/lib/meta-webhook";
 import { sendWhatsAppTextAsTeam } from "@/lib/whatsapp";
 import { extractBrazilianPhoneFromText } from "@/lib/phone-extract";
 import { buildConhecimentoContext, buildTreinoContext } from "@/lib/whatsapp-inbound";
+import { buildCatalogoInstagramContext } from "@/lib/instagram-catalogo";
+
+// Só entra no prompt quando o gestor ativa a coleta de WhatsApp — sem isso a IA não sabe que
+// esse comportamento existe e acaba recusando o número (ex: "não posso armazenar números").
+// O "nunca recuse" é sempre fixo (é a correção do bug); o "como/quando pedir" é configurável
+// pelo gestor — cai num texto padrão neutro quando ele não preenche nada.
+function instrucaoColetaWhatsapp(config: { igColetaWhatsappEnabled: boolean; igColetaWhatsappInstrucoes: string }): string {
+  if (!config.igColetaWhatsappEnabled) return "";
+  const comoPedir = config.igColetaWhatsappInstrucoes.trim()
+    || "Peça o número quando fizer sentido na conversa, com naturalidade — não precisa ser logo de cara.";
+  return `\n\nObjetivo de coleta de WhatsApp: seu objetivo é conseguir o número de WhatsApp do lead pra continuar o atendimento por lá. Como e quando pedir: ${comoPedir} Se o cliente mandar um número de telefone, mesmo sem você pedir, reaja com naturalidade confirmando que a equipe vai continuar o atendimento por WhatsApp em instantes — nunca diga que não pode 'salvar', 'armazenar' ou 'guardar' números, isso não se aplica aqui.`;
+}
 
 // GET: verificação de webhook pela Meta (hub challenge)
 export async function GET(req: NextRequest) {
@@ -207,11 +219,11 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
   }
 
   // Histórico antes de salvar a mensagem atual (mesmo padrão do webhook WhatsApp)
-  const recentMessages = await prisma.message.findMany({
+  const recentMessages = (await prisma.message.findMany({
     where: { conversationId: conversation.id, role: { not: "note" } },
-    orderBy: { createdAt: "asc" },
+    orderBy: { createdAt: "desc" },
     take: 20,
-  });
+  })).reverse();
 
   const savedMsg = await prisma.message.create({
     data: { conversationId: conversation.id, role: "user", content: text },
@@ -265,15 +277,7 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
     ? "\n\nEmojis: você PODE e DEVE usar emojis nas respostas."
     : "\n\nEmojis: NUNCA use emojis nas respostas.";
 
-  // Só entra no prompt quando o gestor ativa a coleta de WhatsApp — sem isso a IA não sabe que
-  // esse comportamento existe e acaba recusando o número (ex: "não posso armazenar números").
-  // O "nunca recuse" é sempre fixo (é a correção do bug); o "como/quando pedir" é configurável
-  // pelo gestor — cai num texto padrão neutro quando ele não preenche nada.
-  const igColetaInstrucoes = config.igColetaWhatsappInstrucoes.trim()
-    || "Peça o número quando fizer sentido na conversa, com naturalidade — não precisa ser logo de cara.";
-  const igColetaInstruction = config.igColetaWhatsappEnabled
-    ? `\n\nObjetivo de coleta de WhatsApp: seu objetivo é conseguir o número de WhatsApp do lead pra continuar o atendimento por lá. Como e quando pedir: ${igColetaInstrucoes} Se o cliente mandar um número de telefone, mesmo sem você pedir, reaja com naturalidade confirmando que a equipe vai continuar o atendimento por WhatsApp em instantes — nunca diga que não pode 'salvar', 'armazenar' ou 'guardar' números, isso não se aplica aqui.`
-    : "";
+  const igColetaInstruction = instrucaoColetaWhatsapp(config);
 
   // Contato automático no WhatsApp quando a pessoa manda o número dela na DM — efeito colateral,
   // não substitui a resposta normal da IA aqui no Instagram (que segue abaixo). Isolado em
@@ -286,7 +290,14 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
 
   async function handleInstagramWhatsappHandoff() {
     if (!config) return;
-    const detectedPhone = extractBrazilianPhoneFromText(text);
+    // O número pode ter vindo numa mensagem anterior da mesma rajada (ex: "84 99999-9999" e logo
+    // depois "esse é meu zap") — o debounce só deixa seguir a última, que nem sempre tem o número
+    const limiteRajada = Date.now() - 2 * 60_000;
+    const mensagensDaRajada = recentMessages
+      .filter((m) => m.role === "user" && m.createdAt.getTime() >= limiteRajada)
+      .map((m) => m.content)
+      .reverse();
+    const detectedPhone = [text, ...mensagensDaRajada].map(extractBrazilianPhoneFromText).find(Boolean);
     if (!detectedPhone) return;
     if (detectedPhone === conversation.extractedWhatsappNumber) return; // já contatamos esse número
 
@@ -385,8 +396,9 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
   // cadastra nessas telas não tinha nenhum efeito nas respostas via Instagram.
   const conhecimentoContext = await buildConhecimentoContext(config.id);
   const treinoContext = await buildTreinoContext(config, text);
+  const catalogoContext = await buildCatalogoInstagramContext(config);
 
-  const result = await runAgent(config.systemPrompt + emojiInstruction + igColetaInstruction + conhecimentoContext + treinoContext, history, text);
+  const result = await runAgent(config.systemPrompt + emojiInstruction + igColetaInstruction + conhecimentoContext + catalogoContext + treinoContext, history, text);
 
   await prisma.message.create({ data: { conversationId: conversation.id, role: "assistant", content: result.reply } });
   emitChatEvent(config.id, conversation.id);
@@ -478,9 +490,10 @@ async function processComment(igBusinessAccountId: string, comment: {
 
     const conhecimentoContext = await buildConhecimentoContext(config.id);
     const treinoContext = await buildTreinoContext(config, text);
+    const catalogoContext = await buildCatalogoInstagramContext(config);
 
     const result = await runAgent(
-      config.systemPrompt + conhecimentoContext + treinoContext,
+      config.systemPrompt + instrucaoColetaWhatsapp(config) + conhecimentoContext + catalogoContext + treinoContext,
       [],
       `Alguém comentou no seu post: "${text}". Responda com uma mensagem direta e personalizada para continuar a conversa no privado.`
     );
