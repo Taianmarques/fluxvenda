@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { UserPlus, Copy, Check, Crown, User, Trash2, MessageCircle, Building2, Plus, X, Shield, Pencil, ChevronDown, Ban, RotateCcw } from "lucide-react";
+import { UserPlus, Copy, Check, Crown, User, Trash2, MessageCircle, Building2, Plus, X, Shield, Pencil, ChevronDown, Ban, RotateCcw, Eye, EyeOff } from "lucide-react";
 import { CRM_CATEGORIES } from "@/lib/crm-nav-config";
 
 type Membro = {
@@ -40,6 +40,8 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
   const [novoNome, setNovoNome] = useState("");
   const [novoEmail, setNovoEmail] = useState("");
   const [novoTelefone, setNovoTelefone] = useState("");
+  const [novaSenha, setNovaSenha] = useState("");
+  const [mostrarSenha, setMostrarSenha] = useState(false);
   const [novoCoManager, setNovoCoManager] = useState(false);
   const [salvandoMembro, setSalvandoMembro] = useState(false);
   const [erroMembro, setErroMembro] = useState("");
@@ -234,19 +236,24 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
       const res = await fetch("/api/equipe/membros", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: novoNome.trim(), email: novoEmail.trim(), phone: novoTelefone.trim() || undefined, coManager: novoCoManager }),
+        body: JSON.stringify({ name: novoNome.trim(), email: novoEmail.trim(), phone: novoTelefone.trim() || undefined, coManager: novoCoManager, senha: novaSenha || undefined }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setErroMembro(data.error ?? "Não foi possível adicionar o membro.");
         return;
       }
+      const nome = novoNome.trim();
       setSucessoMembro(
-        data.needsPassword
-          ? `${novoNome.trim()} foi adicionado(a) — mandamos um e-mail pra definir a senha.`
-          : `${novoNome.trim()} foi adicionado(a) à equipe.`
+        data.senhaDefinida
+          ? `${nome} foi adicionado(a) e já pode entrar com o e-mail e a senha definida.`
+          : data.senhaIgnorada
+            ? `${nome} foi adicionado(a). Esse e-mail já tinha conta, então a senha digitada não foi usada${data.needsPassword ? " — mandamos um e-mail pra definir a senha." : "."}`
+            : data.needsPassword
+              ? `${nome} foi adicionado(a) — mandamos um e-mail pra definir a senha.`
+              : `${nome} foi adicionado(a) à equipe.`
       );
-      setNovoNome(""); setNovoEmail(""); setNovoTelefone(""); setNovoCoManager(false);
+      setNovoNome(""); setNovoEmail(""); setNovoTelefone(""); setNovaSenha(""); setMostrarSenha(false); setNovoCoManager(false);
       router.refresh();
     } finally {
       setSalvandoMembro(false);
@@ -398,6 +405,25 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
                   type="tel"
                   className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm"
                 />
+                <div className="relative">
+                  <input
+                    value={novaSenha}
+                    onChange={e => setNovaSenha(e.target.value)}
+                    placeholder="Senha de acesso (opcional)"
+                    type={mostrarSenha ? "text" : "password"}
+                    autoComplete="new-password"
+                    className="w-full bg-gray-950 border border-gray-800 rounded-lg pl-3 pr-10 py-2 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setMostrarSenha(s => !s)}
+                    title={mostrarSenha ? "Ocultar senha" : "Mostrar senha"}
+                    aria-label={mostrarSenha ? "Ocultar senha" : "Mostrar senha"}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                  >
+                    {mostrarSenha ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
                 <label className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
                   <input
                     type="checkbox"
@@ -417,7 +443,7 @@ export function EquipeClient({ teamName, isManager, inviteLink, manager, members
                   {salvandoMembro ? "Adicionando..." : "Adicionar à equipe"}
                 </button>
                 <p className="text-xs text-gray-600">
-                  A pessoa entra direto na equipe e recebe um e-mail pra definir a senha (ou só um aviso, se já tiver conta).
+                  Com senha (mínimo de 8 caracteres, com letra e número), a pessoa já pode entrar com ela. Sem senha, recebe um e-mail pra criar a própria. A senha só vale para quem ainda não tem conta.
                 </p>
               </div>
             )}

@@ -7,16 +7,20 @@ import { sendTeamMemberAddedEmail } from "@/lib/email";
 import { formatPhone, sendWhatsAppText, getWelcomeMessage } from "@/lib/whatsapp";
 import { getManagedTeam } from "@/lib/team";
 import { maybeAlertHotLead } from "@/lib/hot-lead-alert";
+import { hashPassword, passwordSchema } from "@/lib/auth/password";
 
 const schema = z.object({
   name: z.string().trim().min(2, { message: "Informe o nome." }),
   email: z.string().email({ message: "E-mail inválido." }).trim().toLowerCase(),
   phone: z.string().trim().optional(),
   coManager: z.boolean().optional(),
+  senha: passwordSchema.optional(),
 });
 
 // Gestor (ou co-gestor) adiciona um membro direto na equipe, sem precisar do link de
-// convite — a pessoa recebe um e-mail pra definir senha (ou só um aviso, se já tiver conta).
+// convite. Pode já definir a senha; sem ela, a pessoa recebe um e-mail pra criar a própria
+// (ou só um aviso, se já tiver conta). A senha informada só vale pra conta nova: aplicá-la a
+// um e-mail já cadastrado daria ao gestor acesso à conta de outra pessoa.
 export async function POST(req: NextRequest) {
   try {
     const { userId } = await auth();
@@ -29,7 +33,7 @@ export async function POST(req: NextRequest) {
     if (!body.success) {
       return NextResponse.json({ error: body.error.issues[0]?.message ?? "Dados inválidos" }, { status: 400 });
     }
-    const { name, email, phone, coManager } = body.data;
+    const { name, email, phone, coManager, senha } = body.data;
 
     let profile = await prisma.profile.findUnique({ where: { email } });
 
@@ -53,7 +57,10 @@ export async function POST(req: NextRequest) {
     }
 
     const formattedPhone = phone?.trim() ? formatPhone(phone.trim()) : undefined;
-    const needsPassword = !profile || !profile.passwordHash;
+    const passwordHash = !profile && senha ? await hashPassword(senha) : null;
+    const senhaDefinida = passwordHash !== null;
+    const senhaIgnorada = !!profile && !!senha;
+    const needsPassword = !senhaDefinida && (!profile || !profile.passwordHash);
     const passwordResetToken = needsPassword ? generateToken() : null;
 
     if (!profile) {
@@ -64,6 +71,7 @@ export async function POST(req: NextRequest) {
           phone: formattedPhone,
           role: "FUNCIONARIO",
           onboarded: true,
+          ...(passwordHash && { passwordHash }),
           ...(passwordResetToken && { passwordResetToken, passwordResetExpiresAt: passwordResetExpiry() }),
         },
       });
@@ -80,14 +88,14 @@ export async function POST(req: NextRequest) {
       if (count >= 3) maybeAlertHotLead(team.id, `Adicionou ${count} pessoas na equipe durante o teste grátis.`);
     }).catch(() => {});
 
-    sendTeamMemberAddedEmail(profile.email, profile.name, team.name, passwordResetToken).catch(() => {});
+    sendTeamMemberAddedEmail(profile.email, profile.name, team.name, passwordResetToken, senhaDefinida).catch(() => {});
     if (formattedPhone) {
       getWelcomeMessage(profile.name, "FUNCIONARIO", team.name)
         .then(message => sendWhatsAppText(formattedPhone, message))
         .catch(() => {});
     }
 
-    return NextResponse.json({ ok: true, needsPassword });
+    return NextResponse.json({ ok: true, needsPassword, senhaDefinida, senhaIgnorada });
   } catch (err) {
     console.error("[equipe/membros]", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
