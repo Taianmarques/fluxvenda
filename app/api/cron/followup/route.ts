@@ -9,6 +9,7 @@ import { normalizeFormFunnelSteps, normalizePhone } from "@/lib/lead-form-funnel
 import { interpolateTexto, normalizeQuizResults } from "@/lib/lead-form-shared";
 import { findConversationByPhone } from "@/lib/conversation-lookup";
 import { FLUXVENDA_TEAM_ID } from "@/lib/internal-agent";
+import { renovarTokensInstagramVencendo } from "@/lib/instagram-tokens";
 
 // Erro permanente da UazAPI: o número não tem WhatsApp. Tentar de novo nunca resolve — o follow-up
 // daquela conversa é encerrado em vez de falhar (e gastar IA gerando mensagem) a cada execução.
@@ -30,6 +31,8 @@ export async function POST(req: NextRequest) {
   if (!secret || auth !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  await renovarTokensInstagramVencendo().catch(err => console.error("[instagram-token]", err instanceof Error ? err.message : "erro desconhecido"));
 
   const configs = await prisma.agentConfig.findMany({
     where: { active: true, followupEnabled: true, uazapiToken: { not: null } },

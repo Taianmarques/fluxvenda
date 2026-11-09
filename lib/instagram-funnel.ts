@@ -20,12 +20,13 @@ export async function startFunnelExecution({
   pageAccessToken: string;
   // Quando o funil é disparado por comentário, a primeira mensagem precisa ser private reply
   commentId?: string;
-}) {
+}): Promise<boolean> {
   const funnel = await prisma.instagramFunnel.findUnique({
     where: { id: funnelId },
     include: { blocks: { orderBy: { order: "asc" } } },
   });
-  if (!funnel || !funnel.active || funnel.blocks.length === 0) return;
+  // false = o funil não rodou (inativo ou sem blocos), quem chamou segue o atendimento normal
+  if (!funnel || !funnel.active || funnel.blocks.length === 0) return false;
 
   // Cancela execuções anteriores ativas do mesmo contato nesse agente
   await prisma.instagramFunnelExecution.updateMany({
@@ -50,6 +51,7 @@ export async function startFunnelExecution({
   });
 
   await runExecution(execution.id, funnel.blocks, commentId);
+  return true;
 }
 
 // Avança a execução a partir do bloco atual, processando MESSAGE e DELAY em sequência.

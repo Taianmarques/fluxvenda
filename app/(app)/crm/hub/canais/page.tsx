@@ -27,14 +27,16 @@ async function CanaisPageContent() {
 
   const igConnections = await prisma.instagramConnection.findMany({
     where: { agentConfigId: { in: agentIds } },
-    select: { agentConfigId: true, instagramUsername: true, instagramBusinessAccountId: true },
+    select: { agentConfigId: true, instagramUsername: true, instagramBusinessAccountId: true, tokenExpiresAt: true },
   });
 
-  const igByAgent: Record<string, { username: string; businessAccountId: string }> = {};
+  const agora = new Date();
+  const igByAgent: Record<string, { username: string; businessAccountId: string; tokenVencido: boolean }> = {};
   for (const ig of igConnections) {
     igByAgent[ig.agentConfigId] = {
       username: ig.instagramUsername,
       businessAccountId: ig.instagramBusinessAccountId,
+      tokenVencido: Boolean(ig.tokenExpiresAt && ig.tokenExpiresAt < agora),
     };
   }
 

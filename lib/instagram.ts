@@ -37,6 +37,15 @@ export async function getInstagramLongLivedToken(shortToken: string): Promise<{ 
   return { token: data.access_token, expiresAt };
 }
 
+// Renova um token long-lived ainda válido por mais 60 dias. Token já vencido não renova: só reconectando.
+export async function renovarTokenInstagram(token: string): Promise<{ token: string; expiresAt: Date }> {
+  const params = new URLSearchParams({ grant_type: "ig_refresh_token", access_token: token });
+  const res = await fetch(`https://graph.instagram.com/refresh_access_token?${params}`);
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data?.access_token) throw new Error(data?.error?.message ?? `HTTP ${res.status}`);
+  return { token: data.access_token, expiresAt: new Date(Date.now() + (data.expires_in ?? 5_184_000) * 1000) };
+}
+
 export async function getInstagramUserInfo(accessToken: string, userId: string): Promise<{ igUserId: string; username: string }> {
   // Instagram Business Login: /me retorna `id` (app-scoped) e `user_id` (ID profissional
   // 17841... — o mesmo que chega em entry.id nos webhooks). Salvamos o user_id.

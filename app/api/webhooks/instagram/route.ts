@@ -136,6 +136,10 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
   console.log("[ig-msg] config found:", !!config, "active:", config?.active);
   if (!config || !config.active) { console.log("[ig-msg] config missing or inactive, dropping"); return; }
 
+  // Toda saída sem resposta da IA deixa o motivo no log
+  const agenteId = config.id;
+  const semRespostaIA = (motivo: string) => console.log("[ig-msg] sem resposta da IA:", motivo, "| agente:", agenteId, "| contato:", senderIgsid);
+
   // Se o contato está em um funil aguardando resposta, o funil assume o controle
   const handledByFunnel = await handleFunnelReply({
     agentConfigId: connection.agentConfigId,
@@ -144,11 +148,12 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
     igBusinessAccountId,
     pageAccessToken: connection.pageAccessToken,
   });
-  if (handledByFunnel) return;
+  if (handledByFunnel) { semRespostaIA("contato respondendo a um funil"); return; }
 
-  // Verifica se algum funil tem gatilho de DM que bate com essa mensagem
+  // Verifica se algum funil tem gatilho de DM que bate com essa mensagem. Funil sem blocos não
+  // conta: ele não enviaria nada e a mensagem ficaria sem resposta e fora do CRM.
   const dmFunnels = await prisma.instagramFunnel.findMany({
-    where: { agentConfigId: connection.agentConfigId, active: true, dmTriggerEnabled: true },
+    where: { agentConfigId: connection.agentConfigId, active: true, dmTriggerEnabled: true, blocks: { some: {} } },
     orderBy: { createdAt: "asc" },
   });
   const lowerText = text.toLowerCase();
@@ -167,14 +172,14 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
       },
     });
     if (!alreadyRunning) {
-      await startFunnelExecution({
+      const iniciou = await startFunnelExecution({
         funnelId: matchedDmFunnel.id,
         agentConfigId: connection.agentConfigId,
         contactIgsid: senderIgsid,
         igBusinessAccountId,
         pageAccessToken: connection.pageAccessToken,
       });
-      return;
+      if (iniciou) { semRespostaIA(`funil de DM iniciado: ${matchedDmFunnel.name}`); return; }
     }
   }
 
@@ -215,11 +220,11 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
 
   // Atendente assumiu a conversa OU o canal está pausado só pra IA — em ambos os casos a
   // mensagem já foi salva acima (aparece no chat normalmente), só não gera resposta automática
-  if (conversation.humanTakeover) return;
-  if (config.instagramAiPaused) return;
+  if (conversation.humanTakeover) { semRespostaIA("atendente assumiu a conversa"); return; }
+  if (config.instagramAiPaused) { semRespostaIA("IA pausada no Instagram"); return; }
   // Agente ainda não configurado (sem systemPrompt) — conectar o canal não exige configurar
   // o agente primeiro. A mensagem já foi salva acima; só a IA não tem o que usar pra responder.
-  if (!config.systemPrompt) return;
+  if (!config.systemPrompt) { semRespostaIA("agente sem prompt configurado"); return; }
 
   // Debounce: aguarda mensagens em partes antes de responder
   const debounceMs = Number(process.env.MESSAGE_DEBOUNCE_MS ?? "8000");
@@ -250,10 +255,11 @@ async function processMessage(igBusinessAccountId: string, senderIgsid: string, 
         content: `Agente pausado automaticamente: possível contato automatizado detectado (${burstReplies >= 5 ? `${burstReplies} respostas em 60s` : `${sustainedReplies} respostas em 10min`}).`,
       },
     });
+    semRespostaIA("proteção contra loop");
     return;
   }
 
-  if (await isOverQuota(config.teamId)) return;
+  if (await isOverQuota(config.teamId)) { semRespostaIA("cota de IA da equipe esgotada"); return; }
 
   const emojiInstruction = config.emojiEnabled
     ? "\n\nEmojis: você PODE e DEVE usar emojis nas respostas."
@@ -447,7 +453,7 @@ async function processComment(igBusinessAccountId: string, comment: {
 
   // Funil tem prioridade sobre mensagem direta
   if (matchedFlow?.funnelId) {
-    await startFunnelExecution({
+    const iniciou = await startFunnelExecution({
       funnelId: matchedFlow.funnelId,
       agentConfigId: connection.agentConfigId,
       contactIgsid: commenterId,
@@ -455,7 +461,7 @@ async function processComment(igBusinessAccountId: string, comment: {
       pageAccessToken: connection.pageAccessToken,
       commentId: comment.id,
     });
-    return;
+    if (iniciou) return;
   }
 
   let dmMessage: string;

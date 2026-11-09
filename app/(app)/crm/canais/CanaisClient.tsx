@@ -19,6 +19,7 @@ type WhatsAppStatus = {
 type InstagramStatus = {
   username: string;
   businessAccountId: string;
+  tokenVencido?: boolean;
 } | null;
 
 type Channel = {
@@ -609,7 +610,11 @@ export function CanaisClient({
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-medium">Instagram DM</span>
-                        {ch.instagram ? (
+                        {ch.instagram?.tokenVencido ? (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-red-900/40 text-red-400 border border-red-800/50">
+                            Conexão vencida
+                          </span>
+                        ) : ch.instagram ? (
                           <span className="text-xs px-2 py-0.5 rounded-full bg-purple-900/40 text-purple-400 border border-purple-800/50">
                             Conectado
                           </span>
@@ -622,6 +627,9 @@ export function CanaisClient({
                       {ch.instagram?.username && (
                         <p className="text-xs text-gray-400">@{ch.instagram.username}</p>
                       )}
+                      {ch.instagram?.tokenVencido && (
+                        <p className="text-xs text-red-400">O acesso ao Instagram venceu: a IA não consegue responder até reconectar.</p>
+                      )}
                     </div>
                   </div>
 
@@ -629,6 +637,15 @@ export function CanaisClient({
                     <div className="flex items-center gap-2 flex-shrink-0">
                       {ch.instagram ? (
                         <>
+                          {ch.instagram.tokenVencido && (
+                            <button
+                              onClick={() => { setError(""); openInstagramOAuth(ch.id); }}
+                              className="flex items-center gap-1.5 text-xs text-red-300 border border-red-800/60 hover:border-red-600/60 rounded-lg px-3 py-1.5 transition-colors"
+                            >
+                              <Instagram size={12} />
+                              Reconectar
+                            </button>
+                          )}
                           <a
                             href={`/crm/${ch.id}/condicoes`}
                             className="flex items-center gap-1.5 text-xs border rounded-lg px-3 py-1.5 transition-colors text-gray-400 hover:text-gray-200 border-gray-700 hover:border-gray-500"
