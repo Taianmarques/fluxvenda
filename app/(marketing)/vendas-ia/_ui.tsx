@@ -132,7 +132,7 @@ export function BotaoFixoCelular({ href, texto }: { href: string; texto: string 
   );
 }
 
-export function Rodape() {
+export function Rodape({ avisos = [] }: { avisos?: string[] }) {
   return (
     <footer className="border-t border-[var(--line)]">
       <div className="max-w-5xl mx-auto px-4 md:px-6 py-10 text-xs text-[var(--muted)] space-y-2 text-center">
@@ -140,6 +140,7 @@ export function Rodape() {
         <p>Direito de arrependimento: reembolso integral em até 7 dias após a compra (art. 49 do Código de Defesa do Consumidor).</p>
         <p>Os resultados dependem do seu negócio, da sua oferta e de como você aplica as ferramentas. Não prometemos aumento de vendas nem faturamento específico.</p>
         <p>ChatGPT e Claude são marcas de seus respectivos donos. O Vendas IA não é afiliado à OpenAI nem à Anthropic.</p>
+        {avisos.map(a => <p key={a}>{a}</p>)}
       </div>
     </footer>
   );
