@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   ArrowRight, BarChart3, Briefcase, Check, ChevronDown, Megaphone, MessageSquareText, Play, Plug,
-  Plus, ShieldCheck, SlidersHorizontal, Sparkles, Target, Timer, UserRound, X,
+  Plus, Rocket, ShieldCheck, SlidersHorizontal, Sparkles, Target, Timer, UserRound, X,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { fontesGestor } from "@/app/fontes-gestor";
@@ -172,7 +172,9 @@ const MODULOS = [
   "Sua rotina de 20 minutos",
 ];
 
+// O primeiro (quem ainda não anuncia) e o segundo ficam em destaque na 1ª linha da grade
 const PUBLICO = [
+  { Icone: Rocket, titulo: "Quem quer começar a anunciar, mas não entende de tráfego", texto: "Nunca anunciou ou só impulsionou posts? A IA explica cada passo em português simples e monta a primeira campanha com você, sem precisar dominar o Gerenciador." },
   { Icone: Briefcase, titulo: "Empresários que anunciam", texto: "Para entender para onde vai a verba e decidir com base nos números, não no achismo." },
   { Icone: UserRound, titulo: "Quem administra os próprios anúncios", texto: "Para criar e acompanhar campanhas sem se perder no Gerenciador de Anúncios." },
   { Icone: Target, titulo: "Gestores de tráfego", texto: "Para acelerar análises, relatórios e o trabalho operacional de várias contas." },
@@ -481,11 +483,14 @@ export default async function GestorComIaLanding() {
       <Secao>
         <div className="text-center">
           <Etiqueta>Para quem é</Etiqueta>
-          <Titulo className="mt-4">Feito para quem <Ouro>anuncia no Meta.</Ouro></Titulo>
+          <Titulo className="mt-4">Feito para quem anuncia <Ouro>ou quer começar.</Ouro></Titulo>
         </div>
-        <div className="mt-14 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {PUBLICO.map(({ Icone, titulo: t, texto }) => (
-            <div key={t} className={`${card} gx-in p-6`}>
+        <div className="mt-14 grid sm:grid-cols-2 lg:grid-cols-6 gap-4">
+          {PUBLICO.map(({ Icone, titulo: t, texto }, i) => (
+            <div
+              key={t}
+              className={`gx-in p-6 ${i < 2 ? "lg:col-span-3" : "lg:col-span-2"} ${i === 0 ? "sm:col-span-2 lg:col-span-3 rounded-2xl border border-[var(--gold)]/45 bg-[linear-gradient(180deg,rgba(255,191,36,.08),rgba(255,191,36,.02))]" : card}`}
+            >
               <Icone size={22} className="text-[var(--gold)]" />
               <h3 className={`${fonteTitulo} mt-5 text-lg leading-snug tracking-[-0.02em]`}>{t}</h3>
               <p className="mt-2 text-[var(--sec)] leading-relaxed">{texto}</p>
