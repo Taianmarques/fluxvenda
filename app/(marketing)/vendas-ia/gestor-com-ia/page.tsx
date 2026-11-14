@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   ArrowRight, BarChart3, Briefcase, Check, ChevronDown, Megaphone, MessageSquareText, Play, Plug,
-  Plus, ShieldCheck, SlidersHorizontal, Sparkles, Target, UserRound, X,
+  Plus, ShieldCheck, SlidersHorizontal, Sparkles, Target, Timer, UserRound, X,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { fontesGestor } from "@/app/fontes-gestor";
@@ -19,9 +19,6 @@ import { MotionGerenciador } from "./MotionGerenciador";
 const VIDEOS = {
   hero: "",
   demonstracao: "",
-  criacao: "",
-  analise: "",
-  desperdicio: "",
 };
 
 export const dynamic = "force-dynamic";
@@ -182,11 +179,19 @@ const PUBLICO = [
   { Icone: Sparkles, titulo: "Profissionais de marketing", texto: "Para aplicar IA no dia a dia de mídia paga com um método claro." },
 ];
 
-const DEMONSTRACOES: { chave: keyof typeof VIDEOS; titulo: string; texto: string }[] = [
-  { chave: "criacao", titulo: "Criação de uma campanha", texto: "Do pedido em português à campanha montada para revisão." },
-  { chave: "analise", titulo: "Análise de resultados", texto: "A leitura das métricas da conta, explicada em linguagem simples." },
-  { chave: "desperdicio", titulo: "Identificação de desperdícios", texto: "Onde a verba está rendendo menos e o que fazer com ela." },
-];
+// Agência × Gestor com IA. Valores de agência = faixa de referência de mensalidade de gestão para
+// pequeno negócio (avisado na tela que variam); o preço do Gestor vem da oferta.
+const AGENCIA_MENSAL = "R$ 1.500 a R$ 3.000";
+const AGENCIA_ANO = "R$ 18.000 a R$ 36.000";
+function linhasAgencia(preco: string): [string, string, string][] {
+  return [
+    ["Investimento", `${AGENCIA_MENSAL} por mês`, `${preco}, uma vez`],
+    ["Em 12 meses", AGENCIA_ANO, preco],
+    ["Para começar", "Reuniões, briefing e dias de espera", "20 minutos de configuração"],
+    ["Seus números", "No relatório do fim do mês", "Quando você quiser, na conversa"],
+    ["Decisões", "Tomadas pela agência", "Suas, com confirmação antes de mudar"],
+  ];
+}
 
 // ── Página ───────────────────────────────────────────────────────────────────────────────────
 
@@ -195,6 +200,7 @@ export default async function GestorComIaLanding() {
     .findUnique({ where: { slug: OFERTA_SLUG }, include: { itens: { where: { papel: "PRINCIPAL" }, take: 1 } } })
     .catch(() => null);
   const preco = brl(oferta?.itens[0]?.precoCentavos ?? PRECO_PADRAO_CENTAVOS);
+  const agencia = linhasAgencia(preco);
 
   const faq: [string, string][] = [
     ["Preciso saber programar?", "Não. Você conecta a conta seguindo a aula, sem código, e depois usa a IA por mensagens em português."],
@@ -259,7 +265,10 @@ export default async function GestorComIaLanding() {
               </li>
             ))}
           </ul>
-          <div className="mt-9 flex flex-col items-center gap-3">
+          <p className="mt-7 inline-flex items-center gap-2.5 rounded-full border border-[var(--gold)]/45 bg-[var(--gold)]/[.08] px-4 py-2 text-sm sm:text-base font-semibold text-[var(--gold-2)]">
+            <Timer size={17} className="text-[var(--gold)]" /> Configure seu gestor com IA em 20 minutos
+          </p>
+          <div className="mt-7 flex flex-col items-center gap-3">
             <Botao texto="QUERO MEU GESTOR COM IA" grande />
             {linhaPreco}
             <a href="#demonstracao" className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-[var(--gold)] hover:text-[var(--gold-2)]">Ver a IA funcionando <ChevronDown size={16} /></a>
@@ -369,6 +378,9 @@ export default async function GestorComIaLanding() {
         <div className="text-center">
           <Etiqueta>Como funciona</Etiqueta>
           <Titulo className="mt-4">Conecte. Peça. <Ouro>Confirme.</Ouro></Titulo>
+          <p className="mt-6 inline-flex items-center gap-2.5 rounded-full border border-[var(--gold)]/45 bg-[var(--gold)]/[.08] px-5 py-2.5 text-base sm:text-lg font-semibold text-[var(--gold-2)]">
+            <Timer size={19} className="text-[var(--gold)]" /> Seu gestor com IA configurado em 20 minutos
+          </p>
         </div>
         <ol className="mt-14 grid md:grid-cols-3 gap-4">
           {PASSOS.map(p => (
@@ -482,21 +494,66 @@ export default async function GestorComIaLanding() {
         </div>
       </Secao>
 
-      {/* 10 — Prova prática */}
+      {/* 10 — Agência × Gestor com IA */}
       <Secao>
-        <div className="text-center">
-          <Etiqueta>Prova prática</Etiqueta>
-          <Titulo className="mt-4">Veja o que o agente <Ouro>consegue fazer.</Ouro></Titulo>
+        <div className="text-center max-w-4xl mx-auto">
+          <Etiqueta>Faça as contas</Etiqueta>
+          <Titulo className="mt-4">Agência todo mês <Ouro>ou gestor com IA uma vez?</Ouro></Titulo>
         </div>
-        <div className="mt-14 grid md:grid-cols-3 gap-6">
-          {DEMONSTRACOES.map(d => (
-            <div key={d.chave} className="gx-in">
-              <Video src={VIDEOS[d.chave]} titulo={d.titulo} />
-              <h3 className={`${fonteTitulo} mt-4 text-lg tracking-[-0.02em]`}>{d.titulo}</h3>
-              <p className="mt-1 text-[var(--sec)]">{d.texto}</p>
+
+        {/* Destaque do valor */}
+        <div className="mt-14 grid md:grid-cols-2 gap-4">
+          <div className={`${card} p-6 md:p-8`}>
+            <p className={`${mono} text-xs uppercase tracking-[0.18em] text-[var(--sec)]/70`}>Agência</p>
+            <p className={`${fonteTitulo} mt-4 text-3xl sm:text-4xl tracking-[-0.03em] text-[var(--sec)]`}>{AGENCIA_MENSAL}</p>
+            <p className="mt-1 text-[var(--sec)]">por mês, todo mês</p>
+            <p className={`${mono} mt-6 pt-6 border-t border-[var(--line)] text-sm text-[var(--sec)]`}>{AGENCIA_ANO} em 12 meses</p>
+          </div>
+          <div className="rounded-2xl border border-[var(--gold)]/45 bg-[linear-gradient(180deg,rgba(255,191,36,.08),rgba(255,191,36,.02))] p-6 md:p-8">
+            <p className={`${mono} text-xs uppercase tracking-[0.18em] text-[var(--gold)]`}>Gestor com IA</p>
+            <p className={`${fonteTitulo} mt-4 text-5xl sm:text-6xl tracking-[-0.04em] text-[var(--gold)]`}>{preco}</p>
+            <p className="mt-1 text-[var(--txt)]">uma vez, sem mensalidade</p>
+            <p className={`${mono} mt-6 pt-6 border-t border-[var(--gold)]/25 text-sm text-[var(--txt)]`}>Configurado em 20 minutos</p>
+          </div>
+        </div>
+
+        {/* Tabela: computador */}
+        <div className={`${card} mt-4 hidden md:block overflow-hidden`}>
+          <table className="w-full text-left">
+            <thead>
+              <tr>
+                <th className="p-5 w-[24%]" />
+                <th className={`p-5 ${mono} text-[11px] font-normal uppercase tracking-[0.16em] text-[var(--sec)]/70`}>Agência</th>
+                <th className={`p-5 ${mono} text-[11px] font-normal uppercase tracking-[0.16em] text-[var(--gold)] bg-[var(--gold)]/[.06]`}>Gestor com IA</th>
+              </tr>
+            </thead>
+            <tbody>
+              {agencia.map(([criterio, ag, ia]) => (
+                <tr key={criterio} className="border-t border-[var(--line)]">
+                  <th scope="row" className="p-5 font-semibold">{criterio}</th>
+                  <td className="p-5 text-[var(--sec)]">{ag}</td>
+                  <td className="p-5 font-semibold bg-[var(--gold)]/[.06]"><Check size={15} strokeWidth={3} className="inline mr-2 -mt-0.5 text-[var(--gold)]" />{ia}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Tabela: celular (critério por critério) */}
+        <dl className="mt-4 md:hidden space-y-3">
+          {agencia.map(([criterio, ag, ia]) => (
+            <div key={criterio} className={`${card} p-5`}>
+              <dt className={`${mono} text-[11px] uppercase tracking-[0.16em] text-[var(--sec)]/70`}>{criterio}</dt>
+              <dd className="mt-2 text-[var(--sec)]"><span className="text-[var(--sec)]/60">Agência:</span> {ag}</dd>
+              <dd className="mt-1 font-semibold"><span className="text-[var(--gold)]">Gestor com IA:</span> {ia}</dd>
             </div>
           ))}
-        </div>
+        </dl>
+
+        <p className="mt-6 mx-auto max-w-3xl text-center text-sm text-[var(--sec)]/80">
+          Valores de agência são uma faixa de referência de mensalidade de gestão para pequenos negócios e variam conforme a região e o escopo. A verba dos anúncios é paga ao Meta nos dois casos. O Gestor com IA não substitui uma agência completa: ele coloca a análise e a operação do dia a dia nas suas mãos.
+        </p>
+        <div className="mt-10 flex flex-col items-center gap-3"><Botao texto="QUERO MEU GESTOR COM IA" />{linhaPreco}</div>
       </Secao>
 
       {/* 11 — Oferta */}
@@ -526,6 +583,7 @@ export default async function GestorComIaLanding() {
                 {[
                   "8 módulos em vídeo, do zero à rotina semanal",
                   "17 comandos prontos para criar, analisar e otimizar",
+                  "Configuração em 20 minutos, com aula passo a passo",
                   "Treinamento de conexão do Meta Ads com o ChatGPT e o Claude",
                   "Aulas práticas de criação de campanhas",
                   "Análise de resultados em linguagem simples",
