@@ -7,6 +7,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { fontesGestor } from "@/app/fontes-gestor";
 import { ChatAgente } from "./ChatAgente";
+import { MotionGerenciador } from "./MotionGerenciador";
 
 // Landing "Gestor com IA" (3ª página do Gestor de Tráfego com IA): direção de arte própria — preto,
 // branco e dourado, Manrope/Inter/IBM Plex Mono, sem serifa nem itálico. Mesmo produto das landings
@@ -275,20 +276,23 @@ export default async function GestorComIaLanding() {
           <Etiqueta>Veja a IA funcionando</Etiqueta>
           <Titulo className="mt-4">Não é só conversar com a IA. <Ouro>É colocá-la para trabalhar.</Ouro></Titulo>
         </div>
+        {/* Uma conversa no estilo de cada IA: no Claude a análise, no ChatGPT a aplicação */}
         <div className="mt-14 grid lg:grid-cols-2 gap-6 items-start">
-          <ChatAgente />
-          <div>
-            <Video src={VIDEOS.demonstracao} titulo="Gravação real do agente" legenda="A mesma análise feita numa conta de anúncios de verdade, do pedido à recomendação." />
-            <div className={`${card} mt-6 p-5`}>
-              <p className={`${mono} text-[11px] uppercase tracking-[0.16em] text-[var(--gold)]`}>O que você está vendo</p>
-              <ul className="mt-3 space-y-2 text-[var(--sec)]">
-                {["A IA lê as campanhas direto da sua conta", "Classifica cada uma pela sua meta de custo", "Recomenda o que fazer, em ordem de prioridade"].map(t => (
-                  <li key={t} className="flex gap-2.5"><Check size={17} className="mt-0.5 flex-shrink-0 text-[var(--gold)]" />{t}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
+          <figure className="min-w-0">
+            <figcaption className={`${mono} mb-3 text-[11px] uppercase tracking-[0.16em] text-[var(--sec)]`}><span className="text-[var(--gold)]">01 ·</span> No Claude: analisar resultados</figcaption>
+            <ChatAgente />
+          </figure>
+          <figure className="min-w-0">
+            <figcaption className={`${mono} mb-3 text-[11px] uppercase tracking-[0.16em] text-[var(--sec)]`}><span className="text-[var(--gold)]">02 ·</span> No ChatGPT: criar campanha</figcaption>
+            {/* Com gravação real (VIDEOS.demonstracao), ela entra no lugar da animação */}
+            {VIDEOS.demonstracao ? <Video src={VIDEOS.demonstracao} titulo="Gravação real do agente" /> : <MotionGerenciador />}
+          </figure>
         </div>
+        <ul className="mt-10 grid sm:grid-cols-3 gap-4">
+          {["Analisa as campanhas direto da sua conta", "Monta campanhas a partir de um pedido em português", "Só publica ou altera depois da sua confirmação"].map(t => (
+            <li key={t} className={`${card} flex gap-2.5 p-4 text-[var(--sec)]`}><Check size={17} className="mt-0.5 flex-shrink-0 text-[var(--gold)]" />{t}</li>
+          ))}
+        </ul>
         <div className="mt-12 flex flex-col items-center gap-3"><Botao texto="QUERO MEU GESTOR COM IA" />{linhaPreco}</div>
       </Secao>
 
