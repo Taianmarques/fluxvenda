@@ -4,12 +4,15 @@ import { prisma } from "@/lib/prisma";
 import { carregarPerfil } from "@/lib/central";
 import { perfilCompleto, perfilTemEssenciais } from "@/lib/central-shared";
 import { precosVigentes, temAcessoAoProduto } from "@/lib/infoprodutos";
+import { carregarCurso } from "@/lib/curso";
 import { CentralClient } from "./ProdutoClient";
+import { CursoClient } from "./CursoClient";
 import { ProdutoBloqueado } from "../ProdutoBloqueado";
 
 // Página de um infoproduto (/biblioteca/<slug>): módulos, ferramentas, busca, filtros, favoritos.
-// O acesso é checado aqui no servidor — sem acesso, só a apresentação do produto.
-export default async function ProdutoPage({ params }: { params: Promise<{ produto: string }> }) {
+// Produto no formato "curso" abre a área do curso (aulas, progresso e comandos; ?aula=<id> abre
+// direto numa aula). O acesso é checado aqui no servidor — sem acesso, só a apresentação do produto.
+export default async function ProdutoPage({ params, searchParams }: { params: Promise<{ produto: string }>; searchParams: Promise<{ aula?: string | string[] }> }) {
   const user = await currentUser();
   if (!user) redirect("/sign-in");
   const { produto: slug } = await params;
@@ -26,6 +29,7 @@ export default async function ProdutoPage({ params }: { params: Promise<{ produt
             orderBy: [{ ordem: "asc" }, { nome: "asc" }],
             select: { id: true, slug: true, nome: true, descricao: true, icone: true, ordem: true, createdAt: true },
           },
+          _count: { select: { aulas: { where: { publicada: true } } } },
         },
       },
     },
@@ -36,14 +40,31 @@ export default async function ProdutoPage({ params }: { params: Promise<{ produt
   // Rascunho só existe pra quem já tem acesso (admin); pros demais é como se não existisse
   if (!produto.publicado && !acesso) notFound();
 
+  const curso = produto.formato === "curso";
   if (!acesso) {
     const preco = (await precosVigentes([produto.id])).get(produto.id) ?? null;
+    const porModulo = produto.modulos
+      .map(m => ({ nome: m.nome, total: curso ? m._count.aulas : m.ferramentas.length }))
+      .filter(m => m.total > 0);
     return (
       <ProdutoBloqueado
         produto={produto}
-        modulos={produto.modulos.filter(m => m.ferramentas.length > 0).map(m => ({ nome: m.nome, total: m.ferramentas.length }))}
-        totalFerramentas={produto.modulos.reduce((s, m) => s + m.ferramentas.length, 0)}
+        modulos={porModulo}
+        totalItens={porModulo.reduce((s, m) => s + m.total, 0)}
+        rotuloItens={curso ? "aulas" : "ferramentas"}
         preco={preco}
+      />
+    );
+  }
+
+  if (curso) {
+    const [{ modulos, concluidas }, sp] = await Promise.all([carregarCurso(produto.id, userId), searchParams]);
+    return (
+      <CursoClient
+        produto={{ nome: produto.nome, beneficio: produto.beneficio }}
+        modulos={modulos}
+        concluidasIniciais={concluidas}
+        aulaInicial={typeof sp.aula === "string" ? sp.aula : null}
       />
     );
   }

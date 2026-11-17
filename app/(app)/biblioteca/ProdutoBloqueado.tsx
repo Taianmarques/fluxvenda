@@ -1,14 +1,15 @@
 import Link from "next/link";
-import { ArrowLeft, Lock, Layers, Wrench } from "lucide-react";
+import { ArrowLeft, Lock, Layers, PlayCircle, Wrench } from "lucide-react";
 import { CentralIcone } from "@/lib/central-icons";
 import { formatarPreco } from "@/lib/infoprodutos";
 
 // Página de um produto que o usuário ainda não tem: mostra o que é e o que contém (nunca as
 // ferramentas em si) e, se houver oferta ativa, o preço vigente e o caminho de compra.
-export function ProdutoBloqueado({ produto, modulos, totalFerramentas, preco }: {
+export function ProdutoBloqueado({ produto, modulos, totalItens, rotuloItens, preco }: {
   produto: { nome: string; descricao: string; beneficio: string; capaUrl: string | null; icone: string; categoria: string };
   modulos: { nome: string; total: number }[];
-  totalFerramentas: number;
+  totalItens: number;
+  rotuloItens: "ferramentas" | "aulas"; // produto de ferramentas ou curso
   preco: { precoCentavos: number; ofertaSlug: string } | null;
 }) {
   return (
@@ -34,7 +35,7 @@ export function ProdutoBloqueado({ produto, modulos, totalFerramentas, preco }: 
             </div>
             {produto.descricao && <p className="text-sm text-slate-600 leading-relaxed">{produto.descricao}</p>}
             <div className="flex flex-wrap gap-4 text-sm text-slate-600">
-              <span className="inline-flex items-center gap-1.5"><Wrench size={15} className="text-indigo-600" /> {totalFerramentas} ferramentas</span>
+              <span className="inline-flex items-center gap-1.5">{rotuloItens === "aulas" ? <PlayCircle size={15} className="text-indigo-600" /> : <Wrench size={15} className="text-indigo-600" />} {totalItens} {rotuloItens}</span>
               <span className="inline-flex items-center gap-1.5"><Layers size={15} className="text-indigo-600" /> {modulos.length} {modulos.length === 1 ? "módulo" : "módulos"}</span>
             </div>
             {modulos.length > 0 && (

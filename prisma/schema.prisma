@@ -2293,8 +2293,63 @@ model CentralModulo {
   produto   InfoProduto @relation(fields: [produtoId], references: [id])
 
   ferramentas CentralFerramenta[]
+  aulas       CentralAula[]
+  comandos    CentralComando[]
 
   @@index([produtoId, numero])
+}
+
+// Aula em vídeo de um módulo (produtos no formato "curso"). O vídeo fica no Vimeo (ou YouTube/.mp4):
+// guarda só o link, a página monta o player.
+model CentralAula {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  moduloId String
+  modulo   CentralModulo @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+
+  titulo     String
+  descricao  String  @default("") @db.Text
+  videoUrl   String? // vazio = aula sem vídeo ainda ("em breve" pro aluno)
+  duracaoMin Int?
+  ordem      Int     @default(0)
+  publicada  Boolean @default(false)
+
+  concluidas AulaConcluida[]
+
+  @@index([moduloId, ordem])
+}
+
+// Aula marcada como concluída pelo aluno (progresso do curso)
+model AulaConcluida {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  profileId String
+  aulaId    String
+  aula      CentralAula @relation(fields: [aulaId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, aulaId])
+  @@index([profileId])
+}
+
+// Comando pronto de um módulo: texto fixo que o aluno copia e cola no ChatGPT ou no Claude
+model CentralComando {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  moduloId String
+  modulo   CentralModulo @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+
+  titulo    String
+  descricao String  @default("") // pra que serve, em 1 frase
+  texto     String  @db.Text
+  ordem     Int     @default(0)
+  publicada Boolean @default(false)
+
+  @@index([moduloId, ordem])
 }
 
 // ─── Infoprodutos (Minha Biblioteca) ─────────────────────────────────────────────────────
@@ -2330,6 +2385,9 @@ model InfoProduto {
   // O que a pessoa precisa anexar na IA junto com o prompt (ex: "o relatório de vendas") —
   // aparece no passo a passo e na tela do prompt pronto. Vazio = nada a anexar.
   anexoNecessario String?
+  // Como a página do produto aparece na biblioteca: "ferramentas" (lista de ferramentas/prompts) ou
+  // "curso" (aulas em vídeo por módulo, com progresso, e comandos prontos para copiar)
+  formato String @default("ferramentas")
 
   modulos    CentralModulo[]
   ofertaItens OfertaItem[]

@@ -10,17 +10,20 @@ export async function carregarCardsBiblioteca(userId: string): Promise<CardProdu
     // Rascunho só aparece pra quem já tem acesso a ele (admin), marcado como rascunho
     where: { OR: [{ publicado: true }, { id: { in: [...liberados] } }] },
     orderBy: [{ ordem: "asc" }, { nome: "asc" }],
-    include: { modulos: { select: { _count: { select: { ferramentas: { where: { publicada: true } } } } } } },
+    include: { modulos: { select: { _count: { select: { ferramentas: { where: { publicada: true } }, aulas: { where: { publicada: true } } } } } } },
   });
   const precos = await precosVigentes(produtos.filter(p => !liberados.has(p.id)).map(p => p.id));
 
   return produtos.map(p => {
     const ferramentas = p.modulos.reduce((s, m) => s + m._count.ferramentas, 0);
+    const curso = p.formato === "curso";
+    const aulas = p.modulos.reduce((s, m) => s + m._count.aulas, 0);
     const preco = precos.get(p.id);
     return {
       slug: p.slug, nome: p.nome, descricao: p.descricao, beneficio: p.beneficio, capaUrl: p.capaUrl,
       categoria: p.categoria, icone: p.icone, rascunho: !p.publicado,
-      ferramentas, modulos: p.modulos.filter(m => m._count.ferramentas > 0).length,
+      ferramentas, modulos: p.modulos.filter(m => (curso ? m._count.aulas : m._count.ferramentas) > 0).length,
+      aulas: curso ? aulas : null,
       liberado: liberados.has(p.id),
       precoCentavos: preco?.precoCentavos ?? null,
     };

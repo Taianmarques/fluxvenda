@@ -22,6 +22,7 @@ const schema = z.object({
   regrasQualidade: z.boolean(),
   anexoNecessario: z.preprocess(vazioParaNull, z.string().trim().max(200).nullable()),
   checkoutRef: z.preprocess(vazioParaNull, z.string().trim().max(100).nullable()),
+  formato: z.enum(["ferramentas", "curso"]),
 }).partial();
 
 // Edita um infoproduto (o editor manda tudo; a lista manda só { publicado })

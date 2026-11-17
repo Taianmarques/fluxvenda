@@ -19,12 +19,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   return NextResponse.json({ modulo });
 }
 
-// Só apaga módulo vazio — ferramentas precisam ser movidas ou apagadas antes (Central IA)
+// Só apaga módulo vazio — ferramentas (Central IA), aulas e comandos precisam ser movidos ou apagados antes
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!(await exigirAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   const { id } = await params;
-  const total = await prisma.centralFerramenta.count({ where: { moduloId: id } });
+  const [total, aulas, comandos] = await Promise.all([
+    prisma.centralFerramenta.count({ where: { moduloId: id } }),
+    prisma.centralAula.count({ where: { moduloId: id } }),
+    prisma.centralComando.count({ where: { moduloId: id } }),
+  ]);
   if (total > 0) return NextResponse.json({ error: `O módulo tem ${total} ferramenta(s). Mova ou apague as ferramentas antes.` }, { status: 400 });
+  if (aulas + comandos > 0) return NextResponse.json({ error: `O módulo tem ${aulas} aula(s) e ${comandos} comando(s). Apague-os antes.` }, { status: 400 });
   await prisma.centralModulo.delete({ where: { id } }).catch(() => null);
   return NextResponse.json({ ok: true });
 }

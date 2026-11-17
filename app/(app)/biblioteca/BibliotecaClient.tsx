@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Box, Building2, Route, CheckCircle2, Layers, Library, Search, Star, Wrench, X } from "lucide-react";
+import { ArrowRight, Box, Building2, Route, CheckCircle2, Layers, Library, PlayCircle, Search, Star, Wrench, X } from "lucide-react";
 import { CentralIcone } from "@/lib/central-icons";
 
 // Mesmo valor de PRODUTO_PLANO_SLUG em lib/plano-7-dias.ts (aquele arquivo usa o banco e não vem pro cliente)
@@ -12,6 +12,7 @@ export type CardProduto = {
   slug: string; nome: string; descricao: string; beneficio: string; capaUrl: string | null;
   categoria: string; icone: string; rascunho: boolean;
   ferramentas: number; modulos: number;
+  aulas: number | null; // só em produto no formato "curso" (o card mostra aulas no lugar de ferramentas)
   liberado: boolean;
   precoCentavos: number | null; // preço da oferta ativa (só pros não adquiridos)
 };
@@ -39,7 +40,9 @@ function Capa({ p }: { p: CardProduto }) {
 function Conteudo({ p }: { p: CardProduto }) {
   return (
     <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
-      <span className="inline-flex items-center gap-1"><Wrench size={13} /> {p.ferramentas} {p.ferramentas === 1 ? "ferramenta" : "ferramentas"}</span>
+      {p.aulas !== null
+        ? <span className="inline-flex items-center gap-1"><PlayCircle size={13} /> {p.aulas} {p.aulas === 1 ? "aula" : "aulas"}</span>
+        : <span className="inline-flex items-center gap-1"><Wrench size={13} /> {p.ferramentas} {p.ferramentas === 1 ? "ferramenta" : "ferramentas"}</span>}
       <span className="inline-flex items-center gap-1"><Layers size={13} /> {p.modulos} {p.modulos === 1 ? "módulo" : "módulos"}</span>
     </p>
   );

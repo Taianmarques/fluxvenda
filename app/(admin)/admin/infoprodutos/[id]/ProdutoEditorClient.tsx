@@ -7,13 +7,15 @@ import { ArrowLeft, ExternalLink, KeyRound, Layers, Loader2, Plus, Save, Trash2,
 import { CENTRAL_ICONES, CentralIcone } from "@/lib/central-icons";
 import { slugify } from "@/lib/central-shared";
 import { ImageField } from "@/app/(admin)/admin/formularios/[id]/FormularioTelas";
+import { ConteudoCurso, type AulaAdmin, type ComandoAdmin } from "./ConteudoCurso";
 
 type Produto = {
   id: string; slug: string; nome: string; descricao: string; beneficio: string; categoria: string; icone: string;
   capaUrl: string | null; ordem: number; publicado: boolean; precoReferenciaCentavos: number | null;
   inclusoNaPlataforma: boolean; regrasQualidade: boolean; anexoNecessario: string; checkoutRef: string;
+  formato: "ferramentas" | "curso";
 };
-type Modulo = { id: string; numero: number; nome: string; descricao: string; icone: string; ferramentas: number };
+type Modulo = { id: string; numero: number; nome: string; descricao: string; icone: string; ferramentas: number; aulas: AulaAdmin[]; comandos: ComandoAdmin[] };
 type Acesso = {
   id: string; createdAt: string; origem: string; ativo: boolean; motivo: string | null; nome: string; email: string;
   compra: { status: string; sandbox: boolean; valorCentavos: number } | null;
@@ -36,8 +38,10 @@ function IconePicker({ valor, onChange }: { valor: string; onChange: (v: string)
   );
 }
 
-function ModuloLinha({ m, aoMudar }: { m: Modulo; aoMudar: () => void }) {
+function ModuloLinha({ m, curso, aoMudar }: { m: Modulo; curso: boolean; aoMudar: () => void }) {
   const [editando, setEditando] = useState(false);
+  // Curso: o conteúdo (aulas e comandos) já abre visível quando o módulo ainda está vazio
+  const [conteudo, setConteudo] = useState(curso && m.aulas.length + m.comandos.length === 0);
   const [nome, setNome] = useState(m.nome);
   const [descricao, setDescricao] = useState(m.descricao);
   const [icone, setIcone] = useState(m.icone);
@@ -62,7 +66,12 @@ function ModuloLinha({ m, aoMudar }: { m: Modulo; aoMudar: () => void }) {
           <p className="font-medium text-sm">{m.nome}</p>
           {m.descricao && <p className="text-xs text-gray-500 truncate">{m.descricao}</p>}
         </div>
-        <span className="text-xs text-gray-500 tabular-nums">{m.ferramentas} ferramentas</span>
+        <span className="text-xs text-gray-500 tabular-nums">
+          {curso ? `${m.aulas.length} aulas · ${m.comandos.length} comandos${m.ferramentas ? ` · ${m.ferramentas} ferramentas` : ""}` : `${m.ferramentas} ferramentas`}
+        </span>
+        {curso && (
+          <button onClick={() => setConteudo(v => !v)} className="text-xs text-blue-300 hover:text-white border border-blue-900 rounded-lg px-2 py-1">{conteudo ? "Ocultar conteúdo" : "Aulas e comandos"}</button>
+        )}
         <button onClick={() => setEditando(v => !v)} className="text-xs text-gray-400 hover:text-white border border-gray-700 rounded-lg px-2 py-1">{editando ? "Fechar" : "Editar"}</button>
         <button onClick={apagar} aria-label="Apagar módulo" className="p-1 text-gray-500 hover:text-red-400"><Trash2 size={14} /></button>
       </div>
@@ -74,6 +83,7 @@ function ModuloLinha({ m, aoMudar }: { m: Modulo; aoMudar: () => void }) {
           <button onClick={salvar} className="bg-blue-600 hover:bg-blue-500 text-white rounded-lg px-3 py-1.5 text-sm">Salvar módulo</button>
         </div>
       )}
+      {curso && conteudo && <ConteudoCurso moduloId={m.id} aulas={m.aulas} comandos={m.comandos} />}
       {erro && <p className="text-xs text-red-400 pl-7">{erro}</p>}
     </li>
   );
@@ -181,6 +191,21 @@ export function ProdutoEditorClient({ produto, modulos, acessos }: { produto: Pr
           <input value={d.anexoNecessario} onChange={e => set({ anexoNecessario: e.target.value })} maxLength={200} placeholder="Ex: o relatório de vendas (planilha ou PDF)" className={`${input} mt-1`} />
           <p className="text-xs text-gray-500 mt-1">Aparece no passo a passo e na tela do prompt pronto de todas as ferramentas do produto.</p>
         </div>
+        <div>
+          <label className={label}>Formato na biblioteca</label>
+          <div className="mt-1.5 grid sm:grid-cols-2 gap-2">
+            {([
+              ["ferramentas", "Ferramentas", "Lista de ferramentas que montam prompts (100 Prompts, Analisador...)."],
+              ["curso", "Curso", "Aulas em vídeo por módulo, com progresso do aluno, e comandos prontos para copiar."],
+            ] as const).map(([valor, nome, texto]) => (
+              <label key={valor} className={`flex gap-2.5 rounded-xl border p-3 cursor-pointer ${d.formato === valor ? "border-blue-600 bg-blue-600/10" : "border-gray-800 hover:border-gray-700"}`}>
+                <input type="radio" name="formato" checked={d.formato === valor} onChange={() => set({ formato: valor })} className="mt-1" />
+                <span><span className="text-sm font-medium">{nome}</span><span className="block text-xs text-gray-500 mt-0.5">{texto}</span></span>
+              </label>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500 mt-1">Depois de mudar, salve o produto para o cadastro de aulas e comandos aparecer nos módulos.</p>
+        </div>
         <div className="space-y-2 text-sm">
           <label className="flex items-center gap-2"><input type="checkbox" checked={d.publicado} onChange={e => set({ publicado: e.target.checked })} /> Publicado (aparece na biblioteca e pode entrar em ofertas)</label>
           <label className="flex items-center gap-2"><input type="checkbox" checked={d.inclusoNaPlataforma} onChange={e => set({ inclusoNaPlataforma: e.target.checked })} /> Incluso na Plataforma B2B (quem tem a Plataforma acessa sem comprar)</label>
@@ -194,7 +219,7 @@ export function ProdutoEditorClient({ produto, modulos, acessos }: { produto: Pr
           <Link href="/admin/central" className="inline-flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300"><Wand2 size={14} /> Ferramentas e prompts (Central IA)</Link>
         </div>
         {modulos.length === 0 ? <p className="px-4 py-4 text-sm text-gray-500">Nenhum módulo ainda.</p> : (
-          <ul className="divide-y divide-gray-800">{modulos.map(m => <ModuloLinha key={m.id} m={m} aoMudar={() => router.refresh()} />)}</ul>
+          <ul className="divide-y divide-gray-800">{modulos.map(m => <ModuloLinha key={m.id} m={m} curso={produto.formato === "curso"} aoMudar={() => router.refresh()} />)}</ul>
         )}
         <div className="flex items-center gap-2 px-4 py-3 border-t border-gray-800">
           <input value={novoModulo} onChange={e => setNovoModulo(e.target.value)} onKeyDown={e => e.key === "Enter" && criarModulo()} placeholder="Nome do novo módulo" className={input} />

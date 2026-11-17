@@ -10,7 +10,14 @@ export default async function ProdutoEditorPage({ params }: { params: Promise<{ 
   const produto = await prisma.infoProduto.findUnique({
     where: { id },
     include: {
-      modulos: { orderBy: { numero: "asc" }, include: { _count: { select: { ferramentas: true } } } },
+      modulos: {
+        orderBy: { numero: "asc" },
+        include: {
+          _count: { select: { ferramentas: true } },
+          aulas: { orderBy: [{ ordem: "asc" }, { createdAt: "asc" }] },
+          comandos: { orderBy: [{ ordem: "asc" }, { createdAt: "asc" }] },
+        },
+      },
       acessos: { orderBy: { createdAt: "desc" }, take: 500, include: { compra: { select: { id: true, status: true, sandbox: true, valorCentavos: true } } } },
     },
   });
@@ -29,8 +36,13 @@ export default async function ProdutoEditorPage({ params }: { params: Promise<{ 
         categoria: produto.categoria, icone: produto.icone, capaUrl: produto.capaUrl, ordem: produto.ordem, publicado: produto.publicado,
         precoReferenciaCentavos: produto.precoReferenciaCentavos, inclusoNaPlataforma: produto.inclusoNaPlataforma,
         regrasQualidade: produto.regrasQualidade, anexoNecessario: produto.anexoNecessario ?? "", checkoutRef: produto.checkoutRef ?? "",
+        formato: produto.formato === "curso" ? "curso" : "ferramentas",
       }}
-      modulos={produto.modulos.map(m => ({ id: m.id, numero: m.numero, nome: m.nome, descricao: m.descricao, icone: m.icone, ferramentas: m._count.ferramentas }))}
+      modulos={produto.modulos.map(m => ({
+        id: m.id, numero: m.numero, nome: m.nome, descricao: m.descricao, icone: m.icone, ferramentas: m._count.ferramentas,
+        aulas: m.aulas.map(a => ({ id: a.id, titulo: a.titulo, descricao: a.descricao, videoUrl: a.videoUrl ?? "", duracaoMin: a.duracaoMin, ordem: a.ordem, publicada: a.publicada })),
+        comandos: m.comandos.map(c => ({ id: c.id, titulo: c.titulo, descricao: c.descricao, texto: c.texto, ordem: c.ordem, publicada: c.publicada })),
+      }))}
       acessos={produto.acessos.map(a => ({
         id: a.id, createdAt: a.createdAt.toISOString(), origem: a.origem, ativo: a.ativo, motivo: a.motivo,
         nome: perfil.get(a.profileId)?.name ?? "—", email: perfil.get(a.profileId)?.email ?? "(conta removida)",
