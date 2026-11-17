@@ -20,7 +20,11 @@ const PRECO_PADRAO_CENTAVOS = 6700;
 const PRECO_DE_CENTAVOS = 19700;
 const CTA = "QUERO A IA CUIDANDO DOS MEUS ANÚNCIOS";
 
-// Grade do curso: cada módulo tem aulas em vídeo e comandos prontos para colar no chat conectado
+// Total de comandos prontos do curso. Os cards da grade mostram só alguns de cada módulo (exemplos),
+// por isso o total vem daqui e não da soma das listas abaixo.
+const TOTAL_COMANDOS = 30;
+
+// Grade do curso: cada módulo tem aulas em vídeo e exemplos dos comandos prontos para colar no chat conectado
 const MODULOS = [
   {
     titulo: "Conectando o Meta Ads à IA",
@@ -173,7 +177,7 @@ export async function LandingTrafego({ titulo }: { titulo: ReactNode }) {
   const preco = reais(oferta?.itens[0]?.precoCentavos ?? PRECO_PADRAO_CENTAVOS);
   const precoDe = reais(PRECO_DE_CENTAVOS);
   const comparacao = linhasComparacao(preco);
-  const totalComandos = MODULOS.reduce((s, m) => s + m.comandos.length, 0);
+  const totalComandos = TOTAL_COMANDOS;
   const totalAulas = MODULOS.reduce((s, m) => s + m.aulas.length, 0);
 
   const precoLinha = (
@@ -432,6 +436,7 @@ export async function LandingTrafego({ titulo }: { titulo: ReactNode }) {
               </div>
             ))}
           </div>
+          <p className="mt-6 text-center text-sm text-[var(--muted)]">Em cada módulo, alguns exemplos dos comandos. São {totalComandos} comandos prontos no total.</p>
         </div>
       </section>
 

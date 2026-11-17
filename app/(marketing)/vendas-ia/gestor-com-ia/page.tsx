@@ -154,7 +154,7 @@ const DESPERDICIOS = [
 
 const ENTREGAVEIS = [
   { Icone: Play, titulo: "8 módulos em vídeo", texto: "Do zero à rotina semanal, com aulas curtas gravando a tela." },
-  { Icone: MessageSquareText, titulo: "17 comandos prontos", texto: "Para colar no chat e criar, analisar e otimizar campanhas." },
+  { Icone: MessageSquareText, titulo: "30 comandos prontos", texto: "Para colar no chat e criar, analisar e otimizar campanhas." },
   { Icone: Plug, titulo: "Conexão com o Meta Ads", texto: "Treinamento passo a passo para ligar a conta ao ChatGPT ou ao Claude." },
   { Icone: Megaphone, titulo: "Criação de campanhas", texto: "Aulas práticas de campanhas de mensagens no WhatsApp e de vendas." },
   { Icone: BarChart3, titulo: "Análise de resultados", texto: "O que cada métrica significa e como pedir à IA para ler por você." },
@@ -447,7 +447,7 @@ export default async function GestorComIaLanding() {
             </div>
           ))}
         </div>
-        <p className="mt-6 text-sm text-[var(--sec)]/70">Comandos ilustrativos. No treinamento você recebe 17 comandos prontos, organizados por etapa.</p>
+        <p className="mt-6 text-sm text-[var(--sec)]/70">Comandos ilustrativos. No treinamento você recebe 30 comandos prontos, organizados por etapa.</p>
         <div className="mt-10 flex flex-col items-center gap-3"><Botao texto="QUERO MEU GESTOR COM IA" />{linhaPreco}</div>
       </Secao>
 
@@ -587,7 +587,7 @@ export default async function GestorComIaLanding() {
               <ul className="mt-6 space-y-4">
                 {[
                   "8 módulos em vídeo, do zero à rotina semanal",
-                  "17 comandos prontos para criar, analisar e otimizar",
+                  "30 comandos prontos para criar, analisar e otimizar",
                   "Configuração em 20 minutos, com aula passo a passo",
                   "Treinamento de conexão do Meta Ads com o ChatGPT e o Claude",
                   "Aulas práticas de criação de campanhas",
