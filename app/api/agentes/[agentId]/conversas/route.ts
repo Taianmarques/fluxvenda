@@ -49,7 +49,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ agentId
     orderBy: { updatedAt: "desc" },
     include: {
       messages: { where: { role: { not: "note" } }, orderBy: { createdAt: "desc" }, take: 1 },
-      opportunities: { orderBy: { createdAt: "asc" } },
+      // Só oportunidade GANHA não aparece nem no card da lista nem nos filtros (ver
+      // WhatsappInbox.tsx, sempre filtra por "!wonAt") — de-perdida continua contando como
+      // aberta de propósito. Excluir ganha aqui evita carregar, pra sempre, todo histórico de
+      // vendas já fechadas de cada conversa numa lista que é repolled a cada 5s / cada evento.
+      opportunities: { where: { wonAt: null }, orderBy: { createdAt: "asc" } },
       etiquetas: { select: { id: true, nome: true, cor: true } },
     },
   });

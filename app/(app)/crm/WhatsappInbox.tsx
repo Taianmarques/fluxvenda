@@ -495,6 +495,7 @@ export function WhatsappInbox({
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const nearBottomRef = useRef(true);
   const lastScrolledConversationRef = useRef<string | null>(null);
+  const sseListDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const t = THEMES[theme];
 
   useEffect(() => {
@@ -817,11 +818,15 @@ export function WhatsappInbox({
     es.onmessage = (ev) => {
       try {
         const e = JSON.parse(ev.data) as { conversationId: string };
-        refreshList(true);
+        // Rajada de eventos (vários leads mandando mensagem ao mesmo tempo) não deve refazer
+        // a busca da lista inteira uma vez por evento — junta tudo numa só, depois que a
+        // rajada acalma. O chat aberto (refreshDetail) continua instantâneo, sem debounce.
+        if (sseListDebounceRef.current) clearTimeout(sseListDebounceRef.current);
+        sseListDebounceRef.current = setTimeout(() => refreshList(true), 1500);
         if (e.conversationId === selectedIdRef.current) refreshDetail(e.conversationId);
       } catch {}
     };
-    return () => es.close();
+    return () => { es.close(); if (sseListDebounceRef.current) clearTimeout(sseListDebounceRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentId]);
 
